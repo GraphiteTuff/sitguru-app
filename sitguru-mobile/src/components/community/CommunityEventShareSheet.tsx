@@ -61,10 +61,12 @@ export default function CommunityEventShareSheet({
 
   if (!event) return null;
 
+  const activeEvent = event;
+
   async function copyLink() {
     try {
       await Share.share({
-        title: event.title,
+        title: activeEvent.title,
         message: url,
       });
       setCopied(true);
@@ -72,7 +74,7 @@ export default function CommunityEventShareSheet({
       void trackMobileEvent({
         eventName: "event_link_copy",
         source: "mobile_community_event_share_sheet",
-        metadata: { eventId: event.id, slug: event.slug, kind: "link" },
+        metadata: { eventId: activeEvent.id, slug: activeEvent.slug, kind: "link" },
       });
     } catch {
       // cancelled
@@ -82,14 +84,14 @@ export default function CommunityEventShareSheet({
   async function nativeShare() {
     try {
       await Share.share({
-        title: event.title,
+        title: activeEvent.title,
         message: `${caption}\n\n${url}`,
         url,
       });
       void trackMobileEvent({
         eventName: "event_share",
         source: "mobile_community_event_share_sheet",
-        metadata: { eventId: event.id, slug: event.slug, channel: "native" },
+        metadata: { eventId: activeEvent.id, slug: activeEvent.slug, channel: "native" },
       });
       onClose();
     } catch {
@@ -117,13 +119,18 @@ export default function CommunityEventShareSheet({
 
           <View style={styles.previewCard}>
             {previewImage ? (
-              <Image source={{ uri: previewImage }} style={styles.previewImage} />
+              <Image
+                accessibilityLabel={`${activeEvent.title} event photo`}
+                alt={`${activeEvent.title} event photo`}
+                source={{ uri: previewImage }}
+                style={styles.previewImage}
+              />
             ) : (
               <View style={[styles.previewImage, styles.previewFallback]} />
             )}
             <View style={styles.previewCopy}>
               <Text style={styles.previewTitle} numberOfLines={2}>
-                {event.title}
+                {activeEvent.title}
               </Text>
               <Text style={styles.previewUrl} numberOfLines={1}>
                 {displayUrl}

@@ -26,6 +26,7 @@ export function useProfileMedia(userId?: string | null) {
   }, [userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- profile media fetch
     void refresh();
   }, [refresh]);
 

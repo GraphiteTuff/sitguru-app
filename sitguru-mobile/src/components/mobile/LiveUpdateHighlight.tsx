@@ -30,18 +30,22 @@ export default function LiveUpdateHighlight({
   const primed = useSharedValue(0);
 
   useEffect(() => {
-    if (primed.value === 0) {
-      primed.value = 1;
+    if (primed.get() === 0) {
+      primed.set(1);
       return;
     }
 
-    flash.value = withSequence(
-      withTiming(1, { duration: 140 }),
-      withTiming(0, { duration: 520 }),
+    flash.set(
+      withSequence(
+        withTiming(1, { duration: 140 }),
+        withTiming(0, { duration: 520 }),
+      ),
     );
-    scale.value = withSequence(
-      withTiming(1.018, { duration: 140 }),
-      withTiming(1, { duration: 420 }),
+    scale.set(
+      withSequence(
+        withTiming(1.018, { duration: 140 }),
+        withTiming(1, { duration: 420 }),
+      ),
     );
   }, [flash, primed, scale, watchKey]);
 

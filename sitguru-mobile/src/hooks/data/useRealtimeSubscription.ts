@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
+
+import { useLatestRef } from '@/hooks/useLatestRef';
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
@@ -42,12 +44,9 @@ export function useRealtimeSubscription<
   onChange,
   debounceMs = 400,
 }: UseRealtimeSubscriptionOptions<T>) {
-  const onPayloadRef = useRef(onPayload);
-  const onChangeRef = useRef(onChange);
+  const onPayloadRef = useLatestRef(onPayload);
+  const onChangeRef = useLatestRef(onChange);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  onPayloadRef.current = onPayload;
-  onChangeRef.current = onChange;
 
   const scheduleChange = useCallback(() => {
     if (!onChangeRef.current) return;
@@ -59,6 +58,7 @@ export function useRealtimeSubscription<
     timerRef.current = setTimeout(() => {
       onChangeRef.current?.();
     }, debounceMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onChangeRef is a stable latest-ref
   }, [debounceMs]);
 
   useEffect(() => {
@@ -105,6 +105,8 @@ export function useRealtimeSubscription<
         void supabase.removeChannel(channel);
       }
     };
+    // Latest-ref containers are stable; adding them reconnects channels.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onPayloadRef is a stable latest-ref
   }, [
     channelName,
     table,

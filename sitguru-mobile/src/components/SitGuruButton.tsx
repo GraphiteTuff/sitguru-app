@@ -3,8 +3,9 @@ import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
 import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
-import { SitGuruColors } from '@/constants/colors';
+import { Colors } from '@/constants/theme';
 import { AppFonts } from '@/constants/fonts';
+import { useThemeMode } from '@/hooks/use-theme';
 import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
 
 type SitGuruButtonProps = {
@@ -32,6 +33,8 @@ export default function SitGuruButton({
   trailing,
   variant = 'primary',
 }: SitGuruButtonProps) {
+  const isDark = useThemeMode() === 'dark';
+  const theme = isDark ? Colors.dark : Colors.light;
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
   const isDanger = variant === 'danger';
@@ -40,17 +43,35 @@ export default function SitGuruButton({
     <BubblePressable
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
+      bubble={!disabled}
+      bubbleColor={
+        isPrimary ? 'rgba(255,255,255,0.22)' : SitGuruAccent.soft
+      }
       disabled={disabled}
       onPress={onPress}
-      scaleTo={disabled ? 1 : 0.96}
+      scaleTo={disabled ? 1 : 0.94}
       style={[
         styles.button,
         flex ? styles.flex : null,
         fullWidth && !flex ? styles.fullWidth : null,
         size === 'compact' ? styles.compactButton : styles.defaultButton,
         isPrimary ? styles.primaryButton : null,
-        isSecondary ? styles.secondaryButton : null,
-        isDanger ? styles.dangerButton : null,
+        isSecondary
+          ? {
+              backgroundColor: theme.card,
+              borderColor: isDark ? theme.borderStrong : SitGuruAccent.border,
+              borderWidth: 1,
+            }
+          : null,
+        isDanger
+          ? {
+              backgroundColor: isDark ? '#3A1A16' : '#FFF1F0',
+              borderColor: isDark
+                ? 'rgba(255, 128, 109, 0.35)'
+                : 'rgba(180, 35, 24, 0.24)',
+              borderWidth: 1,
+            }
+          : null,
         variant === 'ghost' ? styles.ghostButton : null,
         disabled ? styles.disabledButton : null,
         style,
@@ -63,10 +84,10 @@ export default function SitGuruButton({
           styles.buttonText,
           size === 'compact' ? styles.compactText : null,
           isPrimary ? styles.primaryText : null,
-          isSecondary ? styles.secondaryText : null,
-          isDanger ? styles.dangerText : null,
-          variant === 'ghost' ? styles.ghostText : null,
-          disabled ? styles.disabledText : null,
+          isSecondary ? { color: isDark ? theme.primary : SitGuruAccent.text } : null,
+          isDanger ? { color: theme.danger } : null,
+          variant === 'ghost' ? { color: isDark ? theme.primary : SitGuruAccent.text } : null,
+          disabled ? { color: theme.muted } : null,
         ]}
       >
         {label}
@@ -106,17 +127,6 @@ const styles = StyleSheet.create({
     backgroundColor: SitGuruAccent.primary,
     elevation: 4,
   },
-  secondaryButton: {
-    backgroundColor: SitGuruColors.surface,
-    borderWidth: 1,
-    borderColor: SitGuruColors.primaryLight,
-    elevation: 1,
-  },
-  dangerButton: {
-    backgroundColor: '#FFF1F0',
-    borderColor: 'rgba(180, 35, 24, 0.24)',
-    borderWidth: 1,
-  },
   ghostButton: {
     backgroundColor: 'transparent',
   },
@@ -133,17 +143,5 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: '#FFFFFF',
-  },
-  secondaryText: {
-    color: SitGuruColors.primary,
-  },
-  dangerText: {
-    color: SitGuruColors.danger,
-  },
-  ghostText: {
-    color: SitGuruColors.primary,
-  },
-  disabledText: {
-    color: SitGuruColors.textSoft,
   },
 });

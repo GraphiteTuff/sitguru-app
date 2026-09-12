@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- RN Animated.Value is the supported banner driver; passing it into style is the documented API. */
 import {
     AlertCircle,
     CheckCircle2,

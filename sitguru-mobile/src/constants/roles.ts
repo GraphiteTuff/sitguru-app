@@ -20,10 +20,10 @@ export const sitGuruRoles: SitGuruRole[] = [
     id: 'petParent',
     dashboardHref: '/pet-parent-dashboard',
     description:
-      'Message local Gurus, request care, manage pets, and pay securely after care is accepted.',
+      'Find a trusted Guru nearby, request care, manage pets, and pay securely after they accept.',
     icon: 'care',
     label: 'Pet Parent',
-    meta: 'Book care',
+    meta: 'Find care nearby',
     tone: 'petParent',
   },
   {

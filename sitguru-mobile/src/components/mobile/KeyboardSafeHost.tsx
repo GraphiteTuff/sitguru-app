@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- RN Animated.Value lift driver; reading it in transform is the supported keyboard-avoid API. */
 import {
   createContext,
   useCallback,
@@ -65,7 +66,9 @@ export default function KeyboardSafeHost({ children }: { children: ReactNode }) 
   const keyboardHeightRef = useRef(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  windowHeightRef.current = windowHeight;
+  useEffect(() => {
+    windowHeightRef.current = windowHeight;
+  }, [windowHeight]);
 
   const applyLift = useCallback(
     (next: number) => {

@@ -2032,6 +2032,8 @@ function AvatarImage({
     >
       {showImage ? (
         <Image
+          accessibilityLabel="Profile photo"
+          alt="Profile photo"
           onError={() => setImageFailed(true)}
           resizeMode="cover"
           source={{ uri: imageUrl as string }}

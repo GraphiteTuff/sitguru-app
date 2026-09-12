@@ -47,6 +47,8 @@ export default function ChatToastBanner({
       toValue: 1,
       useNativeDriver: true,
     }).start();
+    // Restart only when a new message arrives — not when the toast object identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast?.id is the stable message key
   }, [animation, toast?.id]);
 
   if (!toast) return null;

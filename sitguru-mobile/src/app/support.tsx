@@ -698,8 +698,10 @@ export default function SupportScreen() {
 
   const compactGrid = width < 390;
 
+  const userId = user?.id ?? '';
+
   const refreshRequests = useCallback(async () => {
-    if (!user?.id || !isSupabaseConfigured) {
+    if (!userId || !isSupabaseConfigured) {
       setRequestRows([]);
       setRequestTable(null);
       setRequestLoadError('');
@@ -708,15 +710,16 @@ export default function SupportScreen() {
 
     setLoadingRequests(true);
 
-    const result = await loadSupportRequests(user.id);
+    const result = await loadSupportRequests(userId);
 
     setRequestRows(result.rows);
     setRequestTable(result.table);
     setRequestLoadError(result.error);
     setLoadingRequests(false);
-  }, [user?.id]);
+  }, [userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- keep default topic aligned to the loaded role
     setTopic((current) =>
       current === 'Booking'
         ? defaultTopicForRole(primaryRole)
@@ -725,6 +728,7 @@ export default function SupportScreen() {
   }, [primaryRole]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- support request list fetch
     void refreshRequests();
   }, [refreshRequests]);
 

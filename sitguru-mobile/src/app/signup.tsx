@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -151,9 +151,10 @@ export default function SignupScreen() {
   const [signupIntent, setSignupIntent] = useState<SignupIntent>(
     resolveIntent(params.intent),
   );
-  useEffect(() => {
-    setSignupIntent(resolveIntent(params.intent));
-  }, [params.intent]);
+  const nextSignupIntent = resolveIntent(params.intent);
+  if (nextSignupIntent !== signupIntent) {
+    setSignupIntent(nextSignupIntent);
+  }
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 

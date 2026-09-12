@@ -1,41 +1,44 @@
 /**
- * Shared spring / threshold tokens for the floating bubble tab bar.
- * High damping keeps bounce subtle; stiffness stays snappy.
+ * Floating bubble tab bar — App Store pattern:
+ * Scroll = browse. Tap a tab = go. Never swipe across tabs to change sections.
+ * Scroll down → compact and stay compact while reading.
+ * Scroll up or return to top → expand. Tap a tab → bubble slides. Never swipe tabs.
  */
 export const TAB_BAR_MOTION = {
-  scrollThresholdPx: 12,
-  expandDelayMs: 200,
+  /** Per-frame delta that counts as a real scroll direction. */
+  scrollThresholdPx: 4,
+  expandDelayMs: 220,
 
   /** Horizontal slide of the persistent selection bubble. */
   slideSpring: {
     damping: 22,
-    stiffness: 280,
-    mass: 0.72,
-    overshootClamping: false,
+    stiffness: 320,
+    mass: 0.62,
+    overshootClamping: true,
   },
 
   /** Brief width stretch while the bubble travels. */
   stretchSpring: {
-    damping: 18,
-    stiffness: 340,
-    mass: 0.42,
-    overshootClamping: false,
+    damping: 22,
+    stiffness: 300,
+    mass: 0.46,
+    overshootClamping: true,
   },
 
   /** Return to resting bubble size. */
   settleSpring: {
-    damping: 20,
-    stiffness: 260,
-    mass: 0.55,
-    overshootClamping: false,
+    damping: 24,
+    stiffness: 240,
+    mass: 0.58,
+    overshootClamping: true,
   },
 
   /** Capsule shrink / expand. */
   compactSpring: {
-    damping: 20,
-    stiffness: 240,
-    mass: 0.68,
-    overshootClamping: false,
+    damping: 24,
+    stiffness: 220,
+    mass: 0.72,
+    overshootClamping: true,
   },
 
   /** Icon emphasis. */
@@ -52,8 +55,8 @@ export const TAB_BAR_MOTION = {
    * Instagram-style compress: stay recognizably wide.
    * 0.96 × 92% ≈ 88% of the screen — not a tiny collapsed control.
    */
-  compactScaleX: 0.96,
-  compactScaleY: 0.88,
-  compactTranslateY: 5,
-  compactBubbleScale: 0.92,
+  compactScaleX: 0.9,
+  compactScaleY: 0.82,
+  compactTranslateY: 8,
+  compactBubbleScale: 0.88,
 } as const;

@@ -168,7 +168,12 @@ export default function ProfileMediaStudio({
 
       <View style={[styles.cover, { backgroundColor: palette.soft }]}>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.coverImage} />
+          <Image
+            accessibilityLabel="Cover photo"
+            alt="Cover photo"
+            source={{ uri: cover }}
+            style={styles.coverImage}
+          />
         ) : (
           <Text style={[styles.coverEmpty, { color: palette.muted }]}>
             Add a cover photo
@@ -200,7 +205,12 @@ export default function ProfileMediaStudio({
       <View style={styles.avatarRow}>
         <View style={[styles.avatarWrap, { borderColor: palette.avatarBorder, backgroundColor: palette.avatarBackground }]}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <Image
+              accessibilityLabel="Profile photo"
+              alt="Profile photo"
+              source={{ uri: avatarUrl }}
+              style={styles.avatar}
+            />
           ) : (
             <Camera color={palette.primary} size={22} strokeWidth={2.3} />
           )}
@@ -237,7 +247,12 @@ export default function ProfileMediaStudio({
       <View style={styles.gallery}>
         {media.gallery.map((item) => (
           <View key={item.id} style={styles.galleryItem}>
-            <Image source={{ uri: item.fileUrl }} style={styles.galleryImage} />
+            <Image
+              accessibilityLabel="Gallery photo"
+              alt="Gallery photo"
+              source={{ uri: item.fileUrl }}
+              style={styles.galleryImage}
+            />
             <View style={styles.deleteBadge}>
               <SitGuruIconButton
                 accessibilityLabel="Remove photo"
@@ -392,7 +407,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   coverImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   coverEmpty: {
     fontFamily: AppFonts.medium,

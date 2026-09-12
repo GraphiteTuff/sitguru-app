@@ -150,6 +150,7 @@ export function useEventAttendance(eventId?: string) {
   }, [eventId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external community-event detail fetch
     void reload();
   }, [reload]);
 

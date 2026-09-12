@@ -1,9 +1,8 @@
 import { Ellipsis } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,12 +13,12 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BubblePressable from '@/components/BubblePressable';
 import GlassChrome from '@/components/mobile/GlassChrome';
 import ToolbarOverflowMenu, {
   type ToolbarOverflowMenuItem,
@@ -28,13 +27,11 @@ import { AppFonts } from '@/constants/fonts';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import type { TabChromePalette } from '@/constants/role-palettes';
+import { SitGuruAccent } from '@/constants/button-tokens';
 import { TAB_BAR_MOTION } from '@/constants/tab-bar-motion';
 import { useTabBarMotion } from '@/context/TabBarMotionContext';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { MAX_CHROME_FONT_MULTIPLIER } from '@/lib/a11y/type-scale';
-import { playAppHaptic } from '@/lib/haptics';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type FloatingBubbleTab = {
   key: string;
@@ -76,6 +73,12 @@ export default function FloatingBubbleTabBar({
   const motion = useTabBarMotion();
   const compactProgress = motion?.compactProgress;
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [overflowForKey, setOverflowForKey] = useState(activeKey);
+
+  if (overflowForKey !== activeKey) {
+    setOverflowForKey(activeKey);
+    setOverflowOpen(false);
+  }
   const overflowItems = additionalOverflowItems ?? [];
   const showOverflowButton = additionalOverflowItems != null;
   const overflowSelected = overflowItems.some((item) => item.selected);
@@ -84,14 +87,18 @@ export default function FloatingBubbleTabBar({
     0,
   );
 
-  const bubbleX = useSharedValue(0);
-  const bubbleStretchX = useSharedValue(1);
-  const bubbleStretchY = useSharedValue(1);
   const fallbackCompact = useSharedValue(0);
+  const fallbackBubbleX = useSharedValue(0);
+  const fallbackBubbleWidth = useSharedValue(PILL_WIDTH);
+  const fallbackStretchX = useSharedValue(1);
+  const fallbackStretchY = useSharedValue(1);
   const compact = compactProgress ?? fallbackCompact;
+  const bubbleX = motion?.bubbleX ?? fallbackBubbleX;
+  const bubbleWidth = motion?.bubbleWidth ?? fallbackBubbleWidth;
+  const bubbleStretchX = motion?.bubbleStretchX ?? fallbackStretchX;
+  const bubbleStretchY = motion?.bubbleStretchY ?? fallbackStretchY;
 
   const rowWidthRef = useRef(0);
-  const bubbleXRef = useRef(0);
 
   const slotCount = tabs.length + (showOverflowButton ? 1 : 0);
   const tabActiveIndex = tabs.findIndex((tab) => tab.key === activeKey);
@@ -100,72 +107,32 @@ export default function FloatingBubbleTabBar({
       ? slotCount - 1
       : Math.max(0, tabActiveIndex);
 
-  function slotMetrics(width: number, index: number) {
-    const count = Math.max(slotCount, 1);
-    const slot = width / count;
-    const x = index * slot + (slot - PILL_WIDTH) / 2;
-    return { x };
-  }
+  const moveSelection = useCallback(
+    (index: number, animate: boolean) => {
+      const width = rowWidthRef.current;
+      if (width <= 0) return;
+      motion?.moveBubbleTo({
+        width,
+        index,
+        slotCount,
+        animate,
+      });
+    },
+    [motion, slotCount],
+  );
 
   function handleRowLayout(event: LayoutChangeEvent) {
     const width = event.nativeEvent.layout.width;
     if (width <= 0) return;
 
-    const changed = Math.abs(width - rowWidthRef.current) > 0.5;
+    const firstLayout = rowWidthRef.current <= 0;
     rowWidthRef.current = width;
-
-    const next = slotMetrics(width, activeIndex);
-
-    if (changed) {
-      bubbleX.value = next.x;
-      bubbleXRef.current = next.x;
-      bubbleStretchX.value = 1;
-      bubbleStretchY.value = 1;
-    }
+    moveSelection(activeIndex, !firstLayout);
   }
 
   useEffect(() => {
-    const width = rowWidthRef.current;
-    if (width <= 0) return;
-
-    const next = slotMetrics(width, activeIndex);
-
-    const travel = Math.abs(next.x - bubbleXRef.current);
-    bubbleXRef.current = next.x;
-
-    if (reduceMotion || travel < 1) {
-      bubbleX.value = next.x;
-      bubbleStretchX.value = 1;
-      bubbleStretchY.value = 1;
-      return;
-    }
-
-    const slot = width / Math.max(slotCount, 1);
-    const stretch = 1 + Math.min(0.22, 0.08 + (travel / Math.max(slot, 1)) * 0.12);
-
-    bubbleX.value = withSpring(next.x, TAB_BAR_MOTION.slideSpring);
-    bubbleStretchX.value = withSequence(
-      withSpring(stretch, TAB_BAR_MOTION.stretchSpring),
-      withSpring(1, TAB_BAR_MOTION.settleSpring),
-    );
-    bubbleStretchY.value = withSequence(
-      withSpring(0.92, TAB_BAR_MOTION.stretchSpring),
-      withSpring(1, TAB_BAR_MOTION.settleSpring),
-    );
-  }, [
-    activeIndex,
-    activeKey,
-    bubbleStretchX,
-    bubbleStretchY,
-    bubbleX,
-    overflowSelected,
-    reduceMotion,
-    slotCount,
-  ]);
-
-  useEffect(() => {
-    setOverflowOpen(false);
-  }, [activeKey]);
+    moveSelection(activeIndex, true);
+  }, [activeIndex, activeKey, moveSelection, overflowSelected, slotCount]);
 
   const capsuleStyle = useAnimatedStyle(() => {
     const progress = compact.value;
@@ -216,7 +183,7 @@ export default function FloatingBubbleTabBar({
         );
 
     return {
-      width: PILL_WIDTH,
+      width: bubbleWidth.value,
       height: PILL_HEIGHT,
       transform: [
         { translateX: bubbleX.value },
@@ -270,7 +237,7 @@ export default function FloatingBubbleTabBar({
               ]}
             />
 
-            {tabs.map((tab) => (
+            {tabs.map((tab, index) => (
               <FloatingTabItem
                 key={tab.key}
                 active={!overflowSelected && tab.key === activeKey}
@@ -278,8 +245,11 @@ export default function FloatingBubbleTabBar({
                 mutedColor={palette.mutedColor}
                 onPress={() => {
                   if (tab.key === activeKey) return;
-                  playAppHaptic('selection');
                   onTabPress(tab);
+                }}
+                onThumbDown={() => {
+                  motion?.expandNow();
+                  moveSelection(index, true);
                 }}
                 reduceMotion={reduceMotion}
                 tab={tab}
@@ -293,9 +263,12 @@ export default function FloatingBubbleTabBar({
                 compact={compact}
                 mutedColor={palette.mutedColor}
                 onPress={() => {
-                  playAppHaptic('selection');
                   motion?.expandNow();
                   setOverflowOpen(true);
+                }}
+                onThumbDown={() => {
+                  motion?.expandNow();
+                  moveSelection(slotCount - 1, true);
                 }}
                 reduceMotion={reduceMotion}
                 tab={{
@@ -333,6 +306,7 @@ function FloatingTabItem({
   tintColor,
   mutedColor,
   onPress,
+  onThumbDown,
 }: {
   tab: FloatingBubbleTab;
   active: boolean;
@@ -341,89 +315,92 @@ function FloatingTabItem({
   tintColor: string;
   mutedColor: string;
   onPress: () => void;
+  onThumbDown: () => void;
 }) {
-  const pressScale = useSharedValue(1);
   const emphasis = useSharedValue(active ? 1 : 0);
   const Icon = tab.icon;
   const color = active ? tintColor : mutedColor;
 
   useEffect(() => {
-    emphasis.value = reduceMotion
-      ? active
-        ? 1
-        : 0
-      : withSpring(active ? 1 : 0, TAB_BAR_MOTION.iconSpring);
+    emphasis.set(
+      reduceMotion
+        ? active
+          ? 1
+          : 0
+        : withSpring(active ? 1 : 0, TAB_BAR_MOTION.iconSpring),
+    );
   }, [active, emphasis, reduceMotion]);
 
-  const itemStyle = useAnimatedStyle(() => {
+  const wrapStyle = useAnimatedStyle(() => {
     const compactScale = reduceMotion
       ? 1
       : interpolate(compact.value, [0, 1], [1, 0.96], Extrapolation.CLAMP);
     const focusScale = interpolate(
       emphasis.value,
       [0, 1],
-      [1, 1.04],
+      [1, 1.06],
       Extrapolation.CLAMP,
     );
     const opacity = interpolate(
       emphasis.value,
       [0, 1],
-      [0.72, 1],
+      [0.7, 1],
       Extrapolation.CLAMP,
     );
 
     return {
+      flex: 1,
+      flexBasis: 0,
       opacity,
-      transform: [{ scale: pressScale.value * focusScale * compactScale }],
+      transform: [{ scale: focusScale * compactScale }],
     };
   });
 
   return (
-    <AnimatedPressable
-      accessibilityLabel={tab.label}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      hitSlop={10}
-      onPress={onPress}
-      onPressIn={() => {
-        pressScale.value = reduceMotion
-          ? 0.96
-          : withSpring(0.94, TAB_BAR_MOTION.iconSpring);
-      }}
-      onPressOut={() => {
-        pressScale.value = reduceMotion
-          ? 1
-          : withSpring(1, TAB_BAR_MOTION.settleSpring);
-      }}
-      style={[styles.tab, itemStyle]}
-    >
-      <View style={styles.iconWell}>
-        <Icon
-          color={color}
-          size={ButtonMetrics.tabIcon}
-          strokeWidth={active ? 2.4 : 2.1}
-        />
-
-        {tab.badge ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {tab.badge > 9 ? '9+' : tab.badge}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <Text
-        adjustsFontSizeToFit
-        allowFontScaling
-        maxFontSizeMultiplier={MAX_CHROME_FONT_MULTIPLIER}
-        minimumFontScale={0.88}
-        numberOfLines={1}
-        style={[styles.label, { color }]}
+    <Animated.View style={wrapStyle}>
+      <BubblePressable
+        accessibilityLabel={`${tab.label} tab`}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        active={active}
+        bubble
+        bubbleColor={SitGuruAccent.soft}
+        bubblePlacement="glyph"
+        haptic="selection"
+        hitSlop={10}
+        onPress={onPress}
+        onPressIn={onThumbDown}
+        scaleTo={0.9}
+        style={styles.tab}
       >
-        {tab.label}
-      </Text>
-    </AnimatedPressable>
+        <View style={styles.iconWell}>
+          <Icon
+            color={color}
+            size={ButtonMetrics.tabIcon}
+            strokeWidth={active ? 2.4 : 2.1}
+          />
+
+          {tab.badge ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {tab.badge > 9 ? '9+' : tab.badge}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text
+          adjustsFontSizeToFit
+          allowFontScaling
+          maxFontSizeMultiplier={MAX_CHROME_FONT_MULTIPLIER}
+          minimumFontScale={0.88}
+          numberOfLines={1}
+          style={[styles.label, { color }]}
+        >
+          {tab.label}
+        </Text>
+      </BubblePressable>
+    </Animated.View>
   );
 }
 
@@ -485,8 +462,10 @@ const styles = StyleSheet.create({
     gap: ButtonMetrics.tabGap,
     justifyContent: 'center',
     minHeight: TOUCH_MIN,
+    overflow: 'visible',
     paddingHorizontal: 2,
     paddingVertical: 4,
+    width: '100%',
     zIndex: 1,
   },
   iconWell: {

@@ -75,11 +75,13 @@ export default function BubblePressable({
   const bubbleProgress = useSharedValue(active ? 1 : 0);
 
   useEffect(() => {
-    bubbleProgress.value = reduceMotion
-      ? active
-        ? 1
-        : 0
-      : withSpring(active ? 1 : 0, BUBBLE_SPRING);
+    bubbleProgress.set(
+      reduceMotion
+        ? active
+          ? 1
+          : 0
+        : withSpring(active ? 1 : 0, BUBBLE_SPRING),
+    );
   }, [active, bubbleProgress, reduceMotion]);
 
   const contentStyle = useAnimatedStyle(() => ({
@@ -99,21 +101,21 @@ export default function BubblePressable({
       onPressIn={(event) => {
         if (!disabled) {
           playAppHaptic(haptic);
-          scale.value = reduceMotion
-            ? scaleTo
-            : withSpring(scaleTo, PRESS_SPRING);
-          bubbleProgress.value = reduceMotion
-            ? 1
-            : withSpring(1, BUBBLE_SPRING);
+          scale.set(
+            reduceMotion ? scaleTo : withSpring(scaleTo, PRESS_SPRING),
+          );
+          bubbleProgress.set(
+            reduceMotion ? 1 : withSpring(1, BUBBLE_SPRING),
+          );
         }
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
-        scale.value = reduceMotion ? 1 : withSpring(1, RELEASE_SPRING);
+        scale.set(reduceMotion ? 1 : withSpring(1, RELEASE_SPRING));
         if (!active) {
-          bubbleProgress.value = reduceMotion
-            ? 0
-            : withSpring(0, BUBBLE_SPRING);
+          bubbleProgress.set(
+            reduceMotion ? 0 : withSpring(0, BUBBLE_SPRING),
+          );
         }
         onPressOut?.(event);
       }}

@@ -1,3 +1,5 @@
+import { SitGuruAccent } from '@/constants/button-tokens';
+
 /**
  * Role-aware greens — warmer pet-parent cream surfaces vs fresher guru mint.
  * Canonical marketing brand remains #0D5C3A; UI surfaces use these tokens.
@@ -165,7 +167,7 @@ export function getTabChromePalette(
           border: '#CFE5D7',
           activeColor: '#214C35',
           mutedColor: '#6F8176',
-          bubble: '#DDF1E4',
+          bubble: SitGuruAccent.selectedPill,
           tint: '#F8FCF9',
         };
   }
@@ -185,7 +187,7 @@ export function getTabChromePalette(
           border: '#CFE5D7',
           activeColor: '#214C35',
           mutedColor: '#6F8176',
-          bubble: '#DDF1E4',
+          bubble: SitGuruAccent.selectedPill,
           tint: '#FFFCF7',
         };
   }
@@ -204,7 +206,7 @@ export function getTabChromePalette(
         border: '#CFE5D7',
         activeColor: '#214C35',
         mutedColor: '#6F8176',
-        bubble: '#DDF1E4',
+        bubble: SitGuruAccent.selectedPill,
         tint: '#FFFCF7',
       };
 }

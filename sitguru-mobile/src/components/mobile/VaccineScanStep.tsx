@@ -58,7 +58,12 @@ export default function VaccineScanStep({
   if (uri) {
     return (
       <View style={styles.wrap}>
-        <Image source={{ uri }} style={styles.preview} />
+        <Image
+          accessibilityLabel="Captured vaccine papers"
+          alt="Captured vaccine papers"
+          source={{ uri }}
+          style={styles.preview}
+        />
         <View style={styles.successRow}>
           <CheckCircle2 color={SitGuruColors.primary} size={20} strokeWidth={2.4} />
           <Text style={styles.successText}>Vaccine papers captured</Text>

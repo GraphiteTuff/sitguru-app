@@ -27,10 +27,16 @@ export function useReducedMotion() {
   const [reduced, setReduced] = useState(currentValue);
 
   useEffect(() => {
+    let cancelled = false;
     ensureListener();
-    setReduced(currentValue);
     subscribers.add(setReduced);
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((value) => {
+        if (!cancelled) setReduced(value);
+      })
+      .catch(() => undefined);
     return () => {
+      cancelled = true;
       subscribers.delete(setReduced);
     };
   }, []);

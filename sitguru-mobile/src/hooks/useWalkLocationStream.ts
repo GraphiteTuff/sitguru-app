@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+import { useLatestRef } from '@/hooks/useLatestRef';
+
 import {
   createPingThrottle,
   pingWalkCoordinate,
@@ -36,15 +38,10 @@ export function useWalkLocationStream({
   onStreamError,
 }: UseWalkLocationStreamOptions) {
   const throttleRef = useRef(createPingThrottle(minPingIntervalMs));
-  const bookingIdRef = useRef(bookingId);
-  const onPermissionDeniedRef = useRef(onPermissionDenied);
-  const onStreamErrorRef = useRef(onStreamError);
-  const onUpdateRef = useRef(onUpdate);
-
-  bookingIdRef.current = bookingId;
-  onPermissionDeniedRef.current = onPermissionDenied;
-  onStreamErrorRef.current = onStreamError;
-  onUpdateRef.current = onUpdate;
+  const bookingIdRef = useLatestRef(bookingId);
+  const onPermissionDeniedRef = useLatestRef(onPermissionDenied);
+  const onStreamErrorRef = useLatestRef(onStreamError);
+  const onUpdateRef = useLatestRef(onUpdate);
 
   useEffect(() => {
     throttleRef.current = createPingThrottle(minPingIntervalMs);
@@ -68,6 +65,7 @@ export function useWalkLocationStream({
         onStreamErrorRef.current?.(result.error);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- latest-refs are stable; do not restart the GPS stream
   }, []);
 
   const location = useLiveLocation({
@@ -84,6 +82,7 @@ export function useWalkLocationStream({
     if (location.error) {
       onPermissionDeniedRef.current?.(location.error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- permission callback is kept on a latest-ref
   }, [location.error]);
 
   useEffect(() => {
@@ -112,6 +111,7 @@ export function useWalkLocationStream({
       cancelled = true;
       void stopBackgroundWalkUpdates();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- permission callback is kept on a latest-ref
   }, [bookingId, enabled]);
 
   return {

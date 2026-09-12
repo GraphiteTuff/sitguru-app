@@ -12,8 +12,8 @@
  */
 
 export const MOBILE_CONVERT = {
-  bookLabel: 'Book care near you',
-  bookHelper: 'Free to browse · Nothing charged until a Guru accepts',
+  bookLabel: 'Find your Guru nearby',
+  bookHelper: 'Browse free · Pay after they accept',
   exploreHref: '/find-care',
   joinHref: '/signup',
   joinParams: { role: 'parent' as const },

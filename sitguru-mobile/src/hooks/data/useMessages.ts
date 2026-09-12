@@ -86,13 +86,14 @@ function mergeMessages(existing: SitGuruMessage[], incoming: SitGuruMessage[]) {
 
 export function useConversations(options?: { enabled?: boolean }) {
   const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? '';
   const enabled = options?.enabled ?? true;
   const [conversations, setConversations] = useState<SitGuruConversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !user?.id || !isSupabaseConfigured) {
+    if (!enabled || !isAuthenticated || !userId || !isSupabaseConfigured) {
       setConversations([]);
       return;
     }
@@ -103,13 +104,13 @@ export function useConversations(options?: { enabled?: boolean }) {
       supabase
         .from(TABLES.conversations)
         .select('*')
-        .eq('customer_id', user.id)
+        .eq('customer_id', userId)
         .order('last_message_at', { ascending: false })
         .limit(100),
       supabase
         .from(TABLES.conversations)
         .select('*')
-        .eq('guru_id', user.id)
+        .eq('guru_id', userId)
         .order('last_message_at', { ascending: false })
         .limit(100),
     ]);
@@ -131,18 +132,19 @@ export function useConversations(options?: { enabled?: boolean }) {
     setConversations(Array.from(map.values()));
     setError(null);
     setLoading(false);
-  }, [enabled, isAuthenticated, user?.id]);
+  }, [enabled, isAuthenticated, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase inbox fetch
     void refresh();
   }, [refresh]);
 
   useRealtimeSubscription({
-    channelName: user?.id
-      ? `sitguru-conversations-${user.id}`
+    channelName: userId
+      ? `sitguru-conversations-${userId}`
       : 'sitguru-conversations-idle',
     table: TABLES.conversations,
-    enabled: Boolean(enabled && user?.id),
+    enabled: Boolean(enabled && userId),
     onChange: () => {
       void refresh();
     },
@@ -156,6 +158,7 @@ export function useConversation(
   options?: { enabled?: boolean },
 ) {
   const { user, isAuthenticated, primaryRole } = useAuth();
+  const userId = user?.id ?? '';
   const enabled = options?.enabled ?? true;
   const id = asString(conversationId);
 
@@ -194,6 +197,7 @@ export function useConversation(
   }, [enabled, id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase thread fetch
     void refresh();
   }, [refresh]);
 
@@ -269,7 +273,7 @@ export function useConversation(
         (result.data?.message as RecordRow | undefined) ?? {
           id: clientMessageId,
           conversation_id: id,
-          sender_id: user?.id,
+          sender_id: userId,
           content: text,
           created_at: new Date().toISOString(),
         },
@@ -281,7 +285,7 @@ export function useConversation(
 
       return { message, error: null as string | null };
     },
-    [id, isAuthenticated, primaryRole, user?.id],
+    [id, isAuthenticated, primaryRole, userId],
   );
 
   const ensureBookingConversation = useCallback(async (bookingId: string) => {
@@ -308,7 +312,7 @@ export function useConversation(
   }, []);
 
   const markRead = useCallback(async () => {
-    if (!user?.id || !id || !isSupabaseConfigured) return;
+    if (!userId || !id || !isSupabaseConfigured) return;
 
     await supabase
       .from(TABLES.messages)
@@ -317,17 +321,17 @@ export function useConversation(
         read_at: new Date().toISOString(),
       })
       .eq('conversation_id', id)
-      .eq('recipient_id', user.id)
+      .eq('recipient_id', userId)
       .eq('is_read', false);
-  }, [id, user?.id]);
+  }, [id, userId]);
 
   const unreadCount = useMemo(
     () =>
       messages.filter(
         (message) =>
-          !message.isRead && message.recipientId === user?.id,
+          !message.isRead && message.recipientId === userId,
       ).length,
-    [messages, user?.id],
+    [messages, userId],
   );
 
   return {

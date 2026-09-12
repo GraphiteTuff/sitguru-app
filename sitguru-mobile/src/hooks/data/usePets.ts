@@ -58,6 +58,7 @@ async function queryOwnedPets(userId: string): Promise<{
 
 export function usePets(options?: { enabled?: boolean }) {
   const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? '';
   const enabled = options?.enabled ?? true;
   const [pets, setPets] = useState<CanonicalPet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,26 +66,27 @@ export function usePets(options?: { enabled?: boolean }) {
   const [saving, setSaving] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !user?.id || !isSupabaseConfigured) {
+    if (!enabled || !isAuthenticated || !userId || !isSupabaseConfigured) {
       setPets([]);
       setError(null);
       return;
     }
 
     setLoading(true);
-    const result = await queryOwnedPets(user.id);
+    const result = await queryOwnedPets(userId);
     setPets(result.pets);
     setError(result.error);
     setLoading(false);
-  }, [enabled, isAuthenticated, user?.id]);
+  }, [enabled, isAuthenticated, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase pet fetch
     void refresh();
   }, [refresh]);
 
   const savePet = useCallback(
     async (form: CanonicalPetForm, petId?: string) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!userId || !isSupabaseConfigured) {
         return {
           pet: null as CanonicalPet | null,
           error: 'Sign in required to save a Pet Passport.',
@@ -92,7 +94,7 @@ export function usePets(options?: { enabled?: boolean }) {
       }
 
       setSaving(true);
-      const payload = buildCanonicalPetWritePayload(form, user.id);
+      const payload = buildCanonicalPetWritePayload(form, userId);
 
       const result = petId
         ? await withMissingColumnRetry(async (body) => {
@@ -125,12 +127,12 @@ export function usePets(options?: { enabled?: boolean }) {
       await refresh();
       return { pet, error: null as string | null };
     },
-    [refresh, user?.id],
+    [refresh, userId],
   );
 
   const deletePet = useCallback(
     async (petId: string) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!userId || !isSupabaseConfigured) {
         return { error: 'Sign in required to delete a pet.' };
       }
 
@@ -145,7 +147,7 @@ export function usePets(options?: { enabled?: boolean }) {
       await refresh();
       return { error: null as string | null };
     },
-    [refresh, user?.id],
+    [refresh, userId],
   );
 
   return {

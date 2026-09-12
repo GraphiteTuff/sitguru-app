@@ -160,7 +160,9 @@ export async function uploadAndSaveProfileMedia(params: {
     return { uploaded, item: null as ProfileMediaItem | null };
   }
 
-  if (params.kind === 'cover') {
+  const mediaKind: ProfileMediaKind = params.kind;
+
+  if (mediaKind === 'cover') {
     await persistProfilePhotoFields({
       userId: params.userId,
       isGuru: params.isGuru,
@@ -173,7 +175,7 @@ export async function uploadAndSaveProfileMedia(params: {
       .eq('kind', 'cover');
   }
 
-  if (params.kind === 'video') {
+  if (mediaKind === 'video') {
     await persistProfilePhotoFields({
       userId: params.userId,
       isGuru: params.isGuru,
@@ -191,18 +193,14 @@ export async function uploadAndSaveProfileMedia(params: {
 
   const row = {
     user_id: params.userId,
-    kind: params.kind === 'avatar' ? 'gallery' : params.kind,
+    kind: mediaKind,
     file_url: uploaded.publicUrl,
     file_type: uploaded.bucket ? params.mimeType || null : null,
     storage_bucket: uploaded.bucket,
     storage_path: uploaded.path,
-    sort_order: params.kind === 'cover' ? 0 : Date.now() % 100000,
+    sort_order: mediaKind === 'cover' ? 0 : Date.now() % 100000,
     updated_at: new Date().toISOString(),
   };
-
-  if (params.kind === 'avatar') {
-    return { uploaded, item: null };
-  }
 
   const { data, error } = await supabase
     .from(TABLES.profileMedia)

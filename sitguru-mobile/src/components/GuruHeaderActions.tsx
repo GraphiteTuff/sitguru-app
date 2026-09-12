@@ -108,6 +108,8 @@ export function GuruHeaderActions({
         <View style={styles.avatarFrame}>
           {avatarUrl && !imageFailed ? (
             <Image
+              accessibilityLabel={`${profileName} profile photo`}
+              alt={`${profileName} profile photo`}
               onError={() => setImageFailed(true)}
               resizeMode="cover"
               source={{ uri: avatarUrl }}

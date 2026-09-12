@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
+import { MobileSpace } from '@/constants/mobile-layout';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 
@@ -51,15 +51,17 @@ export default function SwipeableListItem({
   const canDecline = Boolean(onSwipeLeft) && enabled && !disabled;
 
   const reset = useCallback(() => {
-    translateX.value = withSpring(0, { damping: 18, stiffness: 220 });
+    translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
   }, [translateX]);
 
   const pulseSuccess = useCallback(
     (accepted: boolean) => {
-      flashTone.value = accepted ? 1 : 0;
-      flash.value = withSequence(
-        withTiming(0.28, { duration: 90 }),
-        withTiming(0, { duration: 260 }),
+      flashTone.set(accepted ? 1 : 0);
+      flash.set(
+        withSequence(
+          withTiming(0.28, { duration: 90 }),
+          withTiming(0, { duration: 260 }),
+        ),
       );
     },
     [flash, flashTone],
@@ -88,20 +90,20 @@ export default function SwipeableListItem({
       const max = ACTION_WIDTH + 24;
       if (next > max) next = max;
       if (next < -max) next = -max;
-      translateX.value = next;
+      translateX.set(next);
     })
     .onEnd((event) => {
       if (event.translationX > THRESHOLD && canAccept) {
-        translateX.value = withSpring(ACTION_WIDTH);
+        translateX.set(withSpring(ACTION_WIDTH));
         runOnJS(fireAccept)();
         return;
       }
       if (event.translationX < -THRESHOLD && canDecline) {
-        translateX.value = withSpring(-ACTION_WIDTH);
+        translateX.set(withSpring(-ACTION_WIDTH));
         runOnJS(fireDecline)();
         return;
       }
-      translateX.value = withSpring(0, { damping: 18, stiffness: 220 });
+      translateX.set(withSpring(0, { damping: 18, stiffness: 220 }));
     });
 
   const cardStyle = useAnimatedStyle(() => ({

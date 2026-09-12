@@ -67,7 +67,8 @@ export function useIncomingMessageToast(options?: { enabled?: boolean }) {
   const { user, isAuthenticated } = useAuth();
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ conversationId?: string | string[] }>();
-  const enabled = (options?.enabled ?? true) && isAuthenticated && !!user?.id;
+  const userId = user?.id ?? '';
+  const enabled = (options?.enabled ?? true) && isAuthenticated && !!userId;
   const [toast, setToast] = useState<ChatToastPayload | null>(null);
 
   const activeConversationId = pathname?.includes('conversation')
@@ -86,8 +87,8 @@ export function useIncomingMessageToast(options?: { enabled?: boolean }) {
       const conversationId = asString(row.conversation_id);
       const messageId = asString(row.id);
 
-      if (!user?.id || recipientId !== user.id) return;
-      if (senderId === user.id) return;
+      if (!userId || recipientId !== userId) return;
+      if (senderId === userId) return;
       if (!conversationId || !messageId) return;
 
       if (activeConversationId && activeConversationId === conversationId) {
@@ -105,16 +106,16 @@ export function useIncomingMessageToast(options?: { enabled?: boolean }) {
         createdAt: Date.now(),
       });
     },
-    [activeConversationId, user?.id],
+    [activeConversationId, userId],
   );
 
   useRealtimeSubscription<RecordRow>({
-    channelName: user?.id
-      ? REALTIME_CHANNELS.inboxToast(user.id)
+    channelName: userId
+      ? REALTIME_CHANNELS.inboxToast(userId)
       : 'inbox-toast-idle',
     table: TABLES.messages,
     event: 'INSERT',
-    filter: user?.id ? `recipient_id=eq.${user.id}` : undefined,
+    filter: userId ? `recipient_id=eq.${userId}` : undefined,
     enabled,
     onPayload,
   });
@@ -123,6 +124,7 @@ export function useIncomingMessageToast(options?: { enabled?: boolean }) {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 5200);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dismiss by message id only; do not reset when toast identity changes
   }, [toast?.id]);
 
   return {

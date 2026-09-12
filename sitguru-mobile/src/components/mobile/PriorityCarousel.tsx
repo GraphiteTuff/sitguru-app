@@ -56,8 +56,8 @@ function CarouselCardShell({
   const opacity = useSharedValue(focused ? 1 : 0.88);
 
   useEffect(() => {
-    scale.value = withTiming(focused ? 1 : 0.96, { duration: 200 });
-    opacity.value = withTiming(focused ? 1 : 0.88, { duration: 200 });
+    scale.set(withTiming(focused ? 1 : 0.96, { duration: 200 }));
+    opacity.set(withTiming(focused ? 1 : 0.88, { duration: 200 }));
   }, [focused, opacity, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({

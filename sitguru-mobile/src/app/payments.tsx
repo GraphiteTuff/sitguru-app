@@ -164,6 +164,9 @@ type CheckoutResponse = {
   sessionId?: string;
   stripeSessionId?: string;
   financialPreview?: unknown;
+  paymentIntentClientSecret?: string;
+  customerId?: string;
+  ephemeralKey?: string;
 };
 
 type StripeConnectResponse = {
@@ -2844,7 +2847,9 @@ export default function PaymentsScreen() {
                   </StickyActionBar>
                 ) : null}
 
-                <SitGuruTabBar active="profile" />
+                {showCheckoutSticky ? null : (
+                  <SitGuruTabBar active="profile" />
+                )}
 
                 {isWebPreview ? <View style={styles.homeIndicator} /> : null}
               </View>
@@ -2890,6 +2895,8 @@ function HeaderAvatar({
     <View style={styles.avatarFrame}>
       {showImage ? (
         <Image
+          accessibilityLabel="Profile photo"
+          alt="Profile photo"
           onError={() => setImageFailed(true)}
           resizeMode="cover"
           source={{ uri: imageUrl as string }}

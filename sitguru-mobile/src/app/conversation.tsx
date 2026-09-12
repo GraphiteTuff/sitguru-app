@@ -6,8 +6,6 @@ import {
 } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  Bell,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
@@ -36,12 +34,10 @@ import BubblePressable from '@/components/BubblePressable';
 import ChatComposerBar, {
   type ChatAttachment,
 } from '@/components/mobile/ChatComposerBar';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruIconButton from '@/components/SitGuruIconButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
-import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { LAST_WORKSPACE_KEY } from '@/constants/workspaces';
@@ -679,8 +675,7 @@ export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
   const threadRef = useRef<ScrollView | null>(null);
 
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
-  const [contextExpanded, setContextExpanded] = useState(true);
+  const [contextExpanded, setContextExpanded] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [conversation, setConversation] = useState<ConversationRow | null>(null);
@@ -896,23 +891,6 @@ export default function ConversationScreen() {
     ? currentRole
     : normalizeRole(otherProfile?.role || otherProfile?.account_type) ||
       (currentRole === 'pet_parent' ? 'guru' : 'pet_parent');
-  const otherRoleLabel =
-    otherRole === 'guru'
-      ? 'Pet Care Guru'
-      : otherRole === 'admin'
-        ? 'SitGuru Support'
-        : otherRole === 'ambassador'
-          ? 'SitGuru Ambassador'
-          : 'Pet Parent';
-  const currentRoleLabel =
-    currentRole === 'guru'
-      ? 'Pet Care Guru'
-      : currentRole === 'admin'
-        ? 'SitGuru Support'
-        : currentRole === 'ambassador'
-          ? 'SitGuru Ambassador'
-          : 'Pet Parent';
-
   const profileBySenderId = useMemo(() => {
     const map = { ...profiles };
 
@@ -1357,13 +1335,26 @@ export default function ConversationScreen() {
     router.push({
       pathname: '/request-booking',
       params: {
-        ...(otherUserId ? { guruId: otherUserId } : {}),
+        ...(requestedGuruId ? { guruId: requestedGuruId } : {}),
+        ...(!requestedGuruId && otherUserId ? { guruId: otherUserId } : {}),
+        ...(requestedGuruSlug ? { slug: requestedGuruSlug } : {}),
         ...(conversation?.id ? { conversationId: conversation.id } : {}),
         ...(bookingContext.petId ? { petId: bookingContext.petId } : {}),
         ...(bookingContext.petName ? { petName: bookingContext.petName } : {}),
         viewerRole: currentRole,
       },
     });
+  }
+
+  function openViewAvailability() {
+    router.push({
+      pathname: '/guru-profile',
+      params: {
+        ...(requestedGuruId ? { guruId: requestedGuruId } : {}),
+        ...(requestedGuruSlug ? { slug: requestedGuruSlug } : {}),
+        ...(!requestedGuruId && otherUserId ? { guruId: otherUserId } : {}),
+      },
+    } as never);
   }
 
   function openBookingDetails() {
@@ -1432,60 +1423,45 @@ export default function ConversationScreen() {
                 </SitGuruIconButton>
 
                 <BubblePressable
-                  accessibilityLabel={`Open my ${currentRoleLabel} profile`}
+                  accessibilityLabel={`Open ${otherName} profile`}
                   accessibilityRole="button"
-                  onPress={openHeaderProfile}
+                  onPress={
+                    currentRole === 'guru'
+                      ? openHeaderProfile
+                      : openViewAvailability
+                  }
                   style={styles.headerIdentity}
                 >
                   <ProfileAvatar
-                    fallbackName={currentUserFirstName}
+                    fallbackName={otherName}
                     size="header"
-                    uri={currentUserAvatar}
+                    uri={otherAvatar}
                     isDark={isDark}
                     styles={styles}
                   />
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle} numberOfLines={1}>
-                      {currentUserFirstName}
+                      {firstNameFromPerson(otherName, 'there')}
                     </Text>
                     <SitGuruRoleStatus
                       compact
-                      role={currentRole}
+                      role={otherRole || (currentRole === 'guru' ? 'pet_parent' : 'guru')}
                       statusLabel={realtimeLabel}
                     />
                   </View>
                 </BubblePressable>
 
                 <View style={styles.headerActions}>
-                  <SitGuruThemeToggle />
-
-                  <SitGuruIconButton
-                    accessibilityLabel="Open notifications"
-                    onPress={() => router.push('/notifications')}
-                  >
-                    <Bell
-                      color={palette.title}
-                      size={ButtonMetrics.iconGlyph}
-                      strokeWidth={2.4}
+                  {currentRole !== 'guru' ? (
+                    <SitGuruButton
+                      accessibilityLabel={`Book with ${firstNameFromPerson(otherName, 'them')}`}
+                      fullWidth={false}
+                      label="Book"
+                      onPress={openRequestCare}
+                      size="compact"
                     />
-                  </SitGuruIconButton>
-
-                  <BubblePressable
-                    accessibilityLabel="Open workspace switcher"
-                    accessibilityRole="button"
-                    onPress={() => setWorkspaceSwitcherOpen(true)}
-                    scaleTo={0.88}
-                    style={styles.profileButton}
-                  >
-                    <ProfileAvatar
-                      fallbackName={currentUserName}
-                      size="header"
-                      uri={currentUserAvatar}
-                      isDark={isDark}
-                      styles={styles}
-                    />
-                  </BubblePressable>
+                  ) : null}
                 </View>
               </View>
 
@@ -1551,23 +1527,19 @@ export default function ConversationScreen() {
                       </View>
 
                       <View style={styles.contextActions}>
-                        <BubblePressable
-                          accessibilityRole="button"
+                        <SitGuruButton
+                          flex
+                          label="View booking"
                           onPress={openBookingDetails}
-                          style={styles.contextSecondaryButton}
-                        >
-                          <CalendarDays color={palette.primary} size={16} strokeWidth={2.4} />
-                          <Text style={styles.contextSecondaryText}>Booking</Text>
-                        </BubblePressable>
-
-                        <BubblePressable
-                          accessibilityRole="button"
+                          size="compact"
+                          variant="secondary"
+                        />
+                        <SitGuruButton
+                          flex
+                          label="Start booking"
                           onPress={openRequestCare}
-                          style={styles.contextPrimaryButton}
-                        >
-                          <PawPrint color="#FFFFFF" size={16} strokeWidth={2.4} />
-                          <Text style={styles.contextPrimaryText}>Request Care</Text>
-                        </BubblePressable>
+                          size="compact"
+                        />
                       </View>
                     </View>
                   ) : null}
@@ -1754,8 +1726,6 @@ export default function ConversationScreen() {
                   onSend={(payload) => void sendMessage(payload)}
                 />
               </View>
-
-              <SitGuruTabBar active="messages" />
             </KeyboardAvoidingView>
           </View>
 
@@ -1763,11 +1733,6 @@ export default function ConversationScreen() {
         </View>
       </View>
 
-      <SitGuruWorkspaceSwitcher
-        currentRole={currentRole}
-        onClose={() => setWorkspaceSwitcherOpen(false)}
-        visible={workspaceSwitcherOpen}
-      />
     </SitGuruScreen>
   );
 }
@@ -1936,6 +1901,7 @@ function ProfileAvatar({
       {uri && !failed ? (
         <Image
           accessibilityLabel={`${fallbackName} profile photo`}
+          alt={`${fallbackName} profile photo`}
           onError={() => setFailedUri(uri)}
           resizeMode="cover"
           source={{ uri }}
@@ -1969,6 +1935,7 @@ function PetAvatar({
       {uri && !failed ? (
         <Image
           accessibilityLabel={`${name} pet photo`}
+          alt={`${name} pet photo`}
           onError={() => setFailedUri(uri)}
           resizeMode="cover"
           source={{ uri }}
@@ -2635,6 +2602,12 @@ function createStyles(isDark: boolean) {
     },
     threadBottomSpace: {
       height: 4,
+    },
+    chatConnectRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 8,
     },
     quickRepliesWrap: {
       paddingBottom: 4,

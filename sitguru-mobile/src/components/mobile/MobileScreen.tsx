@@ -29,8 +29,8 @@ type MobileScreenProps = {
 };
 
 /**
- * Mobile-first screen shell: vertical scroll only, glass footer over content,
- * no horizontal overflow. Prefer this over phone-chrome frames.
+ * Browse shell: vertical scroll only. Tap the footer to go or do.
+ * Horizontal swipe stays on carousels/chips — never section paging.
  */
 export default function MobileScreen({
   children,

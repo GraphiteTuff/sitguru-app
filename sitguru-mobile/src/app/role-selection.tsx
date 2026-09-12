@@ -1337,7 +1337,7 @@ function workspaceLabel(role: AppRole) {
 
 function workspaceDescription(role: AppRole) {
   if (role === 'pet_parent') {
-    return 'Book care, manage pets, and stay connected.';
+    return 'Find a Guru nearby and stay connected.';
   }
 
   if (role === 'guru') {

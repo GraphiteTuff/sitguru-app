@@ -423,6 +423,7 @@ export function usePawPerks() {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external PawPerks fetch
     void load(false);
   }, [load]);
 

@@ -83,17 +83,16 @@ export default function LiveRouteHeader({
   const [followUser, setFollowUser] = useState(autoCenter);
   const showNativeMap = Platform.OS !== 'web';
 
-  const focusPoint: RouteCoordinate | null = coords
-    ? { latitude: coords.latitude, longitude: coords.longitude }
-    : trail.length
-      ? trail[trail.length - 1]
-      : null;
+  if (!autoCenter && followUser) {
+    setFollowUser(false);
+  }
 
-  useEffect(() => {
-    if (!autoCenter) {
-      setFollowUser(false);
-    }
-  }, [autoCenter]);
+  const focusLatitude = coords?.latitude ?? trail[trail.length - 1]?.latitude;
+  const focusLongitude = coords?.longitude ?? trail[trail.length - 1]?.longitude;
+  const focusPoint: RouteCoordinate | null =
+    typeof focusLatitude === 'number' && typeof focusLongitude === 'number'
+      ? { latitude: focusLatitude, longitude: focusLongitude }
+      : null;
 
   useEffect(() => {
     if (!showNativeMap || !followUser || !focusPoint || !mapRef.current) {
@@ -101,7 +100,9 @@ export default function LiveRouteHeader({
     }
 
     mapRef.current.animateToRegion(regionFor(focusPoint, expanded ? 0.01 : 0.008), 450);
-  }, [expanded, focusPoint?.latitude, focusPoint?.longitude, followUser, showNativeMap]);
+    // Primitive lat/lng keep the camera current without depending on a new object each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focusPoint is rebuilt from focusLatitude/focusLongitude
+  }, [expanded, focusLatitude, focusLongitude, followUser, showNativeMap]);
 
   return (
     <View style={[styles.shell, expanded && styles.shellExpanded]}>

@@ -23,9 +23,10 @@ export type FloatingTabBarScrollProps = {
 };
 
 /**
- * Attach to ScrollView / FlatList / SectionList so the floating tab bar
- * can compact and expand. Updates Reanimated shared values only — no
- * React state on scroll.
+ * Vertical-browse hook for the floating tab bar.
+ * Scroll down → compact and stay compact while reading.
+ * Scroll up or return to top → expand. Stopping does not expand.
+ * Tab changes stay tap-only.
  */
 export function useFloatingTabBarScroll(
   options: UseFloatingTabBarScrollOptions = {},
@@ -61,21 +62,15 @@ export function useFloatingTabBarScroll(
     [enabled, motion],
   );
 
-  const onMomentumScrollBegin = useCallback(
-    (_event: ScrollEvent) => {
-      if (!enabled) return;
-      motion?.beginMomentum();
-    },
-    [enabled, motion],
-  );
+  const onMomentumScrollBegin = useCallback(() => {
+    if (!enabled) return;
+    motion?.beginMomentum();
+  }, [enabled, motion]);
 
-  const onMomentumScrollEnd = useCallback(
-    (_event: ScrollEvent) => {
-      if (!enabled) return;
-      motion?.endMomentum();
-    },
-    [enabled, motion],
-  );
+  const onMomentumScrollEnd = useCallback(() => {
+    if (!enabled) return;
+    motion?.endMomentum();
+  }, [enabled, motion]);
 
   return {
     onScroll,

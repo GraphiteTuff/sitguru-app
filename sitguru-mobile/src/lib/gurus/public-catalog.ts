@@ -13,14 +13,49 @@ let guruCatalogCache: {
 } | null = null;
 
 type PublicSearchPayload = {
-  gurus?: PublicGuruProfile[];
+  gurus?: unknown;
 };
 
-function asCatalogGuru(guru: PublicGuruProfile): PublicGuruProfile {
+type CatalogTable = Exclude<PublicGuruProfile['source'], 'placeholder' | undefined>;
+
+type CatalogSource = {
+  table: CatalogTable;
+  profiles?: boolean;
+};
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Dynamic `.select(string)` is typed by supabase-js as GenericStringError[].
+ * Accept a row only after it looks like a Guru record with a real id.
+ */
+function catalogGuruFromUnknown(
+  row: unknown,
+  source: CatalogTable,
+): PublicGuruProfile | null {
+  if (!isPlainRecord(row)) return null;
+  if (row.error === true) return null;
+
+  const id = typeof row.id === 'string' ? row.id.trim() : '';
+  if (!id) return null;
+
   return {
-    ...guru,
-    source: guru.source ?? 'public_guru_search_profiles',
+    ...(row as PublicGuruProfile),
+    id,
+    source,
   };
+}
+
+function catalogGurusFromUnknown(
+  rows: unknown,
+  source: CatalogTable,
+): PublicGuruProfile[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => catalogGuruFromUnknown(row, source))
+    .filter((guru): guru is PublicGuruProfile => Boolean(guru));
 }
 
 async function loadGurusFromWebsite(): Promise<PublicGuruProfile[]> {
@@ -29,20 +64,22 @@ async function loadGurusFromWebsite(): Promise<PublicGuruProfile[]> {
       auth: false,
       timeoutMs: 15_000,
     });
-    const gurus = Array.isArray(result.data?.gurus) ? result.data.gurus : [];
+    const gurus = catalogGurusFromUnknown(
+      result.data?.gurus,
+      'public_guru_search_profiles',
+    );
 
     if (gurus.length) {
-      return gurus.map(asCatalogGuru);
+      return gurus;
     }
   }
 
   return [];
 }
 
-async function loadGurusFromSource(source: {
-  table: string;
-  profiles?: boolean;
-}): Promise<PublicGuruProfile[]> {
+async function loadGurusFromSource(
+  source: CatalogSource,
+): Promise<PublicGuruProfile[]> {
   for (const columns of [SELECT_FIELDS, '*']) {
     let query = supabase.from(source.table).select(columns).limit(60);
 
@@ -58,11 +95,13 @@ async function loadGurusFromSource(source: {
 
     const result = await query;
 
-    if (!result.error && result.data?.length) {
-      return (result.data as PublicGuruProfile[]).map((guru) => ({
-        ...guru,
-        source: source.table as PublicGuruProfile['source'],
-      }));
+    if (result.error) {
+      continue;
+    }
+
+    const gurus = catalogGurusFromUnknown(result.data, source.table);
+    if (gurus.length) {
+      return gurus;
     }
   }
 
@@ -72,7 +111,7 @@ async function loadGurusFromSource(source: {
 async function loadGurusFromSupabase(): Promise<PublicGuruProfile[]> {
   if (!isSupabaseConfigured) return [];
 
-  const sources: Array<{ table: string; profiles?: boolean }> = [
+  const sources: CatalogSource[] = [
     { table: 'public_guru_search_profiles' },
     { table: 'guru_profiles' },
     { table: 'gurus' },

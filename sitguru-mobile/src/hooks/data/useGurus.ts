@@ -115,6 +115,7 @@ export function usePublicGurus(options?: {
   }, [enabled]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- public Guru catalog fetch
     void refresh();
   }, [refresh]);
 
@@ -202,6 +203,7 @@ export function useGuruProfile(
   }, [needle]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Guru profile fetch
     void refresh();
   }, [refresh]);
 

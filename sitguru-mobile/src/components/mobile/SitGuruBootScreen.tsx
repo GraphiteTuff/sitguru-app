@@ -30,37 +30,43 @@ export default function SitGuruBootScreen({
   const glow = useSharedValue(0.18);
 
   useEffect(() => {
-    bounce.value = withRepeat(
-      withSequence(
-        withTiming(-10, {
-          duration: 420,
-          easing: Easing.out(Easing.quad),
-        }),
-        withTiming(0, {
-          duration: 520,
-          easing: Easing.inOut(Easing.quad),
-        }),
+    bounce.set(
+      withRepeat(
+        withSequence(
+          withTiming(-10, {
+            duration: 420,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(0, {
+            duration: 520,
+            easing: Easing.inOut(Easing.quad),
+          }),
+        ),
+        -1,
+        false,
       ),
-      -1,
-      false,
     );
 
-    tilt.value = withRepeat(
-      withSequence(
-        withTiming(-7, { duration: 640, easing: Easing.inOut(Easing.sin) }),
-        withTiming(7, { duration: 640, easing: Easing.inOut(Easing.sin) }),
+    tilt.set(
+      withRepeat(
+        withSequence(
+          withTiming(-7, { duration: 640, easing: Easing.inOut(Easing.sin) }),
+          withTiming(7, { duration: 640, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        true,
       ),
-      -1,
-      true,
     );
 
-    glow.value = withRepeat(
-      withSequence(
-        withTiming(0.34, { duration: 700 }),
-        withTiming(0.16, { duration: 700 }),
+    glow.set(
+      withRepeat(
+        withSequence(
+          withTiming(0.34, { duration: 700 }),
+          withTiming(0.16, { duration: 700 }),
+        ),
+        -1,
+        true,
       ),
-      -1,
-      true,
     );
   }, [bounce, glow, tilt]);
 
@@ -85,6 +91,7 @@ export default function SitGuruBootScreen({
           <View style={styles.photoFill} />
           <Image
             accessibilityLabel="Rogue, SitGuru mascot"
+            alt="Rogue, SitGuru mascot"
             resizeMode="cover"
             source={rogueAvatar}
             style={styles.photo}
@@ -132,7 +139,7 @@ const styles = StyleSheet.create({
   },
   photoFill: {
     backgroundColor: '#FFFFFF',
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   photo: {
     height: '100%',

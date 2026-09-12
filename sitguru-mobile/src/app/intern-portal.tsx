@@ -19,7 +19,7 @@ import StickyActionBar from '@/components/mobile/StickyActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
 import { BrandColors } from '@/constants/theme';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { sitguruApiFetch } from '@/lib/data/api';
 import InternOnboardingFlow, {
   type InternOnboardingPayload,
@@ -112,6 +112,7 @@ export default function InternPortalScreen() {
 
   useEffect(() => {
     if (!session) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intern workspace fetch
     void load();
   }, [session, load]);
 

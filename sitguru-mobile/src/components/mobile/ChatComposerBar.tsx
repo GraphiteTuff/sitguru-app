@@ -23,6 +23,7 @@ import { useKeyboardSafe } from '@/components/mobile/KeyboardSafeHost';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
 import { useThemeMode } from '@/hooks/use-theme';
+import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ChatAttachment = {
@@ -195,7 +196,12 @@ export default function ChatComposerBar({
       {attachment ? (
         <View style={styles.preview}>
           {attachment.kind === 'photo' ? (
-            <Image source={{ uri: attachment.uri }} style={styles.previewImage} />
+            <Image
+              accessibilityLabel="Attached photo"
+              alt="Attached photo"
+              source={{ uri: attachment.uri }}
+              style={styles.previewImage}
+            />
           ) : (
             <View style={styles.voicePreview}>
               <Mic color={palette.accent} size={18} strokeWidth={2.4} />

@@ -262,7 +262,7 @@ export default function BookingsScreen() {
                     <Text style={styles.emptyText}>
                       {activeFilter === 'past'
                         ? 'Completed and cancelled bookings will show up here.'
-                        : 'Find a Guru near you and request your first booking.'}
+                        : 'Your upcoming pet care bookings will appear here.'}
                     </Text>
 
                     <SitGuruButton

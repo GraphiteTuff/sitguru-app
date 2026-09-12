@@ -48,11 +48,12 @@ export default function RoleGate({ requiredRole, title, children, previewAllowed
   const requiredLabel = roleLabel(requiredRole);
   const loadedRoleLabels = roles.length ? roles.map(roleLabel).join(', ') : 'No roles loaded yet';
 
+  if (!loading && accessTimedOut) {
+    setAccessTimedOut(false);
+  }
+
   useEffect(() => {
-    if (!loading) {
-      setAccessTimedOut(false);
-      return;
-    }
+    if (!loading) return;
 
     const timer = setTimeout(() => setAccessTimedOut(true), 5_000);
     return () => clearTimeout(timer);

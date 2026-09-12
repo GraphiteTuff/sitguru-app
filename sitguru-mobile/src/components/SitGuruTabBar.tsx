@@ -48,7 +48,7 @@ type TabDefinition = {
 const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
   visitor: [
     { key: 'home', label: 'Home', icon: Home, href: '/' },
-    { key: 'explore', label: 'Explore', icon: Search, href: '/find-care' },
+    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
     {
       key: 'profile',
       label: 'Join',
@@ -72,7 +72,7 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
   ],
   petParent: [
     { key: 'home', label: 'Home', icon: Home, href: '/pet-parent-dashboard' },
-    { key: 'explore', label: 'Explore', icon: Search, href: '/find-care' },
+    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
     {
       key: 'bookings',
       label: 'Bookings',
@@ -177,6 +177,7 @@ function navigateOverflowHref(
   router.navigate(href as never);
 }
 
+/** Tap a tab to move. The bubble slides; sections are never swipe-paged. */
 export default function SitGuruTabBar({
   active,
   role,

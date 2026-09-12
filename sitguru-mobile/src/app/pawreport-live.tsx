@@ -68,7 +68,7 @@ export default function PawReportLiveScreen() {
       accuracy: null,
       heading: null,
       speed: null,
-      timestamp: Date.now(),
+      timestamp: 0,
     };
   }, [snapshot.latitude, snapshot.longitude]);
 

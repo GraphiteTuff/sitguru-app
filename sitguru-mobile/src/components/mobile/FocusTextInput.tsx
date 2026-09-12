@@ -49,17 +49,19 @@ export default function FocusTextInput({
 
   useEffect(() => {
     if (!valid || !editable) {
-      pulse.value = withTiming(0, { duration: 160 });
+      pulse.set(withTiming(0, { duration: 160 }));
       return;
     }
 
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 520 }),
-        withTiming(0.28, { duration: 520 }),
+    pulse.set(
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 520 }),
+          withTiming(0.28, { duration: 520 }),
+        ),
+        3,
+        false,
       ),
-      3,
-      false,
     );
   }, [editable, pulse, valid]);
 

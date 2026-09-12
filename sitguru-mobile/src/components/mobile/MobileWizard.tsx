@@ -68,20 +68,24 @@ export default function MobileWizard({
     const direction = stepIndex >= previous ? 1 : -1;
     prevIndexRef.current = stepIndex;
 
-    translateX.value = direction * 56;
-    opacity.value = 0.55;
-    translateX.value = withTiming(0, {
-      duration: 240,
-      easing: Easing.out(Easing.cubic),
-    });
-    opacity.value = withTiming(1, {
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-    });
+    translateX.set(direction * 56);
+    opacity.set(0.55);
+    translateX.set(
+      withTiming(0, {
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+      }),
+    );
+    opacity.set(
+      withTiming(1, {
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+      }),
+    );
   }, [opacity, stepIndex, translateX]);
 
   useEffect(() => {
-    nextGlow.value = withTiming(nextDisabled ? 0 : 1, { duration: 220 });
+    nextGlow.set(withTiming(nextDisabled ? 0 : 1, { duration: 220 }));
   }, [nextDisabled, nextGlow]);
 
   const bodyStyle = useAnimatedStyle(() => ({

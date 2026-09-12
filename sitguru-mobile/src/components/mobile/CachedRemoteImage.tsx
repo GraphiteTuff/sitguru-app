@@ -51,6 +51,7 @@ export default function CachedRemoteImage({
       >
         <Image
           accessibilityLabel={accessibilityLabel}
+          alt={accessibilityLabel}
           source={{ uri: resolved }}
           style={[styles.image, style]}
           contentFit="cover"
@@ -74,6 +75,8 @@ export default function CachedRemoteImage({
         >
           <View style={styles.modalFrame}>
             <Image
+              accessibilityLabel={accessibilityLabel}
+              alt={accessibilityLabel}
               source={{ uri: resolved }}
               style={styles.modalImage}
               contentFit="contain"

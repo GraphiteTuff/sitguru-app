@@ -36,12 +36,14 @@ export default function WelcomeSummaryCard({
   const expand = useSharedValue(0);
 
   useEffect(() => {
-    expand.value = withDelay(
-      40,
-      withTiming(1, {
-        duration: 420,
-        easing: Easing.out(Easing.cubic),
-      }),
+    expand.set(
+      withDelay(
+        40,
+        withTiming(1, {
+          duration: 420,
+          easing: Easing.out(Easing.cubic),
+        }),
+      ),
     );
   }, [expand]);
 

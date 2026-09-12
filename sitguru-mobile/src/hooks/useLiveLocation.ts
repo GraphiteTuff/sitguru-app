@@ -1,6 +1,8 @@
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+
+import { useLatestRef } from '@/hooks/useLatestRef';
 
 export type LiveCoords = {
   latitude: number;
@@ -37,8 +39,7 @@ export function useLiveLocation({
     useState<Location.PermissionStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
-  const onUpdateRef = useRef(onUpdate);
-  onUpdateRef.current = onUpdate;
+  const onUpdateRef = useLatestRef(onUpdate);
 
   const requestPermission = useCallback(async () => {
     if (Platform.OS === 'web') {
@@ -117,6 +118,7 @@ export function useLiveLocation({
       subscription?.remove();
       setTracking(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onUpdateRef is a stable latest-ref
   }, [
     accuracy,
     distanceIntervalMeters,

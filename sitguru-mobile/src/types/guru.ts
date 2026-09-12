@@ -167,7 +167,8 @@ export function isGuruBookable(guru: PublicGuruProfile) {
 }
 
 export function getGuruBookingLabel(guru: PublicGuruProfile) {
-  return isKnownPreviewGuru(guru) ? 'Preview Only' : isGuruBookable(guru) ? 'Request Care' : 'Message First';
+  if (isKnownPreviewGuru(guru)) return 'Preview only';
+  return `Book with ${getGuruFirstName(guru)}`;
 }
 
 export function getGuruSearchBadge(guru: PublicGuruProfile) {

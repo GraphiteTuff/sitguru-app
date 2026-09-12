@@ -17,7 +17,7 @@ import {
   WalletCards
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   Alert,
@@ -39,7 +39,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import { ButtonMetrics } from '@/constants/button-tokens';
+import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { getGuruVerification, MARKETPLACE_TRUST_LINES } from '@/lib/marketplace-trust';
 import { useThemeMode } from '@/hooks/use-theme';
@@ -90,7 +90,16 @@ export default function GuruProfileScreen() {
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
-  const tabBarScroll = useFloatingTabBarScroll();
+  const stickyVisibleRef = useRef(false);
+  const [stickyActions, setStickyActions] = useState(false);
+  const tabBarScroll = useFloatingTabBarScroll({
+    onScroll: (event) => {
+      const next = event.nativeEvent.contentOffset.y > 220;
+      if (next === stickyVisibleRef.current) return;
+      stickyVisibleRef.current = next;
+      setStickyActions(next);
+    },
+  });
 
   const [gurus, setGurus] = useState<PublicGuruProfile[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -222,6 +231,7 @@ export default function GuruProfileScreen() {
         params: {
           guruId: selectedGuru.id,
           slug: getGuruSlug(selectedGuru),
+          guruSlug: getGuruSlug(selectedGuru),
         },
       } as never);
       return;
@@ -276,8 +286,14 @@ export default function GuruProfileScreen() {
                 showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                   <SitGuruIconButton
-                    accessibilityLabel="Back to Find Care"
-                    onPress={() => router.push('/find-care')}>
+                    accessibilityLabel="Back to previous screen"
+                    onPress={() => {
+                      if (router.canGoBack()) {
+                        router.back();
+                        return;
+                      }
+                      router.push('/find-care');
+                    }}>
                     <ArrowLeft
                       color={palette.primary}
                       size={ButtonMetrics.iconGlyph}
@@ -331,6 +347,10 @@ export default function GuruProfileScreen() {
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyTitle}>Profile unavailable</Text>
                     <Text style={styles.emptyText}>{loadError}</Text>
+                    <SitGuruButton
+                      label="Try again"
+                      onPress={() => void handleRefresh()}
+                    />
                   </View>
                 ) : !selectedGuru ? (
                   <View style={styles.emptyState}>
@@ -350,6 +370,8 @@ export default function GuruProfileScreen() {
                 <View style={styles.heroCard}>
                   {guruCoverUrl || profileMedia.cover?.fileUrl ? (
                     <Image
+                      accessibilityLabel={`${guruName} cover photo`}
+                      alt={`${guruName} cover photo`}
                       source={{
                         uri: guruCoverUrl || profileMedia.cover?.fileUrl || '',
                       }}
@@ -481,6 +503,11 @@ export default function GuruProfileScreen() {
 
                     <View style={styles.heroActions}>
                       <SitGuruButton
+                        accessibilityLabel={
+                          preview
+                            ? 'Message preview'
+                            : `Message ${guruFirstName}`
+                        }
                         flex
                         label={
                           preview
@@ -493,6 +520,7 @@ export default function GuruProfileScreen() {
                       />
 
                       <SitGuruButton
+                        accessibilityLabel={getGuruBookingLabel(selectedGuru)}
                         disabled={preview}
                         flex
                         label={getGuruBookingLabel(selectedGuru)}
@@ -512,6 +540,8 @@ export default function GuruProfileScreen() {
                         {profileMedia.gallery.map((item) => (
                           <Image
                             key={item.id}
+                            accessibilityLabel={`${guruName} gallery photo`}
+                            alt={`${guruName} gallery photo`}
                             source={{ uri: item.fileUrl }}
                             style={styles.galleryImage}
                           />
@@ -798,35 +828,45 @@ export default function GuruProfileScreen() {
 
                   <Text style={styles.connectText}>
                     {preview
-                      ? 'Message SitGuru to learn when more local Gurus become available.'
-                      : bookable
-                        ? 'Message first or send a care request when you are ready.'
-                        : `Message ${guruFirstName} to ask about availability and fit.`}
+                      ? 'This preview is not taking bookings yet.'
+                      : `Message ${guruFirstName} or book from the buttons below.`}
                   </Text>
 
-                  <View style={styles.connectActions}>
-                    <SitGuruButton
-                      flex
-                      label="Message"
-                      onPress={openConversation}
-                      size="compact"
-                      variant="secondary"
-                    />
-
-                    <SitGuruButton
-                      disabled={preview}
-                      flex
-                      label={getGuruBookingLabel(selectedGuru)}
-                      onPress={handleBookingAction}
-                      size="compact"
-                    />
-                  </View>
                 </View>
                   </>
                 )}
               </ScrollView>
 
-              <SitGuruTabBar active="profile" role="guru" />
+              {selectedGuru && stickyActions ? (
+                <View style={styles.decisionDock}>
+                  <SitGuruButton
+                    accessibilityLabel={
+                      preview
+                        ? 'Message preview'
+                        : `Message ${guruFirstName}`
+                    }
+                    flex
+                    label={
+                      preview
+                        ? 'Message preview'
+                        : `Message ${guruFirstName}`
+                    }
+                    onPress={openConversation}
+                    size="compact"
+                    variant="secondary"
+                  />
+                  <SitGuruButton
+                    accessibilityLabel={getGuruBookingLabel(selectedGuru)}
+                    disabled={preview}
+                    flex
+                    label={getGuruBookingLabel(selectedGuru)}
+                    onPress={handleBookingAction}
+                    size="compact"
+                  />
+                </View>
+              ) : null}
+
+              <SitGuruTabBar active="explore" />
             </View>
           </View>
 
@@ -1000,8 +1040,8 @@ function getPalette(isDark: boolean) {
     border: isDark ? '#234B38' : '#EADDCB',
     muted: isDark ? '#9DB0A5' : '#738078',
     navMuted: isDark ? '#9BAAA1' : '#748079',
-    primary: isDark ? '#39D982' : '#087449',
-    primaryDark: isDark ? '#1C9F5E' : '#075D3B',
+    primary: isDark ? '#75C69A' : SitGuruAccent.primary,
+    primaryDark: isDark ? SitGuruAccent.primary : SitGuruAccent.pressed,
     primarySoft: isDark ? '#123E2A' : '#E4F5E9',
     star: '#F3A61F',
     surface: isDark ? '#0B2118' : '#FFFEFA',
@@ -1156,7 +1196,7 @@ function createStyles(isDark: boolean) {
 
     scrollContent: {
       gap: 13,
-      paddingBottom: 16,
+      paddingBottom: 148,
       paddingHorizontal: 15,
       paddingTop: 9,
     },
@@ -1688,6 +1728,16 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 8,
       width: '100%',
+    },
+    decisionDock: {
+      backgroundColor: palette.background,
+      borderTopColor: palette.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      flexDirection: 'row',
+      gap: 8,
+      paddingBottom: 4,
+      paddingHorizontal: 12,
+      paddingTop: 8,
     },
 
   });

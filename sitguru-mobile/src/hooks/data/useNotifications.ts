@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 
 import {
   asString,
@@ -49,20 +49,20 @@ export function useNotifications(options?: {
   const enabled = options?.enabled ?? true;
   const realtime = options?.realtime ?? true;
   const limit = options?.limit ?? 100;
-  const channelNonceRef = useRef(
-    Math.random().toString(36).slice(2, 8),
-  );
+  const instanceId = useId().replace(/:/g, '');
+  const userId = user?.id ?? '';
 
   const [notifications, setNotifications] = useState<SitGuruNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const channelName = user?.id
-    ? REALTIME_CHANNELS.notifications(user.id, channelNonceRef.current)
+  const channelName = userId
+    ? REALTIME_CHANNELS.notifications(userId, instanceId)
     : 'notifications-idle';
 
+  /* eslint-disable react-hooks/preserve-manual-memoization -- React state setters are stable; compiler still infers them. Do not add setters to deps. */
   const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !user?.id || !isSupabaseConfigured) {
+    if (!enabled || !isAuthenticated || !userId || !isSupabaseConfigured) {
       setNotifications([]);
       return;
     }
@@ -71,7 +71,7 @@ export function useNotifications(options?: {
     const result = await supabase
       .from(TABLES.notifications)
       .select('id, user_id, title, body, type, href, link, is_read, created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -79,7 +79,7 @@ export function useNotifications(options?: {
       const fallback = await supabase
         .from(TABLES.notifications)
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -106,17 +106,18 @@ export function useNotifications(options?: {
     );
     setError(null);
     setLoading(false);
-  }, [enabled, isAuthenticated, limit, user?.id]);
+  }, [enabled, isAuthenticated, limit, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase notification fetch
     void refresh();
   }, [refresh]);
 
   useRealtimeSubscription({
     channelName,
     table: TABLES.notifications,
-    filter: user?.id ? `user_id=eq.${user.id}` : undefined,
-    enabled: Boolean(realtime && enabled && user?.id),
+    filter: userId ? `user_id=eq.${userId}` : undefined,
+    enabled: Boolean(realtime && enabled && userId),
     onChange: () => {
       void refresh();
     },
@@ -129,7 +130,7 @@ export function useNotifications(options?: {
 
   const markRead = useCallback(
     async (notificationId: string) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!userId || !isSupabaseConfigured) {
         return { error: 'Sign in required.' };
       }
 
@@ -137,7 +138,7 @@ export function useNotifications(options?: {
         .from(TABLES.notifications)
         .update({ is_read: true })
         .eq('id', notificationId)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (result.error) {
         return { error: getErrorMessage(result.error) };
@@ -151,18 +152,18 @@ export function useNotifications(options?: {
 
       return { error: null as string | null };
     },
-    [user?.id],
+    [userId],
   );
 
   const markAllRead = useCallback(async () => {
-    if (!user?.id || !isSupabaseConfigured) {
+    if (!userId || !isSupabaseConfigured) {
       return { error: 'Sign in required.' };
     }
 
     const result = await supabase
       .from(TABLES.notifications)
       .update({ is_read: true })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('is_read', false);
 
     if (result.error) {
@@ -174,7 +175,8 @@ export function useNotifications(options?: {
     );
 
     return { error: null as string | null };
-  }, [user?.id]);
+  }, [userId]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return {
     notifications,

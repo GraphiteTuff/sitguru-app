@@ -203,6 +203,7 @@ export default function PetPassportsScreen() {
       const match = requestedPetId
         ? pets.find((pet) => pet.id === requestedPetId)
         : null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link bootstrap into the passport wizard
       startWizard(match ?? null);
     }
 

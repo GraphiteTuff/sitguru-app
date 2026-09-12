@@ -63,16 +63,6 @@ export type GuruPayoutSetup = {
   pending: number;
 };
 
-const EMPTY_SUMMARY: GuruEarningsSummary = {
-  weekNetTotal: 0,
-  monthNetTotal: 0,
-  lifetimeNetTotal: 0,
-  pendingClearedBalance: 0,
-  paidOutTotal: 0,
-  completedCareWalks: 0,
-  completedCareTotal: 0,
-};
-
 const EMPTY_PAYOUT: GuruPayoutSetup = {
   connected: false,
   actionRequired: false,

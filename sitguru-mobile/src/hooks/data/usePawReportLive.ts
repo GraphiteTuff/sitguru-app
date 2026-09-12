@@ -170,7 +170,7 @@ export function usePawReportLive(bookingIdParam?: string | null) {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
 
   const refresh = useCallback(async (silent = false) => {
     if (!preferredBookingId) {
@@ -237,10 +237,13 @@ export function usePawReportLive(bookingIdParam?: string | null) {
   }, [loadVisitSession, loadVisitUpdates, preferredBookingId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- PawReport session/update fetch
     void refresh(false);
   }, [refresh]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- wall clock, not derived UI state
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, []);
@@ -363,21 +366,20 @@ export function usePawReportLive(bookingIdParam?: string | null) {
     [photos],
   );
 
+  const streamLatitude = stream?.data?.latitude;
+  const streamLongitude = stream?.data?.longitude;
   const trail = useMemo(() => {
     if (trackPoints.length > 1) return trackPoints;
-    if (
-      typeof stream?.data?.latitude === 'number' &&
-      typeof stream?.data?.longitude === 'number'
-    ) {
+    if (typeof streamLatitude === 'number' && typeof streamLongitude === 'number') {
       return [
         {
-          latitude: stream.data.latitude,
-          longitude: stream.data.longitude,
+          latitude: streamLatitude,
+          longitude: streamLongitude,
         },
       ];
     }
     return [] as Array<{ latitude: number; longitude: number }>;
-  }, [stream?.data?.latitude, stream?.data?.longitude, trackPoints]);
+  }, [streamLatitude, streamLongitude, trackPoints]);
 
   const snapshot = useMemo<PawReportLiveSnapshot>(() => {
     const metrics = stream?.data?.currentMetrics;

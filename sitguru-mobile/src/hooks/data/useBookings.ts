@@ -212,6 +212,8 @@ export function useBookings(options?: {
   realtime?: boolean;
 }) {
   const { user, isAuthenticated, primaryRole, roles } = useAuth();
+  const userId = user?.id ?? '';
+  const userEmail = user?.email ?? '';
   const role = options?.role ?? 'any';
   const enabled = options?.enabled ?? true;
   const realtime = options?.realtime ?? true;
@@ -222,36 +224,37 @@ export function useBookings(options?: {
   const [mutating, setMutating] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !user?.id || !isSupabaseConfigured) {
+    if (!enabled || !isAuthenticated || !userId || !isSupabaseConfigured) {
       setBookings([]);
       setError(null);
       return;
     }
 
     setLoading(true);
-    const result = await queryBookingsForUser(user.id, role);
+    const result = await queryBookingsForUser(userId, role);
     setBookings(result.bookings);
     setError(result.error);
     setLoading(false);
-  }, [enabled, isAuthenticated, role, user?.id]);
+  }, [enabled, isAuthenticated, role, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase booking fetch
     void refresh();
   }, [refresh]);
 
   useRealtimeSubscription({
-    channelName: user?.id
-      ? `sitguru-bookings-${user.id}-${role}`
+    channelName: userId
+      ? `sitguru-bookings-${userId}-${role}`
       : 'sitguru-bookings-idle',
     table: TABLES.bookings,
-    filter: user?.id
+    filter: userId
       ? role === 'guru'
-        ? `guru_id=eq.${user.id}`
+        ? `guru_id=eq.${userId}`
         : role === 'pet_parent'
-          ? `customer_id=eq.${user.id}`
+          ? `customer_id=eq.${userId}`
           : undefined
       : undefined,
-    enabled: Boolean(realtime && enabled && user?.id),
+    enabled: Boolean(realtime && enabled && userId),
     onChange: () => {
       void refresh();
     },
@@ -292,7 +295,7 @@ export function useBookings(options?: {
           visitLength: input.visitLength,
           notes: input.notes,
           customerName: input.customerName,
-          customerEmail: input.customerEmail || user?.email || '',
+          customerEmail: input.customerEmail || userEmail || '',
           client: 'sitguru-mobile',
           platform: 'mobile',
         },
@@ -331,7 +334,7 @@ export function useBookings(options?: {
         error: null as string | null,
       };
     },
-    [refresh, user?.email],
+    [refresh, userEmail],
   );
 
   const startCheckout = useCallback(
@@ -393,7 +396,7 @@ export function useBookings(options?: {
 
   const getBookingAccess = useCallback(
     (booking: SitGuruBooking) => {
-      if (!user?.id) {
+      if (!userId) {
         return {
           role: 'none' as const,
           canRead: false,
@@ -403,12 +406,12 @@ export function useBookings(options?: {
 
       return resolveBookingParticipantRole({
         booking: booking.raw,
-        userId: user.id,
-        email: user.email,
+        userId,
+        email: userEmail,
         isAdmin: roles.includes('admin') || primaryRole === 'admin',
       });
     },
-    [primaryRole, roles, user?.email, user?.id],
+    [primaryRole, roles, userEmail, userId],
   );
 
   return {
@@ -462,6 +465,7 @@ export function useBooking(
   }, [bookingId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Supabase booking fetch
     void refresh();
   }, [refresh]);
 

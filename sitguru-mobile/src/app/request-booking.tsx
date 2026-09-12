@@ -11,12 +11,15 @@ import {
   PawPrint,
   Send,
   ShieldCheck,
+  X,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -27,16 +30,12 @@ import {
 
 import BubblePressable from '@/components/BubblePressable';
 import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import { SitGuruAccent } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { useBookings } from '@/hooks/data/useBookings';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
@@ -636,22 +635,12 @@ function getEstimate({
   };
 }
 
-const THEME_OPTIONS: Array<{
-  label: string;
-  value: SitGuruThemePreference;
-  icon: 'sun' | 'moon';
-}> = [
-  { label: 'Light', value: 'light', icon: 'sun' },
-  { label: 'Dark', value: 'dark', icon: 'moon' },
-];
-
 export default function RequestBookingScreen() {
   const { isAuthenticated, user, profile } = useAuth();
   const params = useLocalSearchParams();
   const { createBooking } = useBookings({ enabled: false, realtime: false });
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
@@ -706,6 +695,7 @@ export default function RequestBookingScreen() {
   const guruLabel = guruDisplayLabel(guruTargetSlug, guruTargetId);
   const paramPetId = paramText(params.petId);
   const paramServiceType = paramText(params.serviceType);
+  const conversationId = paramText(params.conversationId);
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
@@ -715,14 +705,6 @@ export default function RequestBookingScreen() {
     firstString(userMetadata, ['full_name', 'name']) ||
     user?.email?.split('@')[0] ||
     'Pet Parent';
-  const petParentAvatarUrl = resolveSupabaseStorageUrl(
-    firstString(profileRecord, [
-      'avatar_url',
-      'photo_url',
-      'profile_photo_url',
-      'profile_image_url',
-    ]) || firstString(userMetadata, ['avatar_url', 'picture']),
-  );
 
   useEffect(() => {
     let active = true;
@@ -924,11 +906,39 @@ export default function RequestBookingScreen() {
     (submitting ||
       (submitOutcome ? !submitOutcome.bookingId : !canSubmitRequest));
 
+  const bookingHasProgress =
+    currentStep > 1 ||
+    Boolean(careNotes.trim() || accessNotes.trim() || submitOutcome);
+
+  function leaveBooking() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.push('/find-care');
+  }
+
+  function confirmLeaveBooking() {
+    if (!bookingHasProgress) {
+      leaveBooking();
+      return;
+    }
+
+    Alert.alert(
+      'Leave booking?',
+      "Your booking details haven't been submitted yet.",
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: leaveBooking },
+      ],
+    );
+  }
+
   function goBack() {
     setNotice('');
 
     if (currentStep === 1) {
-      router.push('/find-care');
+      confirmLeaveBooking();
       return;
     }
 
@@ -958,6 +968,20 @@ export default function RequestBookingScreen() {
       pathname: '/booking-details',
       params: {
         bookingId: submitOutcome.bookingId,
+        viewerRole: 'pet_parent',
+        ...(conversationId ? { conversationId } : {}),
+      },
+    });
+  }
+
+  function openMessageGuru() {
+    router.push({
+      pathname: '/conversation',
+      params: {
+        ...(conversationId ? { conversationId } : {}),
+        ...(guruTargetId ? { guruId: guruTargetId } : {}),
+        ...(guruTargetSlug ? { guruSlug: guruTargetSlug } : {}),
+        ...(submitOutcome?.bookingId ? { bookingId: submitOutcome.bookingId } : {}),
         viewerRole: 'pet_parent',
       },
     });
@@ -1690,7 +1714,7 @@ export default function RequestBookingScreen() {
               </View>
             </View>
 
-            <ReviewRow label="Guru" value="Selected Guru" styles={styles} />
+            <ReviewRow label="Guru" value={guruLabel} styles={styles} />
             <ReviewRow
               label="Pet"
               value={`${selectedPet.name} • ${selectedPet.type}`}
@@ -1782,14 +1806,17 @@ export default function RequestBookingScreen() {
           <MarketplaceTrustNote compact />
 
           {requestSent ? (
-            <BubblePressable
-              accessibilityRole="button"
-              onPress={openCreatedBooking}
-              style={styles.readyButton}
-            >
-              <Text style={styles.readyButtonText}>Open Booking Details</Text>
-              <ChevronRight color={palette.primary} size={18} strokeWidth={2.4} />
-            </BubblePressable>
+            <View style={styles.readyActionStack}>
+              <SitGuruButton
+                label="View booking"
+                onPress={openCreatedBooking}
+              />
+              <SitGuruButton
+                label={`Message ${guruLabel}`}
+                onPress={openMessageGuru}
+                variant="secondary"
+              />
+            </View>
           ) : (
             <BubblePressable
               accessibilityRole="button"
@@ -1845,7 +1872,10 @@ export default function RequestBookingScreen() {
               !isWebPreview && styles.phoneShellNative,
             ]}
           >
-            <View style={styles.screen}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.screen}
+            >
               {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
               <ScrollView
@@ -1877,55 +1907,14 @@ export default function RequestBookingScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <View style={styles.modeToggle}>
-                      {THEME_OPTIONS.map((option) => {
-                        const active = themePreference === option.value;
-
-                        return (
-                          <BubblePressable
-                            key={option.value}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Switch to ${option.label} mode`}
-                            accessibilityState={{ selected: active }}
-                            onPress={() => setThemePreference(option.value)}
-                            scaleTo={0.88}
-                            style={[
-                              styles.modeButton,
-                              active && styles.modeButtonActive,
-                            ]}
-                          >
-                            <SitGuruIcon
-                              name={option.icon}
-                              size={15}
-                              color={
-                                active
-                                  ? option.value === 'light'
-                                    ? '#F3AA1F'
-                                    : isDark
-                                      ? '#F0CF62'
-                                      : palette.primary
-                                  : palette.muted
-                              }
-                              strokeWidth={2.4}
-                            />
-                          </BubblePressable>
-                        );
-                      })}
-                    </View>
-
                     <BubblePressable
-                      accessibilityLabel="Open Pet Parent profile"
+                      accessibilityLabel="Leave booking"
                       accessibilityRole="button"
-                      onPress={() => router.push('/account')}
+                      onPress={confirmLeaveBooking}
                       scaleTo={0.88}
-                      style={styles.profileButton}
+                      style={styles.headerButton}
                     >
-                      <AvatarImage
-                        fallback={initials(petParentName)}
-                        imageUrl={petParentAvatarUrl}
-                        palette={palette}
-                        size={38}
-                      />
+                      <X color={palette.title} size={20} strokeWidth={2.5} />
                     </BubblePressable>
                   </View>
                 </View>
@@ -2015,12 +2004,13 @@ export default function RequestBookingScreen() {
 
               <View style={styles.bottomDock}>
                 <BubblePressable
+                  accessibilityLabel={currentStep === 1 ? 'Leave booking' : 'Back to previous step'}
                   accessibilityRole="button"
                   onPress={goBack}
                   style={styles.dockSecondaryButton}
                 >
                   <Text style={styles.dockSecondaryText}>
-                    {currentStep === 1 ? 'Find Care' : 'Back'}
+                    {currentStep === 1 ? 'Leave' : 'Back'}
                   </Text>
                 </BubblePressable>
 
@@ -2037,7 +2027,7 @@ export default function RequestBookingScreen() {
                   <ChevronRight color="#FFFFFF" size={18} strokeWidth={2.5} />
                 </BubblePressable>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </View>
 
           {isWebPreview ? <View style={styles.homeIndicator} /> : null}
@@ -2083,6 +2073,8 @@ function AvatarImage({
     >
       {showImage ? (
         <Image
+          accessibilityLabel="Profile photo"
+          alt="Profile photo"
           onError={() => setImageFailed(true)}
           resizeMode="cover"
           source={{ uri: imageUrl as string }}
@@ -3215,6 +3207,11 @@ function createStyles(isDark: boolean) {
     readyButtonDisabled: {
       opacity: 0.55,
     },
+    readyActionStack: {
+      gap: 8,
+      marginTop: 8,
+      width: '100%',
+    },
     readyGhostButton: {
       alignItems: 'center',
       borderColor: 'rgba(255,255,255,0.28)',
@@ -3339,7 +3336,7 @@ function createStyles(isDark: boolean) {
     },
     dockPrimaryButton: {
       alignItems: 'center',
-      backgroundColor: palette.primaryDark,
+      backgroundColor: SitGuruAccent.primary,
       borderRadius: 999,
       flex: 1,
       flexDirection: 'row',

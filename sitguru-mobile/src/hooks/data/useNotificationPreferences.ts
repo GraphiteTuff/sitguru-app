@@ -52,6 +52,8 @@ function fromApiShape(
  */
 export function useNotificationPreferences() {
   const { user, isAuthenticated } = useAuth();
+  const userId = user?.id ?? '';
+  const metadataPreferences = user?.user_metadata?.notification_preferences;
   const [preferences, setPreferences] = useState<NotificationPreferences>(
     DEFAULT_NOTIFICATION_PREFERENCES,
   );
@@ -62,7 +64,7 @@ export function useNotificationPreferences() {
   const [message, setMessage] = useState('');
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated || !user?.id) {
+    if (!isAuthenticated || !userId) {
       setPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
       setLoading(false);
       return;
@@ -90,7 +92,7 @@ export function useNotificationPreferences() {
       const result = await supabase
         .from(table)
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (!result.error) {
@@ -100,9 +102,7 @@ export function useNotificationPreferences() {
       }
     }
 
-    const meta = user.user_metadata?.notification_preferences as
-      | Record<string, unknown>
-      | undefined;
+    const meta = metadataPreferences as Record<string, unknown> | undefined;
     if (meta) {
       setPreferences(
         preferencesFromRow({
@@ -114,15 +114,16 @@ export function useNotificationPreferences() {
     }
 
     setLoading(false);
-  }, [isAuthenticated, user?.id, user?.user_metadata?.notification_preferences]);
+  }, [isAuthenticated, metadataPreferences, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- preference fetch
     void refresh();
   }, [refresh]);
 
   const toggle = useCallback(
     async (key: NotificationPreferenceKey) => {
-      if (!user?.id) return;
+      if (!userId) return;
 
       const nextValue = !preferences[key];
       const nextPreferences = {
@@ -154,7 +155,7 @@ export function useNotificationPreferences() {
       // Client-side fallback if API base URL is unavailable.
       if (isSupabaseConfigured) {
         const payload = {
-          user_id: user.id,
+          user_id: userId,
           ...toLegacyPreferenceColumns(nextPreferences),
           updated_at: new Date().toISOString(),
         };
@@ -182,7 +183,7 @@ export function useNotificationPreferences() {
       );
       setSavingKey(null);
     },
-    [preferences, user?.id],
+    [preferences, userId],
   );
 
   return {

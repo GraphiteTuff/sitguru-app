@@ -45,11 +45,13 @@ function AnimatedFill({
   useEffect(() => {
     if (trackWidth <= 0) return;
     const target = Math.max(4, (widthPct / 100) * trackWidth);
-    width.value = 0;
-    width.value = withTiming(target, {
-      duration: 480 + delayMs,
-      easing: Easing.linear,
-    });
+    width.set(0);
+    width.set(
+      withTiming(target, {
+        duration: 480 + delayMs,
+        easing: Easing.linear,
+      }),
+    );
   }, [delayMs, trackWidth, width, widthPct]);
 
   const fillStyle = useAnimatedStyle(() => ({

@@ -95,7 +95,7 @@ export default function CommunityEventsScreen() {
           sticky={
             <ConvertActionBar
               embedded
-              helper="Going to an event? Book a Guru for the outing."
+              helper="Need a Guru for the outing?"
               label={MOBILE_CONVERT.bookLabel}
               onPress={() => router.push(MOBILE_CONVERT.exploreHref)}
               showTrust

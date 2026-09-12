@@ -66,6 +66,7 @@ export function usePartnerCommunityEvents(tab = "upcoming") {
   }, [tab]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external partner-event fetch
     void reload();
   }, [reload]);
 

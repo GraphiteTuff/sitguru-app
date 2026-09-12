@@ -394,7 +394,7 @@ export default function MessagesScreen() {
                       <Text style={styles.emptyText}>
                         {searchQuery || activeFilter !== 'all'
                           ? 'Try another search or choose All.'
-                          : 'Find a Guru and start a conversation before requesting care.'}
+                          : 'Your conversations with Gurus will appear here.'}
                       </Text>
 
                       <BubblePressable
@@ -573,6 +573,7 @@ function Avatar({
       {showImage ? (
         <Image
           accessibilityLabel={`${fallback} profile photo`}
+          alt={`${fallback} profile photo`}
           onError={() => setImageFailed(true)}
           resizeMode="cover"
           source={{ uri: imageUrl as string }}

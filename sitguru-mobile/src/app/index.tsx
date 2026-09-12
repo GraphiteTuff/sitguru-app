@@ -44,6 +44,7 @@ import {
 } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
+import { MOBILE_CONVERT } from '@/constants/mobile-experiences';
 import { BrandColors } from '@/constants/theme';
 import {
   setThemePreference,
@@ -576,12 +577,11 @@ function MarketingHomeScreen() {
                 </View>
 
                 <Text style={styles.heroTitleOnVideo}>
-                  Find trusted pet care{'\n'}near you.
+                  Meet a Guru nearby.
                 </Text>
 
                 <Text style={styles.heroSubtitleOnVideo}>
-                  Book a local Guru in minutes. Free to browse — nothing charged
-                  until they accept.
+                  Browse free. Nothing charged until they accept.
                 </Text>
 
                 <View style={styles.heroButtonRow}>
@@ -591,7 +591,7 @@ function MarketingHomeScreen() {
                     style={styles.heroPrimaryButton}
                   >
                     <Text style={styles.heroPrimaryButtonText}>
-                      Book care near you
+                      {MOBILE_CONVERT.bookLabel}
                     </Text>
                     <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
                   </BubblePressable>
@@ -617,7 +617,7 @@ function MarketingHomeScreen() {
 
           <View style={styles.belowFold}>
           <View style={styles.searchCard}>
-            <Text style={styles.searchLabel}>What service do you need?</Text>
+            <Text style={styles.searchLabel}>What does your pack need?</Text>
 
             <BubblePressable
               accessibilityRole="button"
@@ -934,8 +934,8 @@ function MarketingHomeScreen() {
         <View>
           <ConvertActionBar
             embedded
-            helper="Free to browse · Nothing charged until a Guru accepts"
-            label="Book care near you"
+            helper={MOBILE_CONVERT.bookHelper}
+            label={MOBILE_CONVERT.bookLabel}
             onPress={() => openFindCare()}
             showTrust
           />

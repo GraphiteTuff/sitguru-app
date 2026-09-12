@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- RN Animated.Value is the supported fade driver; .current is read to pass that driver into styles, not to store React state. */
 import { useEventListener } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -105,7 +106,13 @@ function HeroScrim() {
 function PosterFallback({ poster }: { poster: ImageSourcePropType }) {
   return (
     <View style={styles.root} pointerEvents="none">
-      <Image source={poster} resizeMode="cover" style={styles.fill} />
+      <Image
+        accessible={false}
+        alt=""
+        source={poster}
+        resizeMode="cover"
+        style={styles.fill}
+      />
       <HeroScrim />
     </View>
   );
@@ -132,6 +139,8 @@ function ActiveHeroClip({
   });
 
   useEffect(() => {
+    // expo-video documents a mutable player; rate/play/pause are not React state.
+    // eslint-disable-next-line react-hooks/immutability -- VideoPlayer is an external mutable host object
     player.playbackRate = playbackRate;
     if (paused) {
       player.pause();
@@ -162,7 +171,6 @@ function RotatingHeroVideo({
   activeIndex,
   onActiveIndexChange,
   onTransitionChange,
-  topInset: _topInset = 0,
   bottomInset = 0,
 }: HomeHeroMediaProps) {
   const opacity = useRef(new Animated.Value(1)).current;
@@ -211,7 +219,13 @@ function RotatingHeroVideo({
 
   return (
     <View style={styles.root}>
-      <Image source={poster} resizeMode="cover" style={styles.fill} />
+      <Image
+        accessible={false}
+        alt=""
+        source={poster}
+        resizeMode="cover"
+        style={styles.fill}
+      />
 
       <Animated.View style={[styles.fill, { opacity }]}>
         <ActiveHeroClip

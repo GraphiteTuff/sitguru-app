@@ -497,8 +497,8 @@ export default function PetParentDashboardScreen() {
 
     return {
       eyebrow: 'READY WHEN YOU ARE',
-      title: 'Book care near you',
-      helper: 'Browse trusted local Gurus — nothing charged until they accept.',
+      title: 'Find your Guru nearby',
+      helper: 'Browse free · Pay after they accept',
       route: '/find-care' as const,
     };
   }, [
@@ -640,11 +640,10 @@ export default function PetParentDashboardScreen() {
       cards.push({
         id: 'find-care',
         eyebrow: 'Ready when you are',
-        title: 'Book care near you',
-        helper:
-          'Browse local Gurus — free to send a request, nothing charged until they accept.',
+        title: 'Find your Guru nearby',
+        helper: 'Browse free · Pay after they accept',
         tone: 'primary',
-        ctaLabel: 'Find Care',
+        ctaLabel: 'Meet Gurus',
         onPress: () => router.push('/find-care'),
         icon: <Search color="#FFFFFF" size={22} strokeWidth={2.4} />,
       });
