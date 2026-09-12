@@ -40,7 +40,7 @@ import {
 
 import BubblePressable from '@/components/BubblePressable';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -841,7 +841,13 @@ export default function AmbassadorReferralAnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: 'ambassador',
+  });
 
   const hasAmbassadorRole = roles.includes('ambassador');
 
@@ -1170,7 +1176,8 @@ export default function AmbassadorReferralAnalyticsScreen() {
           <BubblePressable
             accessibilityLabel="Switch workspace"
             accessibilityRole="button"
-            onPress={() => setWorkspaceSwitcherOpen(true)}
+            haptic="none"
+            {...avatarPressProps}
             scaleTo={0.88}
             style={styles.avatar}>
             {avatarUrl && !avatarFailed ? (
@@ -1688,11 +1695,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
 
       <SitGuruTabBar active="referrals" role="ambassador" />
 
-      <SitGuruWorkspaceSwitcher
-        currentRole="ambassador"
-        onClose={() => setWorkspaceSwitcherOpen(false)}
-        visible={workspaceSwitcherOpen}
-      />
+              {workspaceMenus}
     </View>
   );
 

@@ -66,8 +66,8 @@ export default function CustomerBottomNav() {
             href={item.href}
             className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-black transition ${
               active
-                ? "bg-emerald-50 text-emerald-800"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                ? "bg-[#0D5C3A] text-white shadow-sm"
+                : "text-slate-500 hover:bg-sky-50 hover:text-[#0D5C3A]"
             }`}
           >
             <Icon className="h-5 w-5" aria-hidden />

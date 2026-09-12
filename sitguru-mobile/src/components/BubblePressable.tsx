@@ -119,14 +119,22 @@ export default function BubblePressable({
         }
         onPressOut?.(event);
       }}
-      style={[style, contentStyle, bubble ? styles.clipVisible : null]}
+      style={[
+        style,
+        contentStyle,
+        bubble
+          ? bubblePlacement === 'glyph'
+            ? styles.clipVisible
+            : styles.clipHidden
+          : null,
+      ]}
     >
       {bubble ? (
         <Animated.View
           pointerEvents="none"
           style={[
             styles.bubble,
-            bubblePlacement === 'glyph' ? styles.glyphBubble : null,
+            bubblePlacement === 'glyph' ? styles.glyphBubble : styles.fillBubble,
             { backgroundColor: bubbleColor },
             bubbleStyle,
             bubbleAnimatedStyle,
@@ -143,16 +151,23 @@ const styles = StyleSheet.create({
   clipVisible: {
     overflow: 'visible',
   },
+  clipHidden: {
+    overflow: 'hidden',
+  },
   bubble: {
-    borderRadius: 999,
-    bottom: -6,
-    left: -6,
     position: 'absolute',
-    right: -6,
-    top: -6,
+  },
+  /** Wide CTAs: tint stays inside the button shape (not a floating circle). */
+  fillBubble: {
+    borderRadius: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
   },
   glyphBubble: {
     alignSelf: 'center',
+    borderRadius: 999,
     bottom: undefined,
     height: 46,
     left: '50%',

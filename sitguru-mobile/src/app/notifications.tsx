@@ -39,7 +39,7 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import {
@@ -482,10 +482,19 @@ export default function NotificationsScreen() {
 
   const activeRole: AppRole = primaryRole || roles[0] || 'pet_parent';
 
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: activeRole,
+    profileHref: '/account',
+    profileLabel: 'Manage account',
+  });
+
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [selectedFilter, setSelectedFilter] =
     useState<NotificationCategory>('all');
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
@@ -804,7 +813,8 @@ export default function NotificationsScreen() {
                       <BubblePressable
                         accessibilityLabel="Switch workspace"
                         accessibilityRole="button"
-                        onPress={() => setWorkspaceSwitcherOpen(true)}
+                        haptic="none"
+                        {...avatarPressProps}
                         scaleTo={0.88}
                         style={styles.profileButton}>
                         <HeaderAvatar
@@ -1077,13 +1087,7 @@ export default function NotificationsScreen() {
         </View>
       </SitGuruScreen>
 
-      <SitGuruWorkspaceSwitcher
-        currentRole={activeRole}
-        onClose={() => setWorkspaceSwitcherOpen(false)}
-        profileHref="/account"
-        profileLabel="Manage account"
-        visible={workspaceSwitcherOpen}
-      />
+      {workspaceMenus}
     </>
   );
 }

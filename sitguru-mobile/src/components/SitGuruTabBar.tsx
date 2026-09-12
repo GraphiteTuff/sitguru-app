@@ -22,6 +22,7 @@ import {
 } from '@/constants/toolbar-overflow';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import type { AppRole } from '@/types/auth';
 
 export type SitGuruTabRole = 'petParent' | 'guru' | 'ambassador' | 'visitor';
@@ -45,17 +46,13 @@ type TabDefinition = {
   params?: Record<string, string>;
 };
 
+/*
+ * Thumb-zone order: keep Find Care on the right (beside Profile), matching
+ * Instagram/TikTok/Facebook — primary browse action + avatar on the right.
+ */
 const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
   visitor: [
     { key: 'home', label: 'Home', icon: Home, href: '/' },
-    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
-    {
-      key: 'profile',
-      label: 'Join',
-      icon: User,
-      href: '/signup',
-      params: { role: 'parent' },
-    },
     {
       key: 'events',
       label: 'Events',
@@ -69,10 +66,17 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       href: '/ai-companion',
       params: { id: 'rogue' },
     },
+    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
+    {
+      key: 'profile',
+      label: 'Join',
+      icon: User,
+      href: '/signup',
+      params: { role: 'parent' },
+    },
   ],
   petParent: [
     { key: 'home', label: 'Home', icon: Home, href: '/pet-parent-dashboard' },
-    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
     {
       key: 'bookings',
       label: 'Bookings',
@@ -85,11 +89,11 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: MessageCircle,
       href: '/messages',
     },
+    { key: 'explore', label: 'Find Care', icon: Search, href: '/find-care' },
     { key: 'profile', label: 'Profile', icon: User, href: '/account' },
   ],
   guru: [
     { key: 'home', label: 'Dashboard', icon: Home, href: '/guru-dashboard' },
-    { key: 'careMap', label: 'Care Map', icon: Map, href: '/guru-care-map' },
     {
       key: 'bookings',
       label: 'Bookings',
@@ -102,6 +106,7 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: MessageCircle,
       href: '/messages',
     },
+    { key: 'careMap', label: 'Care Map', icon: Map, href: '/guru-care-map' },
     { key: 'profile', label: 'Profile', icon: User, href: '/guru-profile' },
   ],
   ambassador: [
@@ -113,16 +118,16 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       href: '/ambassador-referral-analytics',
     },
     {
-      key: 'payouts',
-      label: 'Payouts',
-      icon: Wallet,
-      href: '/ambassador-payouts',
-    },
-    {
       key: 'messages',
       label: 'Messages',
       icon: MessageCircle,
       href: '/messages',
+    },
+    {
+      key: 'payouts',
+      label: 'Payouts',
+      icon: Wallet,
+      href: '/ambassador-payouts',
     },
     { key: 'profile', label: 'Profile', icon: User, href: '/account' },
   ],
@@ -177,6 +182,20 @@ function navigateOverflowHref(
   router.navigate(href as never);
 }
 
+function profileInitials(
+  name?: string | null,
+  email?: string | null,
+) {
+  const source = name?.trim() || email?.split('@')[0] || '';
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  return source.slice(0, 2).toUpperCase() || 'SG';
+}
+
 /** Tap a tab to move. The bubble slides; sections are never swipe-paged. */
 export default function SitGuruTabBar({
   active,
@@ -187,7 +206,7 @@ export default function SitGuruTabBar({
   const isDark = useThemeMode() === 'dark';
   const pathname = usePathname();
   const routeParams = useLocalSearchParams();
-  const { primaryRole } = useAuth();
+  const { primaryRole, profile, user } = useAuth();
 
   const resolvedRole = role ?? toTabRole(primaryRole);
   const palette = getTabChromePalette(resolvedRole, isDark);
@@ -197,6 +216,23 @@ export default function SitGuruTabBar({
   const overflowItems = useMemo(
     () => ADDITIONAL_OVERFLOW_ITEMS[resolvedRole],
     [resolvedRole],
+  );
+
+  const profileName = useMemo(() => {
+    const full =
+      profile?.full_name?.trim() ||
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
+    return full || user?.email?.split('@')[0] || 'You';
+  }, [profile?.first_name, profile?.full_name, profile?.last_name, user?.email]);
+
+  const profileAvatarUrl = useMemo(
+    () => resolveSupabaseStorageUrl(profile?.avatar_url),
+    [profile?.avatar_url],
+  );
+
+  const profileAvatarInitials = useMemo(
+    () => profileInitials(profileName, user?.email),
+    [profileName, user?.email],
   );
 
   return (
@@ -225,6 +261,13 @@ export default function SitGuruTabBar({
         label: tab.label,
         icon: tab.icon,
         badge: badges?.[tab.key],
+        // Social-app pattern: Profile (and Join) show the account avatar.
+        ...(tab.key === 'profile' && resolvedRole !== 'visitor'
+          ? {
+              avatarUrl: profileAvatarUrl,
+              avatarInitials: profileAvatarInitials,
+            }
+          : {}),
       }))}
     />
   );

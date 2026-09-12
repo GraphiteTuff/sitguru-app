@@ -1179,12 +1179,12 @@ export default async function AmbassadorDashboardPage() {
             trainingProgress.label,
           ]}
           metaExtra={
-            <div className="flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 rounded-2xl border border-sky-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
                   Ambassador Code
                 </p>
-                <p className="mt-1 break-all text-3xl font-black tracking-tight text-emerald-950">
+                <p className="mt-1 break-all text-3xl font-black tracking-tight text-slate-950">
                   {referralCode}
                 </p>
               </div>

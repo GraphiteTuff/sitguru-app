@@ -1972,7 +1972,7 @@ export default async function GuruDashboardPage() {
   });
 
   return (
-    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 !text-slate-950 sm:px-5 lg:px-6">
+    <main className="min-h-[100svh] bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_48%,#EEF6FF_100%)] px-3 py-4 !text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <UniversalRoleDashboard
           role="guru"
