@@ -38,15 +38,25 @@ export default function SitGuruButton({
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
   const isDanger = variant === 'danger';
+  const radius =
+    size === 'compact' ? 14 : ButtonMetrics.ctaRadius;
+
+  const secondarySurface = isDark ? theme.primarySoft : SitGuruAccent.soft;
+  const secondaryBorder = isDark ? '#4CD98A' : SitGuruAccent.primary;
+  const secondaryLabel = isDark ? '#E8FFF2' : SitGuruAccent.text;
+  const pressBubble = isPrimary
+    ? 'rgba(255,255,255,0.22)'
+    : isDark
+      ? 'rgba(117, 198, 154, 0.28)'
+      : 'rgba(47, 163, 107, 0.16)';
 
   return (
     <BubblePressable
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       bubble={!disabled}
-      bubbleColor={
-        isPrimary ? 'rgba(255,255,255,0.22)' : SitGuruAccent.soft
-      }
+      bubbleColor={pressBubble}
+      bubbleStyle={{ borderRadius: radius }}
       disabled={disabled}
       onPress={onPress}
       scaleTo={disabled ? 1 : 0.94}
@@ -58,9 +68,9 @@ export default function SitGuruButton({
         isPrimary ? styles.primaryButton : null,
         isSecondary
           ? {
-              backgroundColor: theme.card,
-              borderColor: isDark ? theme.borderStrong : SitGuruAccent.border,
-              borderWidth: 1,
+              backgroundColor: secondarySurface,
+              borderColor: secondaryBorder,
+              borderWidth: 1.5,
             }
           : null,
         isDanger
@@ -84,7 +94,7 @@ export default function SitGuruButton({
           styles.buttonText,
           size === 'compact' ? styles.compactText : null,
           isPrimary ? styles.primaryText : null,
-          isSecondary ? { color: isDark ? theme.primary : SitGuruAccent.text } : null,
+          isSecondary ? { color: secondaryLabel } : null,
           isDanger ? { color: theme.danger } : null,
           variant === 'ghost' ? { color: isDark ? theme.primary : SitGuruAccent.text } : null,
           disabled ? { color: theme.muted } : null,

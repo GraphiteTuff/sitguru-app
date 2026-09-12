@@ -155,18 +155,18 @@ export function getTabChromePalette(
   if (role === 'guru') {
     return isDark
       ? {
-          fallback: '#0E1A15',
-          border: 'rgba(74,155,118,0.35)',
-          activeColor: '#5CE09A',
-          mutedColor: '#8FA89A',
-          bubble: 'rgba(74,200,130,0.28)',
-          tint: '#0E1A15',
+          fallback: '#12241C',
+          border: 'rgba(92,224,154,0.45)',
+          activeColor: '#7AEDB0',
+          mutedColor: '#C5D9CE',
+          bubble: 'rgba(92,224,154,0.32)',
+          tint: '#12241C',
         }
       : {
           fallback: '#FFFFFF',
-          border: '#CFE5D7',
+          border: '#B8D9C8',
           activeColor: '#214C35',
-          mutedColor: '#6F8176',
+          mutedColor: '#4F6558',
           bubble: SitGuruAccent.selectedPill,
           tint: '#F8FCF9',
         };
@@ -175,18 +175,18 @@ export function getTabChromePalette(
   if (role === 'visitor') {
     return isDark
       ? {
-          fallback: '#101A16',
-          border: 'rgba(40,70,55,0.6)',
-          activeColor: '#58D58A',
-          mutedColor: '#8FA096',
-          bubble: 'rgba(88,213,138,0.24)',
-          tint: '#101A16',
+          fallback: '#12241C',
+          border: 'rgba(92,224,154,0.42)',
+          activeColor: '#7AEDB0',
+          mutedColor: '#C5D9CE',
+          bubble: 'rgba(88,213,138,0.3)',
+          tint: '#12241C',
         }
       : {
           fallback: '#FFFFFF',
-          border: '#CFE5D7',
+          border: '#B8D9C8',
           activeColor: '#214C35',
-          mutedColor: '#6F8176',
+          mutedColor: '#4F6558',
           bubble: SitGuruAccent.selectedPill,
           tint: '#FFFCF7',
         };
@@ -194,18 +194,18 @@ export function getTabChromePalette(
 
   return isDark
     ? {
-        fallback: '#101A16',
-        border: 'rgba(30,59,43,0.7)',
-        activeColor: '#7ED9A8',
-        mutedColor: '#8FA096',
-        bubble: 'rgba(47,163,107,0.32)',
-        tint: '#101A16',
+        fallback: '#12241C',
+        border: 'rgba(126,217,168,0.45)',
+        activeColor: '#8EE4B4',
+        mutedColor: '#C5D9CE',
+        bubble: 'rgba(126,217,168,0.34)',
+        tint: '#12241C',
       }
     : {
         fallback: '#FFFFFF',
-        border: '#CFE5D7',
+        border: '#B8D9C8',
         activeColor: '#214C35',
-        mutedColor: '#6F8176',
+        mutedColor: '#4F6558',
         bubble: SitGuruAccent.selectedPill,
         tint: '#FFFCF7',
       };

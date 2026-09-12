@@ -131,7 +131,7 @@ export default function CustomerDashboardHeader({
           className="flex min-w-fit items-center gap-3"
           aria-label="SitGuru Customer Dashboard"
         >
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-sky-50 ring-1 ring-sky-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/sitguru-logo-cropped.png"
@@ -141,11 +141,11 @@ export default function CustomerDashboardHeader({
           </div>
 
           <div className="hidden leading-tight sm:block">
-            <p className="text-sm font-black tracking-tight text-emerald-950">
+            <p className="text-sm font-black tracking-tight text-slate-950">
               SitGuru
             </p>
-            <p className="text-xs font-semibold text-emerald-600">
-              Customer Portal
+            <p className="text-xs font-semibold text-[#0D5C3A]">
+              Pet Parent Portal
             </p>
           </div>
         </Link>
@@ -161,14 +161,14 @@ export default function CustomerDashboardHeader({
                 className={[
                   "relative rounded-full px-4 py-2 text-sm font-bold transition",
                   active
-                    ? "bg-emerald-50 text-emerald-800"
-                    : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800",
+                    ? "bg-[#0D5C3A] text-white shadow-sm"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-[#0D5C3A]",
                 ].join(" ")}
               >
                 {item.label}
 
                 {active ? (
-                  <span className="absolute -bottom-2 left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-emerald-500" />
+                  <span className="absolute -bottom-2 left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-sky-400" />
                 ) : null}
               </Link>
             );
@@ -178,7 +178,7 @@ export default function CustomerDashboardHeader({
         <div className="relative flex items-center gap-3">
           <Link
             href="/customer/dashboard/bookings"
-            className="hidden min-h-[44px] items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-100 md:inline-flex"
+            className="hidden min-h-[44px] items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-4 text-sm font-black text-[#0D5C3A] shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white md:inline-flex"
           >
             My Care
           </Link>
@@ -187,19 +187,19 @@ export default function CustomerDashboardHeader({
 
           <div className="hidden text-right md:block">
             <p className="text-sm font-black text-slate-950">{displayName}</p>
-            <p className="text-xs font-semibold text-emerald-600">
-              Customer Account
+            <p className="text-xs font-semibold text-[#0D5C3A]">
+              Pet Parent Account
             </p>
           </div>
 
           <button
             type="button"
             onClick={() => setProfileOpen((current) => !current)}
-            className="flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-2 py-2 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+            className="flex items-center gap-2 rounded-full border border-sky-100 bg-white px-2 py-2 shadow-sm transition hover:border-sky-300 hover:bg-sky-50"
             aria-label="Open customer menu"
             aria-expanded={profileOpen}
           >
-            <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-black text-emerald-800 ring-2 ring-emerald-200">
+            <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[#0D5C3A] text-sm font-black text-white ring-2 ring-sky-200">
               {!imageFailed && displayImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -213,16 +213,16 @@ export default function CustomerDashboardHeader({
               )}
             </span>
 
-            <span className="hidden text-lg font-black text-emerald-700 sm:inline">
+            <span className="hidden text-lg font-black text-[#0D5C3A] sm:inline">
               {profileOpen ? "▴" : "▾"}
             </span>
           </button>
 
           {profileOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-64 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl">
-              <div className="border-b border-emerald-50 bg-emerald-50/80 px-4 py-4">
+            <div className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-64 overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-xl">
+              <div className="border-b border-sky-50 bg-sky-50/80 px-4 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white text-sm font-black text-emerald-700 ring-2 ring-emerald-200">
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#0D5C3A] text-sm font-black text-white ring-2 ring-sky-200">
                     {!imageFailed && displayImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -240,8 +240,8 @@ export default function CustomerDashboardHeader({
                     <p className="text-sm font-black text-slate-950">
                       {displayName}
                     </p>
-                    <p className="text-xs font-semibold text-emerald-700">
-                      Customer Profile
+                    <p className="text-xs font-semibold text-[#0D5C3A]">
+                      Pet Parent Profile
                     </p>
                   </div>
                 </div>
