@@ -631,7 +631,9 @@ function GuruSnapshotCard({
           />
         ) : (
           <View style={styles.guruAvatarFallback}>
-            <PawPrint color={palette.primaryDark} size={18} strokeWidth={2.4} />
+            <Text style={styles.guruAvatarInitials}>
+              {initialsFromName(card.name)}
+            </Text>
           </View>
         )}
       </View>
