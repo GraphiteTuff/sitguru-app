@@ -674,14 +674,14 @@ export default function Header({ user = null }: HeaderProps) {
     : "/customer/dashboard/pawperks";
 
   const displayRole = isGuru
-    ? "SitGuru Guru"
+    ? "Guru"
     : isAdmin
-      ? "SitGuru Admin"
+      ? "Admin"
       : isAmbassador
-        ? "SitGuru Ambassador"
+        ? "Ambassador"
         : isIntern
-          ? "SitGuru Intern"
-          : "SitGuru Pet Parent";
+          ? "Intern"
+          : "Pet Parent";
 
   const logoHref = "/";
   const userName = activeUser?.name || (isAdmin ? "SitGuru Admin" : "My Account");
@@ -689,11 +689,21 @@ export default function Header({ user = null }: HeaderProps) {
   const userAvatarUrl = normalizeAvatarUrl(activeUser?.avatarUrl);
   const userInitials = getInitials(userName, userEmail);
 
+  const accountLevelLinks: NavLink[] = [
+    { label: "Profile & Account", href: "/account" },
+    { label: "Settings", href: "/account/settings" },
+    {
+      label: "Notifications",
+      href: "/customer/dashboard/profile/notifications",
+    },
+    { label: "Help & Support", href: "/help/account" },
+  ];
+
   const accountMenuLinks: NavLink[] = isGuru
     ? [
         { label: "Dashboard", href: "/guru/dashboard" },
         { label: "Pricing Workspace", href: "/guru/dashboard/pricing" },
-        { label: "Update Guru Profile", href: "/guru/dashboard/profile" },
+        { label: "Guru Profile", href: "/guru/dashboard/profile" },
         { label: "Bookings", href: "/guru/dashboard/bookings" },
         { label: "Referrals", href: "/guru/dashboard/referrals" },
         { label: "Messages", href: "/guru/dashboard/messages" },
@@ -706,7 +716,6 @@ export default function Header({ user = null }: HeaderProps) {
           { label: "Dashboard", href: "/ambassador/dashboard" },
           { label: "Referrals", href: "/ambassador/dashboard/referrals" },
           { label: "Earnings", href: "/ambassador/dashboard/earnings" },
-          { label: "Support", href: "mailto:support@sitguru.com" },
           { label: "Training", href: "/ambassador/dashboard/training" },
           {
             label: "Onboarding",
@@ -718,7 +727,9 @@ export default function Header({ user = null }: HeaderProps) {
       : isAdmin
         ? [
             { label: "Dashboard", href: "/admin" },
-            { label: "Update Profile", href: "/admin/settings" },
+            { label: "Manage Accounts", href: "/admin/accounts" },
+            { label: "Account Lifecycle", href: "/admin/account-lifecycle" },
+            { label: "Admin Settings", href: "/admin/settings" },
             { label: "Messages", href: "/admin/messages" },
             { label: "Pet Parents", href: "/admin/petparents" },
             { label: "Gurus", href: "/admin/gurus" },
@@ -728,7 +739,7 @@ export default function Header({ user = null }: HeaderProps) {
         : [
             { label: "Dashboard", href: "/customer/dashboard" },
             {
-              label: "Update Pet Parent Profile",
+              label: "Pet Parent Profile",
               href: "/customer/dashboard/profile",
             },
             { label: "My Care", href: "/customer/dashboard/bookings" },
@@ -917,28 +928,52 @@ export default function Header({ user = null }: HeaderProps) {
 
                     <div className="grid gap-1 p-3">
                       <AccountRoleSwitcher
+                        includeAdmin
                         currentRole={currentSwitchRole}
                         authorizedRoles={authorizedRoles}
                         onNavigate={() => setAvatarOpen(false)}
                         className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
                       />
-                      {accountMenuLinks.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          role="menuitem"
-                          onClick={() => setAvatarOpen(false)}
-                          className="rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
+
+                      <div className="my-1 border-t border-slate-100 pt-1">
+                        <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                          Account
+                        </p>
+                        {accountLevelLinks.map((item) => (
+                          <Link
+                            key={`account-${item.href}`}
+                            href={item.href}
+                            role="menuitem"
+                            onClick={() => setAvatarOpen(false)}
+                            className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+
+                      <div className="my-1 border-t border-slate-100 pt-1">
+                        <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                          Workspace
+                        </p>
+                        {accountMenuLinks.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            role="menuitem"
+                            onClick={() => setAvatarOpen(false)}
+                            className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
 
                       <button
                         type="button"
                         role="menuitem"
                         onClick={handleLogout}
-                        className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
+                        className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-slate-50"
                       >
                         <LogOut className="h-5 w-5" />
                         Log Out
@@ -1019,6 +1054,7 @@ export default function Header({ user = null }: HeaderProps) {
                   <NotificationBell />
                 </div>
                 <AccountRoleSwitcher
+                        includeAdmin
                   currentRole={currentSwitchRole}
                   authorizedRoles={authorizedRoles}
                   onNavigate={() => setMobileOpen(false)}
@@ -1069,6 +1105,22 @@ export default function Header({ user = null }: HeaderProps) {
 
             {isLoggedIn ? (
               <>
+                <p className="px-4 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                  Account
+                </p>
+                {accountLevelLinks.map((item) => (
+                  <Link
+                    key={`mobile-account-${item.href}`}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                <p className="px-4 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                  Workspace
+                </p>
                 {accountMenuLinks.map((item) => (
                   <Link
                     key={`mobile-${item.href}`}
@@ -1082,7 +1134,7 @@ export default function Header({ user = null }: HeaderProps) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
+                  className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-slate-50"
                 >
                   <LogOut className="h-4 w-4" />
                   Log Out

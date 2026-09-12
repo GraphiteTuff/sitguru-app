@@ -27,7 +27,6 @@ import { AppFonts } from '@/constants/fonts';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import type { TabChromePalette } from '@/constants/role-palettes';
-import { SitGuruAccent } from '@/constants/button-tokens';
 import { TAB_BAR_MOTION } from '@/constants/tab-bar-motion';
 import { useTabBarMotion } from '@/context/TabBarMotionContext';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -363,9 +362,8 @@ function FloatingTabItem({
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
         active={active}
-        bubble
-        bubbleColor={SitGuruAccent.soft}
-        bubblePlacement="glyph"
+        bubble={false}
+        // One sliding selection bubble on the bar — no per-tab glyph bubble.
         haptic="selection"
         hitSlop={10}
         onPress={onPress}
@@ -455,6 +453,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: (IDLE_BAR_HEIGHT - PILL_HEIGHT) / 2,
     width: PILL_WIDTH,
+    zIndex: 0,
   },
   tab: {
     alignItems: 'center',
@@ -466,7 +465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 4,
     width: '100%',
-    zIndex: 1,
+    zIndex: 2,
   },
   iconWell: {
     alignItems: 'center',

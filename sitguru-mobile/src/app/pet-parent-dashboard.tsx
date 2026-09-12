@@ -49,6 +49,7 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarMenus } from '@/hooks/useOwnAvatarMenus';
 import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
 import { AI_COMPANIONS } from '@/constants/companions';
 import { getDashboardPalette } from '@/constants/role-palettes';
@@ -231,7 +232,7 @@ export default function PetParentDashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
   const [now, setNow] = useState(Date.now());
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const avatarMenus = useOwnAvatarMenus();
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
   const [needsVisitReview, setNeedsVisitReview] = useState(false);
@@ -852,8 +853,9 @@ export default function PetParentDashboardScreen() {
 
               <SitGuruWorkspaceSwitcher
                 currentRole="pet_parent"
-                onClose={() => setWorkspaceSwitcherOpen(false)}
-                visible={workspaceSwitcherOpen}
+                onClose={avatarMenus.close}
+                variant={avatarMenus.variant}
+                visible={avatarMenus.visible}
               />
             </View>
           }
@@ -903,8 +905,10 @@ export default function PetParentDashboardScreen() {
 
                 <TouchTarget
                   accessibilityRole="button"
-                  accessibilityLabel="Switch workspace"
-                  onPress={() => setWorkspaceSwitcherOpen(true)}
+                  accessibilityLabel="Open profile and account menu. Long press to switch workspace."
+                  delayLongPress={380}
+                  onLongPress={avatarMenus.openQuick}
+                  onPress={avatarMenus.openFull}
                   style={styles.profileButton}
                 >
                   <Avatar

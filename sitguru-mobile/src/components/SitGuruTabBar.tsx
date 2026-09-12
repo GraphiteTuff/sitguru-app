@@ -1,4 +1,9 @@
-import { router, useLocalSearchParams, usePathname } from 'expo-router';
+import {
+  router,
+  useIsFocused,
+  useLocalSearchParams,
+  usePathname,
+} from 'expo-router';
 import {
   CalendarDays,
   Home,
@@ -188,6 +193,9 @@ export default function SitGuruTabBar({
   const pathname = usePathname();
   const routeParams = useLocalSearchParams();
   const { primaryRole } = useAuth();
+  // Expo Stack keeps prior screens mounted. Only the focused screen may draw
+  // the dock — otherwise Home's bubble stays visible and covers Find Care.
+  const isFocused = useIsFocused();
 
   const resolvedRole = role ?? toTabRole(primaryRole);
   const palette = getTabChromePalette(resolvedRole, isDark);
@@ -198,6 +206,10 @@ export default function SitGuruTabBar({
     () => ADDITIONAL_OVERFLOW_ITEMS[resolvedRole],
     [resolvedRole],
   );
+
+  if (!isFocused) {
+    return null;
+  }
 
   return (
     <FloatingBubbleTabBar

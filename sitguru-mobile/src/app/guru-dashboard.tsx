@@ -46,6 +46,7 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarMenus } from '@/hooks/useOwnAvatarMenus';
 import { SitGuruColors } from '@/constants/colors';
 import { getDashboardPalette } from '@/constants/role-palettes';
 import { AppFonts } from '@/constants/fonts';
@@ -318,8 +319,7 @@ export default function GuruDashboardScreen() {
   const [now, setNow] =
     useState(Date.now());
 
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] =
-    useState(false);
+  const avatarMenus = useOwnAvatarMenus();
 
   const profileName =
     firstString(profileRecord, [
@@ -1127,7 +1127,7 @@ export default function GuruDashboardScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Switch workspace"
                         onPress={() =>
-                          setWorkspaceSwitcherOpen(true)
+                          avatarMenus.openFull()
                         }
                         scaleTo={0.88}
                         style={
@@ -1828,8 +1828,9 @@ export default function GuruDashboardScreen() {
 
                 <SitGuruWorkspaceSwitcher
                   currentRole="guru"
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
+                  onClose={() => avatarMenus.close()}
+                  variant={avatarMenus.variant}
+                  visible={avatarMenus.visible}
                 />
               </View>
             </View>

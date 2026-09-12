@@ -21,7 +21,9 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 
 export function tabSlotPillWidth(rowWidth: number, slotCount: number) {
   const slot = rowWidth / Math.max(slotCount, 1);
-  return Math.min(ButtonMetrics.tabPillWidth + 4, Math.max(48, slot - 8));
+  // Keep the pill inside one slot so it cannot cover the neighboring label
+  // (e.g. Home's bubble overlapping "Find Care").
+  return Math.min(ButtonMetrics.tabPillWidth, Math.max(40, slot - 16));
 }
 
 export function tabSlotX(
@@ -114,8 +116,10 @@ export function TabBarMotionProvider({ children }: { children: ReactNode }) {
       }
 
       const slot = width / slotCount;
+      // Keep travel stretch modest so the pill never reads as a second
+      // circle over the neighboring tab (Home covering Find Care).
       const stretch =
-        1 + Math.min(0.12, 0.04 + (travel / Math.max(slot, 1)) * 0.06);
+        1 + Math.min(0.06, 0.02 + (travel / Math.max(slot, 1)) * 0.03);
 
       bubbleX.set(withSpring(nextX, TAB_BAR_MOTION.slideSpring));
       bubbleStretchX.set(

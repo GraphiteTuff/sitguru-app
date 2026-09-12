@@ -17,6 +17,7 @@ import {
   Settings,
   ShieldCheck,
   Megaphone,
+  UserRound,
   Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -385,8 +386,60 @@ export default function AdminAccountMenu() {
               currentRole={resolveDashboardRoleFromPath(pathname) || "admin"}
               authorizedRoles={adminSwitchRoles}
               onNavigate={() => setOpen(false)}
+              includeAdmin
               className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
             />
+
+            <div className="my-1 border-t border-slate-100 pt-1">
+              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Account
+              </p>
+              <Link
+                href="/account"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              >
+                <UserRound size={19} className="text-green-800" />
+                Profile & Account
+              </Link>
+              <Link
+                href="/account/settings"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              >
+                <Settings size={19} className="text-green-800" />
+                Account settings
+              </Link>
+              {growthOnly ? null : (
+                <>
+                  <Link
+                    href="/admin/accounts"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+                  >
+                    <ShieldCheck size={19} className="text-green-800" />
+                    Manage accounts
+                  </Link>
+                  <Link
+                    href="/admin/account-lifecycle"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+                  >
+                    <Users size={19} className="text-green-800" />
+                    Account lifecycle
+                  </Link>
+                </>
+              )}
+            </div>
+
+            <div className="my-1 border-t border-slate-100 pt-1">
+              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Workspace
+              </p>
             <Link
               href="/admin/growth"
               role="menuitem"
@@ -460,6 +513,8 @@ export default function AdminAccountMenu() {
             </Link>
               </>
             )}
+
+            </div>
 
             <Link
               href="/"
