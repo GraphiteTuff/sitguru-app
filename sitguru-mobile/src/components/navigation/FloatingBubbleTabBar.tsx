@@ -362,6 +362,7 @@ function FloatingTabItem({
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
         active={active}
+        bubble={false}
         // One sliding selection bubble on the bar — no per-tab glyph bubble.
         haptic="selection"
         hitSlop={10}
@@ -452,6 +453,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: (IDLE_BAR_HEIGHT - PILL_HEIGHT) / 2,
     width: PILL_WIDTH,
+    zIndex: 0,
   },
   tab: {
     alignItems: 'center',
@@ -463,7 +465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 4,
     width: '100%',
-    zIndex: 1,
+    zIndex: 2,
   },
   iconWell: {
     alignItems: 'center',
