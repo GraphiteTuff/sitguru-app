@@ -68,6 +68,7 @@ import {
   getGuruVisibilityLabel,
   isGuruBookable,
   isKnownPreviewGuru,
+  isRealGuruPhotoUrl,
   type PublicGuruProfile,
 } from "@/types/guru";
 
@@ -76,6 +77,12 @@ import {
 const MapsModule = Platform.OS === "web" ? null : require("react-native-maps");
 const NativeMapView = MapsModule?.default ?? MapsModule?.MapView;
 const NativeMarker = MapsModule?.Marker;
+
+/** Resolve storage paths, then drop OAuth / SitGuru placeholder tiles. */
+function resolveGuruPhotoUrl(guru: PublicGuruProfile) {
+  const resolved = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
+  return isRealGuruPhotoUrl(resolved) ? resolved : "";
+}
 
 /**
  * Tracks the photo that failed rather than a boolean, so a new photoUrl clears
@@ -104,16 +111,18 @@ function GuruAvatarImage({
   initialsStyle?: StyleProp<TextStyle>;
 }) {
   const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
+  const usablePhoto =
+    photoUrl && isRealGuruPhotoUrl(photoUrl) && !imageFailed ? photoUrl : "";
   const initials = initialsFromName(name);
 
-  if (photoUrl && !imageFailed) {
+  if (usablePhoto) {
     return (
       <Image
         accessibilityLabel={`${name || "Guru"} profile photo`}
         alt={`${name || "Guru"} profile photo`}
         onError={markImageFailed}
         resizeMode="cover"
-        source={{ uri: photoUrl }}
+        source={{ uri: usablePhoto }}
         style={style as StyleProp<ImageStyle>}
       />
     );
@@ -143,9 +152,11 @@ function GuruCardHeroImage({
   styles: ReturnType<typeof createStyles>;
 }) {
   const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
+  const usablePhoto =
+    photoUrl && isRealGuruPhotoUrl(photoUrl) && !imageFailed ? photoUrl : "";
   const initials = initialsFromName(name);
 
-  if (!photoUrl || imageFailed) {
+  if (!usablePhoto) {
     return (
       <View style={styles.guruProfilePhotoStage}>
         <View style={styles.guruProfilePhotoInitialsWrap}>
@@ -164,7 +175,7 @@ function GuruCardHeroImage({
         blurRadius={Platform.OS === "web" ? 0 : 6}
         onError={markImageFailed}
         resizeMode="cover"
-        source={{ uri: photoUrl }}
+        source={{ uri: usablePhoto }}
         style={styles.guruProfilePhotoBackdrop}
       />
 
@@ -178,7 +189,7 @@ function GuruCardHeroImage({
         alt={`${name || "Guru"} profile photo`}
         onError={markImageFailed}
         resizeMode="contain"
-        source={{ uri: photoUrl }}
+        source={{ uri: usablePhoto }}
         style={styles.guruProfilePhoto}
       />
     </View>
@@ -188,14 +199,11 @@ function GuruCardHeroImage({
 function initialsFromName(name?: string | null) {
   const cleaned = name?.trim();
   if (!cleaned) return "SG";
-  return (
-    cleaned
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase() || "SG"
-  );
+  const parts = cleaned.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase() || "SG";
 }
 
 type ServiceOption = {
@@ -963,7 +971,7 @@ export default function FindCareScreen() {
         guru,
         id: String(guru.id),
         name: getGuruDisplayName(guru),
-        photoUrl: resolveSupabaseStorageUrl(getGuruPhotoUrl(guru)),
+        photoUrl: resolveGuruPhotoUrl(guru),
         city: getGuruCity(guru),
         stateCode,
         stateName: stateMeta.stateName,
@@ -2530,7 +2538,7 @@ function GuruDiscoveryCard({
 }) {
   const name = getGuruDisplayName(guru);
   const firstName = getGuruFirstName(guru);
-  const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
+  const photoUrl = resolveGuruPhotoUrl(guru);
   const isFavorite = favoriteGuruIds.includes(String(guru.id));
   const preview = isKnownPreviewGuru(guru);
   const bookable = isGuruBookable(guru);
@@ -2690,7 +2698,7 @@ function MapGuruPreviewCard({
 }) {
   const name = getGuruDisplayName(guru);
   const firstName = getGuruFirstName(guru);
-  const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
+  const photoUrl = resolveGuruPhotoUrl(guru);
   const isFavorite = favoriteGuruIds.includes(String(guru.id));
   const preview = isKnownPreviewGuru(guru);
   const bookable = isGuruBookable(guru);
@@ -5427,13 +5435,13 @@ function createStyles(isDark: boolean) {
     },
     nativeMarkerFallback: {
       alignItems: "center",
-      backgroundColor: "#F5FBF6",
+      backgroundColor: palette.primary,
       height: "100%",
       justifyContent: "center",
       width: "100%",
     },
     nativeMarkerInitials: {
-      color: palette.primaryDark,
+      color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
       fontSize: 12,
     },
@@ -6075,16 +6083,16 @@ function createStyles(isDark: boolean) {
     },
     guruProfilePhotoInitialsWrap: {
       alignItems: "center",
-      backgroundColor: isDark ? "#163326" : "#EEF7F1",
+      backgroundColor: palette.primary,
       flex: 1,
       justifyContent: "center",
       width: "100%",
     },
     guruProfilePhotoInitials: {
-      color: palette.primaryDark,
+      color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
-      fontSize: 42,
-      letterSpacing: -1,
+      fontSize: 40,
+      letterSpacing: 0.5,
     },
     guruProfilePhotoShade: {
       backgroundColor: "rgba(5, 29, 21, 0.12)",
@@ -6866,18 +6874,18 @@ function createStyles(isDark: boolean) {
     },
     mapPreviewAvatarFallback: {
       alignItems: "center",
-      backgroundColor: isDark ? "#163326" : "#EEF7F1",
+      backgroundColor: palette.primary,
       height: "100%",
       justifyContent: "center",
       width: "100%",
     },
     mapPreviewAvatarInitials: {
-      color: palette.primaryDark,
+      color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
       fontSize: 13,
     },
     mapExpandedAvatarInitials: {
-      color: palette.primaryDark,
+      color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
       fontSize: 17,
     },
