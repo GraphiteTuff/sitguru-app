@@ -12,6 +12,7 @@ import { useThemeMode } from '@/hooks/use-theme';
 export default function SitGuruThemeToggle() {
   const themePreference = useThemePreference();
   const isDark = useThemeMode() === 'dark';
+  const inactiveIcon = isDark ? '#C5D9CE' : '#5F7268';
 
   return (
     <View
@@ -31,7 +32,7 @@ export default function SitGuruThemeToggle() {
         ]}
       >
         <SitGuruIcon
-          color={themePreference === 'light' ? '#F3AA1F' : styles.iconInactive.color}
+          color={themePreference === 'light' ? '#F3AA1F' : inactiveIcon}
           name="sun"
           size={16}
           strokeWidth={2.4}
@@ -56,7 +57,7 @@ export default function SitGuruThemeToggle() {
               ? isDark
                 ? '#F0CF62'
                 : '#765A1A'
-              : styles.iconInactive.color
+              : inactiveIcon
           }
           name="moon"
           size={16}
@@ -79,8 +80,8 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   containerDark: {
-    backgroundColor: '#0B2118',
-    borderColor: '#3A6B52',
+    backgroundColor: '#123528',
+    borderColor: '#5CE09A',
   },
   option: {
     alignItems: 'center',
@@ -93,9 +94,6 @@ const styles = StyleSheet.create({
     backgroundColor: SitGuruAccent.selectedPill,
   },
   optionActiveDark: {
-    backgroundColor: 'rgba(47, 163, 107, 0.22)',
-  },
-  iconInactive: {
-    color: '#738078',
+    backgroundColor: 'rgba(92, 224, 154, 0.28)',
   },
 });

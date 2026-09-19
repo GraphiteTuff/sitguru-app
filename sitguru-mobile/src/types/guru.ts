@@ -98,8 +98,61 @@ export function getGuruFirstName(guru: PublicGuruProfile) {
   );
 }
 
+export function isRealGuruPhotoUrl(value?: string | null) {
+  const url = cleanString(value);
+  if (!url) return false;
+
+  const lower = url.toLowerCase();
+  const rejectedPatterns = [
+    'sitguru-logo',
+    'sitguru-symbol',
+    'sitguru-admin-avatar',
+    'sitguru-message-avatar',
+    'sitguru-mark',
+    '/images/demo/',
+    'placeholder',
+    'ui-avatars.com',
+    'dicebear.com',
+    'gravatar.com/avatar',
+    'googleusercontent.com',
+    'ggpht.com',
+    'googleapis.com',
+    'fbcdn.net',
+    'facebook.com/',
+  ];
+
+  return !rejectedPatterns.some((pattern) => lower.includes(pattern));
+}
+
+/** First usable uploaded Guru photo — never OAuth defaults or SitGuru placeholders. */
 export function getGuruPhotoUrl(guru: PublicGuruProfile) {
-  return cleanString(guru.profile_photo_url) || cleanString(guru.avatar_url) || cleanString(guru.photo_url) || cleanString(guru.image_url) || cleanString(guru.profile_image_url) || '';
+  const candidates = [
+    guru.profile_photo_url,
+    guru.avatar_url,
+    guru.photo_url,
+    guru.image_url,
+    guru.profile_image_url,
+  ];
+
+  for (const candidate of candidates) {
+    const value = cleanString(candidate);
+    if (value && isRealGuruPhotoUrl(value)) return value;
+  }
+
+  return '';
+}
+
+export function getGuruInitials(guru: PublicGuruProfile) {
+  const parts = getGuruDisplayName(guru)
+    .split(/[\s._-]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  return (parts[0]?.slice(0, 2) || 'SG').toUpperCase();
 }
 
 export function getGuruCoverUrl(guru: PublicGuruProfile) {
@@ -191,10 +244,6 @@ export function getGuruProfileNotice(guru: PublicGuruProfile) {
   if (isKnownPreviewGuru(guru)) return 'This local Guru profile is visible while SitGuru grows local availability, but is not currently accepting booking requests.';
   if (!isGuruBookable(guru)) return 'Message this Guru first to confirm current availability before requesting care.';
   return '';
-}
-
-export function getGuruInitials(guru: PublicGuruProfile) {
-  return getGuruDisplayName(guru).split(' ').slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'SG';
 }
 
 export function getGuruServices(guru: PublicGuruProfile) {

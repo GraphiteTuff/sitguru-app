@@ -13,7 +13,6 @@ import {
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -329,7 +328,11 @@ export default function SignupScreen() {
   }
 
   return (
-    <SitGuruScreen center={isWebPreview} maxWidth={620}>
+    <SitGuruScreen
+      center={isWebPreview}
+      keyboardAvoiding={false}
+      maxWidth={620}
+    >
       <View
         style={[
           styles.previewCanvas,
@@ -350,14 +353,15 @@ export default function SignupScreen() {
               !isWebPreview && styles.phoneShellNative,
             ]}
           >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.keyboardView}
-            >
+            <View style={styles.keyboardView}>
               {isWebPreview ? <PhoneStatusBar /> : null}
 
               <ScrollView
+                automaticallyAdjustKeyboardInsets
                 contentContainerStyle={styles.page}
+                keyboardDismissMode={
+                  Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+                }
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
@@ -722,7 +726,7 @@ export default function SignupScreen() {
                   Privacy Policy.
                 </Text>
               </ScrollView>
-            </KeyboardAvoidingView>
+            </View>
           </View>
 
           {isWebPreview ? <View style={styles.homeIndicator} /> : null}

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { resolvePreferredContactEmail } from "@/lib/auth/account-email";
+import { syncAuthEmailToSitGuruRecords } from "@/lib/auth/sync-auth-email";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +11,7 @@ type GuruStripeConnectRecord = {
   id: string;
   user_id: string | null;
   email: string | null;
+  contact_email?: string | null;
   full_name: string | null;
   display_name: string | null;
   name: string | null;
@@ -63,6 +66,7 @@ async function createOrResumeStripeConnectOnboarding() {
         "id",
         "user_id",
         "email",
+        "contact_email",
         "full_name",
         "display_name",
         "name",
@@ -97,13 +101,40 @@ async function createOrResumeStripeConnectOnboarding() {
     };
   }
 
+  await syncAuthEmailToSitGuruRecords({
+    admin: supabaseAdmin as never,
+    userId: user.id,
+    authEmail: user.email,
+  });
+
+  let profileContactEmail: string | null = null;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("email, contact_email")
+      .eq("id", user.id)
+      .maybeSingle();
+    profileContactEmail =
+      (typeof profile?.contact_email === "string" && profile.contact_email) ||
+      null;
+  } catch {
+    // contact_email column may not exist until migration is applied
+  }
+
   let stripeAccountId = guru.stripe_account_id;
 
   if (!stripeAccountId) {
+    const preferredEmail = resolvePreferredContactEmail({
+      contactEmail: guru.contact_email || profileContactEmail,
+      guruEmail: guru.email,
+      profileEmail: null,
+      authEmail: user.email,
+    });
+
     const account = await stripe.accounts.create({
       type: "express",
       country: "US",
-      email: guru.email || user.email || undefined,
+      email: preferredEmail || undefined,
       business_type: "individual",
       metadata: {
         guru_id: String(guru.id),
@@ -123,6 +154,7 @@ async function createOrResumeStripeConnectOnboarding() {
       .update({
         stripe_account_id: stripeAccountId,
         stripe_onboarding_complete: false,
+        stripe_connect_status: "onboarding_started",
         charges_enabled: false,
         payouts_enabled: false,
         updated_at: new Date().toISOString(),
@@ -130,14 +162,28 @@ async function createOrResumeStripeConnectOnboarding() {
       .eq("user_id", user.id);
 
     if (updateError) {
-      console.error("Error saving Stripe account ID:", updateError);
+      // Retry without stripe_connect_status if column missing
+      const { error: retryError } = await supabaseAdmin
+        .from("gurus")
+        .update({
+          stripe_account_id: stripeAccountId,
+          stripe_onboarding_complete: false,
+          charges_enabled: false,
+          payouts_enabled: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
 
-      return {
-        error: "Could not save Stripe Connect account.",
-        status: 500,
-        url: null,
-        stripeAccountId: null,
-      };
+      if (retryError) {
+        console.error("Error saving Stripe account ID:", retryError);
+
+        return {
+          error: "Could not save Stripe Connect account.",
+          status: 500,
+          url: null,
+          stripeAccountId: null,
+        };
+      }
     }
   }
 

@@ -9,7 +9,7 @@ export default function CustomerLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] pb-[7.5rem] text-slate-900 md:pb-8">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_48%,#EEF6FF_100%)] pb-[7.5rem] text-slate-900 md:pb-8">
       {children}
       <CustomerBottomNav />
     </div>

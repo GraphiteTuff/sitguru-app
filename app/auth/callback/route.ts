@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
+import { syncAuthEmailToSitGuruRecords } from "@/lib/auth/sync-auth-email";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -764,6 +765,18 @@ export async function GET(request: Request) {
   }
 
   const safeNextPath = getSafeNextPath(nextParam, type);
+
+  // Idempotent: repair blank SitGuru emails from auth (Apple relay included).
+  try {
+    const supabaseAdmin = createSupabaseAdminClient();
+    await syncAuthEmailToSitGuruRecords({
+      admin: supabaseAdmin as never,
+      userId: user.id,
+      authEmail: user.email,
+    });
+  } catch (error) {
+    console.error("AUTH CALLBACK EMAIL SYNC:", error);
+  }
 
   if (explicitIntent) {
     return NextResponse.redirect(

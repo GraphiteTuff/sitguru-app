@@ -2246,16 +2246,16 @@ function NearbyGurusCarousel({
   const scrollButtonClass = (enabled: boolean) =>
     `inline-flex h-11 w-11 items-center justify-center rounded-full border-2 text-white shadow-sm transition ${
       enabled
-        ? "border-emerald-700 bg-emerald-600 hover:bg-emerald-700"
-        : "cursor-not-allowed border-emerald-200 bg-emerald-200"
+        ? "border-[#0D5C3A] bg-[#0D5C3A] hover:bg-[#09462C]"
+        : "cursor-not-allowed border-sky-200 bg-sky-200"
     }`;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-      <div className="min-w-0 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
+    <section className="mt-4 overflow-hidden rounded-[2rem] border border-sky-200 bg-white shadow-sm">
+      <div className="min-w-0 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_54%,#f0fdf4_100%)] p-6">
         <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-3xl">
-            <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+            <p className="text-sm font-black uppercase tracking-[0.22em] text-sky-700">
               Nearby Gurus
             </p>
 
@@ -3560,8 +3560,8 @@ export default function CustomerDashboardPage() {
 
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
           {isZeroBookingHome ? (
-            <section className="mb-4 overflow-hidden rounded-[2rem] border border-emerald-100 bg-[linear-gradient(135deg,#047857_0%,#059669_45%,#10b981_100%)] p-5 text-white shadow-sm public-dark-section sm:p-7" data-brand-green>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            <section className="mb-4 overflow-hidden rounded-[2rem] border border-sky-100 bg-[linear-gradient(135deg,#0D5C3A_0%,#0F766E_48%,#0284C7_100%)] p-5 text-white shadow-sm public-dark-section sm:p-7" data-brand-green>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-100">
                 Pet Parent Portal
               </p>
               <h2 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
@@ -3574,7 +3574,7 @@ export default function CustomerDashboardPage() {
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link
                   href={routes.findGuru}
-                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-white px-6 text-base font-black text-emerald-800 transition hover:bg-emerald-50"
+                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-white px-6 text-base font-black text-[#0D5C3A] transition hover:bg-sky-50"
                 >
                   Find Care near you
                 </Link>
@@ -3623,34 +3623,34 @@ export default function CustomerDashboardPage() {
               <div className="grid grid-cols-3 gap-2">
                 <Link
                   href={routes.pets}
-                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                  className="rounded-2xl bg-sky-50 p-3 text-center ring-1 ring-sky-100 transition hover:bg-sky-100"
                 >
                   <p className="text-xl font-black text-slate-950">
                     {pets.length}
                   </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
                     Pets
                   </p>
                 </Link>
                 <Link
                   href={routes.bookings}
-                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                  className="rounded-2xl bg-amber-50 p-3 text-center ring-1 ring-amber-100 transition hover:bg-amber-100"
                 >
                   <p className="text-xl font-black text-slate-950">
                     {upcomingBookings.length}
                   </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
                     Upcoming
                   </p>
                 </Link>
                 <Link
                   href={routes.pawPerks}
-                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                  className="rounded-2xl bg-violet-50 p-3 text-center ring-1 ring-violet-100 transition hover:bg-violet-100"
                 >
                   <p className="text-xl font-black text-slate-950">
                     {formatMoney(pawPerksState.redeemedCashCredits)}
                   </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet-700">
                     PawPerks
                   </p>
                 </Link>

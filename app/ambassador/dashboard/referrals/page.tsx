@@ -937,25 +937,25 @@ export default async function AmbassadorDashboardReferralsPage() {
     .join(" ");
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_42%,#EEF6FF_100%)] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1600px] space-y-4">
-        <section className="overflow-hidden rounded-[1.8rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-6 py-7 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+        <section className="overflow-hidden rounded-[1.8rem] border border-sky-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#bae6fd_0%,#e0f2fe_42%,#bbf7d0_100%)] px-6 py-7 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div>
               <Link
                 href="/ambassador/dashboard"
-                className="inline-flex items-center rounded-full border border-white/80 bg-white/90 px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-white"
+                className="inline-flex items-center rounded-full border border-white/80 bg-white/90 px-4 py-2 text-xs font-black text-[#0D5C3A] shadow-sm transition hover:bg-white"
               >
                 ← Dashboard
               </Link>
 
-              <p className="mt-4 text-xs font-black uppercase tracking-[0.22em] text-emerald-800">
+              <p className="mt-4 text-xs font-black uppercase tracking-[0.22em] text-sky-800">
                 Ambassador Referral Center
               </p>
               <h1 className="mt-3 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl">
                 Share, scan, track, and follow up.
               </h1>
-              <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-800 sm:text-base">
+              <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
                 Use the mobile referral card at events, open full-screen Vendor
                 Mode, share short links, and monitor canonical referral
                 activity without creating duplicate records.
@@ -963,7 +963,7 @@ export default async function AmbassadorDashboardReferralsPage() {
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <span className="rounded-xl bg-white/95 px-4 py-2 text-xs font-black text-slate-900 shadow-sm">
-                  Code: <span className="text-emerald-700">{referralCode}</span>
+                  Code: <span className="text-[#0D5C3A]">{referralCode}</span>
                 </span>
                 <span className="rounded-xl bg-white/95 px-4 py-2 text-xs font-black text-slate-900 shadow-sm">
                   {referralData.stats.totalReferrals} canonical referrals

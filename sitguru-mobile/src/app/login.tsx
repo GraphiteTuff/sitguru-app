@@ -19,7 +19,6 @@ import {
   useState,
 } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -324,6 +323,8 @@ export default function LoginScreen() {
 
   const codeInputRefs =
     useRef<Array<TextInput | null>>([]);
+  const scrollRef =
+    useRef<ScrollView | null>(null);
 
   const [message, setMessage] =
     useState<string | null>(
@@ -596,7 +597,10 @@ export default function LoginScreen() {
 
     setTimeout(() => {
       codeInputRefs.current[0]?.focus();
-    }, 150);
+      scrollRef.current?.scrollToEnd({
+        animated: true,
+      });
+    }, 180);
   }
 
   async function handleVerifyCode() {
@@ -795,6 +799,7 @@ export default function LoginScreen() {
   return (
     <SitGuruScreen
       center={isWebPreview}
+      keyboardAvoiding={false}
       maxWidth={620}
     >
       <View
@@ -845,28 +850,22 @@ export default function LoginScreen() {
                 })
               : null}
 
-            <KeyboardAvoidingView
-              behavior={
-                Platform.OS === 'ios'
-                  ? 'padding'
-                  : undefined
-              }
-              style={
-                styles.keyboardView
-              }
-            >
+            <View style={styles.keyboardView}>
               {isWebPreview ? (
                 <PhoneStatusBar styles={styles} colors={colors} />
               ) : null}
 
               <ScrollView
-                contentContainerStyle={
-                  styles.page
+                ref={scrollRef}
+                automaticallyAdjustKeyboardInsets
+                contentContainerStyle={styles.page}
+                keyboardDismissMode={
+                  Platform.OS === 'ios'
+                    ? 'interactive'
+                    : 'on-drag'
                 }
                 keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={
-                  false
-                }
+                showsVerticalScrollIndicator={false}
               >
                 <View
                   style={styles.topBar}
@@ -1729,7 +1728,7 @@ export default function LoginScreen() {
                   Privacy Policy.
                 </Text>
               </ScrollView>
-            </KeyboardAvoidingView>
+            </View>
           </View>
 
           {isWebPreview ? (

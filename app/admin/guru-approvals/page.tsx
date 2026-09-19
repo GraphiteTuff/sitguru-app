@@ -198,8 +198,13 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow) {
   );
 }
 
-function getGuruEmail(guru: GuruRow, profile?: ProfileRow) {
-  return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "";
+function getGuruEmail(guru: GuruRow, profile?: ProfileRow, authUser?: { email?: string | null }) {
+  return (
+    asTrimmedString(guru.email) ||
+    asTrimmedString(profile?.email) ||
+    asTrimmedString(authUser?.email) ||
+    ""
+  );
 }
 
 async function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
