@@ -3,6 +3,10 @@ import Stripe from "stripe";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  connectStatusFromStripeAccount,
+  toStoredStripeConnectStatus,
+} from "@/lib/stripe/connect-status";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,20 +44,33 @@ async function saveGuruConnectStatus({
   chargesEnabled,
   payoutsEnabled,
   detailsSubmitted,
+  currentlyDue,
+  pastDue,
+  pendingVerification,
 }: {
   userId: string;
   stripeAccountId: string;
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
+  currentlyDue?: string[];
+  pastDue?: string[];
+  pendingVerification?: string[];
 }) {
   const now = new Date().toISOString();
-  const complete = chargesEnabled && payoutsEnabled;
-  const connectStatus = complete
-    ? "connected"
-    : detailsSubmitted
-      ? "pending"
-      : "onboarding_started";
+  const resolved = connectStatusFromStripeAccount({
+    id: stripeAccountId,
+    charges_enabled: chargesEnabled,
+    payouts_enabled: payoutsEnabled,
+    details_submitted: detailsSubmitted,
+    requirements: {
+      currently_due: currentlyDue || [],
+      past_due: pastDue || [],
+      pending_verification: pendingVerification || [],
+    },
+  });
+  const connectStatus = toStoredStripeConnectStatus(resolved.key);
+  const complete = resolved.key === "ready";
 
   const updateAttempts = [
     {
@@ -154,6 +171,10 @@ export async function GET(request: NextRequest) {
     const chargesEnabled = account.charges_enabled === true;
     const payoutsEnabled = account.payouts_enabled === true;
     const detailsSubmitted = account.details_submitted === true;
+    const currentlyDue = account.requirements?.currently_due || [];
+    const pastDue = account.requirements?.past_due || [];
+    const pendingVerification =
+      account.requirements?.pending_verification || [];
 
     await saveGuruConnectStatus({
       userId: user.id,
@@ -161,12 +182,31 @@ export async function GET(request: NextRequest) {
       chargesEnabled,
       payoutsEnabled,
       detailsSubmitted,
+      currentlyDue,
+      pastDue,
+      pendingVerification,
+    });
+
+    const resolved = connectStatusFromStripeAccount({
+      id: account.id,
+      charges_enabled: chargesEnabled,
+      payouts_enabled: payoutsEnabled,
+      details_submitted: detailsSubmitted,
+      requirements: {
+        currently_due: currentlyDue,
+        past_due: pastDue,
+        pending_verification: pendingVerification,
+      },
     });
 
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
         stripe:
-          chargesEnabled && payoutsEnabled ? "connected" : "needs_attention",
+          resolved.key === "ready"
+            ? "connected"
+            : resolved.key === "action_required"
+              ? "action_required"
+              : "needs_attention",
       }),
     );
   } catch (error) {

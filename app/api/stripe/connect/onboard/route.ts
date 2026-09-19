@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolvePreferredContactEmail } from "@/lib/auth/account-email";
+import { syncAuthEmailToSitGuruRecords } from "@/lib/auth/sync-auth-email";
 
 export const dynamic = "force-dynamic";
 
@@ -135,13 +137,42 @@ export async function GET(request: NextRequest) {
   const { stripeAccountId: existingStripeAccountId } =
     await findGuruStripeAccount(user.id);
 
+  await syncAuthEmailToSitGuruRecords({
+    admin: supabaseAdmin as never,
+    userId: user.id,
+    authEmail: user.email,
+  });
+
   let stripeAccountId = existingStripeAccountId;
 
   if (!stripeAccountId) {
+    let contactEmail: string | null = null;
+    let guruEmail: string | null = null;
+    try {
+      const { data: guruRow } = await supabaseAdmin
+        .from("gurus")
+        .select("email, contact_email")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      contactEmail =
+        (typeof guruRow?.contact_email === "string" && guruRow.contact_email) ||
+        null;
+      guruEmail =
+        (typeof guruRow?.email === "string" && guruRow.email) || null;
+    } catch {
+      // optional columns
+    }
+
+    const preferredEmail = resolvePreferredContactEmail({
+      contactEmail,
+      guruEmail,
+      authEmail: user.email,
+    });
+
     const account = await stripe.accounts.create({
       type: "express",
       country: "US",
-      email: user.email || undefined,
+      email: preferredEmail || undefined,
       business_type: "individual",
       capabilities: {
         card_payments: {
@@ -154,7 +185,7 @@ export async function GET(request: NextRequest) {
       metadata: {
         role: "guru",
         user_id: user.id,
-        email: user.email || "",
+        email: preferredEmail || user.email || "",
       },
     });
 

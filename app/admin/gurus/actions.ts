@@ -331,6 +331,7 @@ export async function createAdminGuruAction(formData: FormData) {
 /**
  * Merge a duplicate Guru into a canonical Guru account.
  * - Updates canonical display name (proper casing)
+ * - Copies missing phone/email from duplicate into canonical when blank
  * - Hides duplicate from public + admin queues via account_merge_aliases
  * - Does not delete auth users or booking history
  */
@@ -340,7 +341,7 @@ export async function mergeDuplicateGuruAction(formData: FormData) {
   const canonicalUserId = asTrimmedString(formData.get("canonicalUserId"));
   const duplicateUserId = asTrimmedString(formData.get("duplicateUserId"));
   const displayNameRaw = asTrimmedString(formData.get("displayName"));
-  const displayName = displayNameRaw || "Angel Costner";
+  const displayName = displayNameRaw || "Guru";
 
   if (!canonicalUserId || !duplicateUserId) {
     redirect("/admin/gurus?queue=duplicates&error=missing_merge_ids");
@@ -356,30 +357,171 @@ export async function mergeDuplicateGuruAction(formData: FormData) {
   const lastName = parts.slice(1).join(" ") || "";
 
   try {
+    const [{ data: canonicalProfile }, { data: duplicateProfile }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("profiles")
+          .select(
+            "id, email, phone, phone_number, contact_email, avatar_url, profile_photo_url, photo_url",
+          )
+          .eq("id", canonicalUserId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("profiles")
+          .select(
+            "id, email, phone, phone_number, contact_email, avatar_url, profile_photo_url, photo_url",
+          )
+          .eq("id", duplicateUserId)
+          .maybeSingle(),
+      ]);
+
+    const pickFirst = (...values: unknown[]) => {
+      for (const value of values) {
+        if (typeof value === "string" && value.trim()) return value.trim();
+      }
+      return null;
+    };
+
+    const mergedPhone = pickFirst(
+      canonicalProfile?.phone,
+      canonicalProfile?.phone_number,
+      duplicateProfile?.phone,
+      duplicateProfile?.phone_number,
+    );
+    const mergedEmail = pickFirst(
+      canonicalProfile?.email,
+      duplicateProfile?.email,
+    );
+    const mergedContactEmail = pickFirst(
+      canonicalProfile?.contact_email,
+      duplicateProfile?.contact_email,
+    );
+    const mergedAvatar = pickFirst(
+      canonicalProfile?.avatar_url,
+      canonicalProfile?.profile_photo_url,
+      canonicalProfile?.photo_url,
+      duplicateProfile?.avatar_url,
+      duplicateProfile?.profile_photo_url,
+      duplicateProfile?.photo_url,
+    );
+
+    const profilePatch: Record<string, unknown> = {
+      full_name: displayName,
+      display_name: displayName,
+      first_name: firstName,
+      last_name: lastName || null,
+      updated_at: now,
+    };
+    if (mergedPhone) {
+      profilePatch.phone = mergedPhone;
+      profilePatch.phone_number = mergedPhone;
+    }
+    if (mergedEmail) profilePatch.email = mergedEmail;
+    if (mergedContactEmail) profilePatch.contact_email = mergedContactEmail;
+    if (mergedAvatar) {
+      profilePatch.avatar_url = mergedAvatar;
+      profilePatch.profile_photo_url = mergedAvatar;
+    }
+
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({
-        full_name: displayName,
-        display_name: displayName,
-        first_name: firstName,
-        last_name: lastName || null,
-        updated_at: now,
-      })
+      .update(profilePatch)
       .eq("id", canonicalUserId);
 
     if (profileError) {
       throw new Error(profileError.message);
     }
 
+    const [{ data: canonicalGurus }, { data: duplicateGurus }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("gurus")
+          .select(
+            "id, email, phone, phone_number, contact_email, stripe_account_id, stripe_connect_status, charges_enabled, payouts_enabled, avatar_url, profile_photo_url",
+          )
+          .or(
+            `id.eq.${canonicalUserId},user_id.eq.${canonicalUserId},profile_id.eq.${canonicalUserId}`,
+          ),
+        supabaseAdmin
+          .from("gurus")
+          .select(
+            "id, email, phone, phone_number, contact_email, stripe_account_id, stripe_connect_status, charges_enabled, payouts_enabled, avatar_url, profile_photo_url, notes",
+          )
+          .or(
+            `id.eq.${duplicateUserId},user_id.eq.${duplicateUserId},profile_id.eq.${duplicateUserId}`,
+          ),
+      ]);
+
+    const duplicateGuru = (duplicateGurus || [])[0] as
+      | Record<string, unknown>
+      | undefined;
+    const canonicalGuru = (canonicalGurus || [])[0] as
+      | Record<string, unknown>
+      | undefined;
+
+    const guruPhone = pickFirst(
+      canonicalGuru?.phone,
+      canonicalGuru?.phone_number,
+      duplicateGuru?.phone,
+      duplicateGuru?.phone_number,
+      mergedPhone,
+    );
+    const guruEmail = pickFirst(
+      canonicalGuru?.email,
+      duplicateGuru?.email,
+      mergedEmail,
+    );
+    const guruContact = pickFirst(
+      canonicalGuru?.contact_email,
+      duplicateGuru?.contact_email,
+      mergedContactEmail,
+    );
+    const guruAvatar = pickFirst(
+      canonicalGuru?.avatar_url,
+      canonicalGuru?.profile_photo_url,
+      duplicateGuru?.avatar_url,
+      duplicateGuru?.profile_photo_url,
+      mergedAvatar,
+    );
+    // Prefer existing Stripe account on canonical; otherwise adopt from duplicate.
+    const stripeAccountId = pickFirst(
+      canonicalGuru?.stripe_account_id,
+      duplicateGuru?.stripe_account_id,
+    );
+
+    const guruPatch: Record<string, unknown> = {
+      full_name: displayName,
+      display_name: displayName,
+      first_name: firstName,
+      last_name: lastName || null,
+      updated_at: now,
+    };
+    if (guruPhone) {
+      guruPatch.phone = guruPhone;
+      guruPatch.phone_number = guruPhone;
+    }
+    if (guruEmail) guruPatch.email = guruEmail;
+    if (guruContact) guruPatch.contact_email = guruContact;
+    if (guruAvatar) {
+      guruPatch.avatar_url = guruAvatar;
+      guruPatch.profile_photo_url = guruAvatar;
+    }
+    if (stripeAccountId && !canonicalGuru?.stripe_account_id) {
+      guruPatch.stripe_account_id = stripeAccountId;
+      if (duplicateGuru?.stripe_connect_status) {
+        guruPatch.stripe_connect_status = duplicateGuru.stripe_connect_status;
+      }
+      if (typeof duplicateGuru?.charges_enabled === "boolean") {
+        guruPatch.charges_enabled = duplicateGuru.charges_enabled;
+      }
+      if (typeof duplicateGuru?.payouts_enabled === "boolean") {
+        guruPatch.payouts_enabled = duplicateGuru.payouts_enabled;
+      }
+    }
+
     await supabaseAdmin
       .from("gurus")
-      .update({
-        full_name: displayName,
-        display_name: displayName,
-        first_name: firstName,
-        last_name: lastName || null,
-        updated_at: now,
-      })
+      .update(guruPatch)
       .or(
         `id.eq.${canonicalUserId},user_id.eq.${canonicalUserId},profile_id.eq.${canonicalUserId}`,
       );
@@ -395,6 +537,12 @@ export async function mergeDuplicateGuruAction(formData: FormData) {
         status: "merged_duplicate",
         application_status: "merged_duplicate",
         updated_at: now,
+        notes: [
+          asTrimmedString(duplicateGuru?.notes),
+          `Merged into canonical ${displayName} ${canonicalUserId} on ${now}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
       })
       .or(
         `id.eq.${duplicateUserId},user_id.eq.${duplicateUserId},profile_id.eq.${duplicateUserId}`,
@@ -418,20 +566,25 @@ export async function mergeDuplicateGuruAction(formData: FormData) {
       });
 
     if (aliasError) {
-      // Upsert-style retry if row exists
-      const { error: updateAliasError } = await supabaseAdmin
-        .from("account_merge_aliases")
-        .update({
-          canonical_user_id: canonicalUserId,
-          status: "active",
-        })
-        .eq("duplicate_user_id", duplicateUserId);
-
-      if (updateAliasError) {
-        throw new Error(aliasError.message || updateAliasError.message);
+      const message = (aliasError.message || "").toLowerCase();
+      if (!message.includes("duplicate") && !message.includes("unique")) {
+        const { error: upsertError } = await supabaseAdmin
+          .from("account_merge_aliases")
+          .upsert(
+            {
+              duplicate_user_id: duplicateUserId,
+              canonical_user_id: canonicalUserId,
+              status: "active",
+            },
+            { onConflict: "duplicate_user_id" },
+          );
+        if (upsertError) {
+          throw new Error(upsertError.message);
+        }
       }
     }
 
+    revalidatePath("/admin");
     revalidatePath("/admin/gurus");
     revalidatePath(`/admin/gurus/${canonicalUserId}`);
     redirect(

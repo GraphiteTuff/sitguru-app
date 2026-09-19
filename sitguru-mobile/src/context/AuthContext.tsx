@@ -1205,8 +1205,21 @@ export function AuthProvider({
                     credential.fullName
                       ?.familyName ??
                     undefined,
+                  ...(credential.email
+                    ? {
+                        email:
+                          credential.email,
+                      }
+                    : {}),
                 },
               });
+          } else if (credential.email) {
+            // Apple only returns email on first authorize — persist when present.
+            await supabase.auth.updateUser({
+              data: {
+                email: credential.email,
+              },
+            });
           }
 
           if (
@@ -1215,6 +1228,64 @@ export function AuthProvider({
             throw new Error(
               'SitGuru did not receive a completed Apple sign-in session.',
             );
+          }
+
+          const sessionUser = data.session.user;
+          const authEmail =
+            (typeof credential.email === 'string' &&
+              credential.email.trim()) ||
+            (typeof sessionUser.email === 'string' &&
+              sessionUser.email.trim()) ||
+            '';
+
+          // Idempotent repair: fill blank SitGuru email from Apple/auth email
+          // (including Private Relay). Never overwrite a non-empty value.
+          if (authEmail) {
+            try {
+              const { data: existingProfile } = await supabase
+                .from('profiles')
+                .select('email')
+                .eq('id', sessionUser.id)
+                .maybeSingle();
+
+              const existingEmail =
+                typeof existingProfile?.email === 'string'
+                  ? existingProfile.email.trim()
+                  : '';
+
+              if (!existingEmail) {
+                await supabase
+                  .from('profiles')
+                  .update({
+                    email: authEmail.toLowerCase(),
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', sessionUser.id);
+              }
+
+              const { data: existingGuru } = await supabase
+                .from('gurus')
+                .select('email')
+                .eq('user_id', sessionUser.id)
+                .maybeSingle();
+
+              const existingGuruEmail =
+                typeof existingGuru?.email === 'string'
+                  ? existingGuru.email.trim()
+                  : '';
+
+              if (!existingGuruEmail) {
+                await supabase
+                  .from('gurus')
+                  .update({
+                    email: authEmail.toLowerCase(),
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('user_id', sessionUser.id);
+              }
+            } catch {
+              // Non-blocking; provision / web sync also repair.
+            }
           }
 
           setSession(

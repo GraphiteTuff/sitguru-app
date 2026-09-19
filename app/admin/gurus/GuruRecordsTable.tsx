@@ -130,20 +130,45 @@ function toProperPersonName(value: string) {
     .join(" ");
 }
 
+function normalizeNameKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getMergePartner(
   guru: GuruDisplayRow,
   all: GuruDisplayRow[],
 ): GuruDisplayRow | null {
   if (!guru.possibleDuplicate) return null;
+
   const phoneKey = normalizePhoneKey(guru.phone);
-  if (phoneKey.length < 10) return null;
+  const emailKey = String(guru.email || "")
+    .trim()
+    .toLowerCase();
+  const nameKey = normalizeNameKey(guru.name || "");
+  const selfUserId = guru.userId || guru.guruUserId;
 
   const siblings = all.filter((row) => {
     if (row.id === guru.id) return false;
-    if ((row.userId || row.guruUserId) === (guru.userId || guru.guruUserId)) {
-      return false;
-    }
-    return normalizePhoneKey(row.phone) === phoneKey;
+    const rowUserId = row.userId || row.guruUserId;
+    if (selfUserId && rowUserId && selfUserId === rowUserId) return false;
+    if (!row.possibleDuplicate) return false;
+
+    const rowPhone = normalizePhoneKey(row.phone);
+    const rowEmail = String(row.email || "")
+      .trim()
+      .toLowerCase();
+    const rowName = normalizeNameKey(row.name || "");
+
+    if (phoneKey.length >= 10 && rowPhone === phoneKey) return true;
+    if (emailKey && rowEmail && emailKey === rowEmail) return true;
+    // Name-only: both marked possible duplicates with the same strong personal name.
+    if (nameKey.split(" ").length >= 2 && nameKey === rowName) return true;
+
+    return false;
   });
 
   if (!siblings.length) return null;

@@ -2,11 +2,22 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
+import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
 import { formatCityState, resolveLocationParts } from "@/lib/location/zip-lookup";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import {
+  applePrivateRelayLabel,
+  resolveAuthProvider,
+} from "@/lib/auth/apple-email";
+import { resolveAccountEmails } from "@/lib/auth/account-email";
+import { syncAuthEmailToSitGuruRecords } from "@/lib/auth/sync-auth-email";
+import {
+  resolveStripeConnectStatus,
+  toStoredStripeConnectStatus,
+} from "@/lib/stripe/connect-status";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +41,7 @@ type AuthUserRow = {
   last_sign_in_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
+  identities?: Array<{ provider?: string | null }> | null;
 };
 
 
@@ -297,9 +309,21 @@ function getCredentialStatus(value: unknown) {
 
   if (!normalized) return "Not Started";
   if (normalized === "not_started") return "Not Started";
-  if (normalized === "in_progress") return "In Progress";
-  if (normalized === "pending") return "Pending";
-  if (normalized === "verified") return "Verified";
+  if (normalized === "in_progress" || normalized === "onboarding_started") {
+    return "Started";
+  }
+  if (normalized === "action_required") return "Action required";
+  if (normalized === "pending") return "Under review";
+  if (
+    normalized === "connected" ||
+    normalized === "ready" ||
+    normalized === "complete" ||
+    normalized === "completed" ||
+    normalized === "enabled" ||
+    normalized === "verified"
+  ) {
+    return "Ready";
+  }
   if (normalized === "clear") return "Clear";
   if (normalized === "cleared") return "Cleared";
   if (normalized === "approved") return "Approved";
@@ -319,13 +343,27 @@ function credentialClasses(status: string) {
     normalized === "verified" ||
     normalized === "clear" ||
     normalized === "cleared" ||
-    normalized === "approved"
+    normalized === "approved" ||
+    normalized === "ready" ||
+    normalized === "✓ ready"
   ) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
-  if (normalized === "pending" || normalized === "in progress") {
+  if (
+    normalized === "pending" ||
+    normalized === "in progress" ||
+    normalized === "started" ||
+    normalized === "under review"
+  ) {
     return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  if (
+    normalized === "action required" ||
+    normalized.includes("action required")
+  ) {
+    return "border-amber-200 bg-amber-50 text-amber-800";
   }
 
   if (normalized === "rejected" || normalized === "failed") {
@@ -333,6 +371,101 @@ function credentialClasses(status: string) {
   }
 
   return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function formatStripeConnectDisplayLabel(label: string) {
+  if (label === "Action required") return "⚠️ Action Required";
+  if (label === "Ready") return "✓ Ready";
+  return label;
+}
+
+async function refreshGuruStripeConnectStatus(guru: GuruRow) {
+  const stripeAccountId = asTrimmedString(guru.stripe_account_id);
+  const userId = getGuruUserId(guru);
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+  if (!stripeAccountId || !stripeSecretKey) {
+    return resolveStripeConnectStatus({
+      guru: {
+        stripe_account_id: stripeAccountId || null,
+        stripe_connect_status: asTrimmedString(guru.stripe_connect_status) || null,
+        stripe_onboarding_complete: guru.stripe_onboarding_complete === true,
+        charges_enabled: guru.charges_enabled === true,
+        payouts_enabled: guru.payouts_enabled === true,
+      },
+    });
+  }
+
+  try {
+    const stripe = new Stripe(stripeSecretKey);
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+    const resolved = resolveStripeConnectStatus({
+      guru: {
+        stripe_account_id: stripeAccountId,
+        stripe_connect_status: asTrimmedString(guru.stripe_connect_status) || null,
+        stripe_onboarding_complete: guru.stripe_onboarding_complete === true,
+        charges_enabled: guru.charges_enabled === true,
+        payouts_enabled: guru.payouts_enabled === true,
+      },
+      stripeAccount: {
+        id: account.id,
+        charges_enabled: account.charges_enabled,
+        payouts_enabled: account.payouts_enabled,
+        details_submitted: account.details_submitted,
+        requirements: {
+          currently_due: account.requirements?.currently_due || [],
+          past_due: account.requirements?.past_due || [],
+          pending_verification: account.requirements?.pending_verification || [],
+          disabled_reason: account.requirements?.disabled_reason || null,
+        },
+      },
+    });
+
+    if (userId) {
+      const storedStatus = toStoredStripeConnectStatus(resolved.key);
+      const now = new Date().toISOString();
+      const payloads = [
+        {
+          stripe_connect_status: storedStatus,
+          stripe_onboarding_complete: resolved.key === "ready",
+          charges_enabled: resolved.chargesEnabled,
+          payouts_enabled: resolved.payoutsEnabled,
+          updated_at: now,
+        },
+        {
+          stripe_connect_status: storedStatus,
+          charges_enabled: resolved.chargesEnabled,
+          payouts_enabled: resolved.payoutsEnabled,
+          updated_at: now,
+        },
+        {
+          stripe_connect_status: storedStatus,
+          updated_at: now,
+        },
+      ];
+
+      for (const payload of payloads) {
+        const { error } = await supabaseAdmin
+          .from("gurus")
+          .update(payload)
+          .eq("user_id", userId);
+        if (!error) break;
+      }
+    }
+
+    return resolved;
+  } catch (error) {
+    console.error("Admin Stripe Connect status refresh failed:", error);
+    return resolveStripeConnectStatus({
+      guru: {
+        stripe_account_id: stripeAccountId,
+        stripe_connect_status: asTrimmedString(guru.stripe_connect_status) || null,
+        stripe_onboarding_complete: guru.stripe_onboarding_complete === true,
+        charges_enabled: guru.charges_enabled === true,
+        payouts_enabled: guru.payouts_enabled === true,
+      },
+    });
+  }
 }
 
 function getGuruId(guru: GuruRow) {
@@ -397,8 +530,43 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow | null) {
   );
 }
 
-function getGuruEmail(guru: GuruRow, profile?: ProfileRow | null) {
-  return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "—";
+function getGuruEmail(
+  guru: GuruRow,
+  profile?: ProfileRow | null,
+  authUser?: AuthUserRow | null,
+) {
+  const resolved = resolveAccountEmails({
+    guruEmail: asTrimmedString(guru.email) || null,
+    profileEmail: asTrimmedString(profile?.email) || null,
+    contactEmail:
+      asTrimmedString(guru.contact_email) ||
+      asTrimmedString(profile?.contact_email) ||
+      null,
+    authEmail: asTrimmedString(authUser?.email) || null,
+    appMetadata: authUser?.app_metadata,
+    userMetadata: authUser?.user_metadata,
+    identities: authUser?.identities,
+  });
+
+  return resolved.authEmail || "—";
+}
+
+function getGuruContactEmail(
+  guru: GuruRow,
+  profile?: ProfileRow | null,
+  authUser?: AuthUserRow | null,
+) {
+  const resolved = resolveAccountEmails({
+    guruEmail: asTrimmedString(guru.email) || null,
+    profileEmail: asTrimmedString(profile?.email) || null,
+    contactEmail:
+      asTrimmedString(guru.contact_email) ||
+      asTrimmedString(profile?.contact_email) ||
+      null,
+    authEmail: asTrimmedString(authUser?.email) || null,
+  });
+
+  return resolved.contactEmail;
 }
 
 function getGuruPhone(guru: GuruRow, profile?: ProfileRow | null) {
@@ -1568,9 +1736,11 @@ async function updateGuruStatusAction(formData: FormData) {
 function DetailItem({
   label,
   value,
+  hint,
 }: {
   label: string;
   value: string | number;
+  hint?: string | null;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1580,17 +1750,31 @@ function DetailItem({
       <p className="mt-2 break-words text-sm font-black text-slate-950">
         {value || "—"}
       </p>
+      {hint ? (
+        <p className="mt-1 text-xs font-semibold text-slate-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
 
-function CredentialPill({ label, value }: { label: string; value: string }) {
+function CredentialPill({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string | null;
+}) {
   return (
     <div className={`rounded-2xl border px-4 py-3 ${credentialClasses(value)}`}>
       <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">
         {label}
       </p>
       <p className="mt-2 text-sm font-black">{value}</p>
+      {detail ? (
+        <p className="mt-1 text-xs font-semibold opacity-80">{detail}</p>
+      ) : null}
     </div>
   );
 }
@@ -1762,10 +1946,27 @@ export default async function AdminGuruDetailPage({
   }
 
   const profile = await getProfileForGuru(guru);
+  const authUser = await getAuthUserForGuru(guru, profile);
+
+  if (authUser?.id && authUser.email) {
+    await syncAuthEmailToSitGuruRecords({
+      admin: supabaseAdmin as never,
+      userId: authUser.id,
+      authEmail: authUser.email,
+    });
+  }
+
   const guruId = getGuruId(guru);
   const userId = getGuruUserId(guru);
   const name = getGuruName(guru, profile);
-  const email = getGuruEmail(guru, profile);
+  const email = getGuruEmail(guru, profile, authUser);
+  const contactEmail = getGuruContactEmail(guru, profile, authUser);
+  const relayHint = applePrivateRelayLabel(email === "—" ? null : email);
+  const authProvider = resolveAuthProvider({
+    appMetadata: authUser?.app_metadata,
+    userMetadata: authUser?.user_metadata,
+    identities: authUser?.identities,
+  });
   const phone = getGuruPhone(guru, profile);
 
   // Fill missing city/state from ZIP and persist for the rest of SitGuru.
@@ -1797,7 +1998,20 @@ export default async function AdminGuruDetailPage({
   );
   const backgroundStatus = getCredentialStatus(guru.background_check_status);
   const safetyStatus = getCredentialStatus(guru.safety_cert_status);
-  const stripeConnectStatus = getCredentialStatus(guru.stripe_connect_status);
+  const stripeConnect = await refreshGuruStripeConnectStatus(guru);
+  const stripeConnectStatus = formatStripeConnectDisplayLabel(
+    stripeConnect.label,
+  );
+  const stripeConnectDetail =
+    stripeConnect.key === "action_required"
+      ? "Finish payout setup in Stripe"
+      : stripeConnect.key === "ready"
+        ? "Charges and payouts enabled"
+        : stripeConnect.key === "started"
+          ? "Connected account created"
+          : stripeConnect.key === "under_review"
+            ? "Stripe is reviewing details"
+            : "No connected account yet";
   const lastUpdated = formatDate(guru.updated_at || guru.created_at);
 
   return (
@@ -1944,7 +2158,27 @@ export default async function AdminGuruDetailPage({
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <DetailItem label="Name" value={name} />
-            <DetailItem label="Email" value={email} />
+            <DetailItem
+              label={contactEmail ? "Login Email" : "Email"}
+              value={email}
+              hint={
+                [
+                  relayHint,
+                  authProvider === "apple"
+                    ? "Sign in with Apple"
+                    : authProvider === "google"
+                      ? "Google"
+                      : authProvider === "email"
+                        ? "Email login"
+                        : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null
+              }
+            />
+            {contactEmail ? (
+              <DetailItem label="Contact Email" value={contactEmail} />
+            ) : null}
             <DetailItem label="Phone" value={phone} />
             <DetailItem label="Location" value={location} />
             <DetailItem label="Experience" value={experience} />
@@ -2017,6 +2251,7 @@ export default async function AdminGuruDetailPage({
             <CredentialPill
               label="Stripe Connect"
               value={stripeConnectStatus}
+              detail={stripeConnectDetail}
             />
             <CredentialPill label="Identity" value={identityStatus} />
             <CredentialPill label="Background" value={backgroundStatus} />
