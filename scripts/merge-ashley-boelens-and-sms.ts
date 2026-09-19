@@ -92,11 +92,12 @@ async function sendTwilioSms(to: string, body: string) {
     process.env.TWILIO_FROM_NUMBER?.trim() ||
     process.env.TWILIO_PHONE_NUMBER?.trim() ||
     process.env.TWILIO_FROM_PHONE_NUMBER?.trim() ||
+    process.env.TWILIO_FROM_PHONE?.trim() ||
     "";
 
   if (!messagingServiceSid && !fromNumber) {
     throw new Error(
-      "Need TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER to send SMS.",
+      "Need TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER / TWILIO_FROM_PHONE to send SMS.",
     );
   }
 
