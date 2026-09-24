@@ -4359,6 +4359,34 @@ export default async function GuruSlugPage({ params }: PageProps) {
   const publicGuruProfile = await getPublicGuruProfile(identifier);
 
   if (!publicGuruProfile) {
+    const suffix = identifier.replace(/-/g, "").slice(-8);
+    if (suffix.length >= 6) {
+      const { data: aliases } = await supabaseAdmin
+        .from("account_merge_aliases")
+        .select("duplicate_user_id, canonical_user_id, status")
+        .eq("status", "active")
+        .limit(500);
+      const match = (aliases || []).find((row) => {
+        const duplicateId = String(row.duplicate_user_id || "")
+          .replace(/-/g, "")
+          .toLowerCase();
+        return duplicateId.startsWith(suffix.toLowerCase());
+      });
+      if (match?.canonical_user_id) {
+        const { data: canonical } = await supabaseAdmin
+          .from("gurus")
+          .select("slug, user_id, full_name, display_name")
+          .or(
+            `user_id.eq.${match.canonical_user_id},id.eq.${match.canonical_user_id}`,
+          )
+          .limit(1)
+          .maybeSingle();
+        const canonicalSlug = String(canonical?.slug || "").trim();
+        if (canonicalSlug) {
+          redirect(`/guru/${canonicalSlug}`);
+        }
+      }
+    }
     notFound();
   }
 
