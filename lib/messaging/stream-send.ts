@@ -28,7 +28,7 @@ import {
   matchRoguePublicSoftIntent,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
-import { isOpeningCompanionTurn } from "@/lib/ai/companion-answer-protocol";
+import { personableFactHint } from "@/lib/ai/companion-answer-protocol";
 import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 import {
@@ -373,36 +373,31 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       return simulationDataStreamResponse(matchingAsk);
     }
 
-    const openingTurn = isOpeningCompanionTurn(messages);
-    if (openingTurn && isCommunityCompanionPath(pagePath) && lastUserText) {
-      const faqHit =
-        matchCommunityEventsFaq(lastUserText) ||
-        matchDelilahSoftIntent(lastUserText);
-      if (faqHit?.answer) {
-        void supabaseAdmin.from("analytics_events").insert({
-          event_name: "community_rogue_faq",
-          event_type: "community",
-          source: "web_rogue_companion",
-          page_path: pagePath,
-          metadata: {
-            question: faqHit.question,
-            matched: true,
-            communityEventSlug: communityEventSlug || null,
-          },
-        });
-        return simulationDataStreamResponse(faqHit.answer);
-      }
+    const communityFaq =
+      isCommunityCompanionPath(pagePath) && lastUserText
+        ? matchCommunityEventsFaq(lastUserText) ||
+          matchDelilahSoftIntent(lastUserText)
+        : null;
+    if (communityFaq?.answer) {
+      void supabaseAdmin.from("analytics_events").insert({
+        event_name: "community_rogue_faq",
+        event_type: "community",
+        source: "web_rogue_companion",
+        page_path: pagePath,
+        metadata: {
+          question: communityFaq.question,
+          matched: true,
+          communityEventSlug: communityEventSlug || null,
+        },
+      });
     }
 
-    const exactParentFaq = openingTurn
-      ? matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
-        matchRoguePublicSoftIntent(lastUserText)
-      : null;
-    if (exactParentFaq?.answer) {
-      return simulationDataStreamResponse(exactParentFaq.answer);
-    }
+    const exactParentFaq =
+      matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
+      matchRoguePublicSoftIntent(lastUserText);
+    const factForVoice = communityFaq?.answer || exactParentFaq?.answer || "";
 
-    const systemPrompt = buildRogueSystemPrompt({
+    let systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
       lastUserText: careThread,
@@ -410,6 +405,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       pagePath,
       communityEvent,
     });
+    if (factForVoice) {
+      systemPrompt += `\n\n${personableFactHint(factForVoice, clientFirstName)}`;
+    }
 
     let result;
     try {
