@@ -76,22 +76,22 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What pet events are coming up?",
     answer:
-      "I've got the live upcoming list in my pack notes — ask me about a city, date, or a named event and I'll share the details from current SitGuru listings! Or open **/events** to browse the full map and cards. [[cta:community_parent]]",
+      "Tell me a city or the event name and I’ll check the live list for you. You can also browse **/events**. [[cta:community_parent]]",
   },
   {
     question: "What's happening near me?",
     answer:
-      "Tell me your city or county and I'll cheer you toward matching upcoming Pet Events from the live SitGuru list — or hop to **/events** to search the map yourself! [[cta:community_parent]]",
+      "What’s your city? I’ll look through the live list, or you can poke around **/events** yourself. [[cta:community_parent]]",
   },
   {
     question: "How does I'm Going work?",
     answer:
-      "On each event card, use **Attending?** and tap **Yes**, **Maybe**, or **No** — hosts see live counts so they know who's excited! Guests can RSVP without signup; a free SitGuru account unlocks more pack perks. [[cta:community_parent]]",
+      "On the card, tap **Yes**, **Maybe**, or **No**. You can do that as a guest, no account needed. [[cta:community_parent]]",
   },
   {
     question: "How does Attending Yes Maybe No work?",
     answer:
-      "Tap **Yes**, **Maybe**, or **No** on an event card — your pick updates the live counters so Pet Event Planners & Managers can track interest. Change your mind anytime; guests can RSVP without creating an account. [[cta:community_parent]]",
+      "Tap **Yes**, **Maybe**, or **No** and the count updates right away. You can change your mind anytime. [[cta:community_parent]]",
   },
   {
     question: "Do I need a SitGuru account to RSVP?",
@@ -151,27 +151,27 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I find pet-friendly places near me?",
     answer:
-      "Stay on **/events** and switch **Events | Pet-Friendly Places** — same map! Then pick Eat & Drink, Stay, Play, or Pet Services. We only keep listings Google marks **allowsDogs**, except dedicated dog parks and pet services. [[cta:community_parent]]",
+      "On **/events**, flip over to **Pet-Friendly Places**, then pick Eat, Stay, Play, or Pet Services. [[cta:community_parent]]",
   },
   {
     question: "Where can I take my dog to eat?",
     answer:
-      "Open **/events?view=places&lane=eat** for restaurants, breweries, bars, and cafés where Google says **dogs are allowed**. SitGuru then scores the visit — indoor welcome, patio, water — not generic restaurant stars. [[cta:community_parent]]",
+      "Try **/events?view=places&lane=eat**. Those are places Google says are okay for dogs. [[cta:community_parent]]",
   },
   {
     question: "Where are pet friendly hotels?",
     answer:
-      "Switch Community search to **Stay** at **/events?view=places&lane=stay**. We look for hotels and motels that actually accept pets, then surface the details parents struggle to find — fees, limits, and whether it's truly welcoming. [[cta:community_parent]]",
+      "Hotels that take pets are under Stay: **/events?view=places&lane=stay**. [[cta:community_parent]]",
   },
   {
     question: "Where are dog parks near me?",
     answer:
-      "Tap **Play** then **Dog Parks** on the Community map: **/events?view=places&lane=play&category=dog_park**. A regular park that allows dogs is not the same as a dog park — we look for name signals like dog park, off-leash, or bark park. [[cta:community_parent]]",
+      "Dog parks are here: **/events?view=places&lane=play&category=dog_park**. A regular park that allows dogs isn’t always a dog park. [[cta:community_parent]]",
   },
   {
     question: "Where is the nearest emergency vet?",
     answer:
-      "Open **/events?view=places&lane=services&category=vet_er** — Pet Services includes veterinarians, pet hospitals, **Emergency / ER**, stores, and boarding. Call and Open now sit on the card. If it's an emergency, call the clinic and go. [[cta:community_parent]]",
+      "The closest ER options are at **/events?view=places&lane=services&category=vet_er**. If it’s an emergency, call them and go. [[cta:community_parent]]",
   },
   {
     question: "How do I find a veterinarian near me?",
@@ -181,7 +181,7 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What is the SitGuru pet friendliness rating?",
     answer:
-      "It's **how good the visit is for someone bringing a pet**, not Google's food stars. Under the paws we show why — dogs indoors, no pet fee, water bowls, fenced park, emergency hours. [[cta:community_parent]]",
+      "It’s how good the visit is for you and your pet, not how good the food is. The paws tell you why. [[cta:community_parent]]",
   },
   {
     question: "What's the difference between RSVP and tickets?",
@@ -224,22 +224,22 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     question:
       "How do Pet Event Planners and Managers publish Partner Events on SitGuru?",
     answer:
-      "Let's get your pack gather live! **1)** Apply or sign in as a Partner (`/partners/apply?intent=community_events` or **/events/host**). **2)** Open the Pet Event Manager at `/partners/dashboard/community/events`. **3)** Create a draft → fill Basics, Date & Time, Details (autosaves). **4)** Preview → **Submit for review**. SitGuru publishes it as a **Partner Event** that leads the feed!",
+      "Start at **/events/host**, write the draft, then hit **Submit for review**. Once it’s a Partner Event, it leads the feed.",
   },
   {
     question: "How do I set up a new pet event?",
     answer:
-      "Start at **/events/host**, then open the Pet Event Manager (`/partners/dashboard/community/events`) and choose **Create / New draft**. Fill Basics → Date & Time → Details, preview the SitGuru card, and submit for review. Partner Events always stay first once published!",
+      "Head to **/events/host**, start a draft, and send it in for review when it looks right.",
   },
   {
     question: "How do I host an event on SitGuru?",
     answer:
-      "Head to **/events/host** — apply as a Partner if needed, then use the Pet Event Manager to draft, submit for review, and publish. Once live, share with branded graphics and track **Yes / Maybe / No** attendance on your cards!",
+      "Go to **/events/host**, send in your draft, then share it and watch the **Yes / Maybe / No** counts.",
   },
   {
     question: "How do I edit and manage a Partner Event after it is published?",
     answer:
-      "Partner Dashboard → **Pet Events** → find your event → **Manage Event** (or Edit in ⋮). Update Basics, Date & Location, and Details (autosaves). Preview, then publish/submit if still a draft. Use **Share / Promotion Center** for posts, QR, and flyers — Cancel from ⋮ if needed.",
+      "In your Partner Dashboard, open **Pet Events**, then **Manage Event**. That’s where you edit, share, or cancel.",
   },
   {
     question: "Where do I edit an event after it is published?",
@@ -249,7 +249,7 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I track Yes Maybe No attendance on my event?",
     answer:
-      "On your published Partner Event cards, **Attending?** shows live **Yes / Maybe / No** counters — that's your interest pulse! Guests and members can tap without friction. Admins can also review the roster on the event's admin attendance panel.",
+      "Your event card shows live **Yes / Maybe / No** counts, and admins can open the full roster if you need it.",
   },
   {
     question: "Can Pet Parents RSVP on event cards?",
@@ -259,32 +259,32 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What is the difference between a Partner Event and a Pet Event?",
     answer:
-      "**SitGuru Partner Events** are created and updated by Pet Event Planners & Managers in the Partner Dashboard — they always lead visually. **Pet Events** (discoveries) fill the broader map and homepage gaps behind Partner listings.",
+      "Partner Events are the ones you host from the Partner Dashboard, and they show up first. Other Pet Events fill in the rest of the map.",
   },
   {
     question: "What fields are required to publish a Partner Event?",
     answer:
-      "You'll need a clear **title**, **start date/time**, **short description**, a bright **hero image**, and a **venue or city**. Fill categories, free vs ticketed, and pet-friendly flags in Details — then preview and submit for review!",
+      "You’ll want a title, start time, short description, a photo, and a city or venue. Then send it in for review.",
   },
   {
     question: "How do I promote or share my Partner Event?",
     answer:
-      "Open your event's **Promote / Share** workspace in the Partner Dashboard for branded SitGuru graphics, QR, and social posts — or use **Share from SitGuru** on the public card. Tag **@SitGuruOfficial** for pack highlights! [[cta:social]]",
+      "Open **Promote / Share** on the event and you’ll get graphics, a QR code, and posts ready to go. [[cta:social]]",
   },
   {
     question: "How do I cancel a Partner Event?",
     answer:
-      "In the Pet Event Manager, open the event's **⋮** menu and choose **Cancel**. The public listing updates so Pet Parents see the latest status — always double-check before the big day!",
+      "In Pet Event Manager, open the **⋮** menu on that event and choose **Cancel**.",
   },
   {
     question: "Where is the Pet Event Manager?",
     answer:
-      "Sign in as a Partner and open `/partners/dashboard/community/events` — or start from **/events/host** and tap **Host / manage events**. Tabs cover upcoming, published, drafts, pending, past, and cancelled!",
+      "You can jump straight to `/partners/dashboard/community/events`, or start from **/events/host** and I’ll point you there.",
   },
   {
     question: "Do I need Partner access to host events?",
     answer:
-      "Yes — Pet Event Planners & Managers host through a SitGuru Partner account. Apply via `/partners/apply?intent=community_events` (also linked from **/events/host**), then you'll get the Pet Event Manager!",
+      "Yes. Apply from **/events/host**, and once you’re a Partner you can use Pet Event Manager.",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.delilah,
