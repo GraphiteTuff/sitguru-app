@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveLocationParts } from "@/lib/location/zip-lookup";
+import { resolveCanonicalContactEmail } from "@/lib/auth/contact-email";
 
 export const dynamic = "force-dynamic";
 
@@ -108,7 +109,12 @@ function getGuruName(guru: AnyRow, profile?: AnyRow) {
 }
 
 function getGuruEmail(guru: AnyRow, profile?: AnyRow) {
-  return getText(guru, ["email"]) || getText(profile, ["email"]) || "";
+  return (
+    resolveCanonicalContactEmail({
+      profileEmail: profile?.email,
+      roleEmails: [guru.email],
+    }) || ""
+  );
 }
 
 function getGuruServices(guru: AnyRow) {

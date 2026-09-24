@@ -371,14 +371,20 @@ function getBestAccountName(
   );
 }
 
-function getBestEmail(record: Record<string, unknown>, snapshot: SignupSnapshot | null) {
+function getBestEmail(
+  record: Record<string, unknown>,
+  metadata: Record<string, unknown>,
+  snapshot: SignupSnapshot | null,
+) {
   return firstNonEmpty(
-    asString(record.email),
-    rowString(snapshot?.authUser, "email"),
     rowString(snapshot?.profile, "email"),
     rowString(snapshot?.guru, "email"),
     rowString(snapshot?.ambassador, "email"),
     rowString(snapshot?.petParent, "email"),
+    asString(record.email),
+    rowString(snapshot?.authUser, "email"),
+    getMetadataString(metadata, "email"),
+    getMetadataString(parseMetadata(snapshot?.authUser?.user_metadata), "email"),
   );
 }
 
@@ -699,7 +705,7 @@ export async function POST(request: NextRequest) {
 
   const baseUrl = getBaseUrl(request);
   const id = asString(record.id);
-  const email = getBestEmail(record, snapshot);
+  const email = getBestEmail(record, metadata, snapshot);
   const phone = getBestPhone(record, metadata, snapshot);
   const source = getSource(metadata, snapshot);
   const name = getBestAccountName(record, metadata, snapshot);

@@ -31,6 +31,11 @@ import {
   isHardcodedSuperUserEmail,
   skipNameOnlyDuplicateMatch,
 } from "@/lib/admin/super-users";
+import {
+  formatLoginAndContact,
+  resolveCanonicalContactEmail,
+} from "@/lib/auth/contact-email";
+import { listAuthProviders } from "@/lib/auth/signup-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +61,10 @@ type AuthUserRow = {
   last_sign_in_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
+  identities?: Array<{
+    provider?: string | null;
+    identity_data?: { email?: string | null } | null;
+  }> | null;
 };
 
 type SearchParams = {
@@ -407,9 +416,15 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow, authUser?: AuthUserRow
 
 function getGuruEmail(guru: GuruRow, profile?: ProfileRow, authUser?: AuthUserRow) {
   return emailFallback(
-    asTrimmedString(guru.email) ||
-      asTrimmedString(profile?.email) ||
-      asTrimmedString(authUser?.email),
+    resolveCanonicalContactEmail({
+      profileEmail: profile?.email,
+      roleEmails: [guru.email],
+      authEmail: authUser?.email,
+      identityEmails: (authUser?.identities || []).map(
+        (identity) => identity.identity_data?.email,
+      ),
+      metadataEmail: authUser?.user_metadata?.email,
+    }),
     "—",
   );
 }
@@ -661,14 +676,21 @@ function hasUsablePhone(value: string) {
   return digits.length >= 10 && !/^0+$/.test(digits) && !value.includes("XXX");
 }
 
-function getContactMethod(email: string, phone: string) {
-  const emailReady = hasUsableEmail(email);
-  const phoneReady = hasUsablePhone(phone);
-
-  if (emailReady && phoneReady) return "Email + phone";
-  if (phoneReady) return "Phone only";
-  if (emailReady) return "Email only";
-  return "No usable contact";
+function getContactMethod(
+  email: string,
+  phone: string,
+  authUser?: AuthUserRow,
+) {
+  return formatLoginAndContact({
+    providers: listAuthProviders({
+      identities: authUser?.identities,
+      appMetadata: authUser?.app_metadata,
+      email: authUser?.email,
+      phone: authUser?.phone,
+    }),
+    email: hasUsableEmail(email) ? email : "",
+    phone: hasUsablePhone(phone) ? phone : "",
+  });
 }
 
 function normalizeRoleLabel(value: unknown) {
@@ -1210,7 +1232,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       hasGuruWorkspace: true,
       email,
     });
-    const contactMethod = getContactMethod(email, phone);
+    const contactMethod = getContactMethod(email, phone, authUser);
     const applicationStatus = normalizeApplicationStatus(guru);
     const identityStatus = getCredentialStatus(
       guru.stripe_identity_status || guru.identity_status,
@@ -1470,7 +1492,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       inferredFromFallback: true,
       recordSourceLabel: "Guru role without workspace",
       roles,
-      contactMethod: getContactMethod(email, phone),
+      contactMethod: getContactMethod(email, phone, authUser),
       nextAction: "Create or repair Guru workspace",
       completionPercentage: 15,
       recordCategory: "account_repair",

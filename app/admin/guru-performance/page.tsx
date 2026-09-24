@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveCanonicalContactEmail } from "@/lib/auth/contact-email";
 
 export const dynamic = "force-dynamic";
 
@@ -291,7 +292,12 @@ function getGuruName(guru: AnyRow, profile?: AnyRow) {
 }
 
 function getGuruEmail(guru: AnyRow, profile?: AnyRow) {
-  return getText(guru, ["email"]) || getText(profile, ["email"]) || "—";
+  return (
+    resolveCanonicalContactEmail({
+      profileEmail: getText(profile, ["email"]),
+      roleEmails: [getText(guru, ["email"])],
+    }) || "—"
+  );
 }
 
 function getGuruAvatarUrl(guru: AnyRow, profile?: AnyRow) {
