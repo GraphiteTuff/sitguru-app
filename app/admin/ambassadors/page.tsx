@@ -36,6 +36,11 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { skipNameOnlyDuplicateMatch } from "@/lib/admin/super-users";
+import {
+  formatLoginAndContact,
+  resolveCanonicalContactEmail,
+} from "@/lib/auth/contact-email";
+import { listAuthProviders } from "@/lib/auth/signup-identity";
 import AmbassadorRecordsTable, {
   type AmbassadorDisplayRow,
 } from "@/app/admin/ambassadors/AmbassadorRecordsTable";
@@ -46,6 +51,7 @@ type AmbassadorSummaryRow = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
+  login_providers?: string[];
   program: string | null;
   internal_role: string | null;
   source: string | null;
@@ -178,6 +184,10 @@ type AuthUserSnapshot = {
   confirmed_at?: string | null;
   user_metadata?: GenericRow | null;
   app_metadata?: GenericRow | null;
+  identities?: Array<{
+    provider?: string | null;
+    identity_data?: { email?: string | null } | null;
+  }> | null;
 };
 
 type OperationalMetrics = {
@@ -1092,11 +1102,21 @@ function buildUnifiedAmbassadorRows({
   const enrichedRows = summaryRows.map((row) => {
     const detail = detailMap.get(row.ambassador_id);
     const userId = row.user_id || "";
-    const email = asString(row.email).toLowerCase();
+    const lookupEmail = asString(row.email).toLowerCase();
     const profile =
-      profileByUserId.get(userId) || profileByEmail.get(email) || undefined;
-    const authUser = authByUserId.get(userId) || authByEmail.get(email);
+      profileByUserId.get(userId) || profileByEmail.get(lookupEmail) || undefined;
+    const authUser = authByUserId.get(userId) || authByEmail.get(lookupEmail);
     const metadata = asRecord(authUser?.user_metadata);
+    const email =
+      resolveCanonicalContactEmail({
+        profileEmail: firstString(profile, ["email"]),
+        roleEmails: [row.email],
+        authEmail: authUser?.email,
+        identityEmails: (authUser?.identities || []).map(
+          (identity) => identity.identity_data?.email,
+        ),
+        metadataEmail: metadata.email,
+      }) || lookupEmail;
     const roles = uniqueStrings([
       ...(rolesByUserId.get(userId) || []),
       firstString(profile, ["role"]),
@@ -1169,6 +1189,13 @@ function buildUnifiedAmbassadorRows({
 
     return {
       ...row,
+      email: email || null,
+      login_providers: listAuthProviders({
+        identities: authUser?.identities,
+        appMetadata: authUser?.app_metadata,
+        email: authUser?.email,
+        phone: authUser?.phone,
+      }),
       display_name: detail?.display_name || row.display_name || null,
       ambassador_type: detail?.ambassador_type || row.ambassador_type || null,
       tier: detail?.tier || row.tier || null,
@@ -1291,9 +1318,15 @@ function buildUnifiedAmbassadorRows({
     const authUser = authByUserId.get(userId);
     const profile = profileByUserId.get(userId);
     const metadata = asRecord(authUser?.user_metadata);
-    const email = (
-      authUser?.email || firstString(profile, ["email"])
-    )?.toLowerCase() || "";
+    const email =
+      resolveCanonicalContactEmail({
+        profileEmail: firstString(profile, ["email"]),
+        authEmail: authUser?.email,
+        identityEmails: (authUser?.identities || []).map(
+          (identity) => identity.identity_data?.email,
+        ),
+        metadataEmail: metadata.email,
+      }) || "";
 
     if (existingUserIds.has(userId) || (email && existingEmails.has(email))) {
       return;
@@ -1365,6 +1398,12 @@ function buildUnifiedAmbassadorRows({
       full_name: fullName,
       display_name: firstString(profile, ["display_name"]) || null,
       email: email || null,
+      login_providers: listAuthProviders({
+        identities: authUser?.identities,
+        appMetadata: authUser?.app_metadata,
+        email: authUser?.email,
+        phone: authUser?.phone,
+      }),
       phone: asString(phone) || null,
       program: firstString(metadata, ["program", "ambassador_type"]) || "Ambassador Program",
       internal_role:
@@ -1710,14 +1749,16 @@ function getLocationLabel(ambassador: AmbassadorSummaryRow) {
   );
 }
 
-function getAmbassadorContactMethod(email?: string | null, phone?: string | null) {
-  const emailReady = Boolean(asString(email).includes("@"));
-  const phoneReady = asString(phone).replace(/\D/g, "").length >= 7;
-
-  if (emailReady && phoneReady) return "Email + phone";
-  if (phoneReady) return "Phone only";
-  if (emailReady) return "Email only";
-  return "No usable contact";
+function getAmbassadorContactMethod(
+  email?: string | null,
+  phone?: string | null,
+  providers?: string[],
+) {
+  return formatLoginAndContact({
+    providers,
+    email,
+    phone,
+  });
 }
 
 function normalizeAmbassadorRoleLabel(value: string) {
@@ -1847,7 +1888,11 @@ function toAmbassadorDisplayRow(
     avatarUrl: ambassador.ambassador_photo_url || undefined,
     location: getLocationLabel(ambassador),
     roles: getAmbassadorRoleBadges(ambassador),
-    contactMethod: getAmbassadorContactMethod(email, phone),
+    contactMethod: getAmbassadorContactMethod(
+      email,
+      phone,
+      ambassador.login_providers,
+    ),
     statusLabel: archived
       ? "Archived"
       : missingWorkspace

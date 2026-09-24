@@ -9,6 +9,7 @@ import {
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
 import { resolveLocationParts } from "@/lib/location/zip-lookup";
+import { resolveCanonicalContactEmail } from "@/lib/auth/contact-email";
 
 export const dynamic = "force-dynamic";
 
@@ -199,7 +200,12 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow) {
 }
 
 function getGuruEmail(guru: GuruRow, profile?: ProfileRow) {
-  return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "";
+  return (
+    resolveCanonicalContactEmail({
+      profileEmail: profile?.email,
+      roleEmails: [guru.email],
+    }) || ""
+  );
 }
 
 async function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {

@@ -36,6 +36,11 @@ import {
   skipNameOnlyDuplicateMatch,
 } from "@/lib/admin/super-users";
 import CustomerInsightsTable from "./CustomerInsightsTable";
+import {
+  formatLoginAndContact,
+  resolveCanonicalContactEmail,
+} from "@/lib/auth/contact-email";
+import { listAuthProviders } from "@/lib/auth/signup-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -448,7 +453,11 @@ function getDisplaySourceLabel(value: string, source: "profile" | "account" | "l
 }
 
 function getAccountEmail(row: AnyRow) {
-  return getText(row, ["email", "profile_email", "auth_email"]);
+  return resolveCanonicalContactEmail({
+    profileEmail: getText(row, ["email", "profile_email"]),
+    authEmail: getText(row, ["auth_email"]),
+    metadataEmail: getText(row, ["metadata_email"]),
+  });
 }
 
 function getAccountDisplaySource(row: AnyRow) {
@@ -752,14 +761,16 @@ function hasUsableCustomerPhone(value: string) {
   return digits.length >= 10 && !/^0+$/.test(digits) && !value.includes("XXX");
 }
 
-function getCustomerContactMethod(email: string, phone: string) {
-  const emailReady = hasUsableCustomerEmail(email);
-  const phoneReady = hasUsableCustomerPhone(phone);
-
-  if (emailReady && phoneReady) return "Email + phone";
-  if (phoneReady) return "Phone only";
-  if (emailReady) return "Email only";
-  return "No usable contact";
+function getCustomerContactMethod(
+  email: string,
+  phone: string,
+  providers?: string[],
+) {
+  return formatLoginAndContact({
+    providers,
+    email: hasUsableCustomerEmail(email) ? email : "",
+    phone: hasUsableCustomerPhone(phone) ? phone : "",
+  });
 }
 
 function normalizeCustomerDuplicateText(value: unknown) {
@@ -1476,7 +1487,18 @@ function mapRegistrationHealthToAdminStatus(row: PetParentRegistrationHealthRow 
 
 
 async function getAllAuthUsers() {
-  const users: { id: string; last_sign_in_at?: string | null }[] = [];
+  const users: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+    last_sign_in_at?: string | null;
+    user_metadata?: Record<string, unknown> | null;
+    app_metadata?: Record<string, unknown> | null;
+    identities?: Array<{
+      provider?: string | null;
+      identity_data?: { email?: string | null } | null;
+    }> | null;
+  }[] = [];
   let page = 1;
 
   try {
@@ -1498,7 +1520,12 @@ async function getAllAuthUsers() {
       users.push(
         ...pageUsers.map((user) => ({
           id: user.id,
+          email: user.email || null,
+          phone: user.phone || null,
           last_sign_in_at: user.last_sign_in_at || null,
+          user_metadata: user.user_metadata || null,
+          app_metadata: user.app_metadata || null,
+          identities: user.identities || null,
         })),
       );
       if (pageUsers.length < 1000) break;
@@ -1658,6 +1685,7 @@ async function getCustomerIntelligenceData() {
     (registrationHealthResult.data || []) as PetParentRegistrationHealthRow[]
   ).filter(Boolean);
 
+  const authContactByUserId = new Map(authUsers.map((user) => [user.id, user]));
   const authLastSignInByUserId = new Map(
     authUsers
       .filter((user) => Boolean(user.id && user.last_sign_in_at))
@@ -1772,13 +1800,15 @@ async function getCustomerIntelligenceData() {
 
     const source = normalizeSource(getSource(profile as AnyRow));
     const health = registrationHealthByProfileId.get(profile.id);
+    const authContact = authContactByUserId.get(profile.id);
     const guruLocation = guruLocationByUserId.get(profile.id);
     const profileRole = getRole(profile as AnyRow) || asString(health?.role).toLowerCase();
     profileRoleById.set(profile.id, profileRole);
     const displayRow = {
       ...(profile as AnyRow),
       profile_email: asString(health?.profile_email),
-      auth_email: asString(health?.auth_email),
+      auth_email: asString(health?.auth_email) || asString(authContact?.email),
+      metadata_email: asString(authContact?.user_metadata?.email),
     };
 
     const profileCity = getCity(profile as AnyRow);
@@ -1854,7 +1884,16 @@ async function getCustomerIntelligenceData() {
       archivedAt: getArchivedAt(profile as AnyRow),
       profileCompletion: 0,
       roles,
-      contactMethod: getCustomerContactMethod(email, phone),
+      contactMethod: getCustomerContactMethod(
+        email,
+        phone,
+        listAuthProviders({
+          identities: authContact?.identities,
+          appMetadata: authContact?.app_metadata,
+          email: authContact?.email,
+          phone: authContact?.phone,
+        }),
+      ),
       recordSourceLabel: source,
       lastLoginAt:
         authLastSignInByUserId.get(profile.id) ||

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { notifyHqNewSignup } from "@/lib/admin/customers/signup-alerts";
+import {
+  emailForBlankProfile,
+  resolveCanonicalContactEmail,
+} from "@/lib/auth/contact-email";
 import { notifyHqReferralAttributed } from "@/lib/admin/referrals/hq-alerts";
 import {
   enqueueProfileCompletionReminders,
@@ -2014,11 +2018,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .or(`id.eq.${userId},user_id.eq.${userId}`)
+      .limit(1)
+      .maybeSingle();
+    const identityEmails = (
+      (authUser.identities || []) as Array<{ identity_data?: { email?: string } }>
+    ).map((identity) => identity.identity_data?.email);
+    const contactEmail = resolveCanonicalContactEmail({
+      profileEmail: existingProfile?.email,
+      authEmail,
+      identityEmails,
+      metadataEmail: metadata.email,
+      submittedEmail,
+    });
+    const emailForNewProfile = emailForBlankProfile(
+      existingProfile?.email,
+      contactEmail,
+    );
+
     const result = await callProvisioningRpc(
       {
         ...body,
         userId,
         intent: requestedIntent,
+        email: emailForNewProfile || undefined,
       },
       resolvedAmbassadorReferralCode,
     );
@@ -2048,7 +2074,7 @@ export async function POST(request: NextRequest) {
     }
 
     const referredEmail =
-      authEmail || submittedEmail || lowerText(metadata.email);
+      contactEmail || authEmail || submittedEmail || lowerText(metadata.email);
     const referredName = firstText(
       body.fullName,
       metadata.full_name,

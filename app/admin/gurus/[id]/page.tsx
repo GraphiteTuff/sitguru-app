@@ -8,6 +8,10 @@ import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip"
 import { formatCityState, resolveLocationParts } from "@/lib/location/zip-lookup";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import { listAuthProviders } from "@/lib/auth/signup-identity";
+import {
+  formatLoginAndContact,
+  resolveCanonicalContactEmail,
+} from "@/lib/auth/contact-email";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +36,10 @@ type AuthUserRow = {
   last_sign_in_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
-  identities?: Array<{ provider?: string | null }> | null;
+  identities?: Array<{
+    provider?: string | null;
+    identity_data?: { email?: string | null } | null;
+  }> | null;
 };
 
 
@@ -400,8 +407,22 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow | null) {
   );
 }
 
-function getGuruEmail(guru: GuruRow, profile?: ProfileRow | null) {
-  return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "—";
+function getGuruEmail(
+  guru: GuruRow,
+  profile?: ProfileRow | null,
+  authUser?: AuthUserRow | null,
+) {
+  return (
+    resolveCanonicalContactEmail({
+      profileEmail: profile?.email,
+      roleEmails: [guru.email],
+      authEmail: authUser?.email,
+      identityEmails: (authUser?.identities || []).map(
+        (identity) => identity.identity_data?.email,
+      ),
+      metadataEmail: authUser?.user_metadata?.email,
+    }) || "—"
+  );
 }
 
 function getGuruPhone(guru: GuruRow, profile?: ProfileRow | null) {
@@ -1464,9 +1485,10 @@ async function updateGuruStatusAction(formData: FormData) {
   }
 
   const profile = await getProfileForGuru(guru);
+  const statusAuthUser = await getAuthUserForGuru(guru, profile);
   const realGuruId = getGuruId(guru);
   const oldStatus = normalizeApplicationStatus(guru);
-  const guruEmail = getGuruEmail(guru, profile);
+  const guruEmail = getGuruEmail(guru, profile, statusAuthUser);
   const guruName = getGuruName(guru, profile);
   const payload = buildStatusPayload({
     action,
@@ -1775,7 +1797,7 @@ export default async function AdminGuruDetailPage({
   const guruId = getGuruId(guru);
   const userId = getGuruUserId(guru);
   const name = getGuruName(guru, profile);
-  const email = getGuruEmail(guru, profile);
+  const email = getGuruEmail(guru, profile, authUser);
   const phone = getGuruPhone(guru, profile);
 
   // Fill missing city/state from ZIP and persist for the rest of SitGuru.
@@ -1956,6 +1978,14 @@ export default async function AdminGuruDetailPage({
             <DetailItem label="Name" value={name} />
             <DetailItem label="Email" value={email} />
             <DetailItem label="Phone" value={phone} />
+            <DetailItem
+              label="Account contact"
+              value={formatLoginAndContact({
+                providers: authProviders,
+                email,
+                phone,
+              })}
+            />
             <DetailItem label="Location" value={location} />
             <DetailItem label="Experience" value={experience} />
             <DetailItem
