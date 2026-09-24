@@ -36,6 +36,7 @@ import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
+import { personableFactHint } from "@/lib/ai/companion-answer-protocol";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
   inferLookupParamsFromChat,
@@ -455,27 +456,16 @@ export async function POST(req: Request) {
       return simulationDataStreamResponse(scoutMatchingAsk);
     }
 
-    // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
-    if (officer === "delilah" && lastUserText) {
-      const delilahHit = resolveDelilahInstantFaqAnswer(lastUserText);
-      if (delilahHit) {
-        return simulationDataStreamResponse(delilahHit);
-      }
-    }
-
     const instantFaq =
-      officer === "delilah" ||
-      scoutNeedsDirectory ||
-      needsCareMatchingAsk(careThread)
-        ? null
-        : resolveOfficerInstantFaqAnswer({
-            officer: officer as "scout" | "taco",
-            question: lastUserText,
-            surface,
-          });
-    if (instantFaq) {
-      return simulationDataStreamResponse(instantFaq);
-    }
+      officer === "delilah"
+        ? resolveDelilahInstantFaqAnswer(lastUserText)
+        : scoutNeedsDirectory || needsCareMatchingAsk(careThread)
+          ? null
+          : resolveOfficerInstantFaqAnswer({
+              officer: officer as "scout" | "taco",
+              question: lastUserText,
+              surface,
+            });
 
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
@@ -537,14 +527,21 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString();
-    const system = buildOfficerSystemPrompt({
-      officerId: officer,
-      nowIso,
-      actorLabel,
-      snapshotMarkdown,
-      preset: preset || undefined,
-      surface,
-    });
+    const system = [
+      buildOfficerSystemPrompt({
+        officerId: officer,
+        nowIso,
+        actorLabel,
+        snapshotMarkdown,
+        preset: preset || undefined,
+        surface,
+      }),
+      instantFaq
+        ? personableFactHint(instantFaq, bodyGuruName || undefined)
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     if (!isSitGuruAiConfigured()) {
       return simulationDataStreamResponse(

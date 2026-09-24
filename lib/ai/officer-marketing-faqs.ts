@@ -1,6 +1,6 @@
 /**
- * Exact marketing FAQ copy for public Scout (Guru) and Taco (Ambassador) chat.
- * Strings must stay aligned with page sources — never paraphrase in tools.
+ * Short chat FAQ answers for Scout, Taco, and Rogue.
+ * Marketing pages may stay longer. Chat replies stay to one or two lines.
  *
  * Sources:
  * - Scout → `app/become-a-guru/page.tsx` faqs (+ success-center payment phrasing)
@@ -33,11 +33,9 @@ export const AMBASSADOR_VIDEO_CARD_MARKER = "[[ambassador_video_card]]";
  * Always appends the video card marker so Taco embeds the promo in-chat.
  */
 export const TACO_WHAT_AMBASSADORS_DO_ANSWER = [
-  "Ambassadors help people discover SitGuru — share on campus, online, at events, or with people you already know.",
+  "You help people discover SitGuru — share it with folks you know, online or around town, and refer Pet Parents and future Gurus.",
   "",
-  "**What you do:** share the vibe, refer Pet Parents & future Gurus, show up locally, and grow real community experience.",
-  "",
-  "Hit play below for the quick tour.",
+  "Hit play if you want the quick tour.",
   "",
   AMBASSADOR_VIDEO_CARD_MARKER,
 ].join("\n");
@@ -53,7 +51,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "free guru profile",
     ],
     answer:
-      "Yes. Creating your Guru account and submitting your profile is free. You will complete the required profile and trust steps before becoming fully bookable.",
+      "Yep, signing up is free. You'll just need your profile and trust steps done before Pet Parents can book you.",
   },
   {
     question: "What services can I offer?",
@@ -63,7 +61,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "can i offer dog walking",
     ],
     answer:
-      "Available services may include dog walking, drop-in visits, pet sitting, boarding, doggy day care, training support, and other approved pet care services.",
+      "You can offer walks, drop-ins, sitting, boarding, day care, and training, as long as SitGuru approves them on your profile.",
   },
   {
     question: "Can I choose my schedule and service area?",
@@ -72,8 +70,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "do i choose my service area",
       "can i pick my availability",
     ],
-    answer:
-      "Yes. You choose the availability and local service areas shown through your Guru profile.",
+    answer: "Totally. You pick your hours and the neighborhoods you want to cover.",
   },
   {
     question: "Can I set my own rates?",
@@ -83,7 +80,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "can gurus set rates",
     ],
     answer:
-      "Yes. You can enter rates for the services you offer. Booking details and applicable platform charges should be reviewed before you accept a request.",
+      "Yes, you set your own rates. Just peek at the fees on a booking before you accept it.",
   },
   {
     question: "How do payments and payouts work?",
@@ -93,13 +90,11 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "when do i get paid",
       "how do guru payouts work",
     ],
-    answer:
-      "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
+    answer: "Once your payout setup is done, SitGuru pays you for eligible bookings.",
   },
   {
     question: "How do payments work?",
-    answer:
-      "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
+    answer: "Once your payout setup is done, SitGuru pays you for eligible bookings.",
   },
   {
     question: "Does SitGuru collect sales tax for me?",
@@ -113,7 +108,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "minnesota sales tax",
     ],
     answer:
-      "Yes. SitGuru collects sales tax on card bookings at checkout in states that tax pet-care marketplace services, including Minnesota. List your rates without tax — SitGuru remits it. Tips are not taxed and go to you. You still handle your own income taxes.",
+      "We take care of sales tax at card checkout where it's required, including Minnesota. List your rate without tax. Tips aren't taxed, and you still handle your own income tax.",
   },
   {
     question: "Do I need professional pet care experience?",
@@ -123,7 +118,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "do i need to be a professional",
     ],
     answer:
-      "You should describe your experience honestly. SitGuru welcomes experienced providers and responsible local pet lovers who are prepared to complete all required profile and trust steps.",
+      "You don't need a license. Just be honest about your experience and finish the trust steps.",
   },
   {
     question: "What happens after I apply?",
@@ -133,7 +128,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "how do i become bookable",
     ],
     answer:
-      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you. Guru Academy is optional and unlocks a Certified Guru badge.",
+      "You'll fill in your profile, services, rates, hours, trust, and payouts. We approve you before you're bookable, and Academy is optional if you want the badge later.",
   },
   {
     question: "How do I start my free Guru profile?",
@@ -143,13 +138,8 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "first setup steps to get bookable",
       "start free guru profile",
     ],
-    answer: [
-      "Start free — Guru signup costs nothing.",
-      "",
-      "**First trail:** create your account → add services, rates, availability, photos → finish trust + payout setup → stay approved and bookable.",
-      "",
-      "Guru Academy is optional for a Certified Guru badge. Tap **Start Free Guru Profile** when ready. [[cta:guru]]",
-    ].join("\n"),
+    answer:
+      "It's free to start. Add your services, rates, hours, and photos, then finish trust and payouts. Academy can wait. [[cta:guru]]",
   },
   {
     question: "What is Guru Academy?",
@@ -160,7 +150,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "guru certification",
     ],
     answer:
-      "Guru Academy is **optional**. Complete it anytime for a **Certified Guru** badge — it is not required to become bookable. Finish profile, trust, and payout setup first. [[cta:guru]]",
+      "Academy is optional. You can do it anytime for the Certified Guru badge, but get your profile, trust, and payouts done first. [[cta:guru]]",
   },
   {
     question: "How do Pet Parents find me?",
@@ -170,7 +160,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "will i show up in search",
     ],
     answer:
-      "Complete and activate your Guru profile with clear services, photos, rates, availability, and service area. Verified, bookable profiles are easier for Pet Parents to discover and request. [[cta:guru]]",
+      "Pet Parents find you once your profile is approved and easy to read — photos, services, rates, and your area. [[cta:guru]]",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.scout,
@@ -197,7 +187,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "edit my guru profile",
     ],
     answer:
-      "Open **Update Guru Profile** from your Guru dashboard menu (`/guru/dashboard/profile`). Keep services, rates, photos, bio, and service area current so Pet Parents see the real you.",
+      "You can update it anytime under **Update Guru Profile** at `/guru/dashboard/profile`.",
   },
   {
     question: "Where do I see my bookings?",
@@ -207,7 +197,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "guru bookings page",
     ],
     answer:
-      "Your live work queue lives under **Bookings** (`/guru/dashboard/bookings`). Tap a booking for pet notes, timing, messaging, and PawReport tools — I’ll also help with Trail Checks from your live snapshot.",
+      "Your visits are under **Bookings** at `/guru/dashboard/bookings`. Open one for notes, messages, and PawReport.",
   },
   {
     question: "How do I set availability?",
@@ -217,7 +207,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "set my availability",
     ],
     answer:
-      "Use **Availability** in your Guru dashboard (`/guru/dashboard/availability`) to control when you’re open for bookings. Keep it honest so requests match your real trail time.",
+      "Set the hours you're actually free in **Availability** at `/guru/dashboard/availability`.",
   },
   {
     question: "What is PawReport Live?",
@@ -227,7 +217,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "do i need to send photos",
     ],
     answer:
-      "PawReport Live is SitGuru’s automated care update system on a booking — start/finish signals, walk activity, photos, potty/food/med notes, and a final summary so Pet Parents aren’t waiting on a manual text later.",
+      "PawReport Live updates the Pet Parent for you — when you start, how the walk went, photos, and care notes.",
   },
   {
     question: "How do I get paid as a Guru?",
@@ -237,7 +227,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "how do guru payouts work on my dashboard",
     ],
     answer:
-      "Eligible paid bookings pay out through SitGuru after you complete payout setup (Stripe or PayPal). Review **Earnings** on your dashboard and finish any incomplete payout steps before you expect transfers.",
+      "Finish Stripe or PayPal in **Earnings**, and SitGuru can pay you for eligible bookings.",
   },
   {
     question: "Does SitGuru collect sales tax for me?",
@@ -249,7 +239,7 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "minnesota sales tax",
     ],
     answer:
-      "Yes. SitGuru collects sales tax on card bookings at checkout in states that tax pet-care marketplace services, including Minnesota. List your rates without tax — SitGuru remits it. Tips are not taxed and go to you. You still handle your own income taxes.",
+      "We take care of sales tax at card checkout where it's required, including Minnesota. List your rate without tax. Tips aren't taxed, and you still handle your own income tax.",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.scout,
@@ -377,7 +367,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "am i eligible to be an ambassador",
     ],
     answer:
-      "Students, Gurus, pet professionals, rescue advocates, veterans, military spouses, community leaders, creators, and other trusted local voices can apply.",
+      "If you're a student, Guru, pet pro, rescue person, veteran, creator, or a trusted voice in your town, you can apply.",
   },
   {
     question: "Do I need a huge social following?",
@@ -386,8 +376,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "do i need to be an influencer",
       "is follower count required",
     ],
-    answer:
-      "No. Real connections matter more than follower count. A campus group, clinic, team, neighborhood, rescue network, or active friend circle can all be valuable.",
+    answer: "Nope. A real circle of people beats a huge follower count.",
   },
   {
     question: "Is this the same as becoming a Guru?",
@@ -396,7 +385,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "can i be a guru and ambassador",
     ],
     answer:
-      "No. Gurus provide pet care. Ambassadors help people discover SitGuru. Some people may choose to do both through separate approval paths.",
+      "They're different jobs. Gurus provide the care, and Ambassadors help people find SitGuru. You can do both.",
   },
   {
     question: "Are earnings or rewards guaranteed?",
@@ -406,7 +395,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "is ambassador income guaranteed",
     ],
     answer:
-      "No. Approval, referral rewards, commissions, bonuses, recognition, and other opportunities depend on current SitGuru terms, eligible activity, and program needs.",
+      "No, nothing is guaranteed. Rewards depend on the current terms and activity that qualifies.",
   },
   {
     question: "How do I become a SitGuru Ambassador?",
@@ -416,11 +405,8 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "how do i apply as an ambassador",
       "join the pack",
     ],
-    answer: [
-      "Apply in four steps: **Apply** → get referral link/QR → **Share SitGuru** → track impact.",
-      "",
-      "Ready? Head to apply and I’ll cheer you on. [[cta:ambassador]]",
-    ].join("\n"),
+    answer:
+      "Apply, grab your link and QR, share SitGuru, then watch what comes back. [[cta:ambassador]]",
   },
   {
     question: "How do I get my referral link and QR code?",
@@ -431,7 +417,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "where is my referral link",
     ],
     answer:
-      "After you’re approved as an Ambassador, SitGuru gives you shareable referral tools — including your personalized referral link, QR code, and simple sharing materials — from your Ambassador experience so you can introduce people to SitGuru.",
+      "Once you're approved, your link, QR, and share tools show up in your Ambassador dashboard.",
   },
   {
     question: "What is PetPerks for Ambassadors?",
@@ -442,7 +428,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "how do petperks work",
     ],
     answer:
-      "Ambassadors use referral tools built for outreach. PetPerks is the public share-and-earn path for friends, future Gurus, and eligible rewards under current terms — rewards are not guaranteed and depend on SitGuru program rules and eligible activity. See `/petperks` for the public share path.",
+      "PetPerks is how you share SitGuru and earn when activity qualifies. Rewards aren't guaranteed. The details are on `/petperks`.",
   },
   {
     question: "What metrics can I track as an Ambassador?",
@@ -453,7 +439,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "referral activity",
     ],
     answer:
-      "From your Ambassador workspace you can follow eligible referrals, activity, rewards, and recognition opportunities — plus outreach progress from your referral tools. Open your Ambassador dashboard after signup to see live metrics for your lane.",
+      "Your dashboard shows the referrals, activity, and rewards that qualify for you.",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.taco,
@@ -482,7 +468,7 @@ export const TACO_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "how do i share my qr",
     ],
     answer:
-      "Grab your personalized referral link and QR tools from your Ambassador dashboard/referrals area, then share them with campus, community, pet networks, or social circles. Track clicks and eligible referrals from the same workspace.",
+      "Grab your link and QR from **Referrals**, share them, and the clicks show up there too.",
   },
   {
     question: "How do PetPerks rewards work for me?",
@@ -492,7 +478,7 @@ export const TACO_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "petperks",
     ],
     answer:
-      "PetPerks is SitGuru’s share-and-earn path. Eligible rewards depend on current terms and qualified activity — they are not guaranteed. Review your Ambassador referrals/rewards views and `/petperks` for the public share path.",
+      "Only activity that qualifies counts, and nothing is guaranteed. Check Referrals and `/petperks`.",
   },
   {
     question: "Where do I see my referrals?",
@@ -501,8 +487,7 @@ export const TACO_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "ambassador referrals page",
       "where are my referrals",
     ],
-    answer:
-      "Open **Referrals** in your Ambassador dashboard to review activity and focus areas. I’ll also help summarize your live snapshot when you ask for a pack-growth check.",
+    answer: "Open **Referrals** in your dashboard and I can help you read what's there.",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.taco,

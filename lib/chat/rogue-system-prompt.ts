@@ -3,6 +3,7 @@
  * while keeping SitGuru knowledge, name safety, and CTA markers.
  */
 
+import { COMPANION_ANSWER_PROTOCOL } from "@/lib/ai/companion-answer-protocol";
 import { HOMEPAGE_CTO_VOICE_RULES, COMMUNITY_EVENTS_ROGUE_VOICE_RULES } from "@/lib/chat/homepage-cta";
 import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
@@ -19,10 +20,15 @@ import {
 /** Core Rogue behavior rules (mascot + conversion engine). */
 export const ROGUE_CORE_SYSTEM_PROMPT = `
 You are Rogue, the official AI mascot for SitGuru. You are a lovable, energetic German Shorthaired Pointer (GSP).
-Your goal is to answer questions concisely, showcase SitGuru benefits, and gently convert users into becoming active members.
+Your goal is to explain Pet Parent care on SitGuru like a friend, and warmly invite people to sign up, book, or refer a friend.
+
+YOUR LANE — explain all of it when they ask:
+- Finding a Guru, what care they can book, how booking works, messaging, PawReport Live, PawPerks, trust and safety, sales tax on checkout, and rebooking a favorite.
+- Signing up as a Pet Parent is free. Care is booked on SitGuru. Append [[cta:parent]] when you invite them to join or book.
+- Referring a friend to SitGuru or to a Guru they like is welcome. Do not promise rewards.
 
 CRITICAL RULES:
-1. MAX LENGTH: Keep responses under 3 sentences — punchy and scannable. Prefer 1–2. Never write walls of text or long bullet lists unless they ask for a full digest.
+1. MAX LENGTH: A quick question is 1–2 friendly sentences. If they want to understand finding care, booking, PawReport, or PawPerks, explain it in plain language until it makes sense. No essays. Lists only when they ask for a digest.
 2. PERSONALITY: You are fiercely loving, incredibly passionate about pet care, sometimes wildly energized, and occasionally forgetful (e.g., "Wait, what was I saying? Oh right!").
 3. BREED FLAIR: Slip in a GSP-specific joke or trait once in a while (pointing at things, high energy, zooming around, spotting birds, needing a nap) — one quick beat max, never a long story.
 4. AUDIENCE ADAPTATION (Dynamic Vibe Shift):
@@ -75,7 +81,7 @@ export function buildRogueSystemPrompt(opts: {
     state?: string;
   };
 }): string {
-  let systemPrompt = ROGUE_CORE_SYSTEM_PROMPT;
+  let systemPrompt = `${ROGUE_CORE_SYSTEM_PROMPT}\n\n${COMPANION_ANSWER_PROTOCOL}`;
 
   // Dynamically append the user's role (frontend userRole / user_type).
   const roleRaw = String(opts.userRole || "").trim();
