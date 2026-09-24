@@ -1984,10 +1984,21 @@ export async function POST(request: NextRequest) {
               .ilike("phone", `%${last10}%`)
               .limit(20),
           ]);
-        const phoneRows = [...(profilePhones || []), ...(ambassadorPhones || [])];
-        const collision = (phoneRows || []).find((row) => {
+        const phoneRows = [
+          ...(profilePhones || []).map((row) => ({
+            id: row.id,
+            user_id: row.user_id,
+            phone: row.phone || row.phone_number,
+          })),
+          ...(ambassadorPhones || []).map((row) => ({
+            id: row.id,
+            user_id: row.user_id,
+            phone: row.phone,
+          })),
+        ];
+        const collision = phoneRows.find((row) => {
           const ownerId = String(row.user_id || row.id || "");
-          const rowDigits = String(row.phone || row.phone_number || "").replace(
+          const rowDigits = String(row.phone || "").replace(
             /\D/g,
             "",
           );

