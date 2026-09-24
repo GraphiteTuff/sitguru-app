@@ -973,8 +973,10 @@ function describeDuplicateMatch(keys: string[]) {
         .map((key) => {
           if (key.startsWith("auth:")) return "AUTH IDENTITY DUPLICATE";
           if (key.startsWith("email:")) return "shared email";
-          if (key.startsWith("phone:")) return "same normalized phone";
-          if (key.startsWith("namezip:")) return "same name + ZIP";
+          if (key.startsWith("phone:")) return "Possible Cross-Auth Duplicate — same normalized phone";
+          if (key.startsWith("namezip:")) return "Possible Cross-Auth Duplicate — same name + ZIP";
+          if (key.startsWith("namephone:")) return "Possible Cross-Auth Duplicate — same name + phone";
+          if (key.startsWith("apple-phone:")) return "Possible Cross-Auth Duplicate — Apple account paired with incomplete phone account";
           if (key.startsWith("name:")) return "shared real name";
           return "";
         })

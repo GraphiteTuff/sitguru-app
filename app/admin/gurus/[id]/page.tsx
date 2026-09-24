@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
 import { formatCityState, resolveLocationParts } from "@/lib/location/zip-lookup";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import { listAuthProviders } from "@/lib/auth/signup-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,12 @@ type ProfileRow = Record<string, unknown>;
 type AuthUserRow = {
   id: string;
   email?: string | null;
+  phone?: string | null;
   created_at?: string | null;
   last_sign_in_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
+  identities?: Array<{ provider?: string | null }> | null;
 };
 
 
@@ -1762,6 +1765,13 @@ export default async function AdminGuruDetailPage({
   }
 
   const profile = await getProfileForGuru(guru);
+  const authUser = await getAuthUserForGuru(guru, profile);
+  const authProviders = listAuthProviders({
+    identities: authUser?.identities,
+    appMetadata: authUser?.app_metadata,
+    email: authUser?.email,
+    phone: authUser?.phone,
+  });
   const guruId = getGuruId(guru);
   const userId = getGuruUserId(guru);
   const name = getGuruName(guru, profile);
@@ -1953,7 +1963,11 @@ export default async function AdminGuruDetailPage({
               value={formatShortDate(guru.created_at)}
             />
             <DetailItem label="Guru ID" value={guruId} />
-            <DetailItem label="User ID" value={userId || "—"} />
+            <DetailItem label="Auth user ID" value={authUser?.id || userId || "—"} />
+            <DetailItem
+              label="Providers"
+              value={authProviders.length ? authProviders.join(", ") : "—"}
+            />
           </div>
 
           <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
