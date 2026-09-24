@@ -931,13 +931,32 @@ function isStrongPersonalName(name: string) {
   return parts.length >= 2 && parts.every((part) => part.length >= 2);
 }
 
-function getNormalizedDuplicateKeys(name: string, email: string, phone: string) {
+function getNormalizedDuplicateKeys(
+  name: string,
+  email: string,
+  phone: string,
+  zip = "",
+  authUserId = "",
+) {
   const keys: string[] = [];
   const normalizedEmail = email.toLowerCase();
-  const normalizedPhone = phone.replace(/\D/g, "");
+  const phoneDigits = phone.replace(/\D/g, "");
+  const normalizedPhone =
+    phoneDigits.length === 11 && phoneDigits.startsWith("1")
+      ? phoneDigits.slice(1)
+      : phoneDigits;
+  const zipDigits = zip.replace(/\D/g, "").slice(0, 5);
 
+  if (authUserId) keys.push(`auth:${authUserId.toLowerCase()}`);
   if (hasUsableEmail(email)) keys.push(`email:${normalizedEmail}`);
-  if (hasUsablePhone(phone)) keys.push(`phone:${normalizedPhone}`);
+  if (normalizedPhone.length >= 10) keys.push(`phone:${normalizedPhone}`);
+  if (
+    isStrongPersonalName(name) &&
+    zipDigits.length === 5 &&
+    !skipNameOnlyDuplicateMatch(email)
+  ) {
+    keys.push(`namezip:${normalizeText(name)}|${zipDigits}`);
+  }
   // Name-only collisions on defaults like "SitGuru Member" caused false positives.
   // Founder HQ vs personal marketplace logins also share a legal name on purpose.
   if (isStrongPersonalName(name) && !skipNameOnlyDuplicateMatch(email)) {
@@ -952,8 +971,12 @@ function describeDuplicateMatch(keys: string[]) {
     new Set(
       keys
         .map((key) => {
+          if (key.startsWith("auth:")) return "AUTH IDENTITY DUPLICATE";
           if (key.startsWith("email:")) return "shared email";
-          if (key.startsWith("phone:")) return "shared phone";
+          if (key.startsWith("phone:")) return "Possible Cross-Auth Duplicate — same normalized phone";
+          if (key.startsWith("namezip:")) return "Possible Cross-Auth Duplicate — same name + ZIP";
+          if (key.startsWith("namephone:")) return "Possible Cross-Auth Duplicate — same name + phone";
+          if (key.startsWith("apple-phone:")) return "Possible Cross-Auth Duplicate — Apple account paired with incomplete phone account";
           if (key.startsWith("name:")) return "shared real name";
           return "";
         })
@@ -1158,8 +1181,13 @@ async function getGuruManagementData(searchParams: SearchParams) {
     const name = getGuruName(guru, profile, authUser);
     const email = getGuruEmail(guru, profile, authUser);
     const phone = getGuruPhone(guru, profile, authUser);
+    const zip =
+      asTrimmedString(guru.zip_code) ||
+      asTrimmedString(guru.service_zip) ||
+      asTrimmedString(profile?.zip_code) ||
+      asTrimmedString(profile?.service_zip);
 
-    for (const key of getNormalizedDuplicateKeys(name, email, phone)) {
+    for (const key of getNormalizedDuplicateKeys(name, email, phone, zip, userId)) {
       duplicateCounts.set(key, (duplicateCounts.get(key) || 0) + 1);
     }
   }
@@ -1199,7 +1227,18 @@ async function getGuruManagementData(searchParams: SearchParams) {
       (toBoolean(guru.is_bookable) || applicationStatus === "bookable") &&
       !hasExplicitFalse(guru.is_public_visible) &&
       !hasExplicitFalse(guru.is_public);
-    const duplicateKeys = getNormalizedDuplicateKeys(name, email, phone);
+    const zip =
+      asTrimmedString(guru.zip_code) ||
+      asTrimmedString(guru.service_zip) ||
+      asTrimmedString(profile?.zip_code) ||
+      asTrimmedString(profile?.service_zip);
+    const duplicateKeys = getNormalizedDuplicateKeys(
+      name,
+      email,
+      phone,
+      zip,
+      userId,
+    );
     const matchedDuplicateKeys = duplicateKeys.filter(
       (key) => (duplicateCounts.get(key) || 0) > 1,
     );

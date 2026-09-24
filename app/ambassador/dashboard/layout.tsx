@@ -103,8 +103,8 @@ export default function AmbassadorDashboardLayout({
   const isDashboardHome = pathname === "/ambassador/dashboard";
 
   return (
-    <div className="min-h-[100svh] bg-[#f8fbf6]">
-      <header className="sticky top-0 z-50 border-b border-green-100 bg-white/95 shadow-sm backdrop-blur">
+    <div className="min-h-[100svh] bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_48%,#EEF6FF_100%)]">
+      <header className="sticky top-0 z-50 border-b border-sky-100 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto max-w-[1500px] px-3 sm:px-5 lg:px-6">
           <div className="flex min-h-16 items-center justify-between gap-4 py-2">
             <Link
@@ -112,10 +112,10 @@ export default function AmbassadorDashboardLayout({
               className="min-w-0 shrink-0"
               aria-label="Open Ambassador Dashboard"
             >
-              <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
+              <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
                 SitGuru Ambassador
               </p>
-              <p className="truncate text-base font-black tracking-tight text-green-950">
+              <p className="truncate text-base font-black tracking-tight text-slate-950">
                 Dashboard & Portal
               </p>
             </Link>
@@ -135,8 +135,8 @@ export default function AmbassadorDashboardLayout({
                       aria-current={active ? "page" : undefined}
                       className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-black transition sm:text-sm ${
                         active
-                          ? "bg-green-800 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-green-50 hover:text-green-950"
+                          ? "bg-[#0D5C3A] text-white shadow-sm"
+                          : "text-slate-600 hover:bg-sky-50 hover:text-[#0D5C3A]"
                       }`}
                     >
                       {item.icon}
@@ -153,22 +153,22 @@ export default function AmbassadorDashboardLayout({
       </header>
 
       {isDashboardHome ? (
-        <section className="border-b border-green-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]">
+        <section className="border-b border-sky-100 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_48%,#f0fdf4_100%)]">
           <div className="mx-auto max-w-[1500px] px-3 py-4 sm:px-5 lg:px-6">
             <Link
               href="/ambassador/dashboard/command-center"
-              className="group flex flex-col gap-4 rounded-[24px] border border-green-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
+              className="group flex flex-col gap-4 rounded-[24px] border border-sky-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white shadow-sm">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] text-white shadow-sm">
                   <BriefcaseBusiness size={23} />
                 </div>
 
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
                     Your Working Area
                   </p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight text-green-950 sm:text-2xl">
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
                     Open the SitGuru Ambassador Portal
                   </h2>
                   <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-600">

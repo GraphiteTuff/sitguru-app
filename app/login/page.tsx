@@ -21,6 +21,7 @@ import { login } from "@/app/auth/actions";
 import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
 import TurnstileWidget from "@/components/TurnstileWidget";
 import { supabase } from "@/lib/supabase";
+import { decideNextAuthStep } from "@/lib/auth/signup-identity";
 
 type LoginMethod = "phone" | "email";
 type LoginAudience = "one" | "pet_parent" | "guru" | "ambassador" | "intern";
@@ -327,6 +328,32 @@ function LoginPageContent() {
         typeof window !== "undefined"
           ? window.location.origin
           : "https://www.sitguru.com";
+
+      const { data: existingSession } = await supabase.auth.getSession();
+      const step = decideNextAuthStep({
+        provider,
+        hasVerifiedSession: Boolean(existingSession.session?.user),
+        phoneCodeSent: false,
+        phoneVerified: Boolean(existingSession.session?.user),
+      });
+      const redirectTo = `${origin}/auth/callback?${new URLSearchParams({
+        next: nextPath,
+        flow: "login",
+      }).toString()}`;
+
+      if (step.action === "link_identity") {
+        const { error: linkError } = await supabase.auth.linkIdentity({
+          provider,
+          options: {
+            redirectTo,
+            ...(provider === "google"
+              ? { queryParams: { prompt: "select_account" } }
+              : {}),
+          },
+        });
+        if (linkError) throw linkError;
+        return;
+      }
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,

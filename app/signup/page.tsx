@@ -25,6 +25,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  decideNextAuthStep,
+  resolveAuthenticatedAccount,
+} from "@/lib/auth/signup-identity";
 import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
 
 const BRAND_GREEN = "#0D5C3A";
@@ -814,12 +818,46 @@ function SignupPageContent() {
       const basics = getSignupBasics();
       if (!basics) return;
 
+      const { data: existingSession } = await supabase.auth.getSession();
+      const googleStep = decideNextAuthStep({
+        provider: "google",
+        hasVerifiedSession: Boolean(existingSession.session?.user),
+        phoneCodeSent,
+        phoneVerified: Boolean(existingSession.session?.user),
+      });
+      if (googleStep.action === "require_phone_verification") {
+        setMessage(
+          "Enter the 6-digit code first. Google will be added to this account, not a new one.",
+        );
+        return;
+      }
+
       setGoogleLoading(true);
 
       const origin =
         typeof window !== "undefined"
           ? window.location.origin
           : "https://www.sitguru.com";
+
+      if (googleStep.action === "link_identity") {
+        const { error: linkError } = await supabase.auth.linkIdentity({
+          provider: "google",
+          options: {
+            redirectTo: buildAuthCallbackUrl({
+              origin,
+              nextPath: redirectPath,
+              intent,
+              referralCode: normalizeReferralCode(referralCode),
+              tracking: signupTracking,
+              zipCode: basics.cleanZipCode,
+              fullName: basics.cleanName,
+            }),
+            queryParams: { prompt: "select_account" },
+          },
+        });
+        if (linkError) throw linkError;
+        return;
+      }
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -1072,6 +1110,33 @@ function SignupPageContent() {
 
       setPhoneLoading(true);
 
+      const { data: existingSession } = await supabase.auth.getSession();
+      const phoneStep = decideNextAuthStep({
+        provider: "phone",
+        hasVerifiedSession: Boolean(existingSession.session?.user),
+        phoneCodeSent,
+        phoneVerified: false,
+      });
+      if (phoneStep.action === "attach_phone_to_session" && existingSession.session?.user) {
+        const account = resolveAuthenticatedAccount({
+          authUser: existingSession.session.user,
+        });
+        const { error: phoneUpdateError } = await supabase.auth.updateUser({
+          phone: normalizedPhone,
+          data: {
+            full_name: cleanName,
+            zip_code: cleanZipCode,
+            signup_phone_attached_to: account.userId,
+          },
+        });
+        if (phoneUpdateError) throw phoneUpdateError;
+        setMessage(
+          "This phone is saved on the account you are already signed into.",
+        );
+        setPhoneLoading(false);
+        return;
+      }
+
       const { error: otpError } = await supabase.auth.signInWithOtp({
         phone: normalizedPhone,
         options: {
@@ -1275,6 +1340,21 @@ function SignupPageContent() {
       const basics = getSignupBasics();
       if (!basics) return;
 
+      const { data: existingSession } = await supabase.auth.getSession();
+      const appleStep = decideNextAuthStep({
+        provider: "apple",
+        hasVerifiedSession: Boolean(existingSession.session?.user),
+        phoneCodeSent,
+        phoneVerified: Boolean(existingSession.session?.user),
+      });
+
+      if (appleStep.action === "require_phone_verification") {
+        setMessage(
+          "Enter the 6-digit code first. Apple will be added to this account, not a new one.",
+        );
+        return;
+      }
+
       setAppleLoading(true);
 
       const origin =
@@ -1282,19 +1362,31 @@ function SignupPageContent() {
           ? window.location.origin
           : "https://www.sitguru.com";
 
+      const redirectTo = buildAuthCallbackUrl({
+        origin,
+        nextPath: redirectPath,
+        intent,
+        referralCode: normalizeReferralCode(referralCode),
+        tracking: signupTracking,
+        zipCode: basics.cleanZipCode,
+        fullName: basics.cleanName,
+      });
+
+      if (appleStep.action === "link_identity") {
+        resolveAuthenticatedAccount({
+          authUser: existingSession.session!.user,
+        });
+        const { error: linkError } = await supabase.auth.linkIdentity({
+          provider: "apple",
+          options: { redirectTo },
+        });
+        if (linkError) throw linkError;
+        return;
+      }
+
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "apple",
-        options: {
-          redirectTo: buildAuthCallbackUrl({
-            origin,
-            nextPath: redirectPath,
-            intent,
-            referralCode: normalizeReferralCode(referralCode),
-            tracking: signupTracking,
-            zipCode: basics.cleanZipCode,
-            fullName: basics.cleanName,
-          }),
-        },
+        options: { redirectTo },
       });
 
       if (oauthError) throw oauthError;
@@ -1605,7 +1697,7 @@ function SignupPageContent() {
               ) : (
                 <Apple className="h-5 w-5" />
               )}
-              Continue with Apple
+              {phoneCodeSent ? "Add Apple to this account" : "Continue with Apple"}
             </button>
           </div>
 

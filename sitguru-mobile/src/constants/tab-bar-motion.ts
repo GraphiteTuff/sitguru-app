@@ -11,26 +11,26 @@ export const TAB_BAR_MOTION = {
 
   /** Horizontal slide of the persistent selection bubble. */
   slideSpring: {
-    damping: 22,
-    stiffness: 320,
-    mass: 0.62,
-    overshootClamping: true,
+    damping: 18,
+    stiffness: 280,
+    mass: 0.7,
+    overshootClamping: false,
   },
 
   /** Brief width stretch while the bubble travels. */
   stretchSpring: {
-    damping: 22,
-    stiffness: 300,
-    mass: 0.46,
-    overshootClamping: true,
+    damping: 18,
+    stiffness: 260,
+    mass: 0.5,
+    overshootClamping: false,
   },
 
   /** Return to resting bubble size. */
   settleSpring: {
-    damping: 24,
-    stiffness: 240,
-    mass: 0.58,
-    overshootClamping: true,
+    damping: 20,
+    stiffness: 220,
+    mass: 0.62,
+    overshootClamping: false,
   },
 
   /** Capsule shrink / expand. */

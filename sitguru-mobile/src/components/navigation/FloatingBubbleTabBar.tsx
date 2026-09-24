@@ -2,6 +2,7 @@ import { Ellipsis } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -27,7 +28,6 @@ import { AppFonts } from '@/constants/fonts';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import type { TabChromePalette } from '@/constants/role-palettes';
-import { SitGuruAccent } from '@/constants/button-tokens';
 import { TAB_BAR_MOTION } from '@/constants/tab-bar-motion';
 import { useTabBarMotion } from '@/context/TabBarMotionContext';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -38,6 +38,9 @@ export type FloatingBubbleTab = {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** Instagram / TikTok / Facebook-style account avatar on the Profile tab. */
+  avatarUrl?: string | null;
+  avatarInitials?: string;
 };
 
 export type FloatingBubbleTabBarProps = {
@@ -320,6 +323,13 @@ function FloatingTabItem({
   const emphasis = useSharedValue(active ? 1 : 0);
   const Icon = tab.icon;
   const color = active ? tintColor : mutedColor;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const showAvatar = Boolean(tab.avatarUrl || tab.avatarInitials);
+  const showAvatarImage = Boolean(tab.avatarUrl) && !avatarFailed;
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [tab.avatarUrl]);
 
   useEffect(() => {
     emphasis.set(
@@ -344,7 +354,7 @@ function FloatingTabItem({
     const opacity = interpolate(
       emphasis.value,
       [0, 1],
-      [0.7, 1],
+      [0.92, 1],
       Extrapolation.CLAMP,
     );
 
@@ -363,9 +373,8 @@ function FloatingTabItem({
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
         active={active}
-        bubble
-        bubbleColor={SitGuruAccent.soft}
-        bubblePlacement="glyph"
+        // App Store pattern: one sliding selection bubble on the bar —
+        // no second per-tab glyph bubble fighting the slide.
         haptic="selection"
         hitSlop={10}
         onPress={onPress}
@@ -374,11 +383,34 @@ function FloatingTabItem({
         style={styles.tab}
       >
         <View style={styles.iconWell}>
-          <Icon
-            color={color}
-            size={ButtonMetrics.tabIcon}
-            strokeWidth={active ? 2.4 : 2.1}
-          />
+          {showAvatar ? (
+            <View
+              style={[
+                styles.tabAvatar,
+                active && { borderColor: tintColor, borderWidth: 2 },
+              ]}
+            >
+              {showAvatarImage ? (
+                <Image
+                  accessibilityLabel={`${tab.label} avatar`}
+                  onError={() => setAvatarFailed(true)}
+                  resizeMode="cover"
+                  source={{ uri: tab.avatarUrl! }}
+                  style={styles.tabAvatarImage}
+                />
+              ) : (
+                <Text style={[styles.tabAvatarInitials, { color: tintColor }]}>
+                  {tab.avatarInitials || 'SG'}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <Icon
+              color={color}
+              size={ButtonMetrics.tabIcon}
+              strokeWidth={active ? 2.4 : 2.1}
+            />
+          )}
 
           {tab.badge ? (
             <View style={styles.badge}>
@@ -474,6 +506,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'visible',
     width: 36,
+  },
+  tabAvatar: {
+    alignItems: 'center',
+    backgroundColor: '#E8F3EC',
+    borderColor: 'transparent',
+    borderRadius: 999,
+    height: 28,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 28,
+  },
+  tabAvatarImage: {
+    height: '100%',
+    width: '100%',
+  },
+  tabAvatarInitials: {
+    fontFamily: AppFonts.extraBold,
+    fontSize: 10,
+    letterSpacing: -0.2,
   },
   label: {
     fontFamily: AppFonts.bold,

@@ -1114,6 +1114,18 @@ export function AuthProvider({
         setSocialLoading('apple');
         setAuthError(null);
 
+        const {
+          data: existingSession,
+        } = await supabase.auth.getSession();
+        if (existingSession.session?.user) {
+          setSocialLoading(null);
+          setAuthError(null);
+          return {
+            error: null,
+            cancelled: false,
+          };
+        }
+
         try {
           const AppleAuthentication =
             await import(

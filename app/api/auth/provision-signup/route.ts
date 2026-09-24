@@ -1966,6 +1966,43 @@ export async function POST(request: NextRequest) {
         ? referralResolution.owner.code
         : "";
 
+    const verifiedPhone = cleanText(authUser.phone);
+    if (verifiedPhone) {
+      const digits = verifiedPhone.replace(/\D/g, "");
+      const last10 = digits.length >= 10 ? digits.slice(-10) : "";
+      if (last10) {
+        const [{ data: profilePhones }, { data: ambassadorPhones }] =
+          await Promise.all([
+            supabaseAdmin
+              .from("profiles")
+              .select("id, user_id, phone, phone_number")
+              .or(`phone.ilike.%${last10}%,phone_number.ilike.%${last10}%`)
+              .limit(20),
+            supabaseAdmin
+              .from("ambassadors")
+              .select("id, user_id, phone")
+              .ilike("phone", `%${last10}%`)
+              .limit(20),
+          ]);
+        const phoneRows = [...(profilePhones || []), ...(ambassadorPhones || [])];
+        const collision = (phoneRows || []).find((row) => {
+          const ownerId = String(row.user_id || row.id || "");
+          const rowDigits = String(row.phone || row.phone_number || "").replace(
+            /\D/g,
+            "",
+          );
+          return ownerId && ownerId !== userId && rowDigits.endsWith(last10);
+        });
+        if (collision) {
+          return jsonError(
+            "An existing SitGuru account already uses this verified phone. Sign in to that account to add Apple or Google. We did not create another Guru, Pet Parent, or Ambassador profile.",
+            409,
+            { reconciliationRequired: true },
+          );
+        }
+      }
+    }
+
     const result = await callProvisioningRpc(
       {
         ...body,
