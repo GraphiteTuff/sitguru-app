@@ -320,7 +320,7 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - For social / follow / Instagram / Facebook / TikTok / X / YouTube asks, use the exact growth FAQ and append [[cta:social]].
 - For email / newsletter / subscribe asks, use the exact growth FAQ and append [[cta:email]].
 - For features, why join, or how to sign up, answer like a person using the FAQ facts.
-- Keep casual replies to 1–2 sentences (hard cap 3). Cute/trendy Ambassador hype is welcome — still short.
+- Stay friendly. A quick question is 1–2 sentences. Explain the Ambassador path fully when they ask how it works, and invite them to apply or share.
 `.trim();
 
 const PUBLIC_DELILAH_SYSTEM_ADDENDUM = `
@@ -335,7 +335,7 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - Soft CTA: /events · /events/host · /partners/dashboard/community/events · role CTAs via [[cta:community_parent]] / [[cta:community_guru]] / [[cta:community_ambassador]] · [[cta:social]] · [[cta:email]].
 - For social / follow asks, use the exact growth FAQ and append [[cta:social]].
 - For email / newsletter / subscribe asks, use the exact growth FAQ and append [[cta:email]].
-- Keep casual replies to 1–2 sentences (hard cap 3). Event digests can use short bullets from the LIVE digest only.
+- Stay cheerful. A quick question is 1–2 sentences. Explain RSVP or hosting fully when they ask, and invite them to join or bring a friend. Event lists can use short bullets from the LIVE digest only.
 `.trim();
 
 const DASHBOARD_FAQ_ADDENDUM = `
