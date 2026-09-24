@@ -7,12 +7,17 @@ import {
   listAuthProviders,
   normalizeUsPhone,
   provisionOnce,
+  reconcileVerifiedPhone,
   resolveAmbassadorRole,
   resolveAuthenticatedAccount,
   resolveGuruRole,
   resolvePetParentRole,
   type ExistingAccount,
 } from "./signup-identity";
+import {
+  mergeOwnedRoles,
+  switchActiveRole,
+} from "../dashboard/role-switch";
 
 const appleGuru = "0061a488-8444-45e9-a69e-32f830e40bbb";
 const phoneGuru = "d4441a74-31f0-4dc5-bd33-77f528ecfa42";
@@ -169,6 +174,142 @@ describe("cross-auth duplicates are review only", () => {
 
   it("normalizes phone formats", () => {
     assert.equal(normalizeUsPhone("16096197850"), "6096197850");
+  });
+});
+
+describe("logged-out Apple does not provision a second role", () => {
+  const phoneGuru = "d4441a74-31f0-4dc5-bd33-77f528ecfa42";
+  const appleAttempt = "11111111-1111-1111-1111-111111111111";
+  const phoneParent = "7b9625f5-2bbc-4b12-837c-bc33bce223ed";
+
+  it("existing phone Guru, logout, Apple, same verified phone: no second Guru", () => {
+    const decision = reconcileVerifiedPhone({
+      authUserId: appleAttempt,
+      verifiedPhone: "16166900889",
+      existingAccounts: [{ userId: phoneGuru, phone: "+1 (616) 690-0889" }],
+    });
+    assert.equal(decision.action, "reconciliation_required");
+    if (decision.action === "reconciliation_required") {
+      assert.equal(decision.existingUserId, phoneGuru);
+    }
+    const provisioned = decision.action === "provision";
+    assert.equal(provisioned, false);
+  });
+
+  it("existing phone Pet Parent, logout, Apple, same verified phone: no second Parent", () => {
+    const decision = reconcileVerifiedPhone({
+      authUserId: appleAttempt,
+      verifiedPhone: "16096197850",
+      existingAccounts: [{ userId: phoneParent, phone: "6096197850" }],
+    });
+    assert.equal(decision.action, "reconciliation_required");
+  });
+
+  it("Apple phone owned by an unrelated account requires reconciliation and does not merge", () => {
+    const decision = reconcileVerifiedPhone({
+      authUserId: appleAttempt,
+      verifiedPhone: "+17167158691",
+      existingAccounts: [
+        { userId: "fd5f92f3-ea4d-430c-b23c-2b8a45506177", phone: "7167158691" },
+      ],
+    });
+    assert.equal(decision.action, "reconciliation_required");
+    assert.notEqual(
+      decision.action === "reconciliation_required"
+        ? decision.existingUserId
+        : "",
+      appleAttempt,
+    );
+  });
+
+  it("Apple user with an unused verified phone provisions normally", () => {
+    const decision = reconcileVerifiedPhone({
+      authUserId: appleAttempt,
+      verifiedPhone: "6165550100",
+      existingAccounts: [{ userId: phoneGuru, phone: "6166900889" }],
+    });
+    assert.deepEqual(decision, { action: "provision", userId: appleAttempt });
+  });
+});
+
+describe("multi-role accounts stay intact when providers change", () => {
+  it("Pet Parent add Guru keeps the parent role", () => {
+    assert.deepEqual(mergeOwnedRoles(["parent"], "guru"), ["parent", "guru"]);
+  });
+
+  it("Guru add Pet Parent keeps the Guru role", () => {
+    assert.deepEqual(mergeOwnedRoles(["guru"], "pet_parent"), ["parent", "guru"]);
+  });
+
+  it("Guru + Parent add Ambassador keeps all three", () => {
+    assert.deepEqual(mergeOwnedRoles(["guru", "parent"], "ambassador"), [
+      "parent",
+      "guru",
+      "ambassador",
+    ]);
+  });
+
+  it("linking Apple does not change owned roles", () => {
+    const before = mergeOwnedRoles(["guru", "parent"], null);
+    const afterLink = mergeOwnedRoles(before, null);
+    assert.deepEqual(afterLink, ["parent", "guru"]);
+  });
+
+  it("linking Google does not change Guru, Parent, and Ambassador", () => {
+    const owned = ["parent", "guru", "ambassador"] as const;
+    assert.deepEqual(mergeOwnedRoles(owned, null), [
+      "parent",
+      "guru",
+      "ambassador",
+    ]);
+  });
+
+  it("switching the active role does not change owned roles", () => {
+    const owned = ["parent", "guru", "ambassador"] as const;
+    const toGuru = switchActiveRole({ owned, next: "guru" });
+    const toParent = switchActiveRole({ owned: toGuru.owned, next: "parent" });
+    const toAmbassador = switchActiveRole({
+      owned: toParent.owned,
+      next: "ambassador",
+    });
+    assert.equal(toGuru.active, "guru");
+    assert.equal(toParent.active, "parent");
+    assert.equal(toAmbassador.active, "ambassador");
+    assert.deepEqual(toAmbassador.owned, ["parent", "guru", "ambassador"]);
+  });
+
+  it("resolveGuruRole twice yields one Guru", () => {
+    const once = resolveGuruRole(account(appleGuru, ["pet_parent"]));
+    const twice = resolveGuruRole(once);
+    assert.deepEqual(twice.roles, ["guru", "pet_parent"]);
+    assert.equal(twice.roles?.filter((role) => role === "guru").length, 1);
+  });
+
+  it("resolvePetParentRole twice yields one Pet Parent", () => {
+    const once = resolvePetParentRole(account(appleGuru, ["guru"]));
+    const twice = resolvePetParentRole(once);
+    assert.equal(
+      twice.roles?.filter((role) => role === "pet_parent").length,
+      1,
+    );
+  });
+
+  it("resolveAmbassadorRole twice yields one Ambassador", () => {
+    const once = resolveAmbassadorRole(account(appleGuru, ["guru", "pet_parent"]));
+    const twice = resolveAmbassadorRole(once);
+    assert.equal(
+      twice.roles?.filter((role) => role === "ambassador").length,
+      1,
+    );
+  });
+
+  it("Super Admin plus three roles stays one account", () => {
+    const owned = mergeOwnedRoles(
+      ["admin", "parent", "guru", "ambassador"],
+      "guru",
+    );
+    assert.deepEqual(owned, ["parent", "guru", "ambassador", "admin"]);
+    assert.equal(new Set(owned).size, owned.length);
   });
 });
 

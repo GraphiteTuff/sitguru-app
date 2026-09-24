@@ -379,6 +379,29 @@ export function toRoleSwitchOptions(
   }));
 }
 
+/** Signup intent adds roles. It never replaces roles the account already owns. */
+export function mergeOwnedRoles(
+  existing: unknown,
+  intent: string | null | undefined,
+): DashboardSwitchRole[] {
+  return uniqueOrderedRoles([
+    ...parseAuthorizedRoles(existing),
+    ...authorizedRolesFromSignupIntent(intent),
+  ]);
+}
+
+/** Active workspace is separate from the roles the account owns. */
+export function switchActiveRole(input: {
+  owned: readonly DashboardSwitchRole[];
+  next: DashboardSwitchRole;
+}): { owned: DashboardSwitchRole[]; active: DashboardSwitchRole } {
+  const owned = uniqueOrderedRoles([...input.owned]);
+  if (!owned.includes(input.next)) {
+    throw new Error("Cannot activate a role this account does not own.");
+  }
+  return { owned, active: input.next };
+}
+
 /** Map signup onboarding intent to the authorized dashboard track list. */
 export function authorizedRolesFromSignupIntent(
   intent: string | null | undefined,

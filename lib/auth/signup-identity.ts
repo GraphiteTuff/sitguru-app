@@ -111,6 +111,39 @@ export function provisionOnce(input: {
   return { userId: input.authUserId, created };
 }
 
+/**
+ * Verified phone owned by a different auth user blocks permanent role provisioning.
+ * It does not merge accounts. An unused or same-account phone may provision.
+ */
+export function reconcileVerifiedPhone(input: {
+  authUserId: string;
+  verifiedPhone: string | null | undefined;
+  existingAccounts: Array<{ userId: string; phone?: string | null }>;
+}):
+  | { action: "provision"; userId: string }
+  | {
+      action: "reconciliation_required";
+      existingUserId: string;
+      reason: "verified_phone_belongs_to_another_account";
+    } {
+  const phone = normalizeUsPhone(input.verifiedPhone);
+  if (!phone) return { action: "provision", userId: input.authUserId };
+
+  const owner = input.existingAccounts.find(
+    (account) =>
+      account.userId !== input.authUserId &&
+      normalizeUsPhone(account.phone) === phone,
+  );
+
+  if (!owner) return { action: "provision", userId: input.authUserId };
+
+  return {
+    action: "reconciliation_required",
+    existingUserId: owner.userId,
+    reason: "verified_phone_belongs_to_another_account",
+  };
+}
+
 export function classifyPhoneCollision(input: {
   currentAuthUserId: string;
   otherAuthUserId: string | null;
