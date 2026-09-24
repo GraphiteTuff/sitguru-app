@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 
 import "./globals.css";
@@ -9,9 +9,9 @@ import AmbientAudioSession from "@/components/AmbientAudioSession";
 import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
 import GoogleOneTapHost from "@/components/auth/GoogleOneTapHost";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+const plusJakartaSans = localFont({
+  src: "./fonts/plus-jakarta-sans-latin.woff2",
+  weight: "400 800",
   display: "swap",
   variable: "--font-plus-jakarta-sans",
   fallback: [
