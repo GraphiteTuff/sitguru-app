@@ -12,6 +12,7 @@ import {
   resolveAuthenticatedAccount,
   resolveGuruRole,
   resolvePetParentRole,
+  shouldProvisionRolesOnCallback,
   type ExistingAccount,
 } from "./signup-identity";
 import {
@@ -196,6 +197,23 @@ describe("logged-out Apple does not provision a second role", () => {
     assert.equal(provisioned, false);
   });
 
+  it("existing phone Ambassador, logout, Apple, same verified phone: no second Ambassador", () => {
+    const decision = reconcileVerifiedPhone({
+      authUserId: appleAttempt,
+      verifiedPhone: "+1 253-555-0199",
+      existingAccounts: [
+        { userId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", phone: "2535550199" },
+      ],
+    });
+    assert.equal(decision.action, "reconciliation_required");
+    assert.equal(
+      decision.action === "reconciliation_required"
+        ? decision.existingUserId
+        : "",
+      "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    );
+  });
+
   it("existing phone Pet Parent, logout, Apple, same verified phone: no second Parent", () => {
     const decision = reconcileVerifiedPhone({
       authUserId: appleAttempt,
@@ -247,6 +265,26 @@ describe("multi-role accounts stay intact when providers change", () => {
       "guru",
       "ambassador",
     ]);
+  });
+
+  it("linking Apple on an existing account does not provision roles again", () => {
+    assert.equal(
+      shouldProvisionRolesOnCallback({
+        hasExistingAccount: true,
+        urlRequestedRole: false,
+      }),
+      false,
+    );
+  });
+
+  it("Become a Guru still provisions because the URL requested that role", () => {
+    assert.equal(
+      shouldProvisionRolesOnCallback({
+        hasExistingAccount: true,
+        urlRequestedRole: true,
+      }),
+      true,
+    );
   });
 
   it("linking Apple does not change owned roles", () => {

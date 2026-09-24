@@ -103,6 +103,18 @@ export function decideNextAuthStep(input: {
   return { action: "start_oauth", provider: input.provider };
 }
 
+/**
+ * Linking a login method must not provision roles.
+ * Provision only for a new account, or when the URL explicitly requests a role.
+ */
+export function shouldProvisionRolesOnCallback(input: {
+  hasExistingAccount: boolean;
+  urlRequestedRole: boolean;
+}): boolean {
+  if (!input.hasExistingAccount) return true;
+  return input.urlRequestedRole;
+}
+
 export function provisionOnce(input: {
   authUserId: string;
   alreadyProvisionedUserIds: string[];

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mergeOwnedRoles } from "@/lib/dashboard/role-switch";
+import { shouldProvisionRolesOnCallback } from "@/lib/auth/signup-identity";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -670,11 +671,15 @@ export async function GET(request: Request) {
   const hasExistingSitGuruAccess = Boolean(
     metadataRedirect || existingDatabaseRedirect,
   );
-  const explicitIntent =
-    urlIntent ||
-    normalizeCallbackIntent(
-      getMetadataString(metadata, ["account_intent", "signup_intent"]),
-    );
+  const metadataIntent = normalizeCallbackIntent(
+    getMetadataString(metadata, ["account_intent", "signup_intent"]),
+  );
+  const explicitIntent = shouldProvisionRolesOnCallback({
+    hasExistingAccount: hasExistingSitGuruAccess,
+    urlRequestedRole: Boolean(urlIntent),
+  })
+    ? urlIntent || metadataIntent
+    : null;
 
   if (!explicitIntent && !hasExistingSitGuruAccess) {
     const email = cleanText(user.email).toLowerCase();

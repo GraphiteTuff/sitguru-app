@@ -1971,11 +1971,20 @@ export async function POST(request: NextRequest) {
       const digits = verifiedPhone.replace(/\D/g, "");
       const last10 = digits.length >= 10 ? digits.slice(-10) : "";
       if (last10) {
-        const { data: phoneRows } = await supabaseAdmin
-          .from("profiles")
-          .select("id, user_id, phone, phone_number")
-          .or(`phone.ilike.%${last10}%,phone_number.ilike.%${last10}%`)
-          .limit(20);
+        const [{ data: profilePhones }, { data: ambassadorPhones }] =
+          await Promise.all([
+            supabaseAdmin
+              .from("profiles")
+              .select("id, user_id, phone, phone_number")
+              .or(`phone.ilike.%${last10}%,phone_number.ilike.%${last10}%`)
+              .limit(20),
+            supabaseAdmin
+              .from("ambassadors")
+              .select("id, user_id, phone")
+              .ilike("phone", `%${last10}%`)
+              .limit(20),
+          ]);
+        const phoneRows = [...(profilePhones || []), ...(ambassadorPhones || [])];
         const collision = (phoneRows || []).find((row) => {
           const ownerId = String(row.user_id || row.id || "");
           const rowDigits = String(row.phone || row.phone_number || "").replace(
