@@ -28,6 +28,7 @@ import {
   matchRoguePublicSoftIntent,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
+import { isOpeningCompanionTurn } from "@/lib/ai/companion-answer-protocol";
 import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 import {
@@ -372,7 +373,8 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       return simulationDataStreamResponse(matchingAsk);
     }
 
-    if (isCommunityCompanionPath(pagePath) && lastUserText) {
+    const openingTurn = isOpeningCompanionTurn(messages);
+    if (openingTurn && isCommunityCompanionPath(pagePath) && lastUserText) {
       const faqHit =
         matchCommunityEventsFaq(lastUserText) ||
         matchDelilahSoftIntent(lastUserText);
@@ -392,9 +394,10 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       }
     }
 
-    const exactParentFaq =
-      matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
-      matchRoguePublicSoftIntent(lastUserText);
+    const exactParentFaq = openingTurn
+      ? matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
+        matchRoguePublicSoftIntent(lastUserText)
+      : null;
     if (exactParentFaq?.answer) {
       return simulationDataStreamResponse(exactParentFaq.answer);
     }

@@ -36,6 +36,7 @@ import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
+import { isOpeningCompanionTurn } from "@/lib/ai/companion-answer-protocol";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
   inferLookupParamsFromChat,
@@ -455,8 +456,10 @@ export async function POST(req: Request) {
       return simulationDataStreamResponse(scoutMatchingAsk);
     }
 
-    // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
-    if (officer === "delilah" && lastUserText) {
+    // First turn only. Follow-ups stay with the model so it can go deeper
+    // on what this person already said.
+    const openingTurn = isOpeningCompanionTurn(messages);
+    if (openingTurn && officer === "delilah" && lastUserText) {
       const delilahHit = resolveDelilahInstantFaqAnswer(lastUserText);
       if (delilahHit) {
         return simulationDataStreamResponse(delilahHit);
@@ -464,6 +467,7 @@ export async function POST(req: Request) {
     }
 
     const instantFaq =
+      !openingTurn ||
       officer === "delilah" ||
       scoutNeedsDirectory ||
       needsCareMatchingAsk(careThread)
