@@ -43,6 +43,9 @@
     "scripts",
     "scripts/**/*",
     ".next/dev",
-    ".next/dev/**/*"
+    ".next/dev/**/*",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

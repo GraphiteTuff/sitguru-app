@@ -1119,14 +1119,15 @@ function PaymentSetupCard({
     paypalAccount?.onboardingStatus === "ready" ||
     paypalAccount?.accountStatus === "active";
 
-  const stripeReady =
-    stripeAccount?.payoutsEnabled === true ||
-    stripeAccount?.accountStatus === "ready" ||
-    stripeAccount?.accountStatus === "active" ||
-    stripeAccount?.onboardingStatus === "ready" ||
-    (stripeAccount?.detailsSubmitted === true &&
-      (stripeAccount?.chargesEnabled === true ||
-        stripeAccount?.payoutsEnabled === true));
+  const stripeReady = Boolean(
+    stripeAccount &&
+      (stripeAccount.payoutsEnabled === true ||
+        stripeAccount.accountStatus === "ready" ||
+        stripeAccount.accountStatus === "active" ||
+        stripeAccount.onboardingStatus === "ready" ||
+        (stripeAccount.detailsSubmitted === true &&
+          stripeAccount.chargesEnabled === true)),
+  );
 
   const paypalStarted = Boolean(paypalAccount);
   const stripeStarted =
