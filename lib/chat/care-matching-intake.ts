@@ -247,9 +247,9 @@ export function parseCareMatchingIntake(
       isMatchingFollowUp(lower));
 
   const hasZip = Boolean(zip);
-  // Accept a US ZIP **or** city + state (e.g. Arlington VA / Austin, TX).
+  // Accept US ZIP, city+state, or state alone (PA / NJ / Texas) for area matching.
   const hasCityState = Boolean(city && state);
-  const hasLocation = Boolean(hasZip || hasCityState);
+  const hasLocation = Boolean(hasZip || hasCityState || state);
   const hasServiceType = Boolean(service);
   const hasTime = Boolean(timeWindow);
   const hasExtras = extras.length > 0;
@@ -257,7 +257,7 @@ export function parseCareMatchingIntake(
   const missing: CareMatchingIntake["missing"] = [];
   if (isCareSeeking || isProviderSignup) {
     if (!hasLocation) missing.push("location");
-    if (!hasZip && !hasCityState) missing.push("zip");
+    if (!hasZip && !hasCityState && !state) missing.push("zip");
     if (!hasServiceType && isCareSeeking) missing.push("service");
     if (!hasTime) missing.push("time");
   }
@@ -353,7 +353,9 @@ export function buildCareMatchingAsk(
       ? intake.zip
       : intake.city && intake.state
         ? `${intake.city}, ${intake.state}`
-        : "";
+        : intake.state
+          ? intake.state
+          : "";
 
   if (intake.isProviderSignup) {
     if (!intake.hasLocation) {

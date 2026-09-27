@@ -366,6 +366,64 @@ const MATCHING_CASES: Array<{
     expectZip: "18951",
     expectNext: "time",
   },
+  {
+    thread: "dog walker\nLA",
+    expectCity: "Los Angeles",
+    expectState: "CA",
+    expectNext: "time",
+    askMustInclude: /Los Angeles,\s*CA/i,
+  },
+  {
+    thread: "Looking for Dog Walks\nNYC",
+    expectCity: "New York",
+    expectState: "NY",
+    expectNext: "time",
+    askMustInclude: /New York,\s*NY/i,
+  },
+  {
+    thread: "drop-ins near Philly",
+    expectCity: "Philadelphia",
+    expectState: "PA",
+    expectNext: "time",
+  },
+  {
+    thread: "pet sitter in SF",
+    expectCity: "San Francisco",
+    expectState: "CA",
+    expectNext: "time",
+  },
+  {
+    thread: "dog walks\nTrenton NJ",
+    expectCity: "Trenton",
+    expectState: "NJ",
+    expectNext: "time",
+    askMustInclude: /Trenton,\s*NJ/i,
+  },
+  {
+    thread: "I need a dog walker\nLA CA",
+    expectCity: "Los Angeles",
+    expectState: "CA",
+    expectNext: "time",
+  },
+  {
+    thread: "board my dog\nSD CA",
+    expectCity: "San Diego",
+    expectState: "CA",
+    expectNext: "time",
+  },
+  {
+    thread: "I need a dog walker\nPA",
+    expectState: "PA",
+    expectNext: "time",
+    askMustInclude: /\bPA\b/,
+    askMustNotInclude: /city and state|ZIP/i,
+  },
+  {
+    thread: "I need a dog walker\nNJ",
+    expectState: "NJ",
+    expectNext: "time",
+    askMustInclude: /\bNJ\b/,
+  },
 ];
 
 /** ——— Auth CTA stripping ——— */

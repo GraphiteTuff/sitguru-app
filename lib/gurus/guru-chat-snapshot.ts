@@ -464,6 +464,121 @@ function scrubCityNoise(city?: string | null): string {
 }
 
 /**
+ * Common US city nicknames / initials → canonical city (+ default state).
+ * "LA" means Los Angeles (use "Louisiana" for the state). "NYC", "Philly", "SF", etc.
+ */
+const US_CITY_NICKNAMES: Record<string, { city: string; state?: string }> = {
+  la: { city: "Los Angeles", state: "CA" },
+  "l a": { city: "Los Angeles", state: "CA" },
+  nyc: { city: "New York", state: "NY" },
+  "new york city": { city: "New York", state: "NY" },
+  philly: { city: "Philadelphia", state: "PA" },
+  philadephia: { city: "Philadelphia", state: "PA" }, // common typo
+  philadelphia: { city: "Philadelphia", state: "PA" },
+  sf: { city: "San Francisco", state: "CA" },
+  "san fran": { city: "San Francisco", state: "CA" },
+  "san francisco": { city: "San Francisco", state: "CA" },
+  sd: { city: "San Diego", state: "CA" }, // when used as city token ("SD CA"); bare SD stays state
+  "san diego": { city: "San Diego", state: "CA" },
+  dc: { city: "Washington", state: "DC" },
+  "washington dc": { city: "Washington", state: "DC" },
+  "washington d c": { city: "Washington", state: "DC" },
+  atl: { city: "Atlanta", state: "GA" },
+  atlanta: { city: "Atlanta", state: "GA" },
+  chi: { city: "Chicago", state: "IL" },
+  "chi town": { city: "Chicago", state: "IL" },
+  chitown: { city: "Chicago", state: "IL" },
+  chicago: { city: "Chicago", state: "IL" },
+  nola: { city: "New Orleans", state: "LA" },
+  "new orleans": { city: "New Orleans", state: "LA" },
+  vegas: { city: "Las Vegas", state: "NV" },
+  "las vegas": { city: "Las Vegas", state: "NV" },
+  okc: { city: "Oklahoma City", state: "OK" },
+  kc: { city: "Kansas City", state: "MO" },
+  "kansas city": { city: "Kansas City", state: "MO" },
+  stl: { city: "St Louis", state: "MO" },
+  "st louis": { city: "St Louis", state: "MO" },
+  "st. louis": { city: "St Louis", state: "MO" },
+  indy: { city: "Indianapolis", state: "IN" },
+  jax: { city: "Jacksonville", state: "FL" },
+  bmore: { city: "Baltimore", state: "MD" },
+  baltimore: { city: "Baltimore", state: "MD" },
+  houston: { city: "Houston", state: "TX" },
+  dallas: { city: "Dallas", state: "TX" },
+  austin: { city: "Austin", state: "TX" },
+  miami: { city: "Miami", state: "FL" },
+  seattle: { city: "Seattle", state: "WA" },
+  denver: { city: "Denver", state: "CO" },
+  boston: { city: "Boston", state: "MA" },
+  phoenix: { city: "Phoenix", state: "AZ" },
+  portland: { city: "Portland", state: "OR" },
+  minneapolis: { city: "Minneapolis", state: "MN" },
+  detroit: { city: "Detroit", state: "MI" },
+  "san antonio": { city: "San Antonio", state: "TX" },
+  satx: { city: "San Antonio", state: "TX" },
+};
+
+/** Nicknames that collide with US state abbreviations — prefer city in care chat. */
+const STATE_ABBR_CITY_NICKNAMES = new Set(["la", "dc"]);
+
+function cityNicknameKey(value?: string | null) {
+  return clean(value)
+    .toLowerCase()
+    .replace(/[.]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function lookupCityNickname(value?: string | null) {
+  const key = cityNicknameKey(value);
+  if (!key) return null;
+  return (
+    US_CITY_NICKNAMES[key] ||
+    US_CITY_NICKNAMES[key.replace(/\s+/g, "")] ||
+    null
+  );
+}
+
+/**
+ * Expand city nicknames (LA, NYC, Philly…) and keep explicit state when provided.
+ * "LA CA" → Los Angeles, CA; "NYC" → New York, NY; "Trenton NJ" stays Trenton, NJ.
+ */
+export function resolveUsCityState(
+  cityInput?: string | null,
+  stateInput?: string | null,
+): { city?: string; state?: string } {
+  const rawCity = scrubCityNoise(cityInput);
+  const explicitState = normalizeUsState(stateInput) || undefined;
+  const nick = lookupCityNickname(rawCity);
+
+  if (nick) {
+    return {
+      city: nick.city,
+      state: explicitState || nick.state,
+    };
+  }
+
+  // Whole token was a nickname with no separate state ("NYC", "Philly", "LA").
+  if (!rawCity && !explicitState) {
+    return {};
+  }
+
+  if (!rawCity && explicitState) {
+    // Ambiguous bare state abbr that is also a famous city nick (LA / NY / SD / DC).
+    const abbrNick = lookupCityNickname(explicitState);
+    if (abbrNick && STATE_ABBR_CITY_NICKNAMES.has(explicitState.toLowerCase())) {
+      return { city: abbrNick.city, state: abbrNick.state };
+    }
+    return { state: explicitState };
+  }
+
+  return {
+    city: rawCity ? titleCasePlace(rawCity) : undefined,
+    state: explicitState,
+  };
+}
+
+/**
  * True when free text is (or clearly ends as) a US place reply:
  * ZIP, "City ST", "City, State", etc. Used so chat never treats places as names.
  */
@@ -471,6 +586,21 @@ export function looksLikeUsLocationReply(rawText?: string | null): boolean {
   const text = clean(rawText);
   if (!text) return false;
   if (/^\d{5}(?:-\d{4})?$/.test(text)) return true;
+
+  // Bare city nicknames: NYC, Philly, LA, SF, etc.
+  const compactNick = text
+    .toLowerCase()
+    .replace(/[.,]/g, " ")
+    .replace(/\b(near|in|around|at|please|thanks|thank you)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (lookupCityNickname(compactNick)) return true;
+
+  // Bare state initials / names: PA, NJ, Texas, etc.
+  if (compactNick.split(/\s+/).length <= 3 && isUsStateToken(compactNick)) {
+    return true;
+  }
+
   const inferred = inferLookupParamsFromChat(text);
   if (inferred?.zip && /^\d{5}$/.test(inferred.zip)) {
     // Pure ZIP or ZIP-dominant short replies
@@ -480,12 +610,7 @@ export function looksLikeUsLocationReply(rawText?: string | null): boolean {
   }
   if (inferred?.city && inferred?.state) {
     // Whole message is basically the place (optional near/in)
-    const compact = text
-      .toLowerCase()
-      .replace(/[.,]/g, " ")
-      .replace(/\b(near|in|around|at|please|thanks|thank you)\b/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const compact = compactNick;
     const placeCompact = `${inferred.city} ${inferred.state}`.toLowerCase();
     const placeFull = `${inferred.city} ${usStateDisplayName(inferred.state)}`.toLowerCase();
     if (
@@ -496,9 +621,15 @@ export function looksLikeUsLocationReply(rawText?: string | null): boolean {
       return true;
     }
     // Short replies that parse cleanly as city+state (≤ 5 tokens)
-    if (compact.split(" ").length <= 5 && !/\b(need|looking|find|book|want|walk|sit|board)\b/i.test(compact)) {
+    if (
+      compact.split(" ").length <= 5 &&
+      !/\b(need|looking|find|book|want|walk|sit|board)\b/i.test(compact)
+    ) {
       return Boolean(scrubCityNoise(inferred.city));
     }
+  }
+  if (inferred?.state && !inferred?.city && compactNick.split(/\s+/).length <= 3) {
+    return true;
   }
   return false;
 }
@@ -580,14 +711,25 @@ export function usStateDisplayName(value?: string | null): string {
 
 function splitCityState(raw: string): { city?: string; state?: string } {
   const cleaned = clean(raw)
-    .replace(/\b(zip|area|my|the|please|thanks|gurus?|sitters?)\b/gi, " ")
+    .replace(/\b(zip|area|my|the|please|thanks|thank you|gurus?|sitters?)\b/gi, " ")
     .replace(/[.,]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
   if (!cleaned) return {};
 
+  // Famous city nicknames first (LA, NYC, Philly, SF…) so they aren't eaten as states.
+  const wholeNick = lookupCityNickname(cleaned);
+  if (wholeNick) {
+    return { city: wholeNick.city, state: wholeNick.state };
+  }
+
   if (isUsStateToken(cleaned)) {
+    // Bare "LA" / "DC" → city nick; other abbrs stay as state (PA, NJ, TX…).
+    if (STATE_ABBR_CITY_NICKNAMES.has(stateAliasKey(cleaned))) {
+      const nick = lookupCityNickname(cleaned);
+      if (nick) return { city: nick.city, state: nick.state };
+    }
     return { state: normalizeUsState(cleaned) };
   }
 
@@ -735,6 +877,18 @@ function extractPlacePhrase(text: string): string {
   }
   if (cityStateHits.length) return cityStateHits[cityStateHits.length - 1]!;
 
+  // Bare nicknames: "NYC", "Philly", "LA", "SF" (optionally after near/in).
+  const nickRe =
+    /\b(nyc|philly|philadephia|sf|san\s*fran|nola|atl|chi(?:\s*town)?|chitown|vegas|okc|stl|indy|jax|bmore|satx|l\.?\s*a\.?|dc)\b/gi;
+  const nickHits: string[] = [];
+  for (const match of text.matchAll(nickRe)) {
+    const nick = lookupCityNickname(match[1] || "");
+    if (nick?.city && nick.state) {
+      nickHits.push(`${nick.city} ${nick.state}`);
+    }
+  }
+  if (nickHits.length) return nickHits[nickHits.length - 1]!;
+
   return "";
 }
 
@@ -790,15 +944,21 @@ export function inferLookupParamsFromChat(
   let lastPlaceIndex = -1;
   if (placePhrase) {
     const parsed = splitCityState(placePhrase);
-    const scrubbedCity = scrubCityNoise(parsed.city);
-    city =
-      scrubbedCity && looksLikePlaceName(scrubbedCity)
-        ? titleCasePlace(scrubbedCity)
-        : undefined;
-    state = parsed.state;
-    // Locate the city token in the original text for ZIP-vs-place recency.
-    const cityNeedle = (scrubbedCity || placePhrase).toLowerCase();
+    const resolved = resolveUsCityState(
+      scrubCityNoise(parsed.city) || parsed.city,
+      parsed.state,
+    );
+    city = resolved.city;
+    state = resolved.state;
+    const cityNeedle = (city || placePhrase).toLowerCase();
     lastPlaceIndex = text.toLowerCase().lastIndexOf(cityNeedle);
+    if (lastPlaceIndex < 0) {
+      // Nickname forms: search the original token (nyc, la, philly…)
+      const nickMatch = text.match(
+        /\b(nyc|philly|sf|nola|atl|chi|vegas|okc|stl|indy|jax|bmore|satx|l\.?\s*a\.?|dc)\b/i,
+      );
+      if (nickMatch?.index != null) lastPlaceIndex = nickMatch.index;
+    }
   } else if (!zip) {
     // Only use bare "City ST" fallback when no ZIP (avoids "drop in" → Drop, IN).
     const cityStateRe =
@@ -820,16 +980,57 @@ export function inferLookupParamsFromChat(
       }
     }
     if (lastCity && lastState) {
-      city = titleCasePlace(lastCity);
-      state = normalizeUsState(lastState);
+      const resolved = resolveUsCityState(lastCity, lastState);
+      city = resolved.city;
+      state = resolved.state;
     }
   }
-  if (!state) {
+  if (!state && !city) {
     const bareState = text.match(
       /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i,
     );
     const maybeBare = normalizeUsState(bareState?.[1]);
-    if (maybeBare && !city) state = maybeBare;
+    if (maybeBare) state = maybeBare;
+  }
+  // Bare 2-letter state reply: "PA", "NJ", "TX" (whole message or last line/token).
+  if (!state && !city && !zip) {
+    const lines = text
+      .split(/\n+/)
+      .map((line) =>
+        line
+          .replace(/[.,!?]/g, " ")
+          .replace(/\b(near|in|around|at|please|thanks|thank you)\b/gi, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      )
+      .filter(Boolean);
+    const candidates = [
+      ...lines.slice(-1),
+      lines[lines.length - 1]?.split(/\s+/).slice(-1)[0] || "",
+    ].filter(Boolean);
+
+    for (const only of candidates) {
+      if (lookupCityNickname(only) && STATE_ABBR_CITY_NICKNAMES.has(stateAliasKey(only))) {
+        const nick = lookupCityNickname(only);
+        if (nick) {
+          city = nick.city;
+          state = nick.state;
+          break;
+        }
+      }
+      if (only && isUsStateToken(only) && !lookupCityNickname(only)) {
+        state = normalizeUsState(only) || undefined;
+        break;
+      }
+      if (only && STATE_ABBR_CITY_NICKNAMES.has(stateAliasKey(only))) {
+        const nick = lookupCityNickname(only);
+        if (nick) {
+          city = nick.city;
+          state = nick.state;
+          break;
+        }
+      }
+    }
   }
 
   // If both ZIP and city/state appear, keep only the most recently mentioned one.
