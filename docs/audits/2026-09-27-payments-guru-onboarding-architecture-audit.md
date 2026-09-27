@@ -824,12 +824,12 @@ Each phase: feature flag where possible; no historical ID rewrites; rollback = d
 ## Direct Answers to Decision Questions
 
 1. **Today:** Express + Account Links + platform Checkout/PI + admin Transfers; PayPal scaffolded; $0 fee on some paths, 15–20% on others.  
-2. **Friction:** Checklist step 6 + packet CTA push Stripe before value; entity locked to individual; optional ID upload.  
-3. **Sensitive data touched:** Not SSN/bank in SitGuru forms; optional Photo ID; legal name; tax ack; processor IDs/status.  
-4. **Can Stripe take more?** Already collects KYC/bank; SitGuru should stop optional ID and hardcoding entity when possible.  
+2. **Friction:** Side-gig Gurus hit Stripe SSN/bank too early because checklist step 6 + packet CTA open Account Links before any booking value; entity locked to individual; optional ID upload.  
+3. **Sensitive data touched:** Not SSN/bank in SitGuru forms (Stripe collects those later); optional Photo ID; legal name; tax ack; processor IDs/status.  
+4. **Can Stripe take more?** Already collects KYC/bank; SitGuru should stop optional ID and hardcoding entity when possible — and **stop launching Stripe until payout is meaningful**.  
 5. **Existing accounts:** Remain intact.  
 6. **New Gurus:** Same Express-compatible behavior; optional controller-property create later.  
-7. **Mandatory payout onboarding:** Before accepting first paid booking (and before any charge that assumes payoutability).  
+7. **Mandatory payout onboarding (first SSN ask):** Before accepting first paid booking — signup/profile/publish must stay SSN-free.  
 8. **Web architecture:** Backend-authoritative PaymentAccountService + hosted Account Links + unified checkout.  
 9. **Mobile:** Browser handoff Account Links + HTTPS bridge + status re-sync; no WebView.  
 10. **PayPal/Venmo:** Optional payout rails; not parallel charge marketplace until ready.  
