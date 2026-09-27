@@ -927,10 +927,17 @@ function getAmbassadorSelectedProvider(
 }
 
 function isReadyPayoutAccount(account: PayoutAccountRow) {
+  const onboardingReady = getAccountOnboardingStatus(account) === "ready";
+  const accountActive = getAccountStatus(account) === "active";
+  const payoutsEnabled = account.payouts_enabled === true;
+  const detailsSubmitted = account.details_submitted === true;
+
+  // Transfers-only Stripe Connect can be ready with payouts enabled even when
+  // charges_enabled stays false (platform charges Pet Parents separately).
   return (
-    getAccountOnboardingStatus(account) === "ready" &&
-    getAccountStatus(account) === "active" &&
-    account.payouts_enabled === true
+    payoutsEnabled &&
+    (onboardingReady || detailsSubmitted) &&
+    accountActive
   );
 }
 

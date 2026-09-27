@@ -7,50 +7,15 @@
 import type Stripe from "stripe";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  deriveStripeConnectReadiness,
+  type StripeConnectReadiness,
+} from "@/lib/payments/stripe-connect-readiness";
 
-export type StripeConnectReadiness = {
-  stripeAccountId: string;
-  chargesEnabled: boolean;
-  payoutsEnabled: boolean;
-  detailsSubmitted: boolean;
-  complete: boolean;
-  connectStatus: "connected" | "pending" | "onboarding_started" | "restricted";
-  requirementsCurrentlyDue: string[];
-};
-
-export function deriveStripeConnectReadiness(
-  account: Stripe.Account,
-): StripeConnectReadiness {
-  const chargesEnabled = account.charges_enabled === true;
-  const payoutsEnabled = account.payouts_enabled === true;
-  const detailsSubmitted = account.details_submitted === true;
-  const currentlyDue = Array.isArray(account.requirements?.currently_due)
-    ? account.requirements.currently_due.filter(
-        (item): item is string => typeof item === "string",
-      )
-    : [];
-  const disabledReason = account.requirements?.disabled_reason || null;
-  const complete = chargesEnabled && payoutsEnabled;
-  const restricted = Boolean(disabledReason) || currentlyDue.length > 0;
-
-  const connectStatus: StripeConnectReadiness["connectStatus"] = complete
-    ? "connected"
-    : restricted && detailsSubmitted
-      ? "restricted"
-      : detailsSubmitted
-        ? "pending"
-        : "onboarding_started";
-
-  return {
-    stripeAccountId: account.id,
-    chargesEnabled,
-    payoutsEnabled,
-    detailsSubmitted,
-    complete,
-    connectStatus,
-    requirementsCurrentlyDue: currentlyDue,
-  };
-}
+export {
+  deriveStripeConnectReadiness,
+  type StripeConnectReadiness,
+} from "@/lib/payments/stripe-connect-readiness";
 
 async function updateGuruRow(
   userId: string,
@@ -110,41 +75,75 @@ async function updatePayoutAccountRow(
       : readiness.detailsSubmitted
         ? "pending_verification"
         : "in_progress";
+  const accountStatus = readiness.complete ? "ready" : onboardingStatus;
+  // Keep legacy `status` aligned so sitguru_refresh_user_payout_readiness
+  // does not overwrite a fresh Stripe sync with a stale pending value.
+  const legacyStatus = readiness.complete
+    ? "ready"
+    : readiness.connectStatus === "restricted"
+      ? "restricted"
+      : readiness.detailsSubmitted
+        ? "pending"
+        : "in_progress";
 
   const payload = {
     provider: "stripe",
     provider_account_id: readiness.stripeAccountId,
+    account_purpose: "guru_marketplace_seller",
+    workspace_role: "guru",
+    status: legacyStatus,
     onboarding_status: onboardingStatus,
-    account_status: readiness.complete ? "ready" : onboardingStatus,
+    account_status: accountStatus,
     details_submitted: readiness.detailsSubmitted,
     charges_enabled: readiness.chargesEnabled,
     payouts_enabled: readiness.payoutsEnabled,
     requirements_currently_due: readiness.requirementsCurrentlyDue,
+    onboarding_completed_at: readiness.complete ? now : null,
+    connected_at: readiness.complete ? now : null,
     updated_at: now,
     last_synced_at: now,
+    last_checked_at: now,
   };
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existingRows, error: lookupError } = await supabaseAdmin
     .from("user_payout_accounts")
     .select("id")
     .eq("user_id", userId)
     .eq("provider", "stripe")
-    .maybeSingle();
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(5);
 
-  if (existing?.id) {
-    await supabaseAdmin
+  if (lookupError) {
+    console.error("Stripe payout account lookup failed:", lookupError);
+  }
+
+  const existingIds = (existingRows || [])
+    .map((row) => String(row.id || ""))
+    .filter(Boolean);
+
+  if (existingIds.length > 0) {
+    const { error: updateError } = await supabaseAdmin
       .from("user_payout_accounts")
       .update(payload)
-      .eq("id", existing.id);
+      .in("id", existingIds);
+
+    if (updateError) {
+      console.error("Stripe payout account update failed:", updateError);
+    }
     return;
   }
 
-  await supabaseAdmin.from("user_payout_accounts").insert({
-    user_id: userId,
-    workspace_role: "guru",
-    ...payload,
-    created_at: now,
-  });
+  const { error: insertError } = await supabaseAdmin
+    .from("user_payout_accounts")
+    .insert({
+      user_id: userId,
+      ...payload,
+      created_at: now,
+    });
+
+  if (insertError) {
+    console.error("Stripe payout account insert failed:", insertError);
+  }
 }
 
 async function refreshPreferenceFlags(userId: string, ready: boolean) {
@@ -221,9 +220,8 @@ export async function guruCanAcceptPaidBookings(userId: string) {
 
   const stripeReady = Boolean(
     guru?.stripe_account_id &&
-      guru?.stripe_onboarding_complete === true &&
-      guru?.charges_enabled === true &&
-      guru?.payouts_enabled === true,
+      (guru?.stripe_onboarding_complete === true ||
+        guru?.payouts_enabled === true),
   );
 
   if (stripeReady) {

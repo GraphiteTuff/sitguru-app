@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getStripeServer } from "@/lib/stripe/server";
+import { syncStripeConnectAccountForUser } from "@/lib/payments/sync-stripe-connect-account";
 import {
   ThemeStatCard,
   type ThemeTone,
@@ -1070,7 +1072,7 @@ function ProviderStatusBadge({
   const label = ready
     ? "Ready"
     : started
-      ? "Finish setup"
+      ? "Almost ready"
       : selected
         ? "Selected"
         : "Not connected";
@@ -1097,6 +1099,7 @@ function PaymentSetupCard({
   paypalStatus,
   paypalMessage,
   paypalOnboarding,
+  stripeReturnStatus,
 }: {
   setup: GuruPayoutSetup | null;
   loadError?: string | null;
@@ -1104,6 +1107,7 @@ function PaymentSetupCard({
   paypalStatus?: string | null;
   paypalMessage?: string | null;
   paypalOnboarding: PayPalOnboardingResponse | null;
+  stripeReturnStatus?: string | null;
 }) {
   const selectedProvider = setup?.selectedProvider || "set_up_later";
   const stripeAccount =
@@ -1118,8 +1122,11 @@ function PaymentSetupCard({
   const stripeReady =
     stripeAccount?.payoutsEnabled === true ||
     stripeAccount?.accountStatus === "ready" ||
+    stripeAccount?.accountStatus === "active" ||
+    stripeAccount?.onboardingStatus === "ready" ||
     (stripeAccount?.detailsSubmitted === true &&
-      stripeAccount?.chargesEnabled === true);
+      (stripeAccount?.chargesEnabled === true ||
+        stripeAccount?.payoutsEnabled === true));
 
   const paypalStarted = Boolean(paypalAccount);
   const stripeStarted =
@@ -1142,7 +1149,16 @@ function PaymentSetupCard({
 
   const successMessage =
     saveStatus === "set_up_later"
-      ? "Saved. You can finish payment setup anytime before your first paid booking."
+      ? "Saved. You can finish payout setup anytime before your first paid booking."
+      : stripeReady && stripeReturnStatus === "connected"
+        ? "You’re all set. Stripe is ready."
+        : stripeReady
+          ? "Stripe is ready. You’ll get paid after eligible bookings."
+          : null;
+
+  const stripeHelpMessage =
+    stripeStarted && !stripeReady
+      ? "Almost there — tap Continue for the last secure Stripe steps. SitGuru updates automatically when you’re done."
       : null;
 
   const errorMessage =
@@ -1379,15 +1395,14 @@ function PaymentSetupCard({
               {stripeReady
                 ? "Manage Stripe"
                 : stripeStarted
-                  ? "Continue secure setup"
+                  ? "Continue"
                   : "Set up Stripe"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
-          {stripeStarted && !stripeReady ? (
+          {stripeHelpMessage ? (
             <p className="mt-3 text-xs font-semibold leading-5 !text-slate-600">
-              Setup was started but isn’t finished yet. Tap continue — SitGuru
-              will open the secure partner steps for whatever is still needed.
+              {stripeHelpMessage}
             </p>
           ) : null}
         </article>
@@ -1473,6 +1488,9 @@ export default async function GuruDashboardEarningsPage({
   const payoutStatusParam = resolvedSearchParams.payoutStatus;
   const paypalStatusParam = resolvedSearchParams.paypal;
   const paypalMessageParam = resolvedSearchParams.paypal_message;
+  const stripeReturnParam = resolvedSearchParams.stripe;
+  const stripeReturnStatus =
+    typeof stripeReturnParam === "string" ? stripeReturnParam : null;
   const payoutSaveStatus =
     typeof payoutSavedParam === "string"
       ? payoutSavedParam
@@ -1483,6 +1501,62 @@ export default async function GuruDashboardEarningsPage({
     typeof paypalStatusParam === "string" ? paypalStatusParam : null;
   const paypalMessage =
     typeof paypalMessageParam === "string" ? paypalMessageParam : null;
+
+  // Keep Stripe status fresh: always re-sync when returning from Stripe, and
+  // also when a Guru already started Connect so Ready flips without a hard refresh.
+  const shouldResyncStripe =
+    stripeReturnStatus === "connected" ||
+    stripeReturnStatus === "pending" ||
+    stripeReturnStatus === "return" ||
+    stripeReturnStatus === "refresh";
+
+  if (shouldResyncStripe) {
+    try {
+      const { data: guruRow } = await supabaseAdmin
+        .from("gurus")
+        .select("stripe_account_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const stripeAccountId = String(guruRow?.stripe_account_id || "").trim();
+      if (stripeAccountId) {
+        const stripe = getStripeServer();
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+        await syncStripeConnectAccountForUser({
+          userId: user.id,
+          account,
+        });
+      }
+    } catch (error) {
+      console.error("Earnings page Stripe re-sync failed:", error);
+    }
+  } else {
+    // Soft refresh for in-progress Connect accounts so "Almost ready" can
+    // become Ready after Stripe finishes verifying.
+    try {
+      const { data: guruRow } = await supabaseAdmin
+        .from("gurus")
+        .select("stripe_account_id, stripe_onboarding_complete, payouts_enabled")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const stripeAccountId = String(guruRow?.stripe_account_id || "").trim();
+      const alreadyReady =
+        guruRow?.stripe_onboarding_complete === true ||
+        guruRow?.payouts_enabled === true;
+
+      if (stripeAccountId && !alreadyReady) {
+        const stripe = getStripeServer();
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+        await syncStripeConnectAccountForUser({
+          userId: user.id,
+          account,
+        });
+      }
+    } catch (error) {
+      console.error("Earnings page Stripe soft re-sync failed:", error);
+    }
+  }
 
   const {
     data: { session },
@@ -1663,6 +1737,7 @@ export default async function GuruDashboardEarningsPage({
           paypalStatus={paypalStatus}
           paypalMessage={paypalMessage}
           paypalOnboarding={paypalOnboardingResponse}
+          stripeReturnStatus={stripeReturnStatus}
         />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
