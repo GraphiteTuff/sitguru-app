@@ -494,6 +494,18 @@ export default function HomepageChatBubble() {
           return;
         }
 
+        // Optimistic: authenticated ⇒ suppress parent signup until roles load.
+        const optimistic: CompanionViewerContext = {
+          isAuthenticated: true,
+          firstName: readStoredFirstName() || null,
+          roles:
+            storedType === "Guest Pet Parent" ? ["Pet Parent"] : [storedType],
+        };
+        viewerRef.current = optimistic;
+        setViewer(optimistic);
+        setRogueUserType(primaryCompanionRole(optimistic.roles, "Pet Parent"));
+        if (optimistic.firstName) setAwaitingName(false);
+
         const [{ data: roles }, { data: profile }] = await Promise.all([
           supabase
             .from("user_roles")
