@@ -106,16 +106,15 @@ type CompactGuruCard = {
 };
 
 function toCompact(guru: GuruChatSnapshot): CompactGuruCard {
-  // Keep photo URLs when present — chat UI appends markers server-side so
-  // length is fine (model copy-paste is no longer the only path).
+  // Keep full card fields — server appends markers, so photo/services length is fine.
   const photo =
-    guru.photoUrl && guru.photoUrl.length <= 480 ? guru.photoUrl : null;
+    guru.photoUrl && guru.photoUrl.length <= 900 ? guru.photoUrl : null;
   return {
     i: guru.id,
     n: guru.name,
     s: guru.slug,
     p: photo,
-    v: guru.services.slice(0, 3),
+    v: guru.services.slice(0, 4),
     r: guru.rate,
     l: guru.location,
     a: guru.rating,

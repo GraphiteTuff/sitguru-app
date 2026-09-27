@@ -64,8 +64,12 @@ function collectGuruCardMarkersFromToolSteps(
         typeof toolResult.result === "string"
           ? toolResult.result
           : JSON.stringify(toolResult.result ?? "");
-      const matches = raw.match(/\[\[\s*guru_card\s*:[^\]]+\]\]/gi) || [];
-      for (const marker of matches) {
+      // Prefer the shared multiline-safe pattern so long base64 cards are not dropped.
+      const pattern =
+        /(?:`{1,3})?\[\[\s*guru_card\s*:\s*([\s\S]*?)\]\](?:`{1,3})?/gi;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(raw)) !== null) {
+        const marker = `[[guru_card:${String(match[1] || "").trim()}]]`;
         if (seen.has(marker)) continue;
         seen.add(marker);
         markers.push(marker);
@@ -468,7 +472,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       if (shouldForceGuruLookup(careThread)) {
         const generated = await generateText({
           ...sharedModelConfig,
-          maxTokens: 2800,
+          maxTokens: 4096,
         });
 
         let assistantText = ensureGuruCardsInAssistantText(

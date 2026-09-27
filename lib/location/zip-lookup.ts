@@ -14,6 +14,7 @@ export type ZipLocation = {
 
 type ZippopotamPlace = {
   "place name"?: string;
+  "post code"?: string;
   state?: string;
   "state abbreviation"?: string;
   latitude?: string;
@@ -26,11 +27,16 @@ type ZippopotamResponse = {
 };
 
 const zipCache = new Map<string, ZipLocation | null>();
+const cityCache = new Map<string, ZipLocation | null>();
 
 export function cleanZipCode(value?: string | null) {
   return String(value || "")
     .replace(/\D/g, "")
     .slice(0, 5);
+}
+
+function cityCacheKey(city: string, state: string) {
+  return `${state.trim().toLowerCase()}::${city.trim().toLowerCase()}`;
 }
 
 export function formatCityState(
@@ -98,6 +104,84 @@ export async function lookupZipLocation(
     return result;
   } catch {
     zipCache.set(zip, null);
+    return null;
+  }
+}
+
+/**
+ * Resolve US city + state to a representative ZIP + coordinates (Zippopotam).
+ * Used so chat Guru lookup can apply the same radius matching as ZIP searches.
+ */
+export async function lookupCityLocation(
+  cityInput?: string | null,
+  stateInput?: string | null,
+): Promise<ZipLocation | null> {
+  const city = String(cityInput || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const state = String(stateInput || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 2);
+
+  if (!city || state.length !== 2) return null;
+
+  const key = cityCacheKey(city, state);
+  if (cityCache.has(key)) {
+    return cityCache.get(key) || null;
+  }
+
+  try {
+    const pathCity = encodeURIComponent(city);
+    const response = await fetch(
+      `https://api.zippopotam.us/us/${state.toLowerCase()}/${pathCity}`,
+      { next: { revalidate: 60 * 60 * 24 * 30 } },
+    );
+
+    if (!response.ok) {
+      cityCache.set(key, null);
+      return null;
+    }
+
+    const data = (await response.json()) as ZippopotamResponse & {
+      "place name"?: string;
+      "state abbreviation"?: string;
+    };
+    const place = data.places?.[0];
+    const placeCity = String(
+      place?.["place name"] || data["place name"] || "",
+    ).trim();
+    const placeState = String(
+      place?.["state abbreviation"] ||
+        data["state abbreviation"] ||
+        place?.state ||
+        state,
+    ).trim();
+    const zip = cleanZipCode(
+      place?.["post code"] || data["post code"] || "",
+    );
+    const latitude = Number(place?.latitude);
+    const longitude = Number(place?.longitude);
+
+    if (!placeCity || !placeState) {
+      cityCache.set(key, null);
+      return null;
+    }
+
+    const result: ZipLocation = {
+      zip: zip.length === 5 ? zip : "",
+      city: placeCity,
+      state: placeState,
+      stateName: String(place?.state || "").trim() || undefined,
+      latitude: Number.isFinite(latitude) ? latitude : null,
+      longitude: Number.isFinite(longitude) ? longitude : null,
+    };
+    cityCache.set(key, result);
+    return result;
+  } catch {
+    cityCache.set(key, null);
     return null;
   }
 }

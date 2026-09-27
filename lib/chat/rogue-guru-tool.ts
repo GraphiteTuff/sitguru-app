@@ -11,7 +11,7 @@ import {
 
 export const lookupGurusTool = tool({
   description:
-    "Look up live SitGuru Pet Guru profiles by care type (Dog Walking, Drop-In Visits, Overnight/House Sitting, Boarding, Pet Sitting, day care, training, etc.), city, state, ZIP, and/or Guru name. Pet sitters / dog sitters / cat sitters are Gurus. Use after the visitor shares a ZIP or city/state. Show the full public directory for that area. Booking stays on SitGuru.",
+    "Look up live SitGuru Pet Guru profiles by care type (Dog Walking, Drop-In Visits, Overnight/House Sitting, Boarding, Pet Sitting, day care, training, etc.), city, state, ZIP, and/or Guru name. Pet sitters / dog sitters / cat sitters are Gurus. Use after the visitor shares a ZIP or city/state. Always return the FULL public directory for that area (service matches first, then other local Gurus). Show every card. Booking stays on SitGuru.",
   parameters: z.object({
     service: z
       .string()
@@ -26,18 +26,31 @@ export const lookupGurusTool = tool({
     listAll: z
       .boolean()
       .optional()
-      .describe("Return the full public directory for the location"),
+      .describe(
+        "Always true for city/state/ZIP directory lists. Returns the full public area set.",
+      ),
     limit: z
       .number()
       .int()
       .min(1)
       .max(80)
       .optional()
-      .describe("Max results (default 60 for area lists)"),
+      .describe(
+        "Max results. For area lists omit this or use 60+ — never request fewer than ~40 for a city/ZIP directory.",
+      ),
   }),
   execute: async (params) => {
     try {
-      const result = await lookupGurusForChat(params);
+      const hasArea = Boolean(
+        params.city || params.state || params.zip || params.listAll,
+      );
+      const result = await lookupGurusForChat({
+        ...params,
+        listAll: hasArea ? true : params.listAll,
+        limit: hasArea
+          ? Math.max(Number(params.limit) || 60, 40)
+          : params.limit,
+      });
       // Return the digest string so Claude copies exact [[guru_card:...]] markers.
       return formatGuruLookupForPrompt(result);
     } catch (error) {

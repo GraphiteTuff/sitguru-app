@@ -8,7 +8,7 @@
  */
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { lookupZipLocation } from "@/lib/location/zip-lookup";
+import { lookupZipLocation, lookupCityLocation } from "@/lib/location/zip-lookup";
 import {
   encodeGuruCardMarker,
   isUsStateToken,
@@ -219,6 +219,9 @@ function matchesLocation(
     zipState?: string;
     zipLatitude?: number | null;
     zipLongitude?: number | null;
+    /** City geocode (when visitor searched city+state without ZIP). */
+    cityLatitude?: number | null;
+    cityLongitude?: number | null;
   },
 ) {
   const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5);
@@ -239,6 +242,28 @@ function matchesLocation(
     lower(guru.service_area),
   ].join(" ");
 
+  const withinReach = (
+    latitude: number | null | undefined,
+    longitude: number | null | undefined,
+  ) => {
+    const coords = guruCoordinates(guru);
+    if (
+      !coords ||
+      typeof latitude !== "number" ||
+      typeof longitude !== "number"
+    ) {
+      return false;
+    }
+    const miles = distanceMiles(
+      latitude,
+      longitude,
+      coords.latitude,
+      coords.longitude,
+    );
+    const reachMiles = Math.max(guruRadiusMiles(guru), 60);
+    return miles <= reachMiles;
+  };
+
   if (zip) {
     if (guruZip === zip || guruZip.startsWith(zip) || hay.includes(zip)) {
       return true;
@@ -250,21 +275,7 @@ function matchesLocation(
       return true;
     }
 
-    const coords = guruCoordinates(guru);
-    if (
-      coords &&
-      typeof params.zipLatitude === "number" &&
-      typeof params.zipLongitude === "number"
-    ) {
-      const miles = distanceMiles(
-        params.zipLatitude,
-        params.zipLongitude,
-        coords.latitude,
-        coords.longitude,
-      );
-      const reachMiles = Math.max(guruRadiusMiles(guru), 60);
-      if (miles <= reachMiles) return true;
-    }
+    if (withinReach(params.zipLatitude, params.zipLongitude)) return true;
 
     if (
       zip.length === 5 &&
@@ -282,6 +293,17 @@ function matchesLocation(
       guruState === queryState ||
       stateTokens.some((token) => token && hay.includes(token));
     if (!stateOk) return false;
+  }
+
+  // Exact city / service-area text match
+  if (city && (hay.includes(city) || guruCity === city)) return true;
+
+  // Same as ZIP: include Gurus who reach this city by service radius.
+  if (
+    city &&
+    withinReach(params.cityLatitude, params.cityLongitude)
+  ) {
+    return true;
   }
 
   if (city && !hay.includes(city) && guruCity !== city) return false;
@@ -424,21 +446,74 @@ async function loadPublicGuruRows(): Promise<RawGuru[]> {
   return fallback.data as RawGuru[];
 }
 
+function sortAreaRows(
+  rows: RawGuru[],
+  params: {
+    city?: string;
+    zip?: string;
+    zipCity?: string;
+    originLatitude?: number | null;
+    originLongitude?: number | null;
+  },
+) {
+  const city = lower(params.city || params.zipCity);
+  const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5);
+  const originLat = params.originLatitude;
+  const originLng = params.originLongitude;
+
+  return [...rows].sort((a, b) => {
+    const score = (guru: RawGuru) => {
+      const guruCity = lower(guru.service_city || guru.city);
+      const guruZip = guruZipCode(guru);
+      let exact = 0;
+      if (city && guruCity === city) exact += 2;
+      if (zip && guruZip === zip) exact += 2;
+      if (city && guruCity.includes(city)) exact += 1;
+
+      let miles = Number.POSITIVE_INFINITY;
+      const coords = guruCoordinates(guru);
+      if (
+        coords &&
+        typeof originLat === "number" &&
+        typeof originLng === "number"
+      ) {
+        miles = distanceMiles(
+          originLat,
+          originLng,
+          coords.latitude,
+          coords.longitude,
+        );
+      }
+      return { exact, miles };
+    };
+
+    const left = score(a);
+    const right = score(b);
+    if (left.exact !== right.exact) return right.exact - left.exact;
+    if (left.miles !== right.miles) return left.miles - right.miles;
+    return clean(a.display_name || a.full_name || a.name).localeCompare(
+      clean(b.display_name || b.full_name || b.name),
+    );
+  });
+}
+
 export async function lookupGurusForChat(
   params: LookupGurusParams,
 ): Promise<LookupGurusResult> {
-  const wantsDirectory = Boolean(params.listAll) || !clean(params.name);
-  const limit = Math.min(
-    Math.max(Number(params.limit) || (wantsDirectory ? 60 : 8), 1),
-    wantsDirectory ? 80 : 12,
-  );
+  const name = clean(params.name) || undefined;
+  // Area / directory searches must return the full local set — never a tiny slice.
+  const wantsDirectory =
+    Boolean(params.listAll) || !name || Boolean(params.city || params.state || params.zip);
+  const requestedLimit = Number(params.limit);
+  const limit = wantsDirectory
+    ? Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 60, 40), 80)
+    : Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 8, 1), 12);
   const service = canonicalizeCareService(params.service || "") || undefined;
   const cityRaw = clean(params.city);
   const state = normalizeUsState(params.state || cityRaw) || undefined;
   const city =
     cityRaw && !isUsStateToken(cityRaw) ? cityRaw : undefined;
   const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5) || undefined;
-  const name = clean(params.name) || undefined;
 
   const query: LookupGurusParams = {
     service,
@@ -447,7 +522,7 @@ export async function lookupGurusForChat(
     zip,
     name,
     limit,
-    listAll: Boolean(params.listAll) || wantsDirectory,
+    listAll: wantsDirectory,
   };
 
   if (!service && !city && !state && !zip && !name && !params.listAll) {
@@ -465,37 +540,91 @@ export async function lookupGurusForChat(
   let zipState: string | undefined;
   let zipLatitude: number | null = null;
   let zipLongitude: number | null = null;
+  let cityLatitude: number | null = null;
+  let cityLongitude: number | null = null;
+
   if (zip) {
     const zipPlace = await lookupZipLocation(zip);
     zipCity = zipPlace?.city || undefined;
     zipState = zipPlace?.state || undefined;
     zipLatitude = zipPlace?.latitude ?? null;
     zipLongitude = zipPlace?.longitude ?? null;
+  } else if (city && state) {
+    const cityPlace = await lookupCityLocation(city, state);
+    cityLatitude = cityPlace?.latitude ?? null;
+    cityLongitude = cityPlace?.longitude ?? null;
   }
 
   const rows = await loadPublicGuruRows();
-  const matchedRows = rows
-    .filter(isPublicDirectoryGuru)
-    .filter((guru) => matchesService(guru, service || ""))
-    .filter((guru) =>
-      matchesLocation(guru, {
-        city,
-        state,
-        zip,
-        zipCity,
-        zipState,
-        zipLatitude,
-        zipLongitude,
-      }),
-    )
-    .filter((guru) => matchesName(guru, name || ""));
+  const locationParams = {
+    city,
+    state,
+    zip,
+    zipCity,
+    zipState,
+    zipLatitude,
+    zipLongitude,
+    cityLatitude,
+    cityLongitude,
+  };
+  const originLatitude = zipLatitude ?? cityLatitude;
+  const originLongitude = zipLongitude ?? cityLongitude;
 
-  const matched = matchedRows
+  const areaRows = sortAreaRows(
+    rows
+      .filter(isPublicDirectoryGuru)
+      .filter((guru) => matchesLocation(guru, locationParams))
+      .filter((guru) => matchesName(guru, name || "")),
+    {
+      city,
+      zip,
+      zipCity,
+      originLatitude,
+      originLongitude,
+    },
+  );
+
+  const serviceRows = service
+    ? areaRows.filter((guru) => matchesService(guru, service))
+    : areaRows;
+
+  // Full area directory: service matches first, then other local Gurus so the
+  // visitor sees everyone available nearby — never a single partial slice.
+  const orderedRows =
+    service && wantsDirectory
+      ? [
+          ...serviceRows,
+          ...areaRows.filter(
+            (guru) => !serviceRows.some((row) => row === guru),
+          ),
+        ]
+      : service
+        ? serviceRows
+        : areaRows;
+
+  const matched = orderedRows
     .map(toSnapshot)
     .filter((row): row is GuruChatSnapshot => Boolean(row))
     .slice(0, limit);
 
-  const groups = groupDirectory(matchedRows.slice(0, limit));
+  const groups = groupDirectory(orderedRows.slice(0, limit));
+
+  const serviceMatchCount = serviceRows.length;
+  const areaCount = areaRows.length;
+  let note: string | undefined;
+  if (matched.length === 0) {
+    note =
+      "No public Guru matches for that filter yet — say SitGuru is growing there, then send them to Explore /search or a nearby ZIP. Append [[cta:parent]] only if AUTH SESSION allows guest Pet Parent signup.";
+  } else if (
+    service &&
+    wantsDirectory &&
+    serviceMatchCount > 0 &&
+    areaCount > serviceMatchCount
+  ) {
+    note = `HONEST COUNT: ${serviceMatchCount} Guru(s) match ${service}; ${areaCount} public Guru(s) total in/near this area are listed below (service matches first). Say the real totals. Never claim only one Guru if more markers are present. Never use the visitor's name as a Guru name.`;
+  } else {
+    note = `HONEST COUNT: ${matched.length} public Guru card(s) below. Show EVERY marker. Never claim a smaller count. Never use the visitor's name as a Guru name.`;
+  }
 
   return {
     query,
@@ -503,10 +632,7 @@ export async function lookupGurusForChat(
     gurus: matched,
     groups,
     searchUrl: buildSearchUrl(query),
-    note:
-      matched.length === 0
-        ? "No public Guru matches for that filter yet — say SitGuru is growing there, then send them to Explore /search or a nearby ZIP. Append [[cta:parent]] only if AUTH SESSION allows guest Pet Parent signup."
-        : undefined,
+    note,
   };
 }
 
@@ -535,7 +661,9 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
     "# LIVE GURU LOOKUP RESULT (authoritative for this turn)",
     `Query: ${JSON.stringify(result.query)}`,
     `Browse more: ${result.searchUrl}`,
-    "Show ALL matches grouped by state / ZIP. One short intro, then every card. Pet sitters / dog sitters / cat sitters are Gurus. Stress they book through SitGuru.",
+    result.note || "",
+    "Show ALL matches. One short intro with the TRUE count from this digest, then every card. Pet sitters / dog sitters / cat sitters are Gurus. Stress they book through SitGuru.",
+    "NEVER say a Guru is 'the only one' unless this digest lists exactly one card. NEVER use the visitor's preferred name as a Guru name.",
     "REQUIRED: After your short prose, append EVERY marker line below EXACTLY (copy-paste) — one [[guru_card:...]] per Guru. Then append [[cta:parent]] only if AUTH SESSION allows guest Pet Parent signup. Never invent markers.",
     ...groupLines,
     ...result.gurus.map((guru, index) => {
@@ -549,5 +677,7 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
         `   COPY THIS MARKER EXACTLY: ${marker}`,
       ].join("\n");
     }),
-  ].join("\n");
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 }

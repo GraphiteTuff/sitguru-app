@@ -617,7 +617,13 @@ export async function POST(req: Request) {
               typeof toolResult.result === "string"
                 ? toolResult.result
                 : JSON.stringify(toolResult.result ?? "");
-            const matches = raw.match(/\[\[\s*guru_card\s*:[^\]]+\]\]/gi) || [];
+            const matches: string[] = [];
+            const pattern =
+              /(?:`{1,3})?\[\[\s*guru_card\s*:\s*([\s\S]*?)\]\](?:`{1,3})?/gi;
+            let match: RegExpExecArray | null;
+            while ((match = pattern.exec(raw)) !== null) {
+              matches.push(`[[guru_card:${String(match[1] || "").trim()}]]`);
+            }
             for (const marker of matches) {
               if (seen.has(marker)) continue;
               seen.add(marker);
