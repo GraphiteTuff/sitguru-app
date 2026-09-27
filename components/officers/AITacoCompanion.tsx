@@ -30,6 +30,7 @@ import {
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
 import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import { useCompanionViewer } from "@/hooks/useCompanionViewer";
 import type { Message } from "ai/react";
 import {
   CompanionAssistantBubbleBody,
@@ -202,6 +203,21 @@ export default function AITacoCompanion({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
+  const viewer = useCompanionViewer(
+    !isOnboarding
+      ? {
+          isAuthenticated: true,
+          firstName: ambassadorName,
+          roles: ["Ambassador"],
+        }
+      : ambassadorName
+        ? {
+            isAuthenticated: Boolean(accessToken),
+            firstName: ambassadorName,
+            roles: accessToken ? ["Ambassador"] : ["Guest Pet Parent"],
+          }
+        : null,
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -527,7 +543,7 @@ export default function AITacoCompanion({
                     {isAssistant ? (
                       <CompanionAssistantBubbleBody
                         content={message.content}
-                        ctaContext={{ pagePath: requestBody.pagePath }}
+                        ctaContext={{ pagePath: requestBody.pagePath, viewer }}
                         socialSource="taco_companion_chat"
                         resetKey={message.id}
                         typewriter={

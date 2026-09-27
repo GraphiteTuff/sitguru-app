@@ -26,6 +26,7 @@ import {
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
 import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import { useCompanionViewer } from "@/hooks/useCompanionViewer";
 import type { Message } from "ai/react";
 import {
   OPEN_COMPANION_CHAT_EVENT,
@@ -86,6 +87,7 @@ export default function AIDelilahCompanion() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const benefitsChip = getCompanionBenefitsChip(ACTIVE_COMPANION);
+  const viewer = useCompanionViewer();
 
   useEffect(() => {
     setMounted(true);
@@ -352,6 +354,7 @@ export default function AIDelilahCompanion() {
                           pagePath: pathname || "/events",
                           eventSlug: storedEvent?.slug,
                           eventId: storedEvent?.id,
+                          viewer,
                         }}
                         socialSource="delilah_companion_chat"
                         resetKey={message.id}

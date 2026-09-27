@@ -75,7 +75,7 @@ export async function buildHomepageSimulationReplyWithGurus(
         String(thread || ""),
       )
     ) {
-      return appendGuruCards(`${lead}${intro} [[cta:parent]]`, markers);
+      return appendGuruCards(`${lead}${intro}`, markers);
     }
     return appendGuruCards(`${base}`, markers);
   } catch (error) {

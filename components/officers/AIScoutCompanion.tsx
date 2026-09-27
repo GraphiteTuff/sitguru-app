@@ -47,6 +47,7 @@ import {
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
 import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import { useCompanionViewer } from "@/hooks/useCompanionViewer";
 import type { Message } from "ai/react";
 
 const SCOUT_BRAND = "#047857";
@@ -159,16 +160,18 @@ function ScoutAssistantBody({
   pagePath,
   resetKey,
   typewriter = true,
+  viewer,
 }: {
   text: string;
   pagePath?: string;
   resetKey?: string;
   typewriter?: boolean;
+  viewer?: import("@/lib/chat/companion-auth").CompanionViewerContext | null;
 }) {
   return (
     <CompanionAssistantBubbleBody
       content={text}
-      ctaContext={{ pagePath: pagePath || "/" }}
+      ctaContext={{ pagePath: pagePath || "/", viewer }}
       socialSource="scout_companion_chat"
       resetKey={resetKey}
       typewriter={typewriter}
@@ -189,7 +192,17 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const firstName = user?.firstName || "Guru";
+  const viewer = useCompanionViewer(
+    user
+      ? {
+          isAuthenticated: true,
+          firstName: user.firstName || null,
+          roles: ["Guru"],
+        }
+      : null,
+  );
+
+  const firstName = viewer.firstName || user?.firstName || "Guru";
   const greeting = isPublic
     ? PUBLIC_GREETING
     : buildWorkspaceGreeting(firstName);
@@ -469,6 +482,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                       <ScoutAssistantBody
                         text={message.content}
                         pagePath={requestBody.pagePath}
+                        viewer={viewer}
                         resetKey={message.id}
                         typewriter={
                           message.id ===

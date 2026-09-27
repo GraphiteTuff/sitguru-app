@@ -18,6 +18,13 @@ import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simul
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import {
+  allowsParentSignupCta,
+  primaryCompanionRole,
+  stripDisallowedCompanionCtas,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
+import { resolveCompanionViewer } from "@/lib/chat/companion-auth-server";
+import {
   isCommunityCompanionPath,
   matchCommunityEventsFaq,
   matchDelilahSoftIntent,
@@ -73,18 +80,24 @@ function collectGuruCardMarkersFromToolSteps(
 function ensureGuruCardsInAssistantText(
   text: string,
   markers: string[],
+  viewer?: CompanionViewerContext | null,
 ): string {
   let out = String(text || "").trim();
-  if (!markers.length) return out;
+  if (!markers.length) {
+    return stripDisallowedCompanionCtas(out, viewer);
+  }
 
   const missing = markers.filter((marker) => !out.includes(marker));
   if (missing.length) {
     out = `${out} ${missing.join(" ")}`.trim();
   }
-  if (!/\[\[\s*cta:parent\s*\]\]/i.test(out)) {
+  if (
+    allowsParentSignupCta(viewer) &&
+    !/\[\[\s*cta:parent\s*\]\]/i.test(out)
+  ) {
     out = `${out} [[cta:parent]]`;
   }
-  return out;
+  return stripDisallowedCompanionCtas(out, viewer);
 }
 
 function shouldForceGuruLookup(threadText: string) {
@@ -282,13 +295,32 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const clientFirstNameRaw = sanitizePreferredName(
       body?.client_first_name,
     ).slice(0, 40);
-    const clientFirstName = isReservedPreferredName(clientFirstNameRaw)
+    const bodyClientFirstName = isReservedPreferredName(clientFirstNameRaw)
       ? ""
       : clientFirstNameRaw;
-    parsedClientFirstName = clientFirstName;
-    const userTypeLabel = normalizeRogueUserType(
+    const bodyUserType = normalizeRogueUserType(
       body?.userRole || body?.user_type || body?.user_role || "Guest Pet Parent",
     );
+
+    const viewer = await resolveCompanionViewer(
+      user
+        ? {
+            id: user.id,
+            user_metadata: (user.user_metadata || null) as Record<
+              string,
+              unknown
+            > | null,
+          }
+        : null,
+      bodyClientFirstName,
+      bodyUserType,
+    );
+
+    const clientFirstName = String(
+      viewer.firstName || bodyClientFirstName || "",
+    ).trim();
+    parsedClientFirstName = clientFirstName;
+    const userTypeLabel = primaryCompanionRole(viewer.roles, bodyUserType);
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
@@ -308,11 +340,14 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     const simulationPayload = async () =>
       simulationDataStreamResponse(
-        await buildSimulationReply({
-          clientFirstName,
-          lastUserText,
-          careThread,
-        }),
+        stripDisallowedCompanionCtas(
+          await buildSimulationReply({
+            clientFirstName,
+            lastUserText,
+            careThread,
+          }),
+          viewer,
+        ),
       );
 
     if (!String(process.env.ANTHROPIC_API_KEY || "").trim()) {
@@ -370,7 +405,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     const matchingAsk = buildCareMatchingAsk(careThread, clientFirstName);
     if (matchingAsk) {
-      return simulationDataStreamResponse(matchingAsk);
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(matchingAsk, viewer),
+      );
     }
 
     const communityFaq =
@@ -395,7 +432,10 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const exactParentFaq =
       matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
       matchRoguePublicSoftIntent(lastUserText);
-    const factForVoice = communityFaq?.answer || exactParentFaq?.answer || "";
+    const factForVoice = stripDisallowedCompanionCtas(
+      communityFaq?.answer || exactParentFaq?.answer || "",
+      viewer,
+    );
 
     let systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
@@ -404,6 +444,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       walkId: walkId || undefined,
       pagePath,
       communityEvent,
+      viewer,
     });
     if (factForVoice) {
       systemPrompt += `\n\n${personableFactHint(factForVoice, clientFirstName)}`;
@@ -443,14 +484,18 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
               toolResults?: Array<{ toolName?: string; result?: unknown }>;
             }>),
           ]),
+          viewer,
         );
 
         if (!assistantText) {
-          assistantText = await buildSimulationReply({
-            clientFirstName,
-            lastUserText,
-            careThread,
-          });
+          assistantText = stripDisallowedCompanionCtas(
+            await buildSimulationReply({
+              clientFirstName,
+              lastUserText,
+              careThread,
+            }),
+            viewer,
+          );
         }
 
         void (async () => {
@@ -506,6 +551,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
                   toolResults?: Array<{ toolName?: string; result?: unknown }>;
                 }>,
               ),
+              viewer,
             );
             const withAssistant = [
               ...messages,

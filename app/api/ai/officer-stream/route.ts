@@ -39,6 +39,13 @@ import {
 import { personableFactHint } from "@/lib/ai/companion-answer-protocol";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
+  buildCompanionAuthPromptBlock,
+  primaryCompanionRole,
+  stripDisallowedCompanionCtas,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
+import { resolveCompanionViewer } from "@/lib/chat/companion-auth-server";
+import {
   inferLookupParamsFromChat,
   looksLikeGuruDirectoryQuery,
 } from "@/lib/gurus/guru-chat-snapshot";
@@ -414,6 +421,28 @@ export async function POST(req: Request) {
       actorLabel = `Signed-in guest${session.email ? ` · ${session.email}` : ""}`;
     }
 
+    const viewer = await resolveCompanionViewer(
+      session?.id
+        ? {
+            id: session.id,
+            user_metadata: null,
+          }
+        : null,
+      bodyGuruName || undefined,
+      surface !== "public"
+        ? officer === "scout"
+          ? "Guru"
+          : officer === "taco"
+            ? "Ambassador"
+            : undefined
+        : undefined,
+    );
+    if (viewer.isAuthenticated && viewer.firstName) {
+      actorLabel = `${viewer.firstName} · ${primaryCompanionRole(viewer.roles)}${
+        session?.email ? ` · ${session.email}` : ""
+      }`;
+    }
+
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     if (!messages.length) {
       return Response.json(
@@ -427,7 +456,7 @@ export async function POST(req: Request) {
     const careThread = joinRecentUserTexts(messages, lastUserText);
     const scoutMatchingAsk =
       officer === "scout"
-        ? buildCareMatchingAsk(careThread)
+        ? buildCareMatchingAsk(careThread, viewer.firstName)
         : null;
     const lookupHint = inferLookupParamsFromChat(careThread);
     const scoutNeedsDirectory =
@@ -453,10 +482,12 @@ export async function POST(req: Request) {
     }
 
     if (scoutMatchingAsk) {
-      return simulationDataStreamResponse(scoutMatchingAsk);
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(scoutMatchingAsk, viewer),
+      );
     }
 
-    const instantFaq =
+    const instantFaqRaw =
       officer === "delilah"
         ? resolveDelilahInstantFaqAnswer(lastUserText)
         : scoutNeedsDirectory || needsCareMatchingAsk(careThread)
@@ -466,7 +497,9 @@ export async function POST(req: Request) {
               question: lastUserText,
               surface,
             });
-
+    const instantFaq = instantFaqRaw
+      ? stripDisallowedCompanionCtas(instantFaqRaw, viewer)
+      : null;
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
     if (officer === "delilah") {
@@ -527,6 +560,7 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString();
+    const preferredName = viewer.firstName || bodyGuruName || undefined;
     const system = [
       buildOfficerSystemPrompt({
         officerId: officer,
@@ -535,17 +569,19 @@ export async function POST(req: Request) {
         snapshotMarkdown,
         preset: preset || undefined,
         surface,
+        viewer,
       }),
-      instantFaq
-        ? personableFactHint(instantFaq, bodyGuruName || undefined)
-        : "",
+      instantFaq ? personableFactHint(instantFaq, preferredName) : "",
     ]
       .filter(Boolean)
       .join("\n\n");
 
     if (!isSitGuruAiConfigured()) {
       return simulationDataStreamResponse(
-        fallbackReport(officer, snapshotMarkdown, lastUserText, surface),
+        stripDisallowedCompanionCtas(
+          fallbackReport(officer, snapshotMarkdown, lastUserText, surface),
+          viewer,
+        ),
       );
     }
 
@@ -594,7 +630,9 @@ export async function POST(req: Request) {
           assistantText = `${assistantText} ${missing.join(" ")}`.trim();
         }
         if (assistantText) {
-          return simulationDataStreamResponse(assistantText);
+          return simulationDataStreamResponse(
+            stripDisallowedCompanionCtas(assistantText, viewer),
+          );
         }
       }
 
@@ -621,7 +659,10 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error(`[officer-stream:${officer}] model failure:`, error);
       return simulationDataStreamResponse(
-        fallbackReport(officer, snapshotMarkdown, lastUserText, surface),
+        stripDisallowedCompanionCtas(
+          fallbackReport(officer, snapshotMarkdown, lastUserText, surface),
+          viewer,
+        ),
       );
     }
   } catch (error) {

@@ -7,6 +7,10 @@ import {
   buildCommunityJoinHref,
 } from "@/lib/community/pet-parent-signup";
 import { isCommunityCompanionPath } from "@/lib/ai/community-events-faqs";
+import {
+  isCompanionCtaAllowed,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
 
 export type HomepageCtaId =
   | "guru"
@@ -35,6 +39,7 @@ export type HomepageCtaContext = {
   pagePath?: string;
   eventSlug?: string;
   eventId?: string;
+  viewer?: CompanionViewerContext | null;
 };
 
 export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
@@ -211,7 +216,9 @@ export function parseHomepageChatContent(
 
   return {
     text,
-    ctas: defs.filter((d) => found.has(d.id)),
+    ctas: defs.filter(
+      (d) => found.has(d.id) && isCompanionCtaAllowed(d.id, context?.viewer),
+    ),
     guruCards,
   };
 }
@@ -292,10 +299,11 @@ CARE / ROLE ROUTING:
 - Email / newsletter / subscribe / updates → invite email signup and append [[cta:email]].
 - Follower counts / social growth questions → call fetchLiveSocialFollowers and report live deltas; then soft-invite follow with [[cta:social]].
 
-ONBOARDING CTA MARKERS (REQUIRED WHEN THEY SHOW ROLE INTEREST):
-Guru / handler / sitter / walker / trainer interest → append [[cta:guru]]
-Pet parent / book care / dog walks / drop-ins / overnight / boarding interest → append [[cta:parent]]
-Ambassador / referral interest → append [[cta:ambassador_video]] and [[cta:ambassador]]
+ONBOARDING CTA MARKERS (REQUIRED WHEN THEY SHOW ROLE INTEREST — guests only):
+If AUTH SESSION says they are logged in with that role already, do NOT append the matching signup CTA.
+Guru / handler / sitter / walker / trainer interest → append [[cta:guru]] (guests / non-Gurus only)
+Pet parent / book care / dog walks / drop-ins / overnight / boarding interest → append [[cta:parent]] (guests / non-Pet-Parents only)
+Ambassador / referral interest → append [[cta:ambassador_video]] and [[cta:ambassador]] (non-Ambassadors only)
 Video-only ask → append [[cta:ambassador_video]]
 Social / events / follow us / Instagram / TikTok / YouTube / Facebook / X → append [[cta:social]]
 Email / newsletter / subscribe / don’t miss out / email updates → append [[cta:email]]

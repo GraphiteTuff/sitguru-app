@@ -38,11 +38,17 @@ import {
 } from "@/lib/chat/rogue-greetings";
 import {
   inferRogueUserTypeFromIntent,
-  normalizeRogueUserType,
   persistRogueUserType,
   readStoredRogueUserType,
   type RogueUserTypeLabel,
 } from "@/lib/chat/rogue-user-type";
+import {
+  mergeCompanionIntentRole,
+  primaryCompanionRole,
+  stripDisallowedCompanionCtas,
+  uniqueCompanionRoles,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
 import { supabase } from "@/lib/supabase";
 import {
   COMPANION_BENEFITS_USER_PROMPT,
@@ -307,6 +313,11 @@ export default function HomepageChatBubble() {
   const [clientFirstName, setClientFirstName] = useState("");
   const [awaitingName, setAwaitingName] = useState(false);
   const [userType, setUserType] = useState<RogueUserTypeLabel>("Guest Pet Parent");
+  const [viewer, setViewer] = useState<CompanionViewerContext>({
+    isAuthenticated: false,
+    firstName: null,
+    roles: ["Guest Pet Parent"],
+  });
   const [eventCompanion, setEventCompanion] = useState(
     () => readStoredCommunityEventCompanion(),
   );
@@ -315,6 +326,7 @@ export default function HomepageChatBubble() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
+  const viewerRef = useRef<CompanionViewerContext>(viewer);
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
 
   const ctaContext = useMemo<HomepageCtaContext>(
@@ -322,8 +334,9 @@ export default function HomepageChatBubble() {
       pagePath: pathname || "/",
       eventSlug: eventCompanion?.slug,
       eventId: eventCompanion?.id,
+      viewer,
     }),
-    [eventCompanion?.id, eventCompanion?.slug, pathname],
+    [eventCompanion?.id, eventCompanion?.slug, pathname, viewer],
   );
 
   const intentChips = useMemo(
@@ -396,9 +409,25 @@ export default function HomepageChatBubble() {
     persistRogueUserType(userType);
   }, [userType]);
 
+  useEffect(() => {
+    viewerRef.current = viewer;
+  }, [viewer]);
+
   function setRogueUserType(next: RogueUserTypeLabel) {
     userTypeRef.current = next;
     setUserType(next);
+  }
+
+  function applyIntentUserType(content: string) {
+    const inferred = inferRogueUserTypeFromIntent(content);
+    const next = mergeCompanionIntentRole(
+      userTypeRef.current || userType,
+      inferred,
+      viewerRef.current,
+    );
+    if (next !== (userTypeRef.current || userType)) {
+      setRogueUserType(next);
+    }
   }
 
   /** Always send the latest preferred name + audience type so Rogue can adapt. */
@@ -451,22 +480,76 @@ export default function HomepageChatBubble() {
     const storedType = readStoredRogueUserType();
     setRogueUserType(storedType);
 
-    // Resolve logged-in SitGuru role when available (Guest Pet Parent otherwise).
+    // Resolve logged-in SitGuru role + preferred name (never demote to Guest).
     void (async () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
-        if (!uid) return;
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", uid)
-          .limit(5);
-        const primary =
-          roles?.map((r) => String(r.role || "")).find(Boolean) || "";
-        if (primary) {
-          setRogueUserType(normalizeRogueUserType(primary));
+        if (!uid) {
+          setViewer({
+            isAuthenticated: false,
+            firstName: readStoredFirstName() || null,
+            roles: [storedType],
+          });
+          return;
         }
+
+        const [{ data: roles }, { data: profile }] = await Promise.all([
+          supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", uid)
+            .limit(12),
+          supabase
+            .from("profiles")
+            .select("first_name, full_name")
+            .eq("id", uid)
+            .maybeSingle(),
+        ]);
+
+        const roleLabels = uniqueCompanionRoles([
+          ...(roles || []).map((r) => r.role),
+          storedType,
+        ]);
+        const primary = primaryCompanionRole(roleLabels, "Pet Parent");
+        setRogueUserType(primary);
+
+        const meta = auth.user?.user_metadata || {};
+        const metaFirst =
+          typeof meta.first_name === "string"
+            ? meta.first_name
+            : typeof meta.full_name === "string"
+              ? String(meta.full_name).split(/\s+/)[0]
+              : "";
+        const profileFirst =
+          sanitizeFirstName(profile?.first_name || "") ||
+          sanitizeFirstName(
+            String(profile?.full_name || "").split(/\s+/)[0] || "",
+          ) ||
+          "";
+        const authName =
+          sanitizeFirstName(profileFirst) ||
+          sanitizeFirstName(metaFirst) ||
+          readStoredFirstName() ||
+          "";
+
+        if (authName) {
+          persistFirstName(authName);
+          clientFirstNameRef.current = authName;
+          setClientFirstName(authName);
+          setAwaitingName(false);
+        } else {
+          // Logged in but no name on file — ask once, still auth-aware for CTAs.
+          setAwaitingName(true);
+        }
+
+        const nextViewer: CompanionViewerContext = {
+          isAuthenticated: true,
+          firstName: authName || null,
+          roles: roleLabels.length ? roleLabels : ["Pet Parent"],
+        };
+        viewerRef.current = nextViewer;
+        setViewer(nextViewer);
       } catch {
         // stay on guest / stored type
       }
@@ -698,6 +781,11 @@ export default function HomepageChatBubble() {
     clientFirstNameRef.current = name;
     setClientFirstName(name);
     setAwaitingName(false);
+    setViewer((prev) => {
+      const next = { ...prev, firstName: name };
+      viewerRef.current = next;
+      return next;
+    });
     sendLocalReply(
       raw.trim(),
       `so nice to meet you, ${name}! 🐾 i'm Rogue — your adorable assistant — and i'm doing great. how are you today? whenever you're ready we can book care, meet a Pet Guru, or explore joining the pack.`,
@@ -737,7 +825,10 @@ export default function HomepageChatBubble() {
       content,
     );
     if (growthAnswer) {
-      sendLocalReply(content, growthAnswer);
+      sendLocalReply(
+        content,
+        stripDisallowedCompanionCtas(growthAnswer, viewerRef.current),
+      );
       focusComposer(40);
       return;
     }
@@ -745,8 +836,7 @@ export default function HomepageChatBubble() {
     // Role / care chips wait until we have a preferred name.
     if (awaitingName) return;
 
-    const inferred = inferRogueUserTypeFromIntent(content);
-    if (inferred) setRogueUserType(inferred);
+    applyIntentUserType(content);
     await append({ role: "user", content }, chatRequestOptions());
     focusComposer(40);
   }
@@ -771,7 +861,10 @@ export default function HomepageChatBubble() {
       text,
     );
     if (growthAnswer) {
-      sendLocalReply(text, growthAnswer);
+      sendLocalReply(
+        text,
+        stripDisallowedCompanionCtas(growthAnswer, viewerRef.current),
+      );
       setInput("");
       focusComposer(40);
       return;
@@ -807,8 +900,7 @@ export default function HomepageChatBubble() {
       return;
     }
 
-    const inferred = inferRogueUserTypeFromIntent(text);
-    if (inferred) setRogueUserType(inferred);
+    applyIntentUserType(text);
     handleSubmit(e, chatRequestOptions());
     // Input is disabled while streaming; refocus as soon as Rogue finishes (effect below).
     focusComposer(40);

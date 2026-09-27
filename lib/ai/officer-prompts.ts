@@ -1,4 +1,8 @@
 import { COMPANION_ANSWER_PROTOCOL } from "@/lib/ai/companion-answer-protocol";
+import {
+  buildCompanionAuthPromptBlock,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
 
 /**
  * SitGuru multi-agent Pet Officer personality maps.
@@ -354,6 +358,7 @@ export function buildOfficerSystemPrompt(opts: {
   snapshotMarkdown: string;
   preset?: string;
   surface?: OfficerSurface;
+  viewer?: CompanionViewerContext | null;
 }) {
   const profile = getOfficerPrompt(opts.officerId);
   const surface = opts.surface === "public" ? "public" : "dashboard";
@@ -374,6 +379,7 @@ export function buildOfficerSystemPrompt(opts: {
     profile.systemPrompt,
     COMPANION_ANSWER_PROTOCOL,
     surfaceAddendum,
+    buildCompanionAuthPromptBlock(opts.viewer),
     "",
     "TEMPORAL CONTEXT:",
     `- Current UTC datetime: ${opts.nowIso}`,

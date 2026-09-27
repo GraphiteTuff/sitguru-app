@@ -8,6 +8,10 @@ import { HOMEPAGE_CTO_VOICE_RULES, COMMUNITY_EVENTS_ROGUE_VOICE_RULES } from "@/
 import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import {
+  buildCompanionAuthPromptBlock,
+  type CompanionViewerContext,
+} from "@/lib/chat/companion-auth";
+import {
   buildCommunityEventsFaqSnapshot,
   isCommunityCompanionPath,
   parseCommunityEventSlugFromPath,
@@ -24,7 +28,7 @@ Your goal is to explain Pet Parent care on SitGuru like a friend, and warmly inv
 
 YOUR LANE — explain all of it when they ask:
 - Finding a Guru, what care they can book, how booking works, messaging, PawReport Live, PawPerks, trust and safety, sales tax on checkout, and rebooking a favorite.
-- Signing up as a Pet Parent is free. Care is booked on SitGuru. Append [[cta:parent]] when you invite them to join or book.
+- Signing up as a Pet Parent is free. Care is booked on SitGuru. Append [[cta:parent]] when you invite them to join or book — only if AUTH SESSION allows (guests / non–Pet-Parents).
 - Referring a friend to SitGuru or to a Guru they like is welcome. Do not promise rewards.
 
 CRITICAL RULES:
@@ -57,7 +61,7 @@ GURU MATCHING (LIVE LOOKUP TOOL):
 - After tool results, one short intro naming the area + count, then append every [[guru_card:...]] marker from the digest. Never invent markers.
 - If the digest has matches, show them. If it has zero matches, say SitGuru is still growing that area and send them to Explore /search — never say you "couldn't pull data" or hit a snag unless the digest itself reports a catalog error.
 - BOOKING RULE: All care is booked **through SitGuru** — never suggest contacting Gurus off-platform or paying outside the app.
-- Remind them they can search, save, and rebook their **favorite Guru** anytime on SitGuru (append [[cta:parent]] when they show booking intent).
+- Remind them they can search, save, and rebook their **favorite Guru** anytime on SitGuru (append [[cta:parent]] only when AUTH SESSION allows guest parent signup).
 - Never invent Guru names, rates, or profiles that were not returned by lookupGurus.
 
 IDENTITY + SAFETY:
@@ -73,6 +77,7 @@ export function buildRogueSystemPrompt(opts: {
   lastUserText?: string;
   walkId?: string;
   pagePath?: string;
+  viewer?: CompanionViewerContext | null;
   communityEvent?: {
     slug?: string;
     title?: string;
@@ -83,19 +88,33 @@ export function buildRogueSystemPrompt(opts: {
 }): string {
   let systemPrompt = `${ROGUE_CORE_SYSTEM_PROMPT}\n\n${COMPANION_ANSWER_PROTOCOL}`;
 
-  // Dynamically append the user's role (frontend userRole / user_type).
-  const roleRaw = String(opts.userRole || "").trim();
-  if (roleRaw) {
-    const label = normalizeRogueUserType(roleRaw);
-    systemPrompt += `\nCURRENT USER TYPE: Optimize your tone specifically for a ${label}.`;
-  } else {
-    systemPrompt += `\nCURRENT USER TYPE: General visitor / Guest Pet Parent.`;
-  }
+  const viewer: CompanionViewerContext =
+    opts.viewer || {
+      isAuthenticated: false,
+      firstName: opts.clientFirstName || null,
+      roles: [normalizeRogueUserType(opts.userRole || "Guest Pet Parent")],
+    };
 
-  const name = String(opts.clientFirstName || "").trim();
+  systemPrompt += `\n\n${buildCompanionAuthPromptBlock(viewer)}`;
+
+  // Dynamically append the user's role (frontend userRole / user_type).
+  const roleRaw =
+    String(opts.userRole || "").trim() ||
+    viewer.roles[0] ||
+    "Guest Pet Parent";
+  const label = normalizeRogueUserType(roleRaw);
+  systemPrompt += `\nCURRENT USER TYPE: Optimize your tone specifically for a ${label}.`;
+
+  const name = String(
+    opts.clientFirstName || viewer.firstName || "",
+  ).trim();
   if (name) {
     systemPrompt += `\nVISITOR PREFERRED NAME: ${name}.
-MANDATORY: Address them as ${name} in every reply. NEVER call them Rogue.`;
+MANDATORY: Address them as ${name} in every reply. NEVER call them Rogue.
+Do NOT ask for their name again.`;
+  } else if (viewer.isAuthenticated) {
+    systemPrompt += `\nLogged-in visitor without a preferred name on file.
+Ask once, warmly, what to call them — then keep using it.`;
   } else {
     systemPrompt += `\nNo visitor preferred name yet.
 If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call them.`;

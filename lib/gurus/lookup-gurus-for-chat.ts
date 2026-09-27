@@ -505,7 +505,7 @@ export async function lookupGurusForChat(
     searchUrl: buildSearchUrl(query),
     note:
       matched.length === 0
-        ? "No public Guru matches for that filter yet — say SitGuru is growing there, then send them to Explore /search or a nearby ZIP. Append [[cta:parent]]."
+        ? "No public Guru matches for that filter yet — say SitGuru is growing there, then send them to Explore /search or a nearby ZIP. Append [[cta:parent]] only if AUTH SESSION allows guest Pet Parent signup."
         : undefined,
   };
 }
@@ -536,7 +536,7 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
     `Query: ${JSON.stringify(result.query)}`,
     `Browse more: ${result.searchUrl}`,
     "Show ALL matches grouped by state / ZIP. One short intro, then every card. Pet sitters / dog sitters / cat sitters are Gurus. Stress they book through SitGuru.",
-    "REQUIRED: After your short prose, append EVERY marker line below EXACTLY (copy-paste) — one [[guru_card:...]] per Guru — then [[cta:parent]]. Never invent markers.",
+    "REQUIRED: After your short prose, append EVERY marker line below EXACTLY (copy-paste) — one [[guru_card:...]] per Guru. Then append [[cta:parent]] only if AUTH SESSION allows guest Pet Parent signup. Never invent markers.",
     ...groupLines,
     ...result.gurus.map((guru, index) => {
       const marker = encodeGuruCardMarker(guru);
