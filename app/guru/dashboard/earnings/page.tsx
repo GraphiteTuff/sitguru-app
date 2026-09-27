@@ -386,11 +386,13 @@ function buildEarningsStatusUrl({
   payoutStatus,
   paypal,
   paypalMessage,
+  stripe,
 }: {
   payoutSaved?: string;
   payoutStatus?: string;
   paypal?: string;
   paypalMessage?: string;
+  stripe?: string;
 }) {
   const params = new URLSearchParams();
 
@@ -400,6 +402,7 @@ function buildEarningsStatusUrl({
   if (paypalMessage) {
     params.set("paypal_message", paypalMessage.slice(0, 240));
   }
+  if (stripe) params.set("stripe", stripe);
 
   const query = params.toString();
 
@@ -489,6 +492,76 @@ async function startGuruStripeOnboarding() {
 
   revalidatePath("/guru/dashboard/earnings");
   redirect("/api/stripe/connect/onboard?role=guru");
+}
+
+async function refreshGuruStripeStatus() {
+  "use server";
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/guru/login");
+  }
+
+  try {
+    const { data: guruRow } = await supabaseAdmin
+      .from("gurus")
+      .select("stripe_account_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const stripeAccountId = String(guruRow?.stripe_account_id || "").trim();
+    if (!stripeAccountId) {
+      revalidatePath("/guru/dashboard/earnings");
+      redirect(
+        buildEarningsStatusUrl({
+          stripe: "started",
+        }),
+      );
+    }
+
+    const stripe = getStripeServer();
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+    const readiness = await syncStripeConnectAccountForUser({
+      userId: user.id,
+      account,
+    });
+
+    revalidatePath("/guru/dashboard/earnings");
+
+    redirect(
+      buildEarningsStatusUrl({
+        stripe: readiness.complete
+          ? "connected"
+          : readiness.connectStatus === "restricted"
+            ? "restricted"
+            : readiness.detailsSubmitted || readiness.pendingReview
+              ? "pending"
+              : "started",
+      }),
+    );
+  } catch (error) {
+    // Next.js redirect() throws — do not treat that as a sync failure.
+    if (
+      String((error as { digest?: string }).digest || "").startsWith(
+        "NEXT_REDIRECT",
+      )
+    ) {
+      throw error;
+    }
+
+    console.error("Guru Stripe status refresh failed:", error);
+    revalidatePath("/guru/dashboard/earnings");
+    redirect(
+      buildEarningsStatusUrl({
+        stripe: "pending",
+      }),
+    );
+  }
 }
 
 async function startGuruPayPalOnboarding(formData: FormData) {
@@ -1423,18 +1496,8 @@ function PaymentSetupCard({
             processor="stripe"
           />
 
-          {stripeInReview ? (
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link
-                href="/guru/dashboard/earnings?stripe=pending"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-black !text-sky-900 transition hover:bg-sky-100"
-              >
-                Refresh status
-                <RefreshCw className="h-4 w-4" />
-              </Link>
-            </div>
-          ) : (
-            <form action={startGuruStripeOnboarding} className="mt-4">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <form action={startGuruStripeOnboarding}>
               <button
                 type="submit"
                 className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
@@ -1451,7 +1514,18 @@ function PaymentSetupCard({
                 <ArrowRight className="h-4 w-4" />
               </button>
             </form>
-          )}
+
+            <form action={refreshGuruStripeStatus}>
+              <button
+                type="submit"
+                disabled={!stripeStarted && !stripeReady && !stripeInReview}
+                className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Check status
+              </button>
+            </form>
+          </div>
 
           {stripeStarted || stripeReady || stripeInReview ? (
             <div
