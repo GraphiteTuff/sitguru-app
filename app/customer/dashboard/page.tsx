@@ -428,6 +428,7 @@ const routes = {
   serviceLocation: "/customer/dashboard/profile/service-location",
   accountSecurity: "/customer/dashboard/account-security",
   pawPerks: "/customer/dashboard/pawperks",
+  payments: "/customer/dashboard/payments",
   search: "/search",
   login: "/login",
 };
@@ -3676,7 +3677,7 @@ export default function CustomerDashboardPage() {
               },
               {
                 label: "Payments",
-                href: routes.pawPerks,
+                href: routes.payments,
                 icon: CreditCard,
               },
             ]}
