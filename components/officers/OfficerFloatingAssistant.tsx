@@ -22,6 +22,9 @@ import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
 import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
 import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
+import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
+import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import type { Message } from "ai/react";
 
 export type OfficerTheme = {
   brand: string;
@@ -395,6 +398,17 @@ export default function OfficerFloatingAssistant({
     body: requestBody,
   });
 
+  const {
+    sendLocalReply,
+    isTyping,
+    hideStreamingContent,
+    isBusy,
+  } = useCompanionTypingReply<Message>({
+    setMessages,
+    isLoading,
+    idPrefix: officerId,
+  });
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -403,7 +417,7 @@ export default function OfficerFloatingAssistant({
     if (!open) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, open]);
+  }, [messages, isTyping, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -448,20 +462,7 @@ export default function OfficerFloatingAssistant({
     setOpen(true);
 
     if (chip.localResponse) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `${officerId}-chip-user-${stamp}`,
-          role: "user",
-          content: chip.prompt,
-        },
-        {
-          id: `${officerId}-chip-assistant-${stamp}`,
-          role: "assistant",
-          content: chip.localResponse as string,
-        },
-      ]);
+      sendLocalReply(chip.prompt, chip.localResponse as string);
       focusComposer(40);
       return;
     }
@@ -483,7 +484,7 @@ export default function OfficerFloatingAssistant({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isBusy) return;
     handleSubmit(event, {
       body: {
         ...requestBody,
@@ -633,7 +634,7 @@ export default function OfficerFloatingAssistant({
               <button
                 key={chip.id}
                 type="button"
-                disabled={isLoading}
+                disabled={isBusy}
                 onClick={() => void runChip(chip)}
                 className={theme.chipClass}
               >
@@ -672,6 +673,14 @@ export default function OfficerFloatingAssistant({
 
               if (message.role !== "assistant") return null;
 
+              if (
+                hideStreamingContent &&
+                isLoading &&
+                message.id === messages[messages.length - 1]?.id
+              ) {
+                return null;
+              }
+
               return (
                 <div key={message.id} className="flex items-start gap-2">
                   <span
@@ -694,7 +703,7 @@ export default function OfficerFloatingAssistant({
               );
             })}
 
-            {isLoading ? (
+            {isTyping ? (
               <div className="flex items-start gap-2">
                 <span
                   className={`mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ${theme.ringClass}`}
@@ -706,14 +715,7 @@ export default function OfficerFloatingAssistant({
                     objectPosition={avatarObjectPosition}
                   />
                 </span>
-                <div
-                  className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
-                  aria-live="polite"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                <CompanionTypingBubble label={`${displayName} is typing`} />
               </div>
             ) : null}
 
@@ -744,7 +746,7 @@ export default function OfficerFloatingAssistant({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  if (isLoading) return;
+                  if (isBusy) return;
                   const form = e.currentTarget.form;
                   if (form) form.requestSubmit();
                 }
@@ -752,10 +754,10 @@ export default function OfficerFloatingAssistant({
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isBusy || !input.trim()}
               aria-label={`Send to ${displayName}`}
             >
-              {isLoading ? "…" : "Send"}
+              {isBusy ? "…" : "Send"}
             </button>
           </form>
 

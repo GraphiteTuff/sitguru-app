@@ -49,6 +49,8 @@ import {
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
+import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
+import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
 import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
@@ -374,6 +376,17 @@ export default function HomepageChatBubble() {
     },
   });
 
+  const {
+    sendLocalReply,
+    isTyping,
+    hideStreamingContent,
+    isBusy,
+  } = useCompanionTypingReply<Message>({
+    setMessages,
+    isLoading,
+    idPrefix: "rogue",
+  });
+
   useEffect(() => {
     clientFirstNameRef.current = clientFirstName;
   }, [clientFirstName]);
@@ -548,8 +561,8 @@ export default function HomepageChatBubble() {
   }, [isLoading, open]);
 
   const showIntentChips = useMemo(
-    () => !isLoading,
-    [isLoading],
+    () => !isBusy,
+    [isBusy],
   );
 
   const showMatchingChips = useMemo(() => {
@@ -640,15 +653,10 @@ export default function HomepageChatBubble() {
     clientFirstNameRef.current = name;
     setClientFirstName(name);
     setAwaitingName(false);
-    setMessages((prev) => [
-      ...prev,
-      { id: `user-name-${Date.now()}`, role: "user", content: raw.trim() },
-      {
-        id: `assistant-name-${Date.now()}`,
-        role: "assistant",
-        content: `so nice to meet you, ${name}! 🐾 i'm Rogue — your adorable assistant — and i'm doing great. how are you today? whenever you're ready we can book care, meet a Pet Guru, or explore joining the pack.`,
-      },
-    ]);
+    sendLocalReply(
+      raw.trim(),
+      `so nice to meet you, ${name}! 🐾 i'm Rogue — your adorable assistant — and i'm doing great. how are you today? whenever you're ready we can book care, meet a Pet Guru, or explore joining the pack.`,
+    );
     setInput("");
     focusComposer(40);
     return true;
@@ -656,43 +664,25 @@ export default function HomepageChatBubble() {
 
   function replyWhileAwaitingName(raw: string) {
     const text = raw.trim();
-    setMessages((prev) => [
-      ...prev,
-      { id: `user-${Date.now()}`, role: "user", content: text },
-      {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: buildHomepageSimulationReply({
-          clientFirstName: undefined,
-          lastUserText: text,
-        }),
-      },
-    ]);
+    sendLocalReply(
+      text,
+      buildHomepageSimulationReply({
+        clientFirstName: undefined,
+        lastUserText: text,
+      }),
+    );
     setInput("");
     focusComposer(40);
   }
 
   async function sendChip(content: string) {
-    if (!content.trim() || isLoading) return;
+    if (!content.trim() || isBusy) return;
 
     if (
       content === benefitsChip.prompt ||
       content === COMPANION_BENEFITS_USER_PROMPT.rogue
     ) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `rogue-benefits-user-${stamp}`,
-          role: "user",
-          content: benefitsChip.prompt,
-        },
-        {
-          id: `rogue-benefits-assistant-${stamp}`,
-          role: "assistant",
-          content: benefitsChip.response,
-        },
-      ]);
+      sendLocalReply(benefitsChip.prompt, benefitsChip.response);
       focusComposer(40);
       return;
     }
@@ -702,20 +692,7 @@ export default function HomepageChatBubble() {
       content,
     );
     if (growthAnswer) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `rogue-growth-user-${stamp}`,
-          role: "user",
-          content,
-        },
-        {
-          id: `rogue-growth-assistant-${stamp}`,
-          role: "assistant",
-          content: growthAnswer,
-        },
-      ]);
+      sendLocalReply(content, growthAnswer);
       focusComposer(40);
       return;
     }
@@ -732,26 +709,13 @@ export default function HomepageChatBubble() {
   function onComposerSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isBusy) return;
 
     if (
       text === benefitsChip.prompt ||
       text === COMPANION_BENEFITS_USER_PROMPT.rogue
     ) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `rogue-benefits-user-${stamp}`,
-          role: "user",
-          content: benefitsChip.prompt,
-        },
-        {
-          id: `rogue-benefits-assistant-${stamp}`,
-          role: "assistant",
-          content: benefitsChip.response,
-        },
-      ]);
+      sendLocalReply(benefitsChip.prompt, benefitsChip.response);
       setInput("");
       focusComposer(40);
       return;
@@ -762,20 +726,7 @@ export default function HomepageChatBubble() {
       text,
     );
     if (growthAnswer) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `rogue-growth-user-${stamp}`,
-          role: "user",
-          content: text,
-        },
-        {
-          id: `rogue-growth-assistant-${stamp}`,
-          role: "assistant",
-          content: growthAnswer,
-        },
-      ]);
+      sendLocalReply(text, growthAnswer);
       setInput("");
       focusComposer(40);
       return;
@@ -799,18 +750,13 @@ export default function HomepageChatBubble() {
       }
 
       // Stay interactive, but keep collecting a real preferred name.
-      setMessages((prev) => [
-        ...prev,
-        { id: `user-${Date.now()}`, role: "user", content: text },
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: buildHomepageSimulationReply({
-            clientFirstName: undefined,
-            lastUserText: text,
-          }),
-        },
-      ]);
+      sendLocalReply(
+        text,
+        buildHomepageSimulationReply({
+          clientFirstName: undefined,
+          lastUserText: text,
+        }),
+      );
       setInput("");
       focusComposer(40);
       return;
@@ -825,7 +771,7 @@ export default function HomepageChatBubble() {
 
   if (!mounted) return null;
 
-  const streaming = isLoading;
+  const streaming = isBusy;
 
   return (
     <div
@@ -912,7 +858,14 @@ export default function HomepageChatBubble() {
               }
 
               if (m.role !== "assistant") return null;
-              if (!m.content && streaming) return null;
+              if (!m.content && isTyping) return null;
+              if (
+                hideStreamingContent &&
+                isLoading &&
+                m.id === messages[messages.length - 1]?.id
+              ) {
+                return null;
+              }
 
               return (
                 <AssistantRow key={m.id}>
@@ -929,16 +882,9 @@ export default function HomepageChatBubble() {
               );
             })}
 
-            {streaming ? (
+            {isTyping ? (
               <AssistantRow>
-                <div
-                  className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
-                  aria-live="polite"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                <CompanionTypingBubble label="Rogue is typing" />
               </AssistantRow>
             ) : null}
           </div>

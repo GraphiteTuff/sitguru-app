@@ -28,6 +28,9 @@ import {
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
+import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
+import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import type { Message } from "ai/react";
 import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
@@ -319,6 +322,17 @@ export default function AITacoCompanion({
     body: requestBody,
   });
 
+  const {
+    sendLocalReply,
+    isTyping,
+    hideStreamingContent,
+    isBusy,
+  } = useCompanionTypingReply<Message>({
+    setMessages,
+    isLoading,
+    idPrefix: "taco",
+  });
+
   useEffect(() => {
     setMessages([
       {
@@ -333,7 +347,7 @@ export default function AITacoCompanion({
     if (!isOpen) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isTyping, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -350,20 +364,7 @@ export default function AITacoCompanion({
     setIsOpen(true);
 
     if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `taco-benefits-user-${stamp}`,
-          role: "user",
-          content: chip.prompt,
-        },
-        {
-          id: `taco-benefits-assistant-${stamp}`,
-          role: "assistant",
-          content: benefitsChip.response,
-        },
-      ]);
+      sendLocalReply(chip.prompt, benefitsChip.response);
       window.setTimeout(
         () => inputRef.current?.focus({ preventScroll: true }),
         40,
@@ -376,20 +377,7 @@ export default function AITacoCompanion({
       chip.prompt,
     );
     if (growthAnswer) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `taco-growth-user-${stamp}`,
-          role: "user",
-          content: chip.prompt,
-        },
-        {
-          id: `taco-growth-assistant-${stamp}`,
-          role: "assistant",
-          content: growthAnswer,
-        },
-      ]);
+      sendLocalReply(chip.prompt, growthAnswer);
       window.setTimeout(
         () => inputRef.current?.focus({ preventScroll: true }),
         40,
@@ -409,7 +397,7 @@ export default function AITacoCompanion({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isBusy) return;
     handleSubmit(event, { body: { ...requestBody } });
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -516,6 +504,14 @@ export default function AITacoCompanion({
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
+              if (
+                isAssistant &&
+                hideStreamingContent &&
+                isLoading &&
+                message.id === messages[messages.length - 1]?.id
+              ) {
+                return null;
+              }
               return (
                 <div
                   key={message.id}
@@ -568,10 +564,13 @@ export default function AITacoCompanion({
               </details>
             ) : null}
 
-            {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                Taco is fetching your next growth move…
-              </p>
+            {isTyping ? (
+              <div className="flex justify-start">
+                <CompanionTypingBubble
+                  className="border border-emerald-100 bg-white shadow-sm"
+                  label="Taco is typing"
+                />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -594,7 +593,7 @@ export default function AITacoCompanion({
                 <button
                   key={chip.id}
                   type="button"
-                  disabled={isLoading}
+                  disabled={isBusy}
                   onClick={() => void runChip(chip)}
                   className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -617,7 +616,7 @@ export default function AITacoCompanion({
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    if (!isLoading && input.trim()) {
+                    if (!isBusy && input.trim()) {
                       event.currentTarget.form?.requestSubmit();
                     }
                   }
@@ -625,7 +624,7 @@ export default function AITacoCompanion({
               />
               <button
                 type="submit"
-                disabled={isLoading || !input.trim()}
+                disabled={isBusy || !input.trim()}
                 className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Send

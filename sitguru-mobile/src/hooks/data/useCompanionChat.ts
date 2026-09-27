@@ -21,6 +21,7 @@ import {
   streamCompanionResponse,
   type DataStreamTransport,
 } from '@/lib/ai/data-stream';
+import { COMPANION_MIN_TYPING_MS } from '@/lib/ai/companion-typing';
 import { getSupabaseAccessToken } from '@/lib/supabase';
 
 const STORAGE_PREFIX = 'sitguru:companion-chat:v1';
@@ -263,6 +264,26 @@ export function useCompanionChat(
       void (async () => {
         let streamNotice: string | null = null;
         let accumulated = '';
+        let revealed = false;
+        const revealAt = Date.now() + COMPANION_MIN_TYPING_MS;
+        let revealTimer: ReturnType<typeof setTimeout> | null = null;
+
+        function flushAssistant() {
+          updateAssistant((message) => ({
+            ...message,
+            content: accumulated,
+          }));
+        }
+
+        function revealBufferedContent() {
+          if (revealed) return;
+          revealed = true;
+          if (revealTimer) {
+            clearTimeout(revealTimer);
+            revealTimer = null;
+          }
+          flushAssistant();
+        }
 
         try {
           const accessToken = await getSupabaseAccessToken().catch(() => null);
@@ -282,10 +303,22 @@ export function useCompanionChat(
             signal: controller.signal,
             onTextDelta: (delta) => {
               accumulated += delta;
-              updateAssistant((message) => ({
-                ...message,
-                content: message.content + delta,
-              }));
+              if (revealed) {
+                flushAssistant();
+                return;
+              }
+
+              const wait = revealAt - Date.now();
+              if (wait <= 0) {
+                revealBufferedContent();
+                return;
+              }
+
+              if (!revealTimer) {
+                revealTimer = setTimeout(() => {
+                  revealBufferedContent();
+                }, wait);
+              }
             },
             onStreamError: (message) => {
               streamNotice = message;
@@ -293,6 +326,10 @@ export function useCompanionChat(
           });
 
           if (!mountedRef.current) return;
+          if (revealTimer) {
+            clearTimeout(revealTimer);
+            revealTimer = null;
+          }
           setTransport(result.transport);
 
           if (!accumulated.trim()) {
@@ -308,10 +345,30 @@ export function useCompanionChat(
             return;
           }
 
+          // Hold typing dots through the minimum beat even if the stream finished early.
+          const remaining = revealAt - Date.now();
+          if (!revealed && remaining > 0) {
+            await new Promise<void>((resolve) => {
+              revealTimer = setTimeout(() => {
+                revealTimer = null;
+                resolve();
+              }, remaining);
+            });
+          }
+          if (!mountedRef.current) return;
+
           if (streamNotice) setError(streamNotice);
-          updateAssistant((message) => ({ ...message, state: 'complete' }));
+          updateAssistant((message) => ({
+            ...message,
+            content: accumulated,
+            state: 'complete',
+          }));
         } catch (streamFailure) {
           if (!mountedRef.current) return;
+          if (revealTimer) {
+            clearTimeout(revealTimer);
+            revealTimer = null;
+          }
 
           if (isAbortError(streamFailure)) {
             // Keep whatever streamed before the visitor stopped generation.

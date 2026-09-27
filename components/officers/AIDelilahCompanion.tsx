@@ -24,6 +24,9 @@ import {
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
+import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
+import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
+import type { Message } from "ai/react";
 import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
@@ -154,11 +157,22 @@ export default function AIDelilahCompanion() {
     body: requestBody,
   });
 
+  const {
+    sendLocalReply,
+    isTyping,
+    hideStreamingContent,
+    isBusy,
+  } = useCompanionTypingReply<Message>({
+    setMessages,
+    isLoading,
+    idPrefix: "delilah",
+  });
+
   useEffect(() => {
     if (!isOpen) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isTyping, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -175,20 +189,7 @@ export default function AIDelilahCompanion() {
     setIsOpen(true);
 
     if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `delilah-benefits-user-${stamp}`,
-          role: "user",
-          content: chip.prompt,
-        },
-        {
-          id: `delilah-benefits-assistant-${stamp}`,
-          role: "assistant",
-          content: benefitsChip.response,
-        },
-      ]);
+      sendLocalReply(chip.prompt, benefitsChip.response);
       window.setTimeout(
         () => inputRef.current?.focus({ preventScroll: true }),
         40,
@@ -201,20 +202,7 @@ export default function AIDelilahCompanion() {
       chip.prompt,
     );
     if (growthAnswer) {
-      const stamp = Date.now();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: `delilah-growth-user-${stamp}`,
-          role: "user",
-          content: chip.prompt,
-        },
-        {
-          id: `delilah-growth-assistant-${stamp}`,
-          role: "assistant",
-          content: growthAnswer,
-        },
-      ]);
+      sendLocalReply(chip.prompt, growthAnswer);
       window.setTimeout(
         () => inputRef.current?.focus({ preventScroll: true }),
         40,
@@ -234,7 +222,7 @@ export default function AIDelilahCompanion() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isBusy) return;
     handleSubmit(event, { body: { ...requestBody } });
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -337,6 +325,14 @@ export default function AIDelilahCompanion() {
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
+              if (
+                isAssistant &&
+                hideStreamingContent &&
+                isLoading &&
+                message.id === messages[messages.length - 1]?.id
+              ) {
+                return null;
+              }
               return (
                 <div
                   key={message.id}
@@ -391,10 +387,13 @@ export default function AIDelilahCompanion() {
               </ul>
             </details>
 
-            {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                Delilah is fetching your next event move…
-              </p>
+            {isTyping ? (
+              <div className="flex justify-start">
+                <CompanionTypingBubble
+                  className="border border-emerald-100 bg-white shadow-sm"
+                  label="Delilah is typing"
+                />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -415,7 +414,7 @@ export default function AIDelilahCompanion() {
                 <button
                   key={chip.id}
                   type="button"
-                  disabled={isLoading}
+                  disabled={isBusy}
                   onClick={() => void runChip(chip)}
                   className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -434,7 +433,7 @@ export default function AIDelilahCompanion() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    if (!isLoading && input.trim()) {
+                    if (!isBusy && input.trim()) {
                       event.currentTarget.form?.requestSubmit();
                     }
                   }
@@ -442,7 +441,7 @@ export default function AIDelilahCompanion() {
               />
               <button
                 type="submit"
-                disabled={isLoading || !input.trim()}
+                disabled={isBusy || !input.trim()}
                 className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Send
