@@ -106,7 +106,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
-        stripe: readiness.complete ? "connected" : "pending",
+        stripe: readiness.complete
+          ? "connected"
+          : readiness.connectStatus === "restricted"
+            ? "restricted"
+            : readiness.detailsSubmitted || readiness.pendingReview
+              ? "pending"
+              : "started",
       }),
     );
   } catch (error) {

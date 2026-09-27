@@ -12,9 +12,26 @@ export type StripeConnectReadiness = {
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
   complete: boolean;
-  connectStatus: "connected" | "pending" | "onboarding_started" | "restricted";
+  pendingReview: boolean;
+  connectStatus:
+    | "connected"
+    | "pending"
+    | "onboarding_started"
+    | "restricted";
   requirementsCurrentlyDue: string[];
+  disabledReason: string | null;
 };
+
+function isPendingVerificationReason(reason: string | null | undefined) {
+  const normalized = String(reason || "")
+    .trim()
+    .toLowerCase();
+  return (
+    normalized === "requirements.pending_verification" ||
+    normalized === "pending_verification" ||
+    normalized.includes("pending_verification")
+  );
+}
 
 export function deriveStripeConnectReadiness(
   account: Stripe.Account,
@@ -28,20 +45,26 @@ export function deriveStripeConnectReadiness(
       )
     : [];
   const disabledReason = account.requirements?.disabled_reason || null;
-  const restricted = Boolean(disabledReason) || currentlyDue.length > 0;
+  const pendingReview =
+    detailsSubmitted &&
+    !payoutsEnabled &&
+    currentlyDue.length === 0 &&
+    (isPendingVerificationReason(disabledReason) || !disabledReason);
+
+  // Open dues or a hard disabled reason (not pending review) = restricted.
+  const restricted =
+    currentlyDue.length > 0 ||
+    (Boolean(disabledReason) && !isPendingVerificationReason(disabledReason));
 
   // Transfers-only Express: payouts + submitted details with no open dues.
   const complete =
-    payoutsEnabled &&
-    detailsSubmitted &&
-    !restricted &&
-    currentlyDue.length === 0;
+    payoutsEnabled && detailsSubmitted && currentlyDue.length === 0;
 
   const connectStatus: StripeConnectReadiness["connectStatus"] = complete
     ? "connected"
-    : restricted && detailsSubmitted
+    : restricted
       ? "restricted"
-      : detailsSubmitted
+      : pendingReview || detailsSubmitted
         ? "pending"
         : "onboarding_started";
 
@@ -51,7 +74,9 @@ export function deriveStripeConnectReadiness(
     payoutsEnabled,
     detailsSubmitted,
     complete,
+    pendingReview,
     connectStatus,
     requirementsCurrentlyDue: currentlyDue,
+    disabledReason,
   };
 }

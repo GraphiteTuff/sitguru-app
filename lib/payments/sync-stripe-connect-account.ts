@@ -72,7 +72,7 @@ async function updatePayoutAccountRow(
     ? "ready"
     : readiness.connectStatus === "restricted"
       ? "restricted"
-      : readiness.detailsSubmitted
+      : readiness.pendingReview || readiness.detailsSubmitted
         ? "pending_verification"
         : "in_progress";
   const accountStatus = readiness.complete ? "ready" : onboardingStatus;
@@ -82,7 +82,7 @@ async function updatePayoutAccountRow(
     ? "ready"
     : readiness.connectStatus === "restricted"
       ? "restricted"
-      : readiness.detailsSubmitted
+      : readiness.pendingReview || readiness.detailsSubmitted
         ? "pending"
         : "in_progress";
 

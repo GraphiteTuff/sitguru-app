@@ -24,7 +24,7 @@ function makeAccount(
       alternatives: null,
       current_deadline: null,
       errors: [],
-      ...requirements,
+      ...(requirements || {}),
     },
     ...rest,
   } as Stripe.Account;
@@ -41,10 +41,29 @@ describe("deriveStripeConnectReadiness", () => {
     );
 
     expect(readiness.complete).toBe(true);
+    expect(readiness.pendingReview).toBe(false);
     expect(readiness.connectStatus).toBe("connected");
   });
 
-  it("stays incomplete while currently_due requirements remain", () => {
+  it("shows pending review after info submitted while Stripe verifies", () => {
+    const readiness = deriveStripeConnectReadiness(
+      makeAccount({
+        charges_enabled: false,
+        payouts_enabled: false,
+        details_submitted: true,
+        requirements: {
+          currently_due: [],
+          disabled_reason: "requirements.pending_verification",
+        },
+      }),
+    );
+
+    expect(readiness.complete).toBe(false);
+    expect(readiness.pendingReview).toBe(true);
+    expect(readiness.connectStatus).toBe("pending");
+  });
+
+  it("stays restricted while currently_due requirements remain", () => {
     const readiness = deriveStripeConnectReadiness(
       makeAccount({
         charges_enabled: false,
@@ -58,6 +77,7 @@ describe("deriveStripeConnectReadiness", () => {
     );
 
     expect(readiness.complete).toBe(false);
+    expect(readiness.pendingReview).toBe(false);
     expect(readiness.connectStatus).toBe("restricted");
   });
 

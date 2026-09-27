@@ -1062,29 +1062,35 @@ function SupportedCustomerMethods({
 
 function ProviderStatusBadge({
   ready,
+  inReview,
   started,
   selected,
 }: {
   ready: boolean;
+  inReview?: boolean;
   started: boolean;
   selected: boolean;
 }) {
   const label = ready
     ? "Ready"
-    : started
-      ? "Almost ready"
-      : selected
-        ? "Selected"
-        : "Not connected";
+    : inReview
+      ? "In review"
+      : started
+        ? "Almost ready"
+        : selected
+          ? "Selected"
+          : "Not connected";
 
   return (
     <span
       className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${
         ready
           ? "border-green-200 bg-green-50 !text-green-800"
-          : started || selected
-            ? "border-amber-200 bg-amber-50 !text-amber-800"
-            : "border-slate-200 bg-slate-100 !text-slate-600"
+          : inReview
+            ? "border-sky-200 bg-sky-50 !text-sky-800"
+            : started || selected
+              ? "border-amber-200 bg-amber-50 !text-amber-800"
+              : "border-slate-200 bg-slate-100 !text-slate-600"
       }`}
     >
       {label}
@@ -1129,6 +1135,14 @@ function PaymentSetupCard({
           stripeAccount.chargesEnabled === true)),
   );
 
+  const stripeInReview = Boolean(
+    stripeAccount &&
+      !stripeReady &&
+      (stripeAccount.detailsSubmitted === true ||
+        stripeAccount.onboardingStatus === "pending_verification" ||
+        stripeReturnStatus === "pending"),
+  );
+
   const paypalStarted = Boolean(paypalAccount);
   const stripeStarted =
     Boolean(stripeAccount) || selectedProvider === "stripe";
@@ -1151,14 +1165,18 @@ function PaymentSetupCard({
   const successMessage =
     saveStatus === "set_up_later"
       ? "Saved. You can finish payout setup anytime before your first paid booking."
-      : stripeReady && stripeReturnStatus === "connected"
+      : stripeReady &&
+          (stripeReturnStatus === "connected" || stripeReturnStatus === "pending")
         ? "You’re all set. Stripe is ready."
         : stripeReady
           ? "Stripe is ready. You’ll get paid after eligible bookings."
-          : null;
+          : stripeInReview
+            ? "Thanks — Stripe is reviewing your info. SitGuru will flip to Ready automatically."
+            : null;
 
-  const stripeHelpMessage =
-    stripeStarted && !stripeReady
+  const stripeHelpMessage = stripeInReview
+    ? "No more forms for now. Refresh status anytime — SitGuru updates when Stripe finishes review."
+    : stripeStarted && !stripeReady
       ? "Almost there — tap Continue for the last secure Stripe steps. SitGuru updates automatically when you’re done."
       : null;
 
@@ -1374,6 +1392,7 @@ function PaymentSetupCard({
 
             <ProviderStatusBadge
               ready={stripeReady}
+              inReview={stripeInReview}
               started={stripeStarted}
               selected={selectedProvider === "stripe"}
             />
@@ -1384,23 +1403,35 @@ function PaymentSetupCard({
             processor="stripe"
           />
 
-          <form action={startGuruStripeOnboarding} className="mt-4">
-            <button
-              type="submit"
-              className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
-                stripeReady
-                  ? "border border-green-200 bg-green-50 !text-green-800 hover:bg-green-100"
-                  : "bg-[#635bff] !text-white hover:bg-[#5148e5]"
-              }`}
-            >
-              {stripeReady
-                ? "Manage Stripe"
-                : stripeStarted
-                  ? "Continue"
-                  : "Set up Stripe"}
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
+          {stripeInReview ? (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link
+                href="/guru/dashboard/earnings?stripe=pending"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-black !text-sky-900 transition hover:bg-sky-100"
+              >
+                Refresh status
+                <RefreshCw className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <form action={startGuruStripeOnboarding} className="mt-4">
+              <button
+                type="submit"
+                className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                  stripeReady
+                    ? "border border-green-200 bg-green-50 !text-green-800 hover:bg-green-100"
+                    : "bg-[#635bff] !text-white hover:bg-[#5148e5]"
+                }`}
+              >
+                {stripeReady
+                  ? "Manage Stripe"
+                  : stripeStarted
+                    ? "Continue"
+                    : "Set up Stripe"}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </form>
+          )}
           {stripeHelpMessage ? (
             <p className="mt-3 text-xs font-semibold leading-5 !text-slate-600">
               {stripeHelpMessage}
@@ -1509,7 +1540,9 @@ export default async function GuruDashboardEarningsPage({
     stripeReturnStatus === "connected" ||
     stripeReturnStatus === "pending" ||
     stripeReturnStatus === "return" ||
-    stripeReturnStatus === "refresh";
+    stripeReturnStatus === "refresh" ||
+    stripeReturnStatus === "restricted" ||
+    stripeReturnStatus === "started";
 
   if (shouldResyncStripe) {
     try {
