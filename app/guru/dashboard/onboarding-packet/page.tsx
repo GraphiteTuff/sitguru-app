@@ -353,8 +353,10 @@ async function submitGuruOnboardingPacket(formData: FormData) {
   revalidatePath("/guru/dashboard");
   revalidatePath("/guru/dashboard/onboarding-packet");
 
-  if (nextAction === "step6") {
-    redirect("/api/stripe/connect/onboard?role=guru");
+  // Easy setup: never force payment onboarding from the packet.
+  // Gurus can finish payouts later from Earnings when they are ready.
+  if (nextAction === "dashboard") {
+    redirect("/guru/dashboard?packet=submitted");
   }
 
   redirect("/guru/dashboard/onboarding-packet?submitted=success");
@@ -676,8 +678,8 @@ export default async function GuruOnboardingPacketPage({
               />
               <AcknowledgmentCheckbox
                 name="payment_acknowledged"
-                title="I need payout setup to get paid"
-                body="I understand I connect payouts (Stripe) before SitGuru can send me money from eligible bookings."
+                title="I’ll set up payouts when I’m ready to accept paid bookings"
+                body="I understand SitGuru uses a secure payout partner so I can get paid for eligible bookings. I can finish that quick setup later — it isn’t required just to build my profile."
                 defaultChecked={
                   packet?.payment_acknowledged === true ||
                   packet?.tax_acknowledged === true
@@ -725,8 +727,9 @@ export default async function GuruOnboardingPacketPage({
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               Most Gurus don’t upload anything here. Only add a file if SitGuru
-              asked you for an ID or certificate. Please don’t upload tax forms,
-              Social Security numbers, or bank details on this page.
+              asked you for a certificate or other document. Keep personal
+              financial documents out of this upload — payouts are set up later
+              through SitGuru’s secure partner.
             </p>
 
             <div className="mt-4">
@@ -755,17 +758,18 @@ export default async function GuruOnboardingPacketPage({
 
           <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-900/10 backdrop-blur sm:static sm:shadow-none">
             <p className="px-1 text-center text-xs leading-5 text-slate-500 sm:text-left">
-              After you submit, you’ll set up how you get paid (Step 6).
+              That’s it for this step. You can keep building your profile and set
+              up payouts later when you’re ready to accept paid bookings.
             </p>
             <button
               type="submit"
               name="next_action"
-              value="step6"
+              value="dashboard"
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0D5C3A] px-5 py-3 text-sm font-semibold !text-white transition hover:bg-[#0a4a2e]"
             >
               {alreadySubmitted
-                ? "Save again & set up how I get paid"
-                : "Submit & set up how I get paid"}
+                ? "Save & go to dashboard"
+                : "Submit & continue"}
               <ArrowRight className="h-4 w-4" />
             </button>
             <button

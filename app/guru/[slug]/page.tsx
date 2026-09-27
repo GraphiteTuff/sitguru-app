@@ -3170,31 +3170,38 @@ function GuruSetupChecklist({
     {
       number: 5,
       title: "Complete Guru Onboarding Packet",
-      body: "Review and sign your SitGuru Guru Onboarding Packet so your contractor setup, W-9 acknowledgment, safety policies, and onboarding requirements are documented.",
+      body: "Review and sign your SitGuru Guru Onboarding Packet so care standards, safety policies, and onboarding expectations are documented.",
       status: onboardingPacket.status,
       statusLabel: onboardingPacket.label,
       href: onboardingPacket.href,
     },
     {
       number: 6,
-      title: "Connect payouts",
-      body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
-      status: payoutConnected ? "complete" : "needs_action",
-      statusLabel: payoutConnected ? "Complete" : "Needs Action",
-      href: "/api/stripe/connect/onboard?role=guru",
+      title: "Payouts when you’re ready",
+      body: "Optional for now. When you’re ready to accept a paid booking, finish a quick secure payout setup so SitGuru can send your earnings.",
+      status: payoutConnected ? "complete" : "optional",
+      statusLabel: payoutConnected ? "Ready" : "Later",
+      href: "/guru/dashboard/earnings",
     },
   ];
 
   const completedSteps = steps.filter(
-    (step) => step.status === "complete",
+    (step) => step.status === "complete" || step.status === "optional",
   ).length;
-  const allComplete = completedSteps === steps.length;
+  const allComplete = steps.every(
+    (step) => step.status === "complete" || step.status === "optional",
+  );
   const nextStep =
-    steps.find((step) => step.status !== "complete") || steps[steps.length - 1];
+    steps.find(
+      (step) => step.status !== "complete" && step.status !== "optional",
+    ) || steps[steps.length - 1];
 
   const getStepClassName = (status: string) => {
     if (status === "complete") {
       return "border-emerald-400 bg-[linear-gradient(135deg,#10b981_0%,#05a877_100%)] text-white shadow-[0_18px_36px_rgba(5,150,105,0.24)]";
+    }
+    if (status === "optional") {
+      return "border-slate-200 bg-slate-50 text-slate-800 shadow-sm";
     }
     if (status === "pending") {
       return "border-amber-400 bg-[linear-gradient(135deg,#d97706_0%,#f59e0b_100%)] text-white shadow-[0_18px_36px_rgba(217,119,6,0.22)]";

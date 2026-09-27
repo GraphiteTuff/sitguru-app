@@ -242,28 +242,79 @@ export default function GuruRequestsScreen() {
             setUpdatingId(request.id);
 
             try {
-              const apiResult = await sitguruApiFetch<{
+              const respond = await sitguruApiFetch<{
+                success?: boolean;
                 ok?: boolean;
                 error?: string;
-              }>(API_PATHS.bookingStatus, {
+                code?: string;
+                message?: string;
+                mobileEarningsPath?: string;
+              }>(API_PATHS.respondBooking(request.id), {
                 method: 'POST',
                 body: {
-                  bookingId: request.id,
-                  status: nextStatus,
+                  action: nextStatus === 'accepted' ? 'accept' : 'decline',
                 },
               });
 
-              if (apiResult.error || !apiResult.data?.ok) {
-                const result = await supabase
-                  .from(request.sourceTable)
-                  .update({
-                    status: nextStatus,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', request.id);
+              if (
+                respond.status === 409 ||
+                respond.data?.code === 'PAYOUT_SETUP_REQUIRED'
+              ) {
+                Alert.alert(
+                  'Quick payout setup needed',
+                  respond.data?.error ||
+                    respond.error ||
+                    'Finish your quick secure payout setup before accepting this paid booking.',
+                  [
+                    { text: 'Not now', style: 'cancel' },
+                    {
+                      text: 'Set up payouts',
+                      onPress: () => router.push('/guru-earnings'),
+                    },
+                  ],
+                );
+                return;
+              }
 
-                if (result.error) {
-                  throw new Error(apiResult.error || result.error.message);
+              if (respond.error || respond.data?.success === false) {
+                // Decline can fall back to legacy status APIs. Accept must not
+                // bypass the payout-readiness gate.
+                if (nextStatus === 'declined') {
+                  const fallback = await sitguruApiFetch<{
+                    ok?: boolean;
+                    error?: string;
+                  }>(API_PATHS.bookingStatus, {
+                    method: 'POST',
+                    body: {
+                      bookingId: request.id,
+                      status: nextStatus,
+                    },
+                  });
+
+                  if (fallback.error || !fallback.data?.ok) {
+                    const result = await supabase
+                      .from(request.sourceTable)
+                      .update({
+                        status: nextStatus,
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq('id', request.id);
+
+                    if (result.error) {
+                      throw new Error(
+                        respond.data?.error ||
+                          respond.error ||
+                          fallback.error ||
+                          result.error.message,
+                      );
+                    }
+                  }
+                } else {
+                  throw new Error(
+                    respond.data?.error ||
+                      respond.error ||
+                      'SitGuru could not accept this request.',
+                  );
                 }
               }
 
@@ -288,13 +339,15 @@ export default function GuruRequestsScreen() {
                   ? 'Request accepted'
                   : 'Request declined',
                 nextStatus === 'accepted'
-                  ? 'The booking is now in Upcoming care.'
+                  ? 'The booking is now in Upcoming care. The Pet Parent can finish payment next.'
                   : 'The request was moved out of your pending queue.',
               );
-            } catch {
+            } catch (error) {
               Alert.alert(
                 'Unable to update request',
-                'SitGuru could not update this request. Check the table permissions and status field, then try again.',
+                error instanceof Error
+                  ? error.message
+                  : 'SitGuru could not update this request. Please try again.',
               );
             } finally {
               setUpdatingId(null);

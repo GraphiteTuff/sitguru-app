@@ -2594,7 +2594,7 @@ export default function PaymentsScreen() {
         {effectiveRole === 'guru' ? (
           <>
             <SectionCard
-              eyebrow="Stripe Connect"
+              eyebrow="Earnings"
               title="Guru payout readiness"
               styles={styles}>
               <InfoRow
@@ -2603,22 +2603,22 @@ export default function PaymentsScreen() {
                 styles={styles}
               />
               <InfoRow
-                label="Identity and bank details"
+                label="Secure setup"
                 value={
                   payout.detailsSubmitted
-                    ? 'Submitted'
-                    : 'Needs completion'
+                    ? 'Complete'
+                    : 'Optional until you accept'
                 }
                 styles={styles}
               />
               <InfoRow
-                label="Payments enabled"
-                value={payout.chargesEnabled ? 'Enabled' : 'Not enabled'}
+                label="Ready for paid bookings"
+                value={payout.chargesEnabled ? 'Yes' : 'Finish setup first'}
                 styles={styles}
               />
               <InfoRow
-                label="Payouts enabled"
-                value={payout.payoutsEnabled ? 'Enabled' : 'Not enabled'}
+                label="Ready to earn"
+                value={payout.payoutsEnabled ? 'Yes' : 'Finish setup first'}
                 styles={styles}
               />
               <InfoRow

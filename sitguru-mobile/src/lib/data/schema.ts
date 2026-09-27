@@ -79,6 +79,8 @@ export const REALTIME_CHANNELS = {
 
 export const API_PATHS = {
   createBooking: '/api/bookings/create',
+  respondBooking: (bookingId: string) =>
+    `/api/bookings/${encodeURIComponent(bookingId)}/respond`,
   sendMessage: '/api/messages/send',
   startConversation: '/api/messages/start',
   ensureBookingConversation: '/api/messaging/ensure-booking-conversation',
@@ -88,6 +90,7 @@ export const API_PATHS = {
   bookingStatus: '/api/bookings/status',
   registerPushToken: '/api/mobile/push-token',
   payoutSetup: '/api/payouts/setup',
+  stripeConnect: '/api/stripe/connect',
   walkAction: (bookingId: string) =>
     `/api/walk/${encodeURIComponent(bookingId)}/actions`,
   walkStream: (bookingId: string) =>

@@ -1164,14 +1164,14 @@ function PaymentSetupCard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em] !text-green-700">
-            Get paid
+            Easy payouts
           </p>
           <h2 className="mt-1 text-3xl font-black tracking-tight !text-green-950">
-            Get paid your way
+            Get paid the easy way
           </h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
-            Pick PayPal or Stripe. One is enough to start, and you can connect
-            the other anytime.
+            Connect Stripe or PayPal in a couple of minutes when you’re ready to
+            accept paid bookings. One option is enough.
           </p>
         </div>
 
@@ -1186,7 +1186,7 @@ function PaymentSetupCard({
             {connectedCount}/2
           </p>
           <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-slate-600">
-            {anyProviderReady ? "payment options ready" : "connect one to start"}
+            {anyProviderReady ? "ready to earn" : "optional until you accept"}
           </p>
         </div>
       </div>
@@ -1194,8 +1194,9 @@ function PaymentSetupCard({
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-green-100 bg-green-50/70 p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 !text-green-700" />
         <p className="text-sm font-semibold leading-6 !text-slate-700">
-          Your bank and account passwords stay with PayPal or Stripe. SitGuru
-          never sees them.
+          Secure payouts are powered by Stripe or PayPal. SitGuru keeps the
+          setup light — you finish the quick partner steps only when you need
+          them.
         </p>
       </div>
 
@@ -1344,8 +1345,7 @@ function PaymentSetupCard({
               <div className="min-w-0">
                 <h3 className="text-lg font-black !text-slate-950">Stripe</h3>
                 <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
-                  Connect a bank account and get paid securely after eligible
-                  bookings.
+                  Quick secure setup so you can earn after eligible bookings.
                 </p>
                 {stripeAccount?.providerEmail ? (
                   <p className="mt-2 truncate text-xs font-black !text-violet-800">
@@ -1380,7 +1380,7 @@ function PaymentSetupCard({
                 ? "Manage Stripe"
                 : stripeStarted
                   ? "Continue setup"
-                  : "Connect Stripe"}
+                  : "Set up Stripe"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
@@ -1392,8 +1392,8 @@ function PaymentSetupCard({
           <div>
             <p className="text-sm font-black !text-slate-950">Not ready yet?</p>
             <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
-              Keep building your profile now. Connect one payment option before
-              your first paid booking.
+              Keep building your profile. You’ll do a quick secure payout setup
+              when you’re ready to accept a paid booking.
             </p>
           </div>
 

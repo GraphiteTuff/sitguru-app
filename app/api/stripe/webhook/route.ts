@@ -4,6 +4,10 @@ import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { upsertStripeTransactionFromBalanceTxn } from "@/lib/stripe/sync-ledger";
 import { getCheckoutSessionTaxAddress } from "@/lib/payments/stripe-tax";
+import {
+  findUserIdForStripeAccount,
+  syncStripeConnectAccountForUser,
+} from "@/lib/payments/sync-stripe-connect-account";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1497,6 +1501,25 @@ export async function POST(req: NextRequest) {
         const dispute = event.data.object as Stripe.Dispute;
 
         await updateBookingFromDispute(dispute);
+        break;
+      }
+
+      case "account.updated": {
+        const account = event.data.object as Stripe.Account;
+        const userId =
+          (typeof account.metadata?.user_id === "string"
+            ? account.metadata.user_id
+            : "") || (await findUserIdForStripeAccount(account.id));
+
+        if (!userId) {
+          console.warn(
+            "account.updated with no matching SitGuru user:",
+            account.id,
+          );
+          break;
+        }
+
+        await syncStripeConnectAccountForUser({ userId, account });
         break;
       }
 
