@@ -1018,11 +1018,18 @@ async function loadFinancialSetup(
   const destinations = (destinationsResult.data ||
     []) as PayoutDestinationRow[];
 
-  const guruAccounts = accounts.filter((account) =>
-    ["guru_marketplace_seller", "guru_payout"].includes(
-      getAccountPurpose(account),
-    ),
-  );
+  const guruAccounts = accounts.filter((account) => {
+    const purpose = getAccountPurpose(account);
+    if (["guru_marketplace_seller", "guru_payout"].includes(purpose)) {
+      return true;
+    }
+    // Guru Stripe Connect rows sometimes lack account_purpose after early
+    // onboarding — still surface them on the Guru earnings card.
+    return (
+      role === "guru" &&
+      String(account.provider || "").toLowerCase() === "stripe"
+    );
+  });
   const ambassadorStripeAccounts = accounts.filter(
     (account) =>
       getAccountPurpose(account) === "ambassador_reward" &&
