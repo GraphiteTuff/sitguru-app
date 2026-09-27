@@ -82,10 +82,7 @@ export function buildHomepageSimulationReply(
   if (extracted) preferred = extracted;
 
   const text = normalizeChatIntent(opts.lastUserText);
-  const named = (body: string) => {
-    const name = formatDisplayName(preferred);
-    return name ? `hey ${name}! ${body}` : body;
-  };
+  const named = (body: string) => body;
 
   if (isConversationalGreeting(opts.lastUserText)) {
     return pickGreetingReply(preferred, `${preferred}|${text}`);

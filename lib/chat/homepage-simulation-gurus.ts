@@ -8,12 +8,6 @@ import {
   type HomepageSimulationOpts,
 } from "@/lib/chat/homepage-simulation";
 import {
-  extractVisitorPreferredName,
-  formatDisplayName,
-  isReservedPreferredName,
-  sanitizePreferredName,
-} from "@/lib/chat/homepage-name";
-import {
   encodeGuruCardMarker,
   inferLookupParamsFromChat,
 } from "@/lib/gurus/guru-chat-snapshot";
@@ -49,13 +43,7 @@ export async function buildHomepageSimulationReplyWithGurus(
   try {
     const result = await lookupGurusForChat(lookupParams);
     if (!result.gurus.length) {
-      let preferred = sanitizePreferredName(opts.clientFirstName);
-      if (isReservedPreferredName(preferred)) preferred = "";
-      const extracted = extractVisitorPreferredName(opts.lastUserText);
-      if (extracted) preferred = extracted;
-      const name = formatDisplayName(preferred);
-      const lead = name ? `hey ${name}! ` : "";
-      return `${lead}i checked our live Guru catalog for that filter — nothing public yet in that slice. try a nearby ZIP or browse /search, and i'll keep hunting with you.`;
+      return "i checked our live Guru catalog for that filter — nothing public yet in that slice. try a nearby ZIP or city, or browse /search, and i'll keep hunting with you.";
     }
 
     const markers = result.gurus.map((g) => encodeGuruCardMarker(g));
@@ -63,19 +51,13 @@ export async function buildHomepageSimulationReplyWithGurus(
       ? ` for **${lookupParams.service}**`
       : "";
     const intro = `found live Guru matches${serviceBit} — book through **SitGuru**, tap a snapshot, and you can always find your favorite Guru again in-app.`;
-    let preferred = sanitizePreferredName(opts.clientFirstName);
-    if (isReservedPreferredName(preferred)) preferred = "";
-    const extracted = extractVisitorPreferredName(opts.lastUserText);
-    if (extracted) preferred = extracted;
-    const name = formatDisplayName(preferred);
-    const lead = name ? `hey ${name}! ` : "";
 
     if (
       /\b(walk|drop|overnight|board|sit|zip|\d{5}|near|in )\b/i.test(
         String(thread || ""),
       )
     ) {
-      return appendGuruCards(`${lead}${intro}`, markers);
+      return appendGuruCards(intro, markers);
     }
     return appendGuruCards(`${base}`, markers);
   } catch (error) {

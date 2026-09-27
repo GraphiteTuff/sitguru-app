@@ -175,7 +175,6 @@ function resolveNextStep(intake: {
   isCareSeeking: boolean;
   isProviderSignup: boolean;
   hasLocation: boolean;
-  hasZip: boolean;
   hasServiceType: boolean;
   hasTime: boolean;
 }): CareMatchingStep {
@@ -185,7 +184,8 @@ function resolveNextStep(intake: {
     if (!intake.hasTime) return "time";
     return "ready";
   }
-  if (!intake.hasLocation || !intake.hasZip) return "location";
+  // ZIP **or** city+state is enough to move on — never force ZIP only.
+  if (!intake.hasLocation) return "location";
   if (!intake.hasTime) return "time";
   return "ready";
 }
@@ -235,9 +235,13 @@ export function parseCareMatchingIntake(
   const service = detectService(text);
   const extras = detectExtraServices(text);
   const zip = inferred?.zip || text.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
-  const city =
-    inferred?.city && !isUsStateToken(inferred.city) ? inferred.city : undefined;
-  const state = inferred?.state || normalizeUsState(inferred?.city) || undefined;
+  let city = inferred?.city || undefined;
+  let state = inferred?.state || undefined;
+  // "in Virginia" alone → state only. "New York, NY" keeps both city + state.
+  if (city && isUsStateToken(city) && !state) {
+    state = normalizeUsState(city) || undefined;
+    city = undefined;
+  }
   const timeWindow = detectTimeWindow(text);
 
   const isProviderSignup = PROVIDER_SIGNUP.test(lower);
@@ -250,7 +254,9 @@ export function parseCareMatchingIntake(
       isMatchingFollowUp(lower));
 
   const hasZip = Boolean(zip);
-  const hasLocation = Boolean(zip || city || state);
+  // Accept a US ZIP **or** city + state (e.g. Arlington VA / Austin, TX).
+  const hasCityState = Boolean(city && state);
+  const hasLocation = Boolean(hasZip || hasCityState);
   const hasServiceType = Boolean(service);
   const hasTime = Boolean(timeWindow);
   const hasExtras = extras.length > 0;
@@ -258,7 +264,7 @@ export function parseCareMatchingIntake(
   const missing: CareMatchingIntake["missing"] = [];
   if (isCareSeeking || isProviderSignup) {
     if (!hasLocation) missing.push("location");
-    if (!hasZip) missing.push("zip");
+    if (!hasZip && !hasCityState) missing.push("zip");
     if (!hasServiceType && isCareSeeking) missing.push("service");
     if (!hasTime) missing.push("time");
   }
@@ -267,7 +273,6 @@ export function parseCareMatchingIntake(
     isCareSeeking,
     isProviderSignup,
     hasLocation,
-    hasZip,
     hasServiceType,
     hasTime,
   });
@@ -338,40 +343,45 @@ export function getCareMatchingChipsForThread(
 }
 
 /**
- * One conversational question only.
- * Example: "Hey Jason! For Drop-In Visits, I'm on it — what's the ZIP where you need care?"
+ * One conversational question only — never open with "Hey {name}" on every turn.
+ * Example: "For Drop-In Visits, I'm on it — what city and state (or ZIP)?"
  */
 export function buildCareMatchingAsk(
   rawText?: string | null,
-  firstName?: string | null,
+  _firstName?: string | null,
 ): string | null {
   const intake = parseCareMatchingIntake(rawText);
   if (!needsCareMatchingAsk(rawText)) return null;
 
-  const name = clean(firstName);
-  const hey = name ? `Hey ${name}!` : "Hey!";
   const serviceLabel = intake.service || "pet care";
   const marker = MATCHING_INTAKE_MARKER;
+  const placeLabel =
+    intake.hasZip && intake.zip
+      ? intake.zip
+      : intake.city && intake.state
+        ? `${intake.city}, ${intake.state}`
+        : "";
 
   if (intake.isProviderSignup) {
     if (!intake.hasLocation) {
-      return `${hey} Love that Guru energy — what **ZIP** will you serve? ${marker}`;
+      return `Love that Guru energy — what **city and state** or **ZIP** will you serve? ${marker}`;
     }
     if (!intake.hasServiceType) {
-      return `${hey} Got it — which **services** will you offer? ${marker} [[cta:guru]]`;
+      return `Got it — which **services** will you offer? ${marker} [[cta:guru]]`;
     }
     if (!intake.hasTime) {
-      return `${hey} And when are you usually free — Morning, Afternoon, or Night? ${marker}`;
+      return `And when are you usually free — Morning, Afternoon, or Night? ${marker}`;
     }
     return null;
   }
 
   if (intake.nextStep === "location") {
-    return `${hey} For **${serviceLabel}**, I'm on it — what's the **ZIP** where you need care? ${marker}`;
+    return `For **${serviceLabel}**, I'm on it — what **city and state** or **ZIP** where you need care? ${marker}`;
   }
 
   if (intake.nextStep === "time") {
-    return `${hey} When do you need your **${serviceLabel}** — Morning, Afternoon, or Night? ${marker}`;
+    const where = placeLabel ? ` in **${placeLabel}**` : "";
+    return `When do you need your **${serviceLabel}**${where} — Morning, Afternoon, or Night? ${marker}`;
   }
 
   return null;

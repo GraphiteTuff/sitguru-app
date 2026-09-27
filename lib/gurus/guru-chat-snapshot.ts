@@ -578,6 +578,54 @@ export function looksLikeGuruDirectoryQuery(rawText?: string | null): boolean {
   return false;
 }
 
+function extractPlacePhrase(text: string): string {
+  // Avoid matching the "in" inside drop-in / check-in compounds.
+  const nearMatch = text.match(
+    /(?<![\w-])(?:near|in|around|at)\s+([A-Za-z][A-Za-z .',-]{1,80})/i,
+  );
+  if (nearMatch?.[1]) {
+    return nearMatch[1]
+      .replace(
+        /\b(please|thanks|thank you|asap|today|tomorrow|tonight|this weekend|next week|morning|afternoon|evening|night|for\b.*)$/i,
+        "",
+      )
+      .replace(/[.,!?;:]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // "Arlington, VA" / "Austin TX" / "New York, NY" anywhere — skip service lead-ins.
+  const cityState = text.match(
+    /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/,
+  );
+  if (
+    cityState?.[1] &&
+    cityState?.[2] &&
+    isUsStateToken(cityState[2]) &&
+    !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?|looking|need|find|book)$/i.test(
+      cityState[1].trim(),
+    )
+  ) {
+    return `${cityState[1]} ${cityState[2]}`.trim();
+  }
+
+  return "";
+}
+
+function titleCasePlace(value?: string | null) {
+  const place = clean(value);
+  if (!place) return "";
+  return place
+    .split(/\s+/)
+    .map((word) => {
+      if (/^[A-Za-z]{2}$/.test(word) && isUsStateToken(word)) {
+        return normalizeUsState(word);
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 /** Heuristic parse of free-text chat into lookup filters (simulation / hints). */
 export function inferLookupParamsFromChat(
   rawText?: string | null,
@@ -605,29 +653,37 @@ export function inferLookupParamsFromChat(
 
   let city: string | undefined;
   let state: string | undefined;
-  const nearMatch = text.match(
-    /\b(?:near|in|around|at)\s+([A-Za-z][A-Za-z .'-]{2,40}?)(?:,?\s*([A-Za-z]{2})\b)?/i,
-  );
-  if (nearMatch?.[1]) {
-    const parsed = splitCityState(
-      [nearMatch[1], nearMatch[2]].filter(Boolean).join(" "),
-    );
-    city = parsed.city && looksLikePlaceName(parsed.city) ? parsed.city : undefined;
+  const placePhrase = extractPlacePhrase(text);
+  if (placePhrase) {
+    const parsed = splitCityState(placePhrase);
+    city =
+      parsed.city && looksLikePlaceName(parsed.city)
+        ? titleCasePlace(parsed.city)
+        : undefined;
     state = parsed.state;
-  }
-  if (!state) {
-    const stateOnly = text.match(
-      /\b(?:in|near|around)\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/i,
+  } else if (!zip) {
+    // Only use bare "City ST" fallback when no ZIP (avoids "drop in" → Drop, IN).
+    const cityState = text.match(
+      /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2})\b/,
     );
-    const maybeState = normalizeUsState(stateOnly?.[1]);
-    if (maybeState) state = maybeState;
+    if (
+      cityState?.[1] &&
+      cityState?.[2] &&
+      isUsStateToken(cityState[2]) &&
+      !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?)$/i.test(
+        cityState[1].trim(),
+      )
+    ) {
+      city = titleCasePlace(cityState[1]);
+      state = normalizeUsState(cityState[2]);
+    }
   }
   if (!state) {
     const bareState = text.match(
       /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i,
     );
     const maybeBare = normalizeUsState(bareState?.[1]);
-    if (maybeBare) state = maybeBare;
+    if (maybeBare && !city) state = maybeBare;
   }
 
   let service: string | undefined;
