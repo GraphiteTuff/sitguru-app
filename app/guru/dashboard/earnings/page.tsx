@@ -1107,6 +1107,7 @@ function PaymentSetupCard({
   paypalOnboarding,
   stripeReturnStatus,
   liveStripePendingReview = false,
+  liveStripeDetailsSubmitted = false,
   liveStripeComplete = false,
 }: {
   setup: GuruPayoutSetup | null;
@@ -1117,6 +1118,7 @@ function PaymentSetupCard({
   paypalOnboarding: PayPalOnboardingResponse | null;
   stripeReturnStatus?: string | null;
   liveStripePendingReview?: boolean;
+  liveStripeDetailsSubmitted?: boolean;
   liveStripeComplete?: boolean;
 }) {
   const selectedProvider = setup?.selectedProvider || "set_up_later";
@@ -1134,22 +1136,23 @@ function PaymentSetupCard({
       (stripeAccount &&
         (stripeAccount.payoutsEnabled === true ||
           stripeAccount.accountStatus === "ready" ||
-          stripeAccount.accountStatus === "active" ||
           stripeAccount.onboardingStatus === "ready" ||
           (stripeAccount.detailsSubmitted === true &&
-            stripeAccount.chargesEnabled === true))),
+            stripeAccount.payoutsEnabled === true))),
   );
 
   const stripeInReview = Boolean(
     !stripeReady &&
-      (stripeAccount?.detailsSubmitted === true ||
+      (liveStripePendingReview === true ||
+        liveStripeDetailsSubmitted === true ||
+        stripeAccount?.detailsSubmitted === true ||
+        stripeAccount?.onboardingStatus === "pending_review" ||
         stripeAccount?.onboardingStatus === "pending_verification" ||
         stripeAccount?.onboardingStatus === "pending" ||
         stripeAccount?.accountStatus === "pending" ||
         stripeReturnStatus === "pending" ||
         // Return URL still says connected while Stripe is verifying.
-        stripeReturnStatus === "connected" ||
-        liveStripePendingReview === true),
+        stripeReturnStatus === "connected"),
   );
 
   const paypalStarted = Boolean(paypalAccount);
@@ -1180,11 +1183,11 @@ function PaymentSetupCard({
         : stripeReady
           ? "Stripe is ready. You’ll get paid after eligible bookings."
           : stripeInReview
-            ? "Thanks — Stripe is reviewing your info. SitGuru will flip to Ready automatically."
+            ? "Information submitted. Stripe is reviewing your account — SitGuru flips to Ready automatically."
             : null;
 
   const stripeHelpMessage = stripeInReview
-    ? "No more forms for now. Refresh status anytime — SitGuru updates when Stripe finishes review."
+    ? "No more forms for now. Tap Refresh status anytime. SitGuru updates when Stripe finishes review."
     : stripeStarted && !stripeReady
       ? "Almost there — tap Continue for the last secure Stripe steps. SitGuru updates automatically when you’re done."
       : null;
@@ -1554,7 +1557,18 @@ export default async function GuruDashboardEarningsPage({
     stripeReturnStatus === "started";
 
   let liveStripePendingReview = false;
+  let liveStripeDetailsSubmitted = false;
   let liveStripeComplete = false;
+
+  const applyLiveStripeReadiness = (
+    readiness: Awaited<ReturnType<typeof syncStripeConnectAccountForUser>>,
+  ) => {
+    liveStripeComplete = readiness.complete === true;
+    liveStripeDetailsSubmitted = readiness.detailsSubmitted === true;
+    liveStripePendingReview =
+      readiness.pendingReview === true ||
+      (readiness.detailsSubmitted === true && readiness.complete !== true);
+  };
 
   const runStripeSync = async () => {
     const { data: guruRow } = await supabaseAdmin
@@ -1578,23 +1592,17 @@ export default async function GuruDashboardEarningsPage({
     try {
       const readiness = await runStripeSync();
       if (readiness) {
-        liveStripePendingReview = readiness.pendingReview === true;
-        liveStripeComplete = readiness.complete === true;
-
-        // Normalize stale ?stripe=connected while Stripe is still verifying.
-        if (
-          stripeReturnStatus === "connected" &&
-          !readiness.complete &&
-          (readiness.pendingReview || readiness.detailsSubmitted)
-        ) {
-          redirect("/guru/dashboard/earnings?stripe=pending");
-        }
+        applyLiveStripeReadiness(readiness);
       }
     } catch (error) {
       console.error("Earnings page Stripe re-sync failed:", error);
-      // If return said connected but sync failed, still treat as review UX.
-      if (stripeReturnStatus === "connected") {
+      // Return URL says connected/pending but sync failed — still show review UX.
+      if (
+        stripeReturnStatus === "connected" ||
+        stripeReturnStatus === "pending"
+      ) {
         liveStripePendingReview = true;
+        liveStripeDetailsSubmitted = true;
       }
     }
   } else {
@@ -1615,8 +1623,7 @@ export default async function GuruDashboardEarningsPage({
       if (stripeAccountId && !alreadyReady) {
         const readiness = await runStripeSync();
         if (readiness) {
-          liveStripePendingReview = readiness.pendingReview === true;
-          liveStripeComplete = readiness.complete === true;
+          applyLiveStripeReadiness(readiness);
         }
       }
     } catch (error) {
@@ -1624,13 +1631,14 @@ export default async function GuruDashboardEarningsPage({
     }
   }
 
-  // Avoid unused if sync skipped — still allow connected URL to drive review UX.
+  // Return URL alone must never leave the card on Continue / Almost ready.
   if (
     !liveStripeComplete &&
-    stripeReturnStatus === "connected" &&
+    (stripeReturnStatus === "connected" || stripeReturnStatus === "pending") &&
     !liveStripePendingReview
   ) {
     liveStripePendingReview = true;
+    liveStripeDetailsSubmitted = true;
   }
 
   const {
@@ -1814,6 +1822,7 @@ export default async function GuruDashboardEarningsPage({
           paypalOnboarding={paypalOnboardingResponse}
           stripeReturnStatus={stripeReturnStatus}
           liveStripePendingReview={liveStripePendingReview}
+          liveStripeDetailsSubmitted={liveStripeDetailsSubmitted}
           liveStripeComplete={liveStripeComplete}
         />
 

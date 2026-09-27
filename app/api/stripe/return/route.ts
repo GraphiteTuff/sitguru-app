@@ -110,7 +110,9 @@ export async function GET(request: NextRequest) {
           ? "connected"
           : readiness.connectStatus === "restricted"
             ? "restricted"
-            : readiness.detailsSubmitted || readiness.pendingReview
+            : readiness.detailsSubmitted ||
+                readiness.pendingReview ||
+                readiness.connectStatus === "pending"
               ? "pending"
               : "started",
       }),

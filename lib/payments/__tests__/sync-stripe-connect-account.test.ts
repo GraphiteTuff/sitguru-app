@@ -63,6 +63,24 @@ describe("deriveStripeConnectReadiness", () => {
     expect(readiness.connectStatus).toBe("pending");
   });
 
+  it("treats submitted details with no dues as In review even without disabled_reason", () => {
+    const readiness = deriveStripeConnectReadiness(
+      makeAccount({
+        charges_enabled: false,
+        payouts_enabled: false,
+        details_submitted: true,
+        requirements: {
+          currently_due: [],
+          disabled_reason: null,
+        },
+      }),
+    );
+
+    expect(readiness.complete).toBe(false);
+    expect(readiness.pendingReview).toBe(true);
+    expect(readiness.connectStatus).toBe("pending");
+  });
+
   it("stays restricted while currently_due requirements remain", () => {
     const readiness = deriveStripeConnectReadiness(
       makeAccount({

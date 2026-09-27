@@ -753,7 +753,14 @@ function getAccountOnboardingStatus(account: PayoutAccountRow) {
     return "disabled";
   }
 
-  if (["pending_review", "review", "under_review"].includes(raw)) {
+  if (
+    [
+      "pending_review",
+      "pending_verification",
+      "review",
+      "under_review",
+    ].includes(raw)
+  ) {
     return "pending_review";
   }
 

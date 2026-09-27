@@ -45,13 +45,7 @@ export function deriveStripeConnectReadiness(
       )
     : [];
   const disabledReason = account.requirements?.disabled_reason || null;
-  const pendingReview =
-    detailsSubmitted &&
-    !payoutsEnabled &&
-    currentlyDue.length === 0 &&
-    (isPendingVerificationReason(disabledReason) || !disabledReason);
-
-  // Open dues or a hard disabled reason (not pending review) = restricted.
+  // Open dues or a hard disabled reason (not pending verification) = more setup needed.
   const restricted =
     currentlyDue.length > 0 ||
     (Boolean(disabledReason) && !isPendingVerificationReason(disabledReason));
@@ -59,6 +53,14 @@ export function deriveStripeConnectReadiness(
   // Transfers-only Express: payouts + submitted details with no open dues.
   const complete =
     payoutsEnabled && detailsSubmitted && currentlyDue.length === 0;
+
+  // After Stripe's "Information submitted" screen, details are in and payouts
+  // are not live yet — treat as In review so Earnings does not say Continue.
+  const pendingReview =
+    detailsSubmitted &&
+    !complete &&
+    !restricted &&
+    currentlyDue.length === 0;
 
   const connectStatus: StripeConnectReadiness["connectStatus"] = complete
     ? "connected"
