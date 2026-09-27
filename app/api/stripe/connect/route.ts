@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 
+import {
+  buildGuruExpressAccountParams,
+  createGuruAccountLink,
+  prefillGuruConnectedAccount,
+  type GuruConnectProfile,
+} from "@/lib/stripe/connect-guru-account";
+import { getStripeServer } from "@/lib/stripe/server";
 import {
   mobileCorsHeaders,
   optionsWithMobileCors,
   resolveRequestUser,
 } from "@/lib/supabase/request-auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getStripeServer } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-type GuruStripeConnectRecord = {
-  id: string;
-  user_id: string | null;
-  email: string | null;
-  full_name: string | null;
-  display_name: string | null;
-  name: string | null;
-  stripe_account_id: string | null;
-  stripe_onboarding_complete: boolean | null;
-  charges_enabled: boolean | null;
-  payouts_enabled: boolean | null;
-};
 
 function getAppUrl(request?: NextRequest) {
   const appUrl =
@@ -75,7 +67,7 @@ async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
 
   const user = resolved.user;
 
-  let stripe: Stripe;
+  let stripe;
   try {
     stripe = getStripeServer();
   } catch {
@@ -97,6 +89,7 @@ async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
         "full_name",
         "display_name",
         "name",
+        "slug",
         "stripe_account_id",
         "stripe_onboarding_complete",
         "charges_enabled",
@@ -117,9 +110,9 @@ async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
     };
   }
 
-  const guru = guruData as GuruStripeConnectRecord | null;
+  const guru = guruData as GuruConnectProfile | null;
 
-  if (!guru) {
+  if (!guru?.id || !guru.user_id) {
     return {
       error: "Guru profile not found.",
       status: 404,
@@ -128,24 +121,21 @@ async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
     };
   }
 
-  let stripeAccountId = guru.stripe_account_id;
+  let stripeAccountId = guru.stripe_account_id
+    ? String(guru.stripe_account_id)
+    : "";
 
   if (!stripeAccountId) {
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "US",
-      email: guru.email || user.email || undefined,
-      business_type: "individual",
-      metadata: {
-        guru_id: String(guru.id),
-        user_id: String(user.id),
-        source: "sitguru_guru_payout_setup",
-      },
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
+    const account = await stripe.accounts.create(
+      buildGuruExpressAccountParams({
+        guru,
+        authEmail: user.email,
+        metadataEmail:
+          typeof user.user_metadata?.email === "string"
+            ? user.user_metadata.email
+            : null,
+      }),
+    );
 
     stripeAccountId = account.id;
 
@@ -170,20 +160,27 @@ async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
         stripeAccountId: null,
       };
     }
+  } else {
+    // Existing Restricted / incomplete accounts: fill website + descriptor
+    // so Stripe can clear those past-due requirements.
+    await prefillGuruConnectedAccount({
+      stripeAccountId,
+      guru,
+      authEmail: user.email,
+    });
   }
 
   const refreshUrl = mobile
     ? `${appUrl}/api/mobile/stripe/return?result=refresh`
-    : `${appUrl}/guru/dashboard?stripe=refresh`;
+    : `${appUrl}/guru/dashboard/earnings?stripe=refresh`;
   const returnUrl = mobile
     ? `${appUrl}/api/mobile/stripe/return?result=return`
     : `${appUrl}/api/stripe/return`;
 
-  const accountLink = await stripe.accountLinks.create({
-    account: stripeAccountId,
-    refresh_url: refreshUrl,
-    return_url: returnUrl,
-    type: "account_onboarding",
+  const accountLink = await createGuruAccountLink({
+    stripeAccountId,
+    refreshUrl,
+    returnUrl,
   });
 
   return {
@@ -203,14 +200,18 @@ export async function GET(request: NextRequest) {
     const result = await createOrResumeStripeConnectOnboarding(request);
 
     if (result.error || !result.url) {
-      return NextResponse.redirect(`${getAppUrl(request)}/guru/dashboard?stripe=error`);
+      return NextResponse.redirect(
+        `${getAppUrl(request)}/guru/dashboard/earnings?stripe=error`,
+      );
     }
 
     return NextResponse.redirect(result.url);
   } catch (error) {
     console.error("Stripe Connect GET route error:", error);
 
-    return NextResponse.redirect(`${getAppUrl(request)}/guru/dashboard?stripe=error`);
+    return NextResponse.redirect(
+      `${getAppUrl(request)}/guru/dashboard/earnings?stripe=error`,
+    );
   }
 }
 

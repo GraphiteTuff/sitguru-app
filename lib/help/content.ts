@@ -228,8 +228,9 @@ export const paymentFlows: HelpStepBlock[] = [
 export const guruStripeSteps: string[] = [
   "Open payout setup from your Guru dashboard Earnings page when you’re ready.",
   "Choose Stripe (or PayPal) and follow the quick secure partner screens.",
-  "Confirm you’re done, then return to Earnings to see your ready status.",
-  "That’s it — SitGuru can send eligible booking earnings through your connected option.",
+  "If you used Apple Hide My Email, that’s fine — finish the secure partner steps so payouts can continue.",
+  "If you close the partner screens early, tap Continue secure setup anytime. SitGuru updates automatically when you’re done.",
+  "Confirm you’re ready in Earnings, then accept paid bookings.",
   "Never request cash, Venmo, Zelle, Cash App, or other off-platform payments for SitGuru bookings.",
 ];
 

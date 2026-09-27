@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+
+import {
+  buildGuruExpressAccountParams,
+  createGuruAccountLink,
+  prefillGuruConnectedAccount,
+  type GuruConnectProfile,
+} from "@/lib/stripe/connect-guru-account";
+import { getStripeServer } from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function getBaseUrl(request: NextRequest) {
   const configuredUrl =
@@ -72,26 +80,20 @@ async function updateGuruStripeAccount({
   }
 }
 
-async function findGuruStripeAccount(userId: string) {
+async function loadGuruConnectProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("gurus")
-    .select("id, stripe_account_id")
+    .select(
+      "id, user_id, email, full_name, display_name, name, slug, stripe_account_id",
+    )
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !data) {
-    return {
-      guruId: null as string | null,
-      stripeAccountId: null as string | null,
-    };
+  if (error || !data?.id || !data.user_id) {
+    return null;
   }
 
-  return {
-    guruId: data.id ? String(data.id) : null,
-    stripeAccountId: data.stripe_account_id
-      ? String(data.stripe_account_id)
-      : null,
-  };
+  return data as GuruConnectProfile;
 }
 
 export async function GET(request: NextRequest) {
@@ -100,17 +102,17 @@ export async function GET(request: NextRequest) {
 
   if (role !== "guru") {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, "/guru/dashboard", {
+      buildRedirectUrl(baseUrl, "/guru/dashboard/earnings", {
         stripe_error: "invalid_role",
       }),
     );
   }
 
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-  if (!stripeSecretKey) {
+  try {
+    getStripeServer();
+  } catch {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, "/guru/dashboard", {
+      buildRedirectUrl(baseUrl, "/guru/dashboard/earnings", {
         stripe_error: "missing_stripe_secret",
       }),
     );
@@ -125,38 +127,39 @@ export async function GET(request: NextRequest) {
 
   if (userError || !user) {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, "/guru/login", {
-        redirect: "/api/stripe/connect/onboard?role=guru",
+      buildRedirectUrl(baseUrl, "/login", {
+        role: "guru",
+        next: "/api/stripe/connect/onboard?role=guru",
       }),
     );
   }
 
-  const stripe = new Stripe(stripeSecretKey);
-  const { stripeAccountId: existingStripeAccountId } =
-    await findGuruStripeAccount(user.id);
+  const guru = await loadGuruConnectProfile(user.id);
 
-  let stripeAccountId = existingStripeAccountId;
+  if (!guru) {
+    return NextResponse.redirect(
+      buildRedirectUrl(baseUrl, "/guru/dashboard", {
+        stripe_error: "guru_not_found",
+      }),
+    );
+  }
+
+  let stripeAccountId = guru.stripe_account_id
+    ? String(guru.stripe_account_id)
+    : "";
 
   if (!stripeAccountId) {
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "US",
-      email: user.email || undefined,
-      business_type: "individual",
-      capabilities: {
-        card_payments: {
-          requested: true,
-        },
-        transfers: {
-          requested: true,
-        },
-      },
-      metadata: {
-        role: "guru",
-        user_id: user.id,
-        email: user.email || "",
-      },
-    });
+    const stripe = getStripeServer();
+    const account = await stripe.accounts.create(
+      buildGuruExpressAccountParams({
+        guru,
+        authEmail: user.email,
+        metadataEmail:
+          typeof user.user_metadata?.email === "string"
+            ? user.user_metadata.email
+            : null,
+      }),
+    );
 
     stripeAccountId = account.id;
 
@@ -164,25 +167,26 @@ export async function GET(request: NextRequest) {
       userId: user.id,
       stripeAccountId,
     });
+  } else {
+    await prefillGuruConnectedAccount({
+      stripeAccountId,
+      guru,
+      authEmail: user.email,
+    });
   }
 
-  const refreshUrl = buildRedirectUrl(
-    baseUrl,
-    "/api/stripe/connect/onboard",
-    { role: "guru" },
-  );
+  const refreshUrl = buildRedirectUrl(baseUrl, "/api/stripe/connect/onboard", {
+    role: "guru",
+  });
 
-  const returnUrl = buildRedirectUrl(
-    baseUrl,
-    "/api/stripe/return",
-    { role: "guru" },
-  );
+  const returnUrl = buildRedirectUrl(baseUrl, "/api/stripe/return", {
+    role: "guru",
+  });
 
-  const accountLink = await stripe.accountLinks.create({
-    account: stripeAccountId,
-    refresh_url: refreshUrl,
-    return_url: returnUrl,
-    type: "account_onboarding",
+  const accountLink = await createGuruAccountLink({
+    stripeAccountId,
+    refreshUrl,
+    returnUrl,
   });
 
   return NextResponse.redirect(accountLink.url);

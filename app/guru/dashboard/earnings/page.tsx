@@ -1379,11 +1379,17 @@ function PaymentSetupCard({
               {stripeReady
                 ? "Manage Stripe"
                 : stripeStarted
-                  ? "Continue setup"
+                  ? "Continue secure setup"
                   : "Set up Stripe"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
+          {stripeStarted && !stripeReady ? (
+            <p className="mt-3 text-xs font-semibold leading-5 !text-slate-600">
+              Setup was started but isn’t finished yet. Tap continue — SitGuru
+              will open the secure partner steps for whatever is still needed.
+            </p>
+          ) : null}
         </article>
       </div>
 

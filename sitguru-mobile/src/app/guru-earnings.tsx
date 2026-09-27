@@ -1044,7 +1044,11 @@ export default function GuruEarningsScreen() {
                       <Text style={styles.primaryButtonText}>
                         {payoutsReady && activeProvider === 'stripe'
                           ? 'Update Stripe Payout Details'
-                          : 'Set Up Stripe Payouts'}
+                          : payoutStatus.detailsSubmitted ||
+                              payoutStatus.status === 'pending' ||
+                              payoutStatus.status === 'restricted'
+                            ? 'Continue secure setup'
+                            : 'Set Up Stripe Payouts'}
                       </Text>
                       <ExternalLink
                         color="#FFFFFF"
