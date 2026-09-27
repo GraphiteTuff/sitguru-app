@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, LogOut, UserRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
   resolveAuthorizedRolesFromProfile,
@@ -166,6 +167,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
 
   async function handleLogout() {
     setOpen(false);
+    clearCompanionSessionOnLogout();
     try {
       await supabase.auth.signOut();
     } catch {

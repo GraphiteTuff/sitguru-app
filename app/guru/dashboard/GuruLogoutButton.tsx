@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { LogOut } from "lucide-react";
 
 export default function GuruLogoutButton() {
   const router = useRouter();
 
   async function handleLogout() {
+    clearCompanionSessionOnLogout();
     await supabase.auth.signOut();
     router.replace("/guru/login");
     router.refresh();

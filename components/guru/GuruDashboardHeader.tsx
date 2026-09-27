@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 
 type GuruDashboardHeaderProps = {
   active?:
@@ -99,6 +100,7 @@ export default function GuruDashboardHeader({
     setSigningOut(true);
 
     try {
+      clearCompanionSessionOnLogout();
       await supabase.auth.signOut();
       setMobileOpen(false);
       router.replace("/guru/login");

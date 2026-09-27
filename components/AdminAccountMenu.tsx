@@ -20,6 +20,7 @@ import {
   Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 
 type AdminAccount = {
   displayName: string;
@@ -287,6 +288,7 @@ export default function AdminAccountMenu() {
   async function handleLogout() {
     setLoggingOut(true);
     setOpen(false);
+    clearCompanionSessionOnLogout();
 
     try {
       await supabase.auth.signOut();

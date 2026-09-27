@@ -12,6 +12,10 @@ import {
   type CompanionViewerContext,
 } from "@/lib/chat/companion-auth";
 import { sanitizePreferredName } from "@/lib/chat/homepage-name";
+import {
+  clearCompanionSessionOnLogout,
+  COMPANION_SESSION_CLEARED_EVENT,
+} from "@/lib/chat/clear-companion-session";
 
 const GUEST_VIEWER: CompanionViewerContext = {
   isAuthenticated: false,
@@ -31,18 +35,22 @@ export function useCompanionViewer(
   useEffect(() => {
     let cancelled = false;
 
+    function applyGuest() {
+      if (cancelled) return;
+      setViewer({
+        ...GUEST_VIEWER,
+        isAuthenticated: false,
+        firstName: null,
+        roles: ["Guest Pet Parent"],
+      });
+    }
+
     void (async () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
         if (!uid) {
-          if (!cancelled) {
-            setViewer({
-              ...GUEST_VIEWER,
-              ...seed,
-              roles: seed?.roles?.length ? seed.roles : GUEST_VIEWER.roles,
-            });
-          }
+          applyGuest();
           return;
         }
 
@@ -89,18 +97,28 @@ export function useCompanionViewer(
             : [primaryCompanionRole([], "Pet Parent")],
         });
       } catch {
-        if (!cancelled) {
-          setViewer({
-            ...GUEST_VIEWER,
-            ...seed,
-            roles: seed?.roles?.length ? seed.roles : GUEST_VIEWER.roles,
-          });
-        }
+        applyGuest();
       }
     })();
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        clearCompanionSessionOnLogout();
+        applyGuest();
+      }
+    });
+
+    function onCleared() {
+      applyGuest();
+    }
+    window.addEventListener(COMPANION_SESSION_CLEARED_EVENT, onCleared);
+
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
+      window.removeEventListener(COMPANION_SESSION_CLEARED_EVENT, onCleared);
     };
     // Seed is intentionally shallow — callers pass stable role/name hints.
     // eslint-disable-next-line react-hooks/exhaustive-deps

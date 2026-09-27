@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
   resolveAuthorizedRolesFromProfile,
@@ -453,6 +454,7 @@ export default function GuruDashboardHeader({
 
   async function handleSignOut() {
     setAccountMenuOpen(false);
+    clearCompanionSessionOnLogout();
     await supabase.auth.signOut();
     router.replace("/guru/login");
     router.refresh();

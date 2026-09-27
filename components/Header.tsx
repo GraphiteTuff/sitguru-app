@@ -29,6 +29,7 @@ import {
   normalizePetParentAvatarUrl,
   resolvePetParentAvatarUrl,
 } from "@/lib/pet-parent-avatar";
+import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 
 type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "intern" | "admin";
 
@@ -394,6 +395,8 @@ function clearSitGuruAuthStorage() {
     window.localStorage.removeItem(key);
     window.sessionStorage.removeItem(key);
   });
+  // Companions must not keep a prior signed-in name after logout.
+  clearCompanionSessionOnLogout();
 }
 
 function getGuruStatus(guru: GuruRow | null) {

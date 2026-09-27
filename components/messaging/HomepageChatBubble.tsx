@@ -65,11 +65,18 @@ import {
   getCareMatchingChipsForThread,
   hasMatchingIntakeMarker,
 } from "@/lib/chat/care-matching-intake";
+import {
+  clearCompanionIdentityStorage,
+  COMPANION_CHAT_LEGACY_KEY,
+  COMPANION_CHAT_STORAGE_KEY,
+  COMPANION_NAME_STORAGE_KEY,
+  COMPANION_SESSION_CLEARED_EVENT,
+} from "@/lib/chat/clear-companion-session";
 
 const BRAND_GREEN = "#0D5C3A";
-const STORAGE_KEY = "sitguru-homepage-lead-chat";
-const NAME_STORAGE_KEY = "sitguru_client_first_name";
-const LEGACY_HISTORY_KEY = "sitguru_chat_history";
+const STORAGE_KEY = COMPANION_CHAT_STORAGE_KEY;
+const NAME_STORAGE_KEY = COMPANION_NAME_STORAGE_KEY;
+const LEGACY_HISTORY_KEY = COMPANION_CHAT_LEGACY_KEY;
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
 const ACTIVE_COMPANION = "rogue" as const;
 const ROGUE_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
@@ -179,18 +186,22 @@ function sanitizeFirstName(raw: string): string {
   return formatDisplayName(clean);
 }
 
-function readStoredFirstName(): string {
+function readStoredFirstName(opts?: { guestSessionOnly?: boolean }): string {
   try {
-    const fromLocal = sanitizeFirstName(
-      localStorage.getItem(NAME_STORAGE_KEY) || "",
-    );
-    if (fromLocal && !isReservedPreferredName(fromLocal)) return fromLocal;
+    if (!opts?.guestSessionOnly) {
+      const fromLocal = sanitizeFirstName(
+        localStorage.getItem(NAME_STORAGE_KEY) || "",
+      );
+      if (fromLocal && !isReservedPreferredName(fromLocal)) return fromLocal;
+    }
     const fromSession = sanitizeFirstName(
       sessionStorage.getItem(NAME_STORAGE_KEY) || "",
     );
     if (fromSession && !isReservedPreferredName(fromSession)) return fromSession;
     // Clear bad persisted values like "Rogue"
-    localStorage.removeItem(NAME_STORAGE_KEY);
+    if (!opts?.guestSessionOnly) {
+      localStorage.removeItem(NAME_STORAGE_KEY);
+    }
     sessionStorage.removeItem(NAME_STORAGE_KEY);
     return "";
   } catch {
@@ -198,12 +209,17 @@ function readStoredFirstName(): string {
   }
 }
 
-function persistFirstName(name: string) {
+function persistFirstName(name: string, authenticated = false) {
   const clean = sanitizeFirstName(name);
   if (!clean) return;
   try {
-    localStorage.setItem(NAME_STORAGE_KEY, clean);
     sessionStorage.setItem(NAME_STORAGE_KEY, clean);
+    if (authenticated) {
+      localStorage.setItem(NAME_STORAGE_KEY, clean);
+    } else {
+      // Guests must not leave a durable name for the next logout/login cycle.
+      localStorage.removeItem(NAME_STORAGE_KEY);
+    }
   } catch {
     // ignore quota
   }
@@ -466,33 +482,52 @@ export default function HomepageChatBubble() {
     setEventCompanion(readStoredCommunityEventCompanion());
   }, [pathname]);
 
+  function resetToGuestCompanion() {
+    clearCompanionIdentityStorage();
+    clientFirstNameRef.current = "";
+    setClientFirstName("");
+    setAwaitingName(true);
+    setRogueUserType("Guest Pet Parent");
+    const nextViewer: CompanionViewerContext = {
+      isAuthenticated: false,
+      firstName: null,
+      roles: ["Guest Pet Parent"],
+    };
+    viewerRef.current = nextViewer;
+    setViewer(nextViewer);
+    setMessages([buildWelcome("", { forceNewGreeting: true })]);
+    setHasUnread(true);
+  }
+
   useEffect(() => {
     setMounted(true);
 
-    const storedName = readStoredFirstName();
-    if (storedName) {
-      setClientFirstName(storedName);
-      setAwaitingName(false);
-    } else {
-      setAwaitingName(true);
-    }
-
-    const storedType = readStoredRogueUserType();
-    setRogueUserType(storedType);
-
-    // Resolve logged-in SitGuru role + preferred name (never demote to Guest).
+    // Resolve auth first — guests must not reuse a prior signed-in name.
     void (async () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
+
         if (!uid) {
+          // Drop prior auth name + chat; ask for name again as a guest.
+          clearCompanionIdentityStorage();
+          clientFirstNameRef.current = "";
+          setClientFirstName("");
+          setAwaitingName(true);
+          setRogueUserType("Guest Pet Parent");
           setViewer({
             isAuthenticated: false,
-            firstName: readStoredFirstName() || null,
-            roles: [storedType],
+            firstName: null,
+            roles: ["Guest Pet Parent"],
           });
+          setMessages([buildWelcome("", { forceNewGreeting: true })]);
           return;
         }
+
+        const storedType = readStoredRogueUserType();
+        setRogueUserType(
+          storedType === "Guest Pet Parent" ? "Pet Parent" : storedType,
+        );
 
         // Optimistic: authenticated ⇒ suppress parent signup until roles load.
         const optimistic: CompanionViewerContext = {
@@ -504,7 +539,13 @@ export default function HomepageChatBubble() {
         viewerRef.current = optimistic;
         setViewer(optimistic);
         setRogueUserType(primaryCompanionRole(optimistic.roles, "Pet Parent"));
-        if (optimistic.firstName) setAwaitingName(false);
+        if (optimistic.firstName) {
+          clientFirstNameRef.current = optimistic.firstName;
+          setClientFirstName(optimistic.firstName);
+          setAwaitingName(false);
+        } else {
+          setAwaitingName(true);
+        }
 
         const [{ data: roles }, { data: profile }] = await Promise.all([
           supabase
@@ -546,7 +587,7 @@ export default function HomepageChatBubble() {
           "";
 
         if (authName) {
-          persistFirstName(authName);
+          persistFirstName(authName, true);
           clientFirstNameRef.current = authName;
           setClientFirstName(authName);
           setAwaitingName(false);
@@ -562,46 +603,70 @@ export default function HomepageChatBubble() {
         };
         viewerRef.current = nextViewer;
         setViewer(nextViewer);
+
+        // Restore chat history only for authenticated sessions.
+        try {
+          const raw = sessionStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            setMessages([buildWelcome(authName)]);
+            return;
+          }
+          const parsed = JSON.parse(raw) as {
+            messages?: Message[];
+            client_first_name?: string;
+          };
+          const restoredName =
+            sanitizeFirstName(parsed.client_first_name || "") || authName;
+          if (restoredName) {
+            persistFirstName(restoredName, true);
+            setClientFirstName(restoredName);
+            setAwaitingName(false);
+          }
+          if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+            const onlyPlaceholder =
+              parsed.messages.length === 1 &&
+              parsed.messages[0]?.role === "assistant" &&
+              (parsed.messages[0]?.content === ROGUE_GREETING_PLACEHOLDER ||
+                !String(parsed.messages[0]?.content || "").trim());
+            if (onlyPlaceholder) {
+              setMessages([buildWelcome(restoredName)]);
+            } else {
+              setMessages(parsed.messages);
+              setHasUnread(false);
+            }
+          } else {
+            setMessages([buildWelcome(restoredName)]);
+          }
+        } catch {
+          setMessages([buildWelcome(authName)]);
+        }
       } catch {
-        // stay on guest / stored type
+        resetToGuestCompanion();
       }
     })();
+  }, [setMessages]);
 
-    // Client-only: inject randomized Rogue greeting as the first assistant message.
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        setMessages([buildWelcome(storedName)]);
-        return;
-      }
-      const parsed = JSON.parse(raw) as {
-        messages?: Message[];
-        client_first_name?: string;
-      };
-      const restoredName =
-        sanitizeFirstName(parsed.client_first_name || "") || storedName;
-      if (restoredName) {
-        setClientFirstName(restoredName);
-        setAwaitingName(false);
-      }
-      if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-        const onlyPlaceholder =
-          parsed.messages.length === 1 &&
-          parsed.messages[0]?.role === "assistant" &&
-          (parsed.messages[0]?.content === ROGUE_GREETING_PLACEHOLDER ||
-            !String(parsed.messages[0]?.content || "").trim());
-        if (onlyPlaceholder) {
-          setMessages([buildWelcome(restoredName)]);
-        } else {
-          setMessages(parsed.messages);
-          setHasUnread(false);
-        }
-      } else {
-        setMessages([buildWelcome(restoredName)]);
-      }
-    } catch {
-      setMessages([buildWelcome(storedName)]);
+  // Logout / explicit clear → drop name and re-ask as a fresh guest.
+  useEffect(() => {
+    function onCleared() {
+      resetToGuestCompanion();
     }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        // Storage may already be cleared by Header logout; always reset UI.
+        resetToGuestCompanion();
+      }
+    });
+
+    window.addEventListener(COMPANION_SESSION_CLEARED_EVENT, onCleared);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener(COMPANION_SESSION_CLEARED_EVENT, onCleared);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on auth events only
   }, [setMessages]);
 
   useEffect(() => {
@@ -789,7 +854,7 @@ export default function HomepageChatBubble() {
   function captureFirstName(raw: string) {
     const name = sanitizeFirstName(raw);
     if (!name) return false;
-    persistFirstName(name);
+    persistFirstName(name, viewerRef.current?.isAuthenticated === true);
     clientFirstNameRef.current = name;
     setClientFirstName(name);
     setAwaitingName(false);
