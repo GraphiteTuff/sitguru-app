@@ -957,6 +957,7 @@ async function getGuruPaymentSetupSummary(
     }
   }
 
+  const connectedCount = Number(stripeReady) + Number(paypalReady);
   const helper =
     connectedCount === 2
       ? "Both payout options are connected."
