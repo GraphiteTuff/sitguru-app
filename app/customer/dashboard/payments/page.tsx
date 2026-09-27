@@ -1,8 +1,12 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   CreditCard,
+  Loader2,
   Receipt,
   ShieldCheck,
   Sparkles,
@@ -11,8 +15,8 @@ import Header from "@/components/Header";
 import FinishPaymentButton, {
   isUnpaidBookingPayment,
 } from "@/components/customer/FinishPaymentButton";
-import PaymentMethodStrip from "@/components/payments/PaymentMethodStrip";
-import { createClient } from "@/lib/supabase/server";
+import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
+import { supabase } from "@/lib/supabase";
 import {
   PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
   PREMIUM_PAYMENTS_TRUST_SENTENCE,
@@ -130,11 +134,7 @@ function getStatusClasses(status: string | null | undefined) {
   return "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
 }
 
-async function fetchCustomerBookings(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  userEmail: string | null | undefined,
-) {
+async function fetchCustomerBookings(userId: string, userEmail: string | null | undefined) {
   const attempts = [
     { column: "pet_owner_id", value: userId },
     { column: "customer_id", value: userId },
@@ -226,7 +226,6 @@ function PaymentBookingCard({
           <FinishPaymentButton
             bookingId={bookingId}
             label="Finish payment with card or wallet"
-            className="inline-flex w-full min-h-[52px] items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
           />
         </div>
       ) : null}
@@ -234,32 +233,70 @@ function PaymentBookingCard({
   );
 }
 
-export default async function CustomerPaymentsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function CustomerPaymentsPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [bookings, setBookings] = useState<DbRow[]>([]);
 
-  if (!user) {
-    redirect("/login");
-  }
+  const loadPayments = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
 
-  const bookings = await fetchCustomerBookings(supabase, user.id, user.email);
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-  const unpaidBookings = bookings.filter((booking) =>
-    isUnpaidBookingPayment(firstString(booking, ["payment_status"], "")),
+      if (userError || !user) {
+        router.replace("/login");
+        return;
+      }
+
+      const rows = await fetchCustomerBookings(user.id, user.email);
+      setBookings(rows);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load payments right now.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    void loadPayments();
+  }, [loadPayments]);
+
+  const unpaidBookings = useMemo(
+    () =>
+      bookings.filter((booking) =>
+        isUnpaidBookingPayment(firstString(booking, ["payment_status"], "")),
+      ),
+    [bookings],
   );
 
-  const paidBookings = bookings
-    .filter((booking) => {
-      const payment = firstString(booking, ["payment_status"], "").toLowerCase();
-      return ["paid", "succeeded", "confirmed", "completed"].includes(payment);
-    })
-    .slice(0, 8);
+  const paidBookings = useMemo(
+    () =>
+      bookings
+        .filter((booking) => {
+          const payment = firstString(booking, ["payment_status"], "").toLowerCase();
+          return ["paid", "succeeded", "confirmed", "completed"].includes(payment);
+        })
+        .slice(0, 8),
+    [bookings],
+  );
 
-  const paidTotal = paidBookings.reduce(
-    (sum, booking) => sum + getBestCustomerTotal(booking),
-    0,
+  const paidTotal = useMemo(
+    () =>
+      paidBookings.reduce(
+        (sum, booking) => sum + getBestCustomerTotal(booking),
+        0,
+      ),
+    [paidBookings],
   );
 
   return (
@@ -307,7 +344,7 @@ export default async function CustomerPaymentsPage() {
                 Needs payment
               </p>
               <p className="mt-2 text-3xl font-black text-slate-950">
-                {unpaidBookings.length}
+                {loading ? "—" : unpaidBookings.length}
               </p>
             </div>
             <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
@@ -315,7 +352,7 @@ export default async function CustomerPaymentsPage() {
                 Paid bookings
               </p>
               <p className="mt-2 text-3xl font-black text-slate-950">
-                {paidBookings.length}
+                {loading ? "—" : paidBookings.length}
               </p>
             </div>
             <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
@@ -323,15 +360,14 @@ export default async function CustomerPaymentsPage() {
                 Recent paid total
               </p>
               <p className="mt-2 text-3xl font-black text-slate-950">
-                {formatMoney(paidTotal)}
+                {loading ? "—" : formatMoney(paidTotal)}
               </p>
             </div>
           </div>
         </div>
 
         <div className="mt-6">
-          <PaymentMethodStrip
-            placement="pet_parent_guide"
+          <PaymentIntegrationsGrid
             heading="Pay your way at checkout"
             description={PREMIUM_PAYMENTS_CUSTOMER_SENTENCE}
             ariaLabel="Secure SitGuru payment methods for Pet Parents"
@@ -366,6 +402,19 @@ export default async function CustomerPaymentsPage() {
           </div>
         </div>
 
+        {loadError ? (
+          <div className="mt-6 rounded-[1.6rem] border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-800">
+            {loadError}
+            <button
+              type="button"
+              onClick={() => void loadPayments()}
+              className="ml-3 inline-flex min-h-[40px] items-center rounded-xl bg-rose-700 px-3 text-xs font-black text-white"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+
         <section className="mt-6">
           <div className="mb-4 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-teal-700" />
@@ -374,7 +423,11 @@ export default async function CustomerPaymentsPage() {
             </h2>
           </div>
 
-          {unpaidBookings.length === 0 ? (
+          {loading ? (
+            <div className="flex min-h-[160px] items-center justify-center rounded-[2rem] border border-slate-200 bg-white">
+              <Loader2 className="h-7 w-7 animate-spin text-emerald-700" />
+            </div>
+          ) : unpaidBookings.length === 0 ? (
             <div className="rounded-[2rem] border border-dashed border-teal-200 bg-white p-8 text-center shadow-sm">
               <Sparkles className="mx-auto h-10 w-10 text-teal-600" />
               <h3 className="mt-4 text-xl font-black text-slate-950">
@@ -412,7 +465,11 @@ export default async function CustomerPaymentsPage() {
             </h2>
           </div>
 
-          {paidBookings.length === 0 ? (
+          {loading ? (
+            <div className="flex min-h-[120px] items-center justify-center rounded-[2rem] border border-slate-200 bg-white">
+              <Loader2 className="h-7 w-7 animate-spin text-emerald-700" />
+            </div>
+          ) : paidBookings.length === 0 ? (
             <div className="rounded-[2rem] border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
               <p className="text-lg font-black text-slate-950">No paid bookings yet</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
