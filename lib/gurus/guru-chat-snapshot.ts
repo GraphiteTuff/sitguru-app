@@ -445,11 +445,95 @@ const LOCATION_NOISE_TOKENS = new Set([
 
 function looksLikePlaceName(value?: string | null) {
   const place = clean(value).toLowerCase();
-  if (!place || place.length < 3) return false;
+  if (!place || place.length < 2) return false;
   if (LOCATION_NOISE_TOKENS.has(place)) return false;
   if (GENERIC_NAME_TOKENS.has(place)) return false;
   const last = place.split(/\s+/).pop() || "";
   return !LOCATION_NOISE_TOKENS.has(last) && !GENERIC_NAME_TOKENS.has(last);
+}
+
+/** Care / role words that must never become part of a city name. */
+const PLACE_CITY_NOISE_RE =
+  /\b(dogs?|pets?|cats?|houses?|drop[- ]?ins?|walks?|walkers?|walking|sitters?|sitting|gurus?|boarding|boards?|overnight|day\s*cares?|daycares?|training|trainers?|looking|needed?|find(?:ing)?|book(?:ing)?|want(?:ing)?|care|visits?|inns?|stays?|also|matching|please|thanks|thank|you)\b/gi;
+
+function scrubCityNoise(city?: string | null): string {
+  return clean(city)
+    .replace(PLACE_CITY_NOISE_RE, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * True when free text is (or clearly ends as) a US place reply:
+ * ZIP, "City ST", "City, State", etc. Used so chat never treats places as names.
+ */
+export function looksLikeUsLocationReply(rawText?: string | null): boolean {
+  const text = clean(rawText);
+  if (!text) return false;
+  if (/^\d{5}(?:-\d{4})?$/.test(text)) return true;
+  const inferred = inferLookupParamsFromChat(text);
+  if (inferred?.zip && /^\d{5}$/.test(inferred.zip)) {
+    // Pure ZIP or ZIP-dominant short replies
+    if (text.replace(/\D/g, "").slice(0, 5) === inferred.zip && text.length <= 12) {
+      return true;
+    }
+  }
+  if (inferred?.city && inferred?.state) {
+    // Whole message is basically the place (optional near/in)
+    const compact = text
+      .toLowerCase()
+      .replace(/[.,]/g, " ")
+      .replace(/\b(near|in|around|at|please|thanks|thank you)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const placeCompact = `${inferred.city} ${inferred.state}`.toLowerCase();
+    const placeFull = `${inferred.city} ${usStateDisplayName(inferred.state)}`.toLowerCase();
+    if (
+      compact === placeCompact ||
+      compact === placeFull ||
+      compact === `${inferred.city}, ${inferred.state}`.toLowerCase()
+    ) {
+      return true;
+    }
+    // Short replies that parse cleanly as city+state (≤ 5 tokens)
+    if (compact.split(" ").length <= 5 && !/\b(need|looking|find|book|want|walk|sit|board)\b/i.test(compact)) {
+      return Boolean(scrubCityNoise(inferred.city));
+    }
+  }
+  return false;
+}
+
+/** Map free-text care phrasing onto a canonical SitGuru service label. */
+export function detectCareServiceLabel(rawText?: string | null): string | null {
+  const lower = clean(rawText).toLowerCase();
+  if (!lower) return null;
+  if (/\bdrop[- ]?ins?\b|\bdrop\s*inns?\b|\bvisits?\b/.test(lower)) {
+    return "Drop-In Visits";
+  }
+  if (
+    /\b(dog\s*)?walk(er|ers|ing|s)?\b/.test(lower) ||
+    /\bneed (a )?walk\b/.test(lower)
+  ) {
+    return "Dog Walking";
+  }
+  if (/\bovernight\b|\bhouse\s*sits?\b|\bhouse\s*sitting\b/.test(lower)) {
+    return "House Sitting";
+  }
+  if (/\bboards?\b|\bboarding\b/.test(lower)) return "Boarding";
+  if (/\bday\s*care\b|\bdaycare\b|\bdoggy\s*day\b/.test(lower)) {
+    return "Doggy Day Care";
+  }
+  if (/\btrains?\b|\btrainer\b|\btraining\b/.test(lower)) {
+    return "Training Support";
+  }
+  if (
+    /\bpet\s+sitting\b|\bpet\s+sitters?\b|\bdog\s+sitters?\b|\bcat\s+sitters?\b|\bsitters?\b|\bsitting\b/.test(
+      lower,
+    )
+  ) {
+    return "Pet Sitting";
+  }
+  return null;
 }
 
 function stateAliasKey(value?: string | null) {
@@ -592,15 +676,19 @@ function cleanPlaceCapture(raw: string): string {
 const TIME_WINDOW_PLACE_NOISE =
   /^(the\s+)?(morning|afternoon|evening|night|midday|noon|tonight|today|tomorrow|weekend|flexible)s?$/i;
 
+/** Full US state names for city+state parsing (longest-first). */
+const US_STATE_FULL_NAME_PATTERN =
+  "new hampshire|new jersey|new mexico|new york|north carolina|north dakota|rhode island|south carolina|south dakota|west virginia|washington dc|district of columbia|alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|ohio|oklahoma|oregon|pennsylvania|tennessee|texas|utah|vermont|virginia|washington|wisconsin|wyoming";
+
 function isUsablePlacePhrase(cleaned: string): boolean {
   if (!cleaned || cleaned.length < 2) return false;
   if (TIME_WINDOW_PLACE_NOISE.test(cleaned)) return false;
   if (/^(the|a|an|my|our|this|that|care|need)$/i.test(cleaned)) return false;
   const parsed = splitCityState(cleaned);
-  if (parsed.state) return true;
-  if (parsed.city && looksLikePlaceName(parsed.city) && parsed.city.length >= 3) {
-    return true;
-  }
+  const city = scrubCityNoise(parsed.city);
+  if (parsed.state && city && looksLikePlaceName(city)) return true;
+  if (parsed.state && !city) return true;
+  if (city && looksLikePlaceName(city) && city.length >= 2) return true;
   return false;
 }
 
@@ -608,6 +696,7 @@ function isUsablePlacePhrase(cleaned: string): boolean {
  * Prefer the **most recent** city/state or ZIP in the thread so a new place
  * overrides an earlier one (Boston → New York keeps New York).
  * Ignores time phrases like "in the Morning" so they don't wipe a prior city.
+ * Scrubs care words so "dog walker Quakertown PA" → Quakertown, PA.
  */
 function extractPlacePhrase(text: string): string {
   const nearRe =
@@ -615,28 +704,34 @@ function extractPlacePhrase(text: string): string {
   const nearHits: string[] = [];
   for (const match of text.matchAll(nearRe)) {
     const cleaned = cleanPlaceCapture(match[1] || "");
-    if (isUsablePlacePhrase(cleaned)) nearHits.push(cleaned);
+    if (!isUsablePlacePhrase(cleaned)) continue;
+    const parsed = splitCityState(cleaned);
+    const city = scrubCityNoise(parsed.city);
+    if (parsed.state && city) {
+      nearHits.push(`${city} ${parsed.state}`);
+    } else if (parsed.state) {
+      nearHits.push(parsed.state);
+    } else if (city) {
+      nearHits.push(city);
+    }
   }
   if (nearHits.length) return nearHits[nearHits.length - 1]!;
 
-  // "Arlington, VA" / "Austin TX" / "New York, NY" — take the last valid hit.
-  const cityStateRe =
-    /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/g;
+  // Abbreviation states: "Quakertown PA" / "Austin, TX"
+  // Full names: "Los Angeles, California" — only real state tokens (never "Los Angeles" as state).
+  const cityStateRe = new RegExp(
+    String.raw`\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2}|${US_STATE_FULL_NAME_PATTERN})\b`,
+    "gi",
+  );
   const cityStateHits: string[] = [];
   for (const match of text.matchAll(cityStateRe)) {
-    const cityPart = cleanPlaceCapture(match[1] || "");
+    const rawCity = cleanPlaceCapture(match[1] || "");
     const statePart = clean(match[2] || "");
-    if (
-      cityPart &&
-      statePart &&
-      isUsStateToken(statePart) &&
-      !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?|looking|need|find|book)$/i.test(
-        cityPart,
-      ) &&
-      !TIME_WINDOW_PLACE_NOISE.test(cityPart)
-    ) {
-      cityStateHits.push(`${cityPart} ${statePart}`);
-    }
+    if (!rawCity || !statePart || !isUsStateToken(statePart)) continue;
+    if (TIME_WINDOW_PLACE_NOISE.test(rawCity)) continue;
+    const city = scrubCityNoise(rawCity);
+    if (!city || !looksLikePlaceName(city)) continue;
+    cityStateHits.push(`${city} ${statePart}`);
   }
   if (cityStateHits.length) return cityStateHits[cityStateHits.length - 1]!;
 
@@ -694,13 +789,16 @@ export function inferLookupParamsFromChat(
   const placePhrase = extractPlacePhrase(text);
   let lastPlaceIndex = -1;
   if (placePhrase) {
-    lastPlaceIndex = text.toLowerCase().lastIndexOf(placePhrase.toLowerCase());
     const parsed = splitCityState(placePhrase);
+    const scrubbedCity = scrubCityNoise(parsed.city);
     city =
-      parsed.city && looksLikePlaceName(parsed.city)
-        ? titleCasePlace(parsed.city)
+      scrubbedCity && looksLikePlaceName(scrubbedCity)
+        ? titleCasePlace(scrubbedCity)
         : undefined;
     state = parsed.state;
+    // Locate the city token in the original text for ZIP-vs-place recency.
+    const cityNeedle = (scrubbedCity || placePhrase).toLowerCase();
+    lastPlaceIndex = text.toLowerCase().lastIndexOf(cityNeedle);
   } else if (!zip) {
     // Only use bare "City ST" fallback when no ZIP (avoids "drop in" → Drop, IN).
     const cityStateRe =
@@ -708,13 +806,13 @@ export function inferLookupParamsFromChat(
     let lastCity = "";
     let lastState = "";
     for (const match of text.matchAll(cityStateRe)) {
-      const cityPart = cleanPlaceCapture(match[1] || "");
+      const cityPart = scrubCityNoise(cleanPlaceCapture(match[1] || ""));
       const statePart = clean(match[2] || "");
       if (
         cityPart &&
         statePart &&
         isUsStateToken(statePart) &&
-        !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?)$/i.test(cityPart)
+        looksLikePlaceName(cityPart)
       ) {
         lastCity = cityPart;
         lastState = statePart;
@@ -745,15 +843,8 @@ export function inferLookupParamsFromChat(
   }
 
   let service: string | undefined;
-  if (/\bwalk/.test(lowerText)) service = "Dog Walking";
-  else if (/\bdrop[- ]?in|\bvisit/.test(lowerText)) service = "Drop-In Visits";
-  else if (/\bovernight|\bhouse\s*sit/.test(lowerText)) {
-    service = "House Sitting";
-  } else if (/\bboard/.test(lowerText)) service = "Boarding";
-  else if (/\btrain/.test(lowerText)) service = "Training Support";
-  else if (/\bday\s*care|\bdaycare/.test(lowerText)) {
-    service = "Doggy Day Care";
-  }
+  const detectedService = detectCareServiceLabel(text);
+  if (detectedService) service = detectedService;
 
   if (!service && !city && !state && !zip && !name && !listAll) return null;
   return {

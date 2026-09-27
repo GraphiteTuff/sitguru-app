@@ -64,7 +64,10 @@ import {
 import {
   getCareMatchingChipsForThread,
   hasMatchingIntakeMarker,
+  joinRecentUserTexts,
+  buildCareMatchingAsk,
 } from "@/lib/chat/care-matching-intake";
+import { looksLikeUsLocationReply } from "@/lib/gurus/guru-chat-snapshot";
 import {
   clearCompanionIdentityStorage,
   COMPANION_CHAT_LEGACY_KEY,
@@ -383,9 +386,11 @@ export default function HomepageChatBubble() {
       setMessages((prev) => {
         const lastUser = [...prev].reverse().find((m) => m.role === "user");
         const name = clientFirstNameRef.current || readStoredFirstName();
+        const careThread = joinRecentUserTexts(prev, lastUser?.content);
         const content = buildHomepageSimulationReply({
           clientFirstName: name || undefined,
           lastUserText: lastUser?.content || undefined,
+          careThread,
         });
         // Guard: named visitors must never see the name-collection fallback string.
         const safeContent =
@@ -888,11 +893,32 @@ export default function HomepageChatBubble() {
 
   function replyWhileAwaitingName(raw: string) {
     const text = raw.trim();
+    const careThread = joinRecentUserTexts(
+      [...messages, { role: "user", content: text }],
+      text,
+    );
+    // Location / care replies must continue matching — never treat as a name.
+    const matchingAsk = buildCareMatchingAsk(careThread);
+    if (matchingAsk || looksLikeUsLocationReply(text)) {
+      sendLocalReply(
+        text,
+        matchingAsk ||
+          buildHomepageSimulationReply({
+            clientFirstName: undefined,
+            lastUserText: text,
+            careThread,
+          }),
+      );
+      setInput("");
+      focusComposer(40);
+      return;
+    }
     sendLocalReply(
       text,
       buildHomepageSimulationReply({
         clientFirstName: undefined,
         lastUserText: text,
+        careThread,
       }),
     );
     setInput("");
@@ -924,8 +950,23 @@ export default function HomepageChatBubble() {
       return;
     }
 
-    // Role / care chips wait until we have a preferred name.
-    if (awaitingName) return;
+    // Care matching can start before a preferred name — route chips to live API.
+    if (awaitingName) {
+      const careThread = joinRecentUserTexts(
+        [...messages, { role: "user", content }],
+        content,
+      );
+      if (
+        buildCareMatchingAsk(careThread) ||
+        looksLikeUsLocationReply(content)
+      ) {
+        applyIntentUserType(content);
+        await append({ role: "user", content }, chatRequestOptions());
+        focusComposer(40);
+        return;
+      }
+      return;
+    }
 
     applyIntentUserType(content);
     await append({ role: "user", content }, chatRequestOptions());
@@ -972,6 +1013,23 @@ export default function HomepageChatBubble() {
         return;
       }
 
+      // US city/state/ZIP or mid-matching care replies → keep matching, don't
+      // steal the place as a preferred name. Send through the live API path.
+      const careThread = joinRecentUserTexts(
+        [...messages, { role: "user", content: text }],
+        text,
+      );
+      if (
+        looksLikeUsLocationReply(text) ||
+        buildCareMatchingAsk(careThread)
+      ) {
+        applyIntentUserType(text);
+        handleSubmit(e, chatRequestOptions());
+        setInput("");
+        focusComposer(40);
+        return;
+      }
+
       const extracted = extractVisitorPreferredName(text);
       if (extracted) {
         captureFirstName(extracted);
@@ -984,6 +1042,7 @@ export default function HomepageChatBubble() {
         buildHomepageSimulationReply({
           clientFirstName: undefined,
           lastUserText: text,
+          careThread,
         }),
       );
       setInput("");

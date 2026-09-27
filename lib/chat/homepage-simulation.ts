@@ -13,7 +13,10 @@ import {
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
 import { buildKnowledgeAwareSimulationBeat } from "@/lib/chat/rogue-knowledge";
-import { buildCareMatchingAsk } from "@/lib/chat/care-matching-intake";
+import {
+  buildCareMatchingAsk,
+} from "@/lib/chat/care-matching-intake";
+import { looksLikeUsLocationReply } from "@/lib/gurus/guru-chat-snapshot";
 
 export const SIMULATION_NAME_PROMPT =
   "hi! i'm Rogue 🦴 your adorable SitGuru assistant — so happy you're here. what should i call you? first name or nickname works!";
@@ -77,9 +80,11 @@ export function buildHomepageSimulationReply(
   let preferred = sanitizePreferredName(opts.clientFirstName);
   if (isReservedPreferredName(preferred)) preferred = "";
 
-  // If they just typed a real name in this turn, prefer it.
+  // If they just typed a real name in this turn, prefer it — never a US place.
   const extracted = extractVisitorPreferredName(opts.lastUserText);
-  if (extracted) preferred = extracted;
+  if (extracted && !looksLikeUsLocationReply(opts.lastUserText)) {
+    preferred = extracted;
+  }
 
   const text = normalizeChatIntent(opts.lastUserText);
   const named = (body: string) => body;

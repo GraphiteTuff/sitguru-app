@@ -303,6 +303,69 @@ const MATCHING_CASES: Array<{
     expectZip: "19103",
     expectNext: "time",
   },
+  {
+    thread: "I need a dog walker\nquakertown pa",
+    expectCity: "Quakertown",
+    expectState: "PA",
+    expectNext: "time",
+    askMustInclude: /Quakertown,\s*PA/i,
+    askMustNotInclude: /Hey\s+Quakertown/i,
+  },
+  {
+    thread: "I need a dog walker\nquakertown pa\ndog walker",
+    expectCity: "Quakertown",
+    expectState: "PA",
+    expectNext: "time",
+    askMustInclude: /Quakertown,\s*PA/i,
+    askMustNotInclude: /Dog Walker Quakertown|city and state|ZIP/i,
+  },
+  {
+    thread: "dog walking Quakertown PA",
+    expectCity: "Quakertown",
+    expectState: "PA",
+    expectNext: "time",
+  },
+  {
+    thread: "need walks in austin, texas",
+    expectCity: "Austin",
+    expectState: "TX",
+    expectNext: "time",
+  },
+  {
+    thread: "looking for a sitter in brooklyn new york",
+    expectCity: "Brooklyn",
+    expectState: "NY",
+    expectNext: "time",
+  },
+  {
+    thread: "board my dog in denver, co",
+    expectCity: "Denver",
+    expectState: "CO",
+    expectNext: "time",
+  },
+  {
+    thread: "daycare phoenix az",
+    expectCity: "Phoenix",
+    expectState: "AZ",
+    expectNext: "time",
+  },
+  {
+    thread: "drop inns near st. louis mo",
+    expectCity: "St Louis",
+    expectState: "MO",
+    expectNext: "time",
+  },
+  {
+    thread: "Looking for Dog Walks\nLos Angeles, California",
+    expectCity: "Los Angeles",
+    expectState: "CA",
+    expectNext: "time",
+  },
+  {
+    thread: "I need a pet sitter\n18951",
+    expectZip: "18951",
+    expectNext: "time",
+  },
 ];
 
 /** ——— Auth CTA stripping ——— */

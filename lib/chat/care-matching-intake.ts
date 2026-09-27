@@ -7,6 +7,7 @@ import {
   inferLookupParamsFromChat,
   isUsStateToken,
   looksLikeGuruDirectoryQuery,
+  detectCareServiceLabel,
   normalizeUsState,
 } from "@/lib/gurus/guru-chat-snapshot";
 
@@ -107,15 +108,7 @@ function clean(value: unknown) {
 }
 
 function detectService(text: string): string | null {
-  const lower = text.toLowerCase();
-  if (/\bdrop[- ]?in|\bvisit/.test(lower)) return "Drop-In Visits";
-  if (/\bwalk/.test(lower) && !/\bsitters?\b/.test(lower)) return "Dog Walking";
-  if (/\bovernight|\bhouse\s*sit/.test(lower)) return "House Sitting";
-  if (/\bboard/.test(lower)) return "Boarding";
-  if (/\bday\s*care|\bdaycare/.test(lower)) return "Doggy Day Care";
-  if (/\btrain/.test(lower)) return "Training Support";
-  if (/\bpet\s+sitting\b/.test(lower)) return "Pet Sitting";
-  return null;
+  return detectCareServiceLabel(text);
 }
 
 function detectExtraServices(text: string): string[] {

@@ -1,7 +1,10 @@
 /**
  * Preferred-name helpers for Rogue homepage chat.
  * Prevents "Hi Rogue" / reserved bot names from being treated as the visitor.
+ * Also never treats US city/state/ZIP care locations as a preferred name.
  */
+
+import { looksLikeUsLocationReply } from "@/lib/gurus/guru-chat-snapshot";
 
 const RESERVED_NAME_TOKENS = new Set([
   "rogue",
@@ -69,13 +72,18 @@ export function isWellbeingReply(raw: unknown): boolean {
 
 /**
  * Pull a real visitor name from free text.
- * Returns "" if the message is a greeting, reserved, or not a name.
+ * Returns "" if the message is a greeting, reserved, location, or not a name.
  */
 export function extractVisitorPreferredName(raw: unknown): string {
   const original = String(raw || "").trim();
   if (!original) return "";
 
   if (isConversationalGreeting(original) || isWellbeingReply(original)) {
+    return "";
+  }
+
+  // Never treat US city/state/ZIP (or care place replies) as a preferred name.
+  if (looksLikeUsLocationReply(original) || /^\d{5}(?:-\d{4})?$/.test(original)) {
     return "";
   }
 
@@ -90,7 +98,13 @@ export function extractVisitorPreferredName(raw: unknown): string {
     const match = original.match(pattern);
     if (match?.[1]) {
       const candidate = sanitizePreferredName(match[1]);
-      if (candidate && !isReservedPreferredName(candidate)) return candidate;
+      if (
+        candidate &&
+        !isReservedPreferredName(candidate) &&
+        !looksLikeUsLocationReply(candidate)
+      ) {
+        return candidate;
+      }
     }
   }
 
@@ -104,9 +118,10 @@ export function extractVisitorPreferredName(raw: unknown): string {
   if (
     stripped &&
     !isReservedPreferredName(stripped) &&
+    !looksLikeUsLocationReply(stripped) &&
     stripped.split(/\s+/).length <= 3 &&
     stripped.length <= 40 &&
-    !/looking for|want to|register|dog walk|drop-?in|overnight|boarding|ambassador/i.test(
+    !/looking for|want to|register|dog walk|drop-?in|overnight|boarding|ambassador|sitter|walker|zip|\d{5}/i.test(
       lowered,
     )
   ) {
