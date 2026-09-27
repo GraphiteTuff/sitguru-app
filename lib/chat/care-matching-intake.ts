@@ -234,7 +234,7 @@ export function parseCareMatchingIntake(
   const inferred = inferLookupParamsFromChat(text);
   const service = detectService(text);
   const extras = detectExtraServices(text);
-  const zip = inferred?.zip || text.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
+  const zip = inferred?.zip;
   let city = inferred?.city || undefined;
   let state = inferred?.state || undefined;
   // "in Virginia" alone → state only. "New York, NY" keeps both city + state.
