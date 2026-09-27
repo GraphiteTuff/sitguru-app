@@ -340,6 +340,20 @@ export function matchDelilahSoftIntent(question: string): MarketingFaqEntry | nu
     return find("what pet events are coming up");
   }
   if (
+    /\b(rsvp|attending|yes.?maybe.?no)\b/.test(q) &&
+    !/\b(host|manager|planner|my event|track)\b/.test(q)
+  ) {
+    return (
+      find("how does attending yes maybe no work") ||
+      find("do i need a sitguru account to rsvp")
+    );
+  }
+  if (
+    /\b(dogs? allowed|pets? allowed|pet friendly|bring (my )?dog)\b/.test(q)
+  ) {
+    return find("are pet events pet friendly");
+  }
+  if (
     /\b(publish|set up|create|new (partner )?event|host an event|how do i host)\b/.test(
       q,
     )
@@ -352,7 +366,13 @@ export function matchDelilahSoftIntent(question: string): MarketingFaqEntry | nu
   if (/\b(track|attendance|rsvp counts?|yes.?maybe.?no)\b/.test(q) && /\b(host|manager|planner|my event)\b/.test(q)) {
     return find("how do i track yes maybe no");
   }
-  if (/\b(partner event|pet event).*(difference|vs|versus)\b/.test(q) || /\bdifference between a partner\b/.test(q)) {
+  if (
+    /\b(partner event|pet event).*(difference|vs|versus)\b/.test(q) ||
+    /\bdifference between a partner\b/.test(q) ||
+    (/\bdifference between\b/.test(q) &&
+      /\b(partner|pet event)\b/.test(q)) ||
+    (/\bpartner event\b/.test(q) && /\bpet event\b/.test(q))
+  ) {
     return find("what is the difference between a partner event");
   }
   if (/\b(promote|share|graphics|qr)\b/.test(q) && /\b(event|listing|partner)\b/.test(q)) {

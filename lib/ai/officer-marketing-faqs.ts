@@ -49,6 +49,8 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "is it free to become a guru",
       "does it cost money to apply",
       "free guru profile",
+      "how much does it cost to become a guru",
+      "how much to become a guru",
     ],
     answer:
       "Yep, signing up is free. You'll just need your profile and trust steps done before Pet Parents can book you.",
@@ -70,7 +72,8 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "do i choose my service area",
       "can i pick my availability",
     ],
-    answer: "Totally. You pick your hours and the neighborhoods you want to cover.",
+    answer:
+      "Totally — you set your **schedule**, hours, and the neighborhoods / service area you want to cover.",
   },
   {
     question: "Can I set my own rates?",
@@ -129,6 +132,36 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     ],
     answer:
       "You'll fill in your profile, services, rates, hours, trust, and payouts. We approve you before you're bookable, and Academy is optional if you want the badge later.",
+  },
+  {
+    question: "Do I need insurance as a Guru?",
+    aliases: [
+      "do i need insurance",
+      "guru insurance required",
+      "is insurance required",
+    ],
+    answer:
+      "SitGuru focuses on profile, trust, and payout setup first — check your local rules for any insurance you may want, and finish the in-app trust steps to go bookable. [[cta:guru]]",
+  },
+  {
+    question: "How long does Guru approval take?",
+    aliases: [
+      "how long does approval take",
+      "how long until i am bookable",
+      "when will i be approved",
+    ],
+    answer:
+      "After you finish profile, trust, and payouts, SitGuru reviews you before you’re bookable — complete those steps so approval can move. [[cta:guru]]",
+  },
+  {
+    question: "Can I serve more than one city?",
+    aliases: [
+      "can i work in multiple cities",
+      "multiple service areas",
+      "more than one city",
+    ],
+    answer:
+      "Yes — set the neighborhoods and service area you want to cover on your Guru profile, and update them anytime. [[cta:guru]]",
   },
   {
     question: "How do I start my free Guru profile?",
@@ -285,13 +318,25 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   },
   {
     question: "Is SitGuru free to join as a Pet Parent?",
+    aliases: [
+      "is sitguru free",
+      "is sitguru free for pet parents",
+      "free pet parent account",
+      "does it cost to join as a pet parent",
+    ],
     answer:
       "Pet Parent signup is free — you only pay when you book care. [[cta:parent]]",
   },
   {
     question: "Can I message my Guru?",
+    aliases: [
+      "can i message my guru",
+      "can i text my guru",
+      "chat with my guru",
+      "message the sitter",
+    ],
     answer:
-      "Yes — use SitGuru messaging so care details stay organized with the booking.",
+      "Yes — message your Guru in SitGuru so care details stay with the booking.",
   },
   {
     question: "What services can I book on SitGuru?",
@@ -337,6 +382,50 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "Open their profile or a past booking on SitGuru and book again — an account makes favorites easier. [[cta:parent]]",
   },
   {
+    question: "How do I cancel a booking?",
+    aliases: [
+      "cancel my booking",
+      "can i cancel a booking",
+      "how to cancel sitguru booking",
+    ],
+    answer:
+      "Open the booking in SitGuru and follow the cancel flow there — timing rules can vary by booking, so check the booking details. [[cta:parent]]",
+  },
+  {
+    question: "Can I tip my Guru?",
+    aliases: [
+      "can i tip",
+      "how do tips work",
+      "tip after a walk",
+      "add a tip",
+    ],
+    answer:
+      "Yes — you can add an optional tip at checkout. Tips aren’t taxed like the service, and they go to your Guru. [[cta:parent]]",
+  },
+  {
+    question: "Do Gurus go through background checks?",
+    aliases: [
+      "do gurus do background checks",
+      "are gurus background checked",
+      "background check for sitters",
+      "trust steps for gurus",
+    ],
+    answer:
+      "Gurus complete SitGuru trust steps before they’re bookable — including profile and safety checks — so booking stays on-platform with messaging and PawReport. [[cta:parent]]",
+  },
+  {
+    question: "How much does care cost?",
+    aliases: [
+      "how much does a dog walk cost",
+      "what do drop-ins cost",
+      "guru prices",
+      "how much is pet sitting",
+      "average rate for a walk",
+    ],
+    answer:
+      "Each Guru sets their own rates — search by service and location, then compare profiles before you book. [[cta:parent]]",
+  },
+  {
     question: COMPANION_BENEFITS_USER_PROMPT.rogue,
     aliases: [
       "pet parent benefits",
@@ -368,6 +457,26 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     ],
     answer:
       "If you're a student, Guru, pet pro, rescue person, veteran, creator, or a trusted voice in your town, you can apply.",
+  },
+  {
+    question: "Is there a student Ambassador path?",
+    aliases: [
+      "student ambassador",
+      "is there a student ambassador program",
+      "can students be ambassadors",
+    ],
+    answer:
+      "Yes — students are welcome to apply as Ambassadors and grow the local pack with referral tools. [[cta:ambassador]]",
+  },
+  {
+    question: "How much can I earn as an Ambassador?",
+    aliases: [
+      "ambassador earnings",
+      "how much do ambassadors make",
+      "ambassador pay",
+    ],
+    answer:
+      "Rewards aren’t guaranteed — PetPerks follow current terms when activity qualifies. Check `/petperks` and your dashboard for what’s live. [[cta:ambassador]]",
   },
   {
     question: "Do I need a huge social following?",
@@ -531,7 +640,7 @@ export function matchScoutPublicSoftIntent(
   if (!needle) return null;
 
   if (
-    /free (to )?apply|free (guru )?profile|cost (to )?(apply|sign ?up)|is it free/.test(
+    /free (to )?apply|free (guru )?profile|cost (to )?(apply|sign ?up|become)|how much .{0,24}(cost|become)|is it free/.test(
       needle,
     )
   ) {
@@ -558,6 +667,31 @@ export function matchScoutPublicSoftIntent(
     return (
       SCOUT_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "What happens after I apply?",
+      ) || null
+    );
+  }
+  if (/approval take|how long .{0,24}approv|when will i be approved/.test(needle)) {
+    return (
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How long does Guru approval take?",
+      ) ||
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "What happens after I apply?",
+      ) ||
+      null
+    );
+  }
+  if (/insurance/.test(needle)) {
+    return (
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Do I need insurance as a Guru?",
+      ) || null
+    );
+  }
+  if (/multiple cities|more than one city|multiple service areas/.test(needle)) {
+    return (
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Can I serve more than one city?",
       ) || null
     );
   }
@@ -626,6 +760,32 @@ export function matchTacoPublicSoftIntent(
       TACO_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "Who can become a SitGuru Ambassador?",
       ) || null
+    );
+  }
+  if (/student ambassador|students? (be|become) ambassadors?/.test(needle)) {
+    return (
+      TACO_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Is there a student Ambassador path?",
+      ) ||
+      TACO_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Who can become a SitGuru Ambassador?",
+      ) ||
+      null
+    );
+  }
+  if (
+    /how much .{0,24}(earn|make)|ambassador (pay|earnings)|earn as an ambassador/.test(
+      needle,
+    )
+  ) {
+    return (
+      TACO_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How much can I earn as an Ambassador?",
+      ) ||
+      TACO_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Are earnings or rewards guaranteed?",
+      ) ||
+      null
     );
   }
   if (/followers?|influencer|social following/.test(needle)) {
@@ -749,14 +909,22 @@ export function matchRoguePublicSoftIntent(
       null
     );
   }
-  if (/free to join|free (pet )?parent|cost to (sign ?up|join)/.test(needle)) {
+  if (
+    /free (to )?join|free (pet )?parent|free for (pet )?parents?|is .{0,48}free|cost to (sign ?up|join)/.test(
+      needle,
+    )
+  ) {
     return (
       ROGUE_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "Is SitGuru free to join as a Pet Parent?",
       ) || null
     );
   }
-  if (/message (my )?guru|chat with (my )?guru/.test(needle)) {
+  if (
+    /message (my )?guru|chat with (my )?guru|can i (text|message|dm)/.test(
+      needle,
+    )
+  ) {
     return (
       ROGUE_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "Can I message my Guru?",
@@ -770,7 +938,22 @@ export function matchRoguePublicSoftIntent(
       ) || null
     );
   }
-  if (/what services|dog walk|drop-?in|boarding|day care|overnight/.test(needle)) {
+  if (
+    /how much (does|is|do)|what (does|do) .{0,24}cost|guru prices|average rate/.test(
+      needle,
+    )
+  ) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How much does care cost?",
+      ) || null
+    );
+  }
+  if (
+    /what services|what care can i book|services can i book|do you (offer|have) (dog walk|drop-?in|boarding|overnight|day care)|is there (dog walk|drop-?in|boarding|overnight|day care|pet sitting)/.test(
+      needle,
+    )
+  ) {
     return (
       ROGUE_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "What services can I book on SitGuru?",
@@ -781,6 +964,27 @@ export function matchRoguePublicSoftIntent(
     return (
       ROGUE_PUBLIC_MARKETING_FAQS.find(
         (f) => f.question === "How do I rebook my favorite Guru?",
+      ) || null
+    );
+  }
+  if (/cancel (a |my )?booking|how (do i|to) cancel/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do I cancel a booking?",
+      ) || null
+    );
+  }
+  if (/\btip\b|can i tip|add a tip/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Can I tip my Guru?",
+      ) || null
+    );
+  }
+  if (/background check|background.?checked|trust steps for gurus/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Do Gurus go through background checks?",
       ) || null
     );
   }

@@ -584,15 +584,31 @@ function cleanPlaceCapture(raw: string): string {
       /\b(please|thanks|thank you|asap|today|tomorrow|tonight|this weekend|next week|morning|afternoon|evening|night|for\b.*)$/i,
       "",
     )
-    .replace(/^(near|in|around|at)\s+/i, "")
+    .replace(/^(near|in|around|at|the|a|an)\s+/i, "")
     .replace(/[.,!?;:]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+const TIME_WINDOW_PLACE_NOISE =
+  /^(the\s+)?(morning|afternoon|evening|night|midday|noon|tonight|today|tomorrow|weekend|flexible)s?$/i;
+
+function isUsablePlacePhrase(cleaned: string): boolean {
+  if (!cleaned || cleaned.length < 2) return false;
+  if (TIME_WINDOW_PLACE_NOISE.test(cleaned)) return false;
+  if (/^(the|a|an|my|our|this|that|care|need)$/i.test(cleaned)) return false;
+  const parsed = splitCityState(cleaned);
+  if (parsed.state) return true;
+  if (parsed.city && looksLikePlaceName(parsed.city) && parsed.city.length >= 3) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Prefer the **most recent** city/state or ZIP in the thread so a new place
  * overrides an earlier one (Boston → New York keeps New York).
+ * Ignores time phrases like "in the Morning" so they don't wipe a prior city.
  */
 function extractPlacePhrase(text: string): string {
   const nearRe =
@@ -600,7 +616,7 @@ function extractPlacePhrase(text: string): string {
   const nearHits: string[] = [];
   for (const match of text.matchAll(nearRe)) {
     const cleaned = cleanPlaceCapture(match[1] || "");
-    if (cleaned) nearHits.push(cleaned);
+    if (isUsablePlacePhrase(cleaned)) nearHits.push(cleaned);
   }
   if (nearHits.length) return nearHits[nearHits.length - 1]!;
 
@@ -617,7 +633,8 @@ function extractPlacePhrase(text: string): string {
       isUsStateToken(statePart) &&
       !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?|looking|need|find|book)$/i.test(
         cityPart,
-      )
+      ) &&
+      !TIME_WINDOW_PLACE_NOISE.test(cityPart)
     ) {
       cityStateHits.push(`${cityPart} ${statePart}`);
     }
