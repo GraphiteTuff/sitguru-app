@@ -84,6 +84,7 @@ type GuruPayoutAccount = {
   chargesEnabled?: boolean;
   payoutsEnabled?: boolean;
   connectedAt?: string | null;
+  lastSyncedAt?: string | null;
 };
 
 type GuruPayoutSetup = {
@@ -1109,6 +1110,7 @@ function PaymentSetupCard({
   liveStripePendingReview = false,
   liveStripeDetailsSubmitted = false,
   liveStripeComplete = false,
+  liveStripeLastCheckedAt = null,
 }: {
   setup: GuruPayoutSetup | null;
   loadError?: string | null;
@@ -1120,6 +1122,7 @@ function PaymentSetupCard({
   liveStripePendingReview?: boolean;
   liveStripeDetailsSubmitted?: boolean;
   liveStripeComplete?: boolean;
+  liveStripeLastCheckedAt?: string | null;
 }) {
   const selectedProvider = setup?.selectedProvider || "set_up_later";
   const stripeAccount =
@@ -1155,7 +1158,11 @@ function PaymentSetupCard({
 
   const paypalStarted = Boolean(paypalAccount);
   const stripeStarted =
-    Boolean(stripeAccount) || selectedProvider === "stripe";
+    Boolean(stripeAccount) ||
+    selectedProvider === "stripe" ||
+    liveStripeDetailsSubmitted ||
+    liveStripePendingReview ||
+    liveStripeComplete;
   const anyProviderReady = paypalReady || stripeReady;
   const connectedCount = Number(paypalReady) + Number(stripeReady);
   const paypalConfigured = paypalOnboarding?.configured !== false;
@@ -1163,6 +1170,9 @@ function PaymentSetupCard({
     paypalOnboarding?.statusRefreshAvailable !== false;
   const paypalLastCheckedAt = formatStatusCheckedAt(
     paypalAccount?.lastSyncedAt,
+  );
+  const stripeLastCheckedAt = formatStatusCheckedAt(
+    liveStripeLastCheckedAt || stripeAccount?.lastSyncedAt,
   );
 
   const paypalMethod = GURU_EARNINGS_METHODS.find(
@@ -1442,7 +1452,51 @@ function PaymentSetupCard({
               </button>
             </form>
           )}
-          {stripeHelpMessage ? (
+
+          {stripeStarted || stripeReady || stripeInReview ? (
+            <div
+              role="status"
+              className={`mt-3 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
+                stripeReady
+                  ? "border-green-200 bg-green-50"
+                  : stripeInReview
+                    ? "border-sky-200 bg-sky-50"
+                    : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              {stripeReady ? (
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 !text-green-700" />
+              ) : (
+                <Clock3
+                  className={`mt-0.5 h-5 w-5 shrink-0 ${
+                    stripeInReview ? "!text-sky-700" : "!text-amber-700"
+                  }`}
+                />
+              )}
+              <div>
+                <p
+                  className={`text-sm font-black ${
+                    stripeReady
+                      ? "!text-green-900"
+                      : stripeInReview
+                        ? "!text-sky-900"
+                        : "!text-amber-900"
+                  }`}
+                >
+                  {stripeReady
+                    ? "Stripe status verified"
+                    : stripeInReview
+                      ? "Stripe is reviewing your info"
+                      : "Stripe setup still needs a few steps"}
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  Last checked: {stripeLastCheckedAt}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {stripeHelpMessage && !stripeReady ? (
             <p className="mt-3 text-xs font-semibold leading-5 !text-slate-600">
               {stripeHelpMessage}
             </p>
@@ -1557,6 +1611,7 @@ export default async function GuruDashboardEarningsPage({
   let liveStripePendingReview = false;
   let liveStripeDetailsSubmitted = false;
   let liveStripeComplete = false;
+  let liveStripeLastCheckedAt: string | null = null;
 
   const applyLiveStripeReadiness = (
     readiness: Awaited<ReturnType<typeof syncStripeConnectAccountForUser>>,
@@ -1566,6 +1621,7 @@ export default async function GuruDashboardEarningsPage({
     liveStripePendingReview =
       readiness.pendingReview === true ||
       (readiness.detailsSubmitted === true && readiness.complete !== true);
+    liveStripeLastCheckedAt = new Date().toISOString();
   };
 
   const runStripeSync = async () => {
@@ -1586,46 +1642,54 @@ export default async function GuruDashboardEarningsPage({
     });
   };
 
-  if (shouldResyncStripe) {
-    try {
+  // Always re-sync when a Connect account exists so Ready / In review sticks
+  // after a plain refresh (no ?stripe= query param).
+  try {
+    const { data: guruRow } = await supabaseAdmin
+      .from("gurus")
+      .select(
+        "stripe_account_id, stripe_onboarding_complete, payouts_enabled, stripe_connect_status",
+      )
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const stripeAccountId = String(guruRow?.stripe_account_id || "").trim();
+    const guruMarkedReady =
+      guruRow?.stripe_onboarding_complete === true ||
+      guruRow?.payouts_enabled === true;
+
+    if (stripeAccountId) {
       const readiness = await runStripeSync();
       if (readiness) {
         applyLiveStripeReadiness(readiness);
-      }
-    } catch (error) {
-      console.error("Earnings page Stripe re-sync failed:", error);
-      // Return URL says connected/pending but sync failed — still show review UX.
-      if (
-        stripeReturnStatus === "connected" ||
-        stripeReturnStatus === "pending"
+      } else if (guruMarkedReady) {
+        liveStripeComplete = true;
+        liveStripeLastCheckedAt = new Date().toISOString();
+      } else if (
+        String(guruRow?.stripe_connect_status || "")
+          .toLowerCase()
+          .includes("pending") ||
+        shouldResyncStripe
       ) {
         liveStripePendingReview = true;
         liveStripeDetailsSubmitted = true;
+        liveStripeLastCheckedAt = new Date().toISOString();
       }
+    } else if (shouldResyncStripe) {
+      // Return URL present but account id missing — still avoid Almost ready.
+      liveStripePendingReview = true;
+      liveStripeDetailsSubmitted = true;
+      liveStripeLastCheckedAt = new Date().toISOString();
     }
-  } else {
-    // Soft refresh for in-progress Connect accounts so "Almost ready" can
-    // become Ready / In review after Stripe finishes verifying.
-    try {
-      const { data: guruRow } = await supabaseAdmin
-        .from("gurus")
-        .select("stripe_account_id, stripe_onboarding_complete, payouts_enabled")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const stripeAccountId = String(guruRow?.stripe_account_id || "").trim();
-      const alreadyReady =
-        guruRow?.stripe_onboarding_complete === true ||
-        guruRow?.payouts_enabled === true;
-
-      if (stripeAccountId && !alreadyReady) {
-        const readiness = await runStripeSync();
-        if (readiness) {
-          applyLiveStripeReadiness(readiness);
-        }
-      }
-    } catch (error) {
-      console.error("Earnings page Stripe soft re-sync failed:", error);
+  } catch (error) {
+    console.error("Earnings page Stripe re-sync failed:", error);
+    if (
+      stripeReturnStatus === "connected" ||
+      stripeReturnStatus === "pending"
+    ) {
+      liveStripePendingReview = true;
+      liveStripeDetailsSubmitted = true;
+      liveStripeLastCheckedAt = new Date().toISOString();
     }
   }
 
@@ -1637,6 +1701,8 @@ export default async function GuruDashboardEarningsPage({
   ) {
     liveStripePendingReview = true;
     liveStripeDetailsSubmitted = true;
+    liveStripeLastCheckedAt =
+      liveStripeLastCheckedAt || new Date().toISOString();
   }
 
   const {
@@ -1822,6 +1888,7 @@ export default async function GuruDashboardEarningsPage({
           liveStripePendingReview={liveStripePendingReview}
           liveStripeDetailsSubmitted={liveStripeDetailsSubmitted}
           liveStripeComplete={liveStripeComplete}
+          liveStripeLastCheckedAt={liveStripeLastCheckedAt}
         />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
