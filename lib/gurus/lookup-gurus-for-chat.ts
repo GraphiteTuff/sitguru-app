@@ -457,7 +457,7 @@ export async function lookupGurusForChat(
       gurus: [],
       groups: [],
       searchUrl: "/search",
-      note: "Ask for a ZIP code or city/state — plus every service type and time of care — so I can fetch live matches.",
+      note: "Ask for one missing detail at a time — ZIP first, then when they need care — before fetching live matches.",
     };
   }
 

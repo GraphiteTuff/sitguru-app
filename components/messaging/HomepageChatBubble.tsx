@@ -56,7 +56,7 @@ import {
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
 import {
-  CARE_MATCHING_CHIPS,
+  getCareMatchingChipsForThread,
   hasMatchingIntakeMarker,
 } from "@/lib/chat/care-matching-intake";
 
@@ -567,19 +567,43 @@ export default function HomepageChatBubble() {
 
   const [matchingChipsReady, setMatchingChipsReady] = useState(false);
 
+  const matchingThreadText = useMemo(() => {
+    return messages
+      .filter((message) => message.role === "user")
+      .slice(-6)
+      .map((message) => String(message.content || "").trim())
+      .filter(Boolean)
+      .join(" \n ");
+  }, [messages]);
+
+  const matchingStepChips = useMemo(
+    () => getCareMatchingChipsForThread(matchingThreadText),
+    [matchingThreadText],
+  );
+
   const showMatchingChips = useMemo(() => {
     if (!showIntentChips || !matchingChipsReady) return false;
+    if (!matchingStepChips.length) return false;
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => message.role === "assistant");
     return hasMatchingIntakeMarker(lastAssistant?.content);
-  }, [matchingChipsReady, messages, showIntentChips]);
+  }, [
+    matchingChipsReady,
+    matchingStepChips.length,
+    messages,
+    showIntentChips,
+  ]);
 
   useEffect(() => {
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => message.role === "assistant");
-    if (!lastAssistant || !hasMatchingIntakeMarker(lastAssistant.content)) {
+    if (
+      !lastAssistant ||
+      !hasMatchingIntakeMarker(lastAssistant.content) ||
+      !matchingStepChips.length
+    ) {
       setMatchingChipsReady(false);
       return;
     }
@@ -592,7 +616,7 @@ export default function HomepageChatBubble() {
     const delay = Math.min(2800, Math.max(700, words * 52 + 200));
     const timer = window.setTimeout(() => setMatchingChipsReady(true), delay);
     return () => window.clearTimeout(timer);
-  }, [messages]);
+  }, [matchingStepChips.length, messages]);
 
   function openPanel() {
     setOpen(true);
@@ -923,7 +947,7 @@ export default function HomepageChatBubble() {
               role="toolbar"
               aria-label="Matching details"
             >
-              {CARE_MATCHING_CHIPS.map((chip) => (
+              {matchingStepChips.map((chip) => (
                 <button
                   key={`${chip.group}-${chip.label}`}
                   type="button"

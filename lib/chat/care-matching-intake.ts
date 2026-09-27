@@ -1,7 +1,6 @@
 /**
- * Client-safe care-matching intake for Rogue / Scout.
- * Green-pill care asks should collect ZIP/area, every service type,
- * time of service, and extras before live Guru lookup.
+ * Conversational care-matching intake for Rogue / Scout.
+ * One question per turn: ZIP → when → (optional extras), then live Guru lookup.
  */
 
 import {
@@ -25,11 +24,19 @@ export const CARE_SERVICE_OPTIONS = [
 
 export const CARE_TIME_OPTIONS = [
   "Morning",
-  "Midday",
   "Afternoon",
+  "Night",
+  "Midday",
   "Evening",
   "Overnight",
   "Flexible",
+] as const;
+
+/** Chips shown while Rogue is asking "when?" — keep it simple. */
+export const CARE_TIME_STEP_OPTIONS = [
+  "Morning",
+  "Afternoon",
+  "Night",
 ] as const;
 
 export const CARE_EXTRA_OPTIONS = [
@@ -48,7 +55,10 @@ export const CARE_MATCHING_CHIPS: readonly MatchingChip[] = [
   ...CARE_TIME_OPTIONS.map((label) => ({
     group: "time" as const,
     label,
-    content: `I need care in the ${label}`,
+    content:
+      label === "Night"
+        ? "I need care at Night"
+        : `I need care in the ${label}`,
   })),
   ...CARE_SERVICE_OPTIONS.map((label) => ({
     group: "service" as const,
@@ -62,16 +72,7 @@ export const CARE_MATCHING_CHIPS: readonly MatchingChip[] = [
   })),
 ];
 
-const SERVICES_LIST =
-  "walks, drop-ins, pet sitting, overnight / house sitting, boarding, day care, training";
-
-const ALL_SERVICES_PHRASE = `**every service** to match (${SERVICES_LIST})`;
-
-const TIME_PHRASE =
-  "**when** you need care (morning, midday, afternoon, evening, overnight, a specific day, or flexible)";
-
-const EXTRAS_PHRASE =
-  "any **extras** (medication, puppy care, extra pets)";
+export type CareMatchingStep = "location" | "time" | "extras" | "ready";
 
 export type CareMatchingIntake = {
   isCareSeeking: boolean;
@@ -88,6 +89,7 @@ export type CareMatchingIntake = {
   hasTime: boolean;
   hasExtras: boolean;
   readyForLookup: boolean;
+  nextStep: CareMatchingStep;
   missing: Array<"location" | "zip" | "service" | "time">;
 };
 
@@ -121,7 +123,11 @@ function detectExtraServices(text: string): string[] {
   const extras: string[] = [];
   if (/\bmedicat/.test(lower)) extras.push("Medication Help");
   if (/\bpuppy|\bkitten|\bsenior\b/.test(lower)) extras.push("Puppy Care");
-  if (/\bextra pets?\b|\bmultiple pets?\b|\btwo dogs?\b|\bmore than one\b/.test(lower)) {
+  if (
+    /\bextra pets?\b|\bmultiple pets?\b|\btwo dogs?\b|\bmore than one\b/.test(
+      lower,
+    )
+  ) {
     extras.push("Extra Pets");
   }
   return extras;
@@ -131,7 +137,9 @@ function detectTimeWindow(text: string): string | undefined {
   const lower = text.toLowerCase();
   if (/\bflexible\b|\banytime\b|\bany time\b/.test(lower)) return "Flexible";
   if (/\bovernight\b|\ball[- ]night\b/.test(lower)) return "Overnight";
-  if (/\bevening\b|\bafter work\b|\bafter 5\b|\btonight\b/.test(lower)) {
+  if (
+    /\bnight\b|\bevening\b|\bafter work\b|\bafter 5\b|\btonight\b/.test(lower)
+  ) {
     return "Evening";
   }
   if (/\bafternoon\b|\bafter lunch\b/.test(lower)) return "Afternoon";
@@ -152,6 +160,7 @@ function detectTimeWindow(text: string): string | undefined {
 function isMatchingFollowUp(lower: string): boolean {
   return (
     /\bi need care in the\b/.test(lower) ||
+    /\bi need care at\b/.test(lower) ||
     /\balso matching\b/.test(lower) ||
     CARE_TIME_OPTIONS.some((option) =>
       lower.includes(option.toLowerCase()),
@@ -160,6 +169,25 @@ function isMatchingFollowUp(lower: string): boolean {
       lower.includes(option.toLowerCase()),
     )
   );
+}
+
+function resolveNextStep(intake: {
+  isCareSeeking: boolean;
+  isProviderSignup: boolean;
+  hasLocation: boolean;
+  hasZip: boolean;
+  hasServiceType: boolean;
+  hasTime: boolean;
+}): CareMatchingStep {
+  if (intake.isProviderSignup) {
+    if (!intake.hasLocation) return "location";
+    if (!intake.hasServiceType) return "time";
+    if (!intake.hasTime) return "time";
+    return "ready";
+  }
+  if (!intake.hasLocation || !intake.hasZip) return "location";
+  if (!intake.hasTime) return "time";
+  return "ready";
 }
 
 /** Join recent user turns so ZIP / time / services persist across chips. */
@@ -235,6 +263,15 @@ export function parseCareMatchingIntake(
     if (!hasTime) missing.push("time");
   }
 
+  const nextStep = resolveNextStep({
+    isCareSeeking,
+    isProviderSignup,
+    hasLocation,
+    hasZip,
+    hasServiceType,
+    hasTime,
+  });
+
   return {
     isCareSeeking,
     isProviderSignup,
@@ -249,7 +286,8 @@ export function parseCareMatchingIntake(
     hasServiceType,
     hasTime,
     hasExtras,
-    readyForLookup: isCareSeeking && hasLocation,
+    readyForLookup: isCareSeeking && hasLocation && hasTime,
+    nextStep,
     missing,
   };
 }
@@ -257,17 +295,52 @@ export function parseCareMatchingIntake(
 export function needsCareMatchingAsk(rawText?: string | null): boolean {
   const intake = parseCareMatchingIntake(rawText);
   if (intake.isProviderSignup) {
-    return !intake.hasLocation || !intake.hasTime || !intake.hasServiceType;
+    return intake.nextStep !== "ready";
   }
   if (!intake.isCareSeeking) return false;
-  if (looksLikeGuruDirectoryQuery(rawText) && intake.hasLocation) return false;
-  return !intake.hasLocation || !intake.hasTime;
+  if (looksLikeGuruDirectoryQuery(rawText) && intake.hasLocation && intake.hasTime) {
+    return false;
+  }
+  return intake.nextStep !== "ready";
 }
 
 export function hasMatchingIntakeMarker(raw?: string | null): boolean {
   return /\[\[\s*matching_intake\s*\]\]/i.test(String(raw || ""));
 }
 
+/** Chips for the current intake step only — never dump every option. */
+export function getCareMatchingChipsForThread(
+  rawText?: string | null,
+): MatchingChip[] {
+  const intake = parseCareMatchingIntake(rawText);
+  if (!intake.isCareSeeking && !intake.isProviderSignup) return [];
+
+  if (intake.nextStep === "location") {
+    return [];
+  }
+
+  if (intake.nextStep === "time") {
+    return CARE_TIME_STEP_OPTIONS.map((label) => ({
+      group: "time" as const,
+      label,
+      content:
+        label === "Night"
+          ? "I need care at Night"
+          : `I need care in the ${label}`,
+    }));
+  }
+
+  if (intake.nextStep === "extras") {
+    return CARE_MATCHING_CHIPS.filter((chip) => chip.group === "extra");
+  }
+
+  return [];
+}
+
+/**
+ * One conversational question only.
+ * Example: "Hey Jason! For Drop-In Visits, I'm on it — what's the ZIP where you need care?"
+ */
 export function buildCareMatchingAsk(
   rawText?: string | null,
   firstName?: string | null,
@@ -276,34 +349,30 @@ export function buildCareMatchingAsk(
   if (!needsCareMatchingAsk(rawText)) return null;
 
   const name = clean(firstName);
-  const lead = name ? `hey ${name}! ` : "";
+  const hey = name ? `Hey ${name}!` : "Hey!";
   const serviceLabel = intake.service || "pet care";
-  const marker = `${MATCHING_INTAKE_MARKER}`;
+  const marker = MATCHING_INTAKE_MARKER;
 
   if (intake.isProviderSignup) {
-    return `${lead}love that Guru energy — pet sitters, dog sitters, and cat sitters are all SitGuru **Gurus**. What **ZIP or city** will you serve, which **services** will you offer (${SERVICES_LIST}), and what **times** are you usually free (morning, midday, afternoon, evening, overnight, or flexible)? ${marker} [[cta:guru]]`;
+    if (!intake.hasLocation) {
+      return `${hey} Love that Guru energy — what **ZIP** will you serve? ${marker}`;
+    }
+    if (!intake.hasServiceType) {
+      return `${hey} Got it — which **services** will you offer? ${marker} [[cta:guru]]`;
+    }
+    if (!intake.hasTime) {
+      return `${hey} And when are you usually free — Morning, Afternoon, or Night? ${marker}`;
+    }
+    return null;
   }
 
-  const bits: string[] = [];
-  if (!intake.hasLocation || !intake.hasZip) {
-    bits.push("your **ZIP code** (city + state also works)");
+  if (intake.nextStep === "location") {
+    return `${hey} For **${serviceLabel}**, I'm on it — what's the **ZIP** where you need care? ${marker}`;
   }
-  if (!intake.hasTime) {
-    bits.push(TIME_PHRASE);
-  }
-  if (!intake.hasServiceType) {
-    bits.push(ALL_SERVICES_PHRASE);
-  } else {
-    bits.push(`any **other services** besides ${serviceLabel} (${SERVICES_LIST})`);
-  }
-  bits.push(EXTRAS_PHRASE);
 
-  const ask =
-    bits.length === 1
-      ? bits[0]
-      : bits.length === 2
-        ? `${bits[0]} and ${bits[1]}`
-        : `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}`;
+  if (intake.nextStep === "time") {
+    return `${hey} When do you need your **${serviceLabel}** — Morning, Afternoon, or Night? ${marker}`;
+  }
 
-  return `${lead}**${serviceLabel}** — I'm on it. Tell me ${ask} so I can match the full visit, not just one pill. ${marker} [[cta:parent]]`;
+  return null;
 }
