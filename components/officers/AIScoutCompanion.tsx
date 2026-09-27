@@ -309,7 +309,18 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   useEffect(() => {
     if (!isOpen) return;
     const el = scrollerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scrollToBottom();
+    const observer = new MutationObserver(scrollToBottom);
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => observer.disconnect();
   }, [messages, isTyping, isOpen]);
 
   useEffect(() => {

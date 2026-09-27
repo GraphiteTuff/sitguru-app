@@ -578,36 +578,51 @@ export function looksLikeGuruDirectoryQuery(rawText?: string | null): boolean {
   return false;
 }
 
-function extractPlacePhrase(text: string): string {
-  // Avoid matching the "in" inside drop-in / check-in compounds.
-  const nearMatch = text.match(
-    /(?<![\w-])(?:near|in|around|at)\s+([A-Za-z][A-Za-z .',-]{1,80})/i,
-  );
-  if (nearMatch?.[1]) {
-    return nearMatch[1]
-      .replace(
-        /\b(please|thanks|thank you|asap|today|tomorrow|tonight|this weekend|next week|morning|afternoon|evening|night|for\b.*)$/i,
-        "",
-      )
-      .replace(/[.,!?;:]+$/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  // "Arlington, VA" / "Austin TX" / "New York, NY" anywhere — skip service lead-ins.
-  const cityState = text.match(
-    /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/,
-  );
-  if (
-    cityState?.[1] &&
-    cityState?.[2] &&
-    isUsStateToken(cityState[2]) &&
-    !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?|looking|need|find|book)$/i.test(
-      cityState[1].trim(),
+function cleanPlaceCapture(raw: string): string {
+  return clean(raw)
+    .replace(
+      /\b(please|thanks|thank you|asap|today|tomorrow|tonight|this weekend|next week|morning|afternoon|evening|night|for\b.*)$/i,
+      "",
     )
-  ) {
-    return `${cityState[1]} ${cityState[2]}`.trim();
+    .replace(/^(near|in|around|at)\s+/i, "")
+    .replace(/[.,!?;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Prefer the **most recent** city/state or ZIP in the thread so a new place
+ * overrides an earlier one (Boston → New York keeps New York).
+ */
+function extractPlacePhrase(text: string): string {
+  const nearRe =
+    /(?<![\w-])(?:near|in|around|at)\s+([A-Za-z][A-Za-z .',-]{1,80})/gi;
+  const nearHits: string[] = [];
+  for (const match of text.matchAll(nearRe)) {
+    const cleaned = cleanPlaceCapture(match[1] || "");
+    if (cleaned) nearHits.push(cleaned);
   }
+  if (nearHits.length) return nearHits[nearHits.length - 1]!;
+
+  // "Arlington, VA" / "Austin TX" / "New York, NY" — take the last valid hit.
+  const cityStateRe =
+    /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/g;
+  const cityStateHits: string[] = [];
+  for (const match of text.matchAll(cityStateRe)) {
+    const cityPart = cleanPlaceCapture(match[1] || "");
+    const statePart = clean(match[2] || "");
+    if (
+      cityPart &&
+      statePart &&
+      isUsStateToken(statePart) &&
+      !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?|looking|need|find|book)$/i.test(
+        cityPart,
+      )
+    ) {
+      cityStateHits.push(`${cityPart} ${statePart}`);
+    }
+  }
+  if (cityStateHits.length) return cityStateHits[cityStateHits.length - 1]!;
 
   return "";
 }
@@ -638,8 +653,15 @@ export function inferLookupParamsFromChat(
     text,
   );
 
-  const zipMatch = text.match(/\b(\d{5})(?:-\d{4})?\b/);
-  const zip = zipMatch?.[1];
+  const zipMatches = [...text.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)];
+  // Most recent ZIP wins when the visitor updates location mid-thread.
+  let zip = zipMatches.length
+    ? zipMatches[zipMatches.length - 1]?.[1]
+    : undefined;
+  const lastZipIndex =
+    zipMatches.length > 0
+      ? zipMatches[zipMatches.length - 1]!.index ?? -1
+      : -1;
 
   const namedMatch = text.match(
     /\b(?:guru|sitter|walker|trainer)\s+(?:named|called)\s+([A-Za-z][A-Za-z' -]{1,40})/i,
@@ -654,7 +676,9 @@ export function inferLookupParamsFromChat(
   let city: string | undefined;
   let state: string | undefined;
   const placePhrase = extractPlacePhrase(text);
+  let lastPlaceIndex = -1;
   if (placePhrase) {
+    lastPlaceIndex = text.toLowerCase().lastIndexOf(placePhrase.toLowerCase());
     const parsed = splitCityState(placePhrase);
     city =
       parsed.city && looksLikePlaceName(parsed.city)
@@ -663,19 +687,27 @@ export function inferLookupParamsFromChat(
     state = parsed.state;
   } else if (!zip) {
     // Only use bare "City ST" fallback when no ZIP (avoids "drop in" → Drop, IN).
-    const cityState = text.match(
-      /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2})\b/,
-    );
-    if (
-      cityState?.[1] &&
-      cityState?.[2] &&
-      isUsStateToken(cityState[2]) &&
-      !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?)$/i.test(
-        cityState[1].trim(),
-      )
-    ) {
-      city = titleCasePlace(cityState[1]);
-      state = normalizeUsState(cityState[2]);
+    const cityStateRe =
+      /\b([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,3}),?\s+([A-Za-z]{2})\b/g;
+    let lastCity = "";
+    let lastState = "";
+    for (const match of text.matchAll(cityStateRe)) {
+      const cityPart = cleanPlaceCapture(match[1] || "");
+      const statePart = clean(match[2] || "");
+      if (
+        cityPart &&
+        statePart &&
+        isUsStateToken(statePart) &&
+        !/^(drop|dog|pet|house|day|care|walk|sitter|gurus?)$/i.test(cityPart)
+      ) {
+        lastCity = cityPart;
+        lastState = statePart;
+        lastPlaceIndex = match.index ?? lastPlaceIndex;
+      }
+    }
+    if (lastCity && lastState) {
+      city = titleCasePlace(lastCity);
+      state = normalizeUsState(lastState);
     }
   }
   if (!state) {
@@ -684,6 +716,16 @@ export function inferLookupParamsFromChat(
     );
     const maybeBare = normalizeUsState(bareState?.[1]);
     if (maybeBare && !city) state = maybeBare;
+  }
+
+  // If both ZIP and city/state appear, keep only the most recently mentioned one.
+  if (zip && city && state) {
+    if (lastPlaceIndex > lastZipIndex) {
+      zip = undefined;
+    } else if (lastZipIndex > lastPlaceIndex) {
+      city = undefined;
+      state = undefined;
+    }
   }
 
   let service: string | undefined;

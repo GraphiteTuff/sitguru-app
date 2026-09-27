@@ -686,13 +686,6 @@ export default function HomepageChatBubble() {
 
   useEffect(() => {
     if (!open) return;
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, open]);
-
-  useEffect(() => {
-    if (!open) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 180);
     return () => window.clearTimeout(t);
   }, [open]);
@@ -754,6 +747,27 @@ export default function HomepageChatBubble() {
     messages,
     showIntentChips,
   ]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current;
+    if (!el) return;
+
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+
+    scrollToBottom();
+    // Keep pinned to the latest AI text while typewriter / chips grow the DOM.
+    const observer = new MutationObserver(scrollToBottom);
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, [open, messages, isLoading, isBusy, matchingChipsReady, showMatchingChips]);
 
   useEffect(() => {
     const lastAssistant = [...messages]
