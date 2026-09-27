@@ -3,8 +3,10 @@
 /**
  * Shared assistant bubble body for all web companions (Rogue / Scout / Taco / Delilah).
  * Parses [[cta:*]] + guru cards the same way Rogue does so look & CTAs stay consistent.
+ * Reveals reply text word-by-word so it feels like a person typing.
  */
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
 import { EmailSubscribePack } from "@/components/messaging/EmailSubscribePack";
@@ -16,6 +18,7 @@ import {
   type HomepageCtaContext,
   type HomepageCtaDef,
 } from "@/lib/chat/homepage-cta";
+import { useCompanionTypewriter } from "@/hooks/useCompanionTypewriter";
 
 function CtaActionButton({
   cta,
@@ -53,14 +56,39 @@ function CtaActionButton({
   );
 }
 
+function useTypingCompleteEffect(
+  isComplete: boolean,
+  onTypingComplete?: () => void,
+) {
+  const wasCompleteRef = useRef(false);
+
+  useEffect(() => {
+    if (!isComplete) {
+      wasCompleteRef.current = false;
+      return;
+    }
+    if (wasCompleteRef.current) return;
+    wasCompleteRef.current = true;
+    onTypingComplete?.();
+  }, [isComplete, onTypingComplete]);
+}
+
 export function CompanionAssistantBubbleBody({
   content,
   ctaContext,
   socialSource = "companion_chat",
+  typewriter = true,
+  resetKey,
+  onTypingComplete,
 }: {
   content: string;
   ctaContext?: HomepageCtaContext;
   socialSource?: string;
+  /** Word-by-word reveal (default on). */
+  typewriter?: boolean;
+  /** Stable id so a new reply restarts the typewriter. */
+  resetKey?: string;
+  onTypingComplete?: () => void;
 }) {
   let text = "";
   let ctas: HomepageCtaDef[] = [];
@@ -84,14 +112,21 @@ export function CompanionAssistantBubbleBody({
   // Also strip unused ambassador video marker until card is rendered elsewhere.
   text = text.replace(/\[\[\s*ambassador_video_card\s*\]\]/gi, " ").trim();
 
+  const { visibleText, isComplete } = useCompanionTypewriter(text, {
+    enabled: typewriter && Boolean(text),
+    resetKey: resetKey || content.slice(0, 48),
+  });
+
+  useTypingCompleteEffect(isComplete, onTypingComplete);
+
   return (
     <div className="space-y-1">
-      {text ? (
+      {visibleText ? (
         <SafeAssistantBubble contentHint={content}>
-          <RogueMarkdownText text={text} />
+          <RogueMarkdownText text={visibleText} />
         </SafeAssistantBubble>
       ) : null}
-      {guruCards.length > 0 ? (
+      {isComplete && guruCards.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 pt-1.5">
           {guruCards.map((guru) => (
             <SafeAssistantBubble key={guru.slug} contentHint={guru.slug}>
@@ -100,7 +135,7 @@ export function CompanionAssistantBubbleBody({
           ))}
         </div>
       ) : null}
-      {ctas.length > 0 ? (
+      {isComplete && ctas.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-1">
           {ctas.map((cta) => (
             <SafeAssistantBubble key={cta.id} contentHint={cta.id}>

@@ -565,13 +565,34 @@ export default function HomepageChatBubble() {
     [isBusy],
   );
 
+  const [matchingChipsReady, setMatchingChipsReady] = useState(false);
+
   const showMatchingChips = useMemo(() => {
-    if (!showIntentChips) return false;
+    if (!showIntentChips || !matchingChipsReady) return false;
     const lastAssistant = [...messages]
       .reverse()
       .find((message) => message.role === "assistant");
     return hasMatchingIntakeMarker(lastAssistant?.content);
-  }, [messages, showIntentChips]);
+  }, [matchingChipsReady, messages, showIntentChips]);
+
+  useEffect(() => {
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    if (!lastAssistant || !hasMatchingIntakeMarker(lastAssistant.content)) {
+      setMatchingChipsReady(false);
+      return;
+    }
+
+    setMatchingChipsReady(false);
+    const words = String(lastAssistant.content || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+    const delay = Math.min(2800, Math.max(700, words * 52 + 200));
+    const timer = window.setTimeout(() => setMatchingChipsReady(true), delay);
+    return () => window.clearTimeout(timer);
+  }, [messages]);
 
   function openPanel() {
     setOpen(true);
@@ -867,6 +888,11 @@ export default function HomepageChatBubble() {
                 return null;
               }
 
+              const isLatestAssistant =
+                m.id ===
+                [...messages].reverse().find((row) => row.role === "assistant")
+                  ?.id;
+
               return (
                 <AssistantRow key={m.id}>
                   <div className="homepage-chat-bubble homepage-chat-bubble--ai">
@@ -875,6 +901,8 @@ export default function HomepageChatBubble() {
                         content={m.content}
                         ctaContext={ctaContext}
                         socialSource="rogue_homepage_chat"
+                        resetKey={m.id}
+                        typewriter={isLatestAssistant}
                       />
                     </SafeAssistantBubble>
                   </div>

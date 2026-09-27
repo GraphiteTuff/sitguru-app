@@ -529,6 +529,13 @@ export default function AITacoCompanion({
                         content={message.content}
                         ctaContext={{ pagePath: requestBody.pagePath }}
                         socialSource="taco_companion_chat"
+                        resetKey={message.id}
+                        typewriter={
+                          message.id ===
+                          [...messages]
+                            .reverse()
+                            .find((row) => row.role === "assistant")?.id
+                        }
                       />
                     ) : (
                       message.content

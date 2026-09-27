@@ -154,12 +154,24 @@ function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
-function ScoutAssistantBody({ text, pagePath }: { text: string; pagePath?: string }) {
+function ScoutAssistantBody({
+  text,
+  pagePath,
+  resetKey,
+  typewriter = true,
+}: {
+  text: string;
+  pagePath?: string;
+  resetKey?: string;
+  typewriter?: boolean;
+}) {
   return (
     <CompanionAssistantBubbleBody
       content={text}
       ctaContext={{ pagePath: pagePath || "/" }}
       socialSource="scout_companion_chat"
+      resetKey={resetKey}
+      typewriter={typewriter}
     />
   );
 }
@@ -457,6 +469,13 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                       <ScoutAssistantBody
                         text={message.content}
                         pagePath={requestBody.pagePath}
+                        resetKey={message.id}
+                        typewriter={
+                          message.id ===
+                          [...messages]
+                            .reverse()
+                            .find((row) => row.role === "assistant")?.id
+                        }
                       />
                     ) : (
                       message.content

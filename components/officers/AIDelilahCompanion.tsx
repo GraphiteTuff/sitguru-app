@@ -354,6 +354,13 @@ export default function AIDelilahCompanion() {
                           eventId: storedEvent?.id,
                         }}
                         socialSource="delilah_companion_chat"
+                        resetKey={message.id}
+                        typewriter={
+                          message.id ===
+                          [...messages]
+                            .reverse()
+                            .find((row) => row.role === "assistant")?.id
+                        }
                       />
                     ) : (
                       message.content

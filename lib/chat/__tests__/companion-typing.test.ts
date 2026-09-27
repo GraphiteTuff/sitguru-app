@@ -4,6 +4,7 @@ import {
   COMPANION_MAX_TYPING_MS,
   COMPANION_MIN_TYPING_MS,
   companionTypingDelayMs,
+  splitCompanionRevealTokens,
 } from "../companion-typing";
 
 describe("companionTypingDelayMs", () => {
@@ -17,5 +18,13 @@ describe("companionTypingDelayMs", () => {
     expect(mid).toBeGreaterThan(COMPANION_MIN_TYPING_MS);
     expect(mid).toBeLessThanOrEqual(COMPANION_MAX_TYPING_MS);
     expect(companionTypingDelayMs(10_000)).toBe(COMPANION_MAX_TYPING_MS);
+  });
+});
+
+describe("splitCompanionRevealTokens", () => {
+  it("keeps spaces so word-by-word join rebuilds the sentence", () => {
+    const tokens = splitCompanionRevealTokens("hey Jason! What's your ZIP?");
+    expect(tokens.join("")).toBe("hey Jason! What's your ZIP?");
+    expect(tokens.filter((token) => token.trim()).length).toBeGreaterThan(3);
   });
 });

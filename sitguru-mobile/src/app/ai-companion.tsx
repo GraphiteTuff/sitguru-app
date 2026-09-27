@@ -47,6 +47,7 @@ import {
   useCompanionChat,
   type CompanionChatMessage,
 } from '@/hooks/data/useCompanionChat';
+import { useCompanionTypewriter } from '@/hooks/useCompanionTypewriter';
 import {
   companionAvatarUrl,
   companionWebUrl,
@@ -277,7 +278,7 @@ export default function AiCompanionScreen() {
                     styles={styles}
                   />
 
-                  {messages.map((message) =>
+                  {messages.map((message, index) =>
                     message.role === 'user' ? (
                       <UserBubble
                         key={message.id}
@@ -289,6 +290,7 @@ export default function AiCompanionScreen() {
                         key={message.id}
                         companion={companion}
                         isDark={isDark}
+                        isLatest={index === messages.length - 1}
                         message={message}
                         onCta={openCompanionCta}
                         onGuruCard={openGuruCard}
@@ -493,6 +495,7 @@ function UserBubble({
 function AssistantBubble({
   companion,
   isDark,
+  isLatest = false,
   message,
   onCta,
   onGuruCard,
@@ -503,6 +506,7 @@ function AssistantBubble({
 }: {
   companion: AiCompanionProfile;
   isDark: boolean;
+  isLatest?: boolean;
   message: CompanionChatMessage;
   onCta: (def: CompanionCtaDef) => void;
   onGuruCard: (card: GuruChatSnapshot) => void;
@@ -521,11 +525,28 @@ function AssistantBubble({
     return { ...result, text: toPlainChatText(result.text) };
   }, [isStreamingBubble, message.content]);
 
-  const showSocialPack = parsed.ctas.some((def) => def.action.kind === 'social');
-  const buttonCtas = parsed.ctas.filter((def) => def.action.kind !== 'social');
+  const { visibleText, isComplete } = useCompanionTypewriter(parsed.text, {
+    enabled:
+      Boolean(parsed.text) && message.state !== 'error' && isLatest,
+    resetKey: message.id,
+  });
+
+  const showSocialPack =
+    isComplete && parsed.ctas.some((def) => def.action.kind === 'social');
+  const buttonCtas = isComplete
+    ? parsed.ctas.filter((def) => def.action.kind !== 'social')
+    : [];
   const isError = message.state === 'error';
 
-  if (!parsed.text && !parsed.guruCards.length && !parsed.ctas.length) {
+  if (!visibleText && !isComplete) {
+    return null;
+  }
+
+  if (
+    !visibleText &&
+    !parsed.guruCards.length &&
+    !parsed.ctas.length
+  ) {
     return null;
   }
 
@@ -541,7 +562,7 @@ function AssistantBubble({
       <View style={styles.assistantGroup}>
         <Text style={styles.assistantName}>{companion.name}</Text>
 
-        {parsed.text ? (
+        {visibleText ? (
           <View
             style={[
               styles.assistantBubble,
@@ -554,20 +575,22 @@ function AssistantBubble({
                 isError && styles.assistantBubbleTextError,
               ]}
             >
-              {parsed.text}
+              {visibleText}
             </Text>
           </View>
         ) : null}
 
-        {parsed.guruCards.map((card) => (
-          <GuruSnapshotCard
-            card={card}
-            key={card.slug}
-            onPress={() => onGuruCard(card)}
-            palette={palette}
-            styles={styles}
-          />
-        ))}
+        {isComplete
+          ? parsed.guruCards.map((card) => (
+              <GuruSnapshotCard
+                card={card}
+                key={card.slug}
+                onPress={() => onGuruCard(card)}
+                palette={palette}
+                styles={styles}
+              />
+            ))
+          : null}
 
         {buttonCtas.length ? (
           <View style={styles.ctaStack}>

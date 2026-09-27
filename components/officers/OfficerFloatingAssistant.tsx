@@ -23,6 +23,7 @@ import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
 import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
 import { useCompanionTypingReply } from "@/hooks/useCompanionTypingReply";
+import { useCompanionTypewriter } from "@/hooks/useCompanionTypewriter";
 import { CompanionTypingBubble } from "@/components/messaging/CompanionTypingBubble";
 import type { Message } from "ai/react";
 
@@ -244,9 +245,13 @@ function OfficerMarkdown({
 function OfficerAssistantBody({
   text,
   theme,
+  resetKey,
+  typewriter = true,
 }: {
   text: string;
   theme: OfficerTheme;
+  resetKey?: string;
+  typewriter?: boolean;
 }) {
   const raw = String(text || "");
   const extracted = extractGuruCardsFromText(raw);
@@ -262,17 +267,22 @@ function OfficerAssistantBody({
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
+  const { visibleText, isComplete } = useCompanionTypewriter(cleaned, {
+    enabled: typewriter && Boolean(cleaned),
+    resetKey: resetKey || cleaned.slice(0, 48),
+  });
+
   return (
     <div className="space-y-1">
-      {cleaned ? <OfficerMarkdown text={cleaned} theme={theme} /> : null}
-      {extracted.cards.length > 0 ? (
+      {visibleText ? <OfficerMarkdown text={visibleText} theme={theme} /> : null}
+      {isComplete && extracted.cards.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 pt-1.5">
           {extracted.cards.map((guru) => (
             <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
           ))}
         </div>
       ) : null}
-      {hasVideoCard ? <AmbassadorVideoCard /> : null}
+      {isComplete && hasVideoCard ? <AmbassadorVideoCard /> : null}
     </div>
   );
 }
@@ -697,7 +707,17 @@ export default function OfficerFloatingAssistant({
                     className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1"
                     style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
                   >
-                    <OfficerAssistantBody text={message.content} theme={theme} />
+                    <OfficerAssistantBody
+                      text={message.content}
+                      theme={theme}
+                      resetKey={message.id}
+                      typewriter={
+                        message.id ===
+                        [...messages]
+                          .reverse()
+                          .find((row) => row.role === "assistant")?.id
+                      }
+                    />
                   </div>
                 </div>
               );
