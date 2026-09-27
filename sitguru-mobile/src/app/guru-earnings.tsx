@@ -1045,8 +1045,8 @@ export default function GuruEarningsScreen() {
                         {payoutsReady && activeProvider === 'stripe'
                           ? 'Update Stripe Payout Details'
                           : payoutStatus.detailsSubmitted ||
-                              payoutStatus.status === 'pending' ||
-                              payoutStatus.status === 'restricted'
+                              payoutStatus.requirements.length > 0 ||
+                              (payoutStatus.loaded && !payoutStatus.setupComplete)
                             ? 'Continue secure setup'
                             : 'Set Up Stripe Payouts'}
                       </Text>
