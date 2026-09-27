@@ -11,9 +11,9 @@
 
 1. **What SitGuru has today:** Stripe Connect **Express** accounts for Gurus (and Ambassadors), **Stripe-hosted Account Links** for KYC/bank collection, **separate charges and transfers** (platform Checkout/PaymentIntent → platform balance → admin `transfers.create`), plus a **scaffolded but checkout-disabled PayPal Multiparty** rail.
 
-2. **Why Gurus feel payment friction early:** The **data model already defers payout setup** until accepting the first paid booking, but the **UI does not**. Dashboard checklist step 6 is “Get paid,” and the onboarding packet primary CTA redirects straight into Stripe Connect.
+2. **Why Gurus feel payment friction early (especially SSN):** Most Gurus treat SitGuru as a **side gig**, not a banking product. SitGuru does **not** collect Social Security numbers in its own forms — **Stripe’s hosted Account Link does**, once SitGuru sends them there. The bug is **timing**: dashboard checklist step 6 (“Get paid”) and the onboarding packet primary CTA redirect Gurus into Stripe **before** they have published, gotten discovered, or received a booking. That makes joining feel like opening a bank account.
 
-3. **Sensitive financial data:** SitGuru does **not** collect SSN/EIN/routing/full bank numbers in forms. Stripe/Checkr/PayPal collect them on hosted surfaces. Residual risk: optional Photo ID upload into SitGuru storage, and many readiness booleans that can drift.
+3. **Sensitive financial data:** SitGuru does **not** store SSN/EIN/routing/full bank numbers from Guru forms. Stripe/Checkr/PayPal collect them on hosted surfaces when onboarding is started. Residual risk: optional Photo ID upload into SitGuru storage, and many readiness booleans that can drift. **SSN itself is unavoidable for US payout KYC eventually — it must not appear during basic signup.**
 
 4. **Modern vs legacy Stripe:** Account creation still uses **legacy `type: "express"`** (not controller properties / Accounts v2). Onboarding method (hosted Account Links) is still Stripe’s supported path. No Custom account KYC forms exist.
 
@@ -21,11 +21,11 @@
 
 6. **Biggest mobile risks:** Connect APIs are **cookie-session only** while mobile uses Bearer JWT (fragile fallback); Account Link return/refresh URLs are **web-only**; iOS Universal Links incomplete; `@stripe/stripe-react-native` installed but unused for PaymentSheet.
 
-7. **Biggest conversion opportunities:** Remove payout from early checklist; keep “Set up payouts” optional until first paid accept; enforce readiness at accept; add onboarding funnel analytics.
+7. **Biggest conversion opportunities:** Treat Gurus as side-gig marketplace providers: signup → profile → publish → get discovered → **only then** “Set up secure payouts to accept this booking.” Never surface SSN/tax/bank during registration; remove payout from early checklist; enforce readiness at accept; add onboarding funnel analytics.
 
 8. **Recommended target:** Keep Express (compat layer), keep separate charges/transfers, centralize `PaymentAccountService`, Stripe-hosted onboarding via HTTPS bridge for mobile, PayPal as optional Guru payout rail + future checkout alternative (not a second full marketplace today).
 
-9. **Mandatory payout trigger:** **Before accepting the first paid booking** (already encoded in `user_payout_preferences` / `/api/payouts/setup` rules)—not during signup, not before publish.
+9. **Mandatory payout trigger (and therefore first SSN ask):** **Before accepting the first paid booking** (already encoded in `user_payout_preferences` / `/api/payouts/setup` rules)—not during signup, not before publish. Stripe-hosted KYC (SSN/bank) stays with Stripe; SitGuru only starts that session when money is about to become real.
 
 10. **Do not migrate existing connected accounts** to a new Connect architecture unless Stripe Dashboard proves they are Custom/API-onboarded (they are Express + Account Links in code).
 
@@ -196,13 +196,39 @@ Checklist step 6:
 
 ## 4. Friction Findings
 
-### F1 — UI forces payout during onboarding while DB defers it
+### Product principle (side-gig Gurus)
+
+Joining SitGuru should feel like joining a pet-care marketplace — not applying for a financial product.
+
+Many Gurus are offering dog walking / sitting as a **second income**. For them, an early Social Security Number / bank setup screen is a conversion killer even when Stripe (not SitGuru) is the collector. SitGuru **cannot eliminate** US KYC forever — payouts legally require identity verification — but SitGuru **can and should** delay the Stripe-hosted SSN/bank session until the Guru is accepting paid work.
+
+**Correct experience**
+
+```text
+Signup (no SSN)
+  → Build profile / rates / area
+  → Publish & get discovered
+  → Message Pet Parents / receive booking request
+  → “You got a booking — set up secure payouts to accept”
+  → Stripe-hosted Account Link (SSN/bank collected by Stripe)
+  → Backend verifies charges_enabled / payouts_enabled
+  → Accept → Parent pays → Complete care → Earnings
+```
+
+**Wrong experience (what UI pushes today on web)**
+
+```text
+Signup → Packet → “Submit & set up how I get paid” → Stripe asks for SSN/bank
+  (before discoverability or any booking value)
+```
+
+### F1 — UI forces payout (and therefore SSN) during onboarding while DB defers it
 - **Evidence:** Checklist + packet CTA vs `rules.guruRequirement: "before_accepting_first_paid_booking"` in `app/api/payouts/setup/route.ts` (~1182–1186) and migration `20260724220000_align_shared_payout_schema.sql` (~668–684).
 - **Files:** `app/guru/dashboard/page.tsx`, `app/guru/dashboard/onboarding-packet/page.tsx`, `app/api/payouts/setup/route.ts`
-- **User impact:** Guru feels they are opening a bank account before receiving marketplace value.
-- **Technical impact:** Premature Express account creation; abandoned Account Links; support “why do you need my SSN?” tickets.
-- **Severity:** **High** (conversion)
-- **Recommendation:** Make payout optional on checklist; change packet primary CTA to “Submit packet”; move Stripe CTA to earnings + first-accept gate.
+- **User impact:** Side-gig Gurus abandon when Stripe asks for SSN/bank before they have received any marketplace value. Support hears “why do you need my Social Security number just to be a sitter?”
+- **Technical impact:** Premature Express account creation; abandoned Account Links; inflated “incomplete Connect” support load; conflates profile readiness with payout readiness in the UX even though the schema separates them.
+- **Severity:** **Critical** (conversion) — elevated from High based on side-gig Guru reality
+- **Recommendation:** Make payout optional on checklist; change packet primary CTA to “Submit packet”; soft “Set up payouts” CTA on dashboard/earnings; **hard gate only at first paid accept**; keep SSN collection exclusively on Stripe-hosted UI at that moment.
 
 ### F2 — Accept-paid gate declared but not enforced on mobile accept
 - **Evidence:** `blockers.acceptFirstPaidBooking` in payouts setup; no matches for payout checks in `guru-requests.tsx`.
@@ -457,7 +483,9 @@ Do **not** enable Instant Payouts or new fees until P0/P1 complete.
 Join SitGuru as a Guru
 Name · Email · Password
 [Continue]
-No bank. No tax ID. No “financial product” language.
+
+No bank. No Social Security Number. No “open a payout account” language.
+This is a pet-care marketplace signup — payouts come later when you accept paid work.
 ```
 
 ### Dashboard — profile live, payout not started
@@ -822,12 +850,13 @@ Each phase: feature flag where possible; no historical ID rewrites; rollback = d
 - [ ] Server-side booking accept gate requiring payout readiness  
 - [ ] Stop logging Account Link URLs / secrets (verify sinks)  
 
-### P1 — Guru Onboarding Conversion
-- [ ] Remove forced Stripe from packet submit  
-- [ ] Make checklist “Get paid” optional with soft CTA  
-- [ ] Align web/mobile copy with deferred payout policy  
+### P1 — Guru Onboarding Conversion (side-gig / SSN friction)
+- [ ] Remove forced Stripe from packet submit so SSN never appears mid-packet  
+- [ ] Make checklist “Get paid” optional with soft CTA (“when you’re ready to accept paid bookings”)  
+- [ ] Align web/mobile copy: no financial-product language at signup  
+- [ ] First SSN/bank ask only via Stripe Account Link at first paid-accept gate  
 - [ ] Allow non-individual entity path (or Stripe-collect)  
-- [ ] Instrument Guru → payout funnel analytics  
+- [ ] Instrument Guru → payout funnel analytics (especially `payout_setup_started` abandonment)  
 
 ### P2 — Mobile Payment Architecture
 - [ ] Bearer JWT on Connect APIs  
