@@ -142,10 +142,10 @@ export const billingFaqs: HelpFaqItem[] = [
     answer:
       "No. SitGuru bookings should be paid through SitGuru only. Do not use cash, Venmo, Zelle, Cash App, PayPal, direct bank transfer, personal card readers, checks, or other outside payment arrangements for SitGuru bookings. This keeps receipts, booking records, support, PawReport history, reviews, credits, tips, and payout tracking connected.",
   },
-  {
+    {
     question: "Why do Gurus need to set up Stripe?",
     answer:
-      "Gurus need Stripe setup before eligible booking payouts, tips, commission, or referral earnings can be sent. Complete business type, personal details, bank account connection, and return to the Earnings tab when finished.",
+      "When you’re ready to accept paid bookings, a quick Stripe setup lets SitGuru send your earnings from eligible bookings, tips, and related payouts. You can build your profile and get discovered first — finish the secure partner steps later from Earnings.",
   },
   {
     question: "Why do Ambassadors need to set up Stripe?",
@@ -221,11 +221,10 @@ export const paymentFlows: HelpStepBlock[] = [
 ];
 
 export const guruStripeSteps: string[] = [
-  "Open Guru Stripe setup from your Guru dashboard or the Billing help guide.",
-  "Choose the correct business type and enter personal / business details Stripe requires.",
-  "Connect the bank account where eligible booking payouts, tips, and commission should land.",
-  "Confirm payout account details and complete any Stripe identity verification prompts.",
-  "Return to the Earnings tab to confirm setup status and track future payouts.",
+  "Open payout setup from your Guru dashboard Earnings page when you’re ready.",
+  "Choose Stripe (or PayPal) and follow the quick secure partner screens.",
+  "Confirm you’re done, then return to Earnings to see your ready status.",
+  "That’s it — SitGuru can send eligible booking earnings through your connected option.",
   "Never request cash, Venmo, Zelle, Cash App, or other off-platform payments for SitGuru bookings.",
 ];
 

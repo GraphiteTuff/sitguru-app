@@ -79,12 +79,12 @@ const setupSteps: SetupStep[] = [
   },
   {
     step: 6,
-    shortTitle: 'Payouts',
-    title: 'Prepare Payout Setup',
+    shortTitle: "Ready",
+    title: "You’re Almost There",
     description:
-      'Review payout readiness so completed bookings can move through the correct earnings and payout flow.',
+      "Your Guru profile setup is done. Payouts are optional for now — finish that quick secure step later when you accept a paid booking.",
     usedFor:
-      'Earnings, payout readiness, completed booking payouts, account review, and future Guru financial dashboard.',
+      "Dashboard readiness, earnings when you’re ready, and accepting paid bookings later.",
   },
 ];
 
@@ -670,27 +670,28 @@ export default function GuruSetupScreen() {
     return (
       <View style={styles.stepBody}>
         <View style={styles.payoutPanel}>
-          <Text style={styles.payoutEyebrow}>Payout readiness</Text>
-          <Text style={styles.payoutTitle}>Prepare for future completed bookings.</Text>
+          <Text style={styles.payoutEyebrow}>Easy next step</Text>
+          <Text style={styles.payoutTitle}>You’re ready to be discovered</Text>
           <Text style={styles.payoutText}>
-            After setup, payout details can be completed before eligible earnings are released from completed care.
+            Keep exploring SitGuru. When a paid booking comes in, you’ll finish a
+            quick secure payout setup so you can accept and earn.
           </Text>
         </View>
 
         <View style={styles.checkGrid}>
           <View style={styles.checkCard}>
             <Text style={styles.checkIcon}>•</Text>
-            <Text style={styles.checkText}>Review payout setup requirements</Text>
+            <Text style={styles.checkText}>Profile and services help Pet Parents find you</Text>
           </View>
 
           <View style={styles.checkCard}>
             <Text style={styles.checkIcon}>•</Text>
-            <Text style={styles.checkText}>Keep profile and service details accurate</Text>
+            <Text style={styles.checkText}>Payouts can wait until you accept paid work</Text>
           </View>
 
           <View style={styles.checkCard}>
             <Text style={styles.checkIcon}>•</Text>
-            <Text style={styles.checkText}>Track completed bookings and payout status from earnings</Text>
+            <Text style={styles.checkText}>Track bookings and earnings from your dashboard</Text>
           </View>
         </View>
 

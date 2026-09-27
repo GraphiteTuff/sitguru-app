@@ -194,9 +194,19 @@ Checklist step 6:
 
 ---
 
-## 4. Friction Findings
+## UX copy principle (easy setup)
 
-### Product principle (side-gig Gurus)
+SitGuru product copy for Guru signup and setup must **never** mention:
+
+- Social Security Number / SSN
+- EIN / tax ID / W-9
+- bank account / routing numbers
+- “identity documents” as something SitGuru collects during signup
+
+Prefer: “quick secure payout setup,” “when you’re ready to accept a paid booking,” “powered by Stripe / PayPal.”
+
+Sensitive verification happens only inside the payment partner’s hosted flow at the right lifecycle moment — never as SitGuru scare copy during basic setup.
+
 
 Joining SitGuru should feel like joining a pet-care marketplace — not applying for a financial product.
 
@@ -484,8 +494,8 @@ Join SitGuru as a Guru
 Name · Email · Password
 [Continue]
 
-No bank. No Social Security Number. No “open a payout account” language.
-This is a pet-care marketplace signup — payouts come later when you accept paid work.
+Friendly marketplace signup only.
+No payout pressure. No scare language.
 ```
 
 ### Dashboard — profile live, payout not started

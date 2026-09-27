@@ -1028,12 +1028,11 @@ export default function GuruEarningsScreen() {
 
                     <View style={styles.stripeCopy}>
                       <Text style={styles.stripeTitle}>
-                        Secure payout management
+                        Secure payouts when you’re ready
                       </Text>
                       <Text style={styles.stripeText}>
-                        Identity, tax, and bank details are completed directly
-                        with Stripe or PayPal. SitGuru does not display your
-                        full bank or identity information.
+                        Finish a quick setup with Stripe or PayPal so you can
+                        earn from bookings. SitGuru keeps this simple and secure.
                       </Text>
                     </View>
                   </View>
