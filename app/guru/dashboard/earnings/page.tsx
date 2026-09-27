@@ -1136,9 +1136,7 @@ function PaymentSetupCard({
       (stripeAccount &&
         (stripeAccount.payoutsEnabled === true ||
           stripeAccount.accountStatus === "ready" ||
-          stripeAccount.onboardingStatus === "ready" ||
-          (stripeAccount.detailsSubmitted === true &&
-            stripeAccount.payoutsEnabled === true))),
+          stripeAccount.onboardingStatus === "ready")),
   );
 
   const stripeInReview = Boolean(
