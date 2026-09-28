@@ -320,29 +320,52 @@ export default function PhoneCodeLogin({
       return new Error("Please complete the secure login check first.");
     }
 
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: phoneToSend,
-      options: {
-        shouldCreateUser: canCreateUser,
-        captchaToken: turnstileToken,
-        data: {
-          role:
-            effectiveRole === "ambassador"
-              ? "ambassador"
-              : requestedProfileRole,
-          account_type:
-            effectiveRole === "ambassador"
-              ? "ambassador"
-              : requestedProfileRole,
-          signup_method: "phone",
-          signup_role: effectiveRole,
-          source: canCreateUser ? "phone_signup" : "phone_login",
-          preferred_workspace: effectiveRole,
-        },
-      },
-    });
+    const turnstileAction = codeSent
+      ? `${effectiveRole}_phone_code_resend`
+      : `${effectiveRole}_phone_code_login`;
 
-    return error;
+    try {
+      const response = await fetch("/api/auth/phone/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: phoneToSend,
+          turnstileToken,
+          turnstileAction,
+          allowCreateUser: canCreateUser,
+          metadata: {
+            role:
+              effectiveRole === "ambassador"
+                ? "ambassador"
+                : requestedProfileRole,
+            account_type:
+              effectiveRole === "ambassador"
+                ? "ambassador"
+                : requestedProfileRole,
+            signup_method: "phone",
+            signup_role: effectiveRole,
+            source: canCreateUser ? "phone_signup" : "phone_login",
+            preferred_workspace: effectiveRole,
+          },
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        return new Error(
+          payload?.error || "We could not send the SitGuru code. Please try again.",
+        );
+      }
+
+      return null;
+    } catch {
+      return new Error(
+        "We could not reach SitGuru to send your code. Check your connection and try again.",
+      );
+    }
   }
 
   async function handleSendCode(event: FormEvent<HTMLFormElement>) {
@@ -377,7 +400,7 @@ export default function PhoneCodeLogin({
     setDisplaySentPhone(formatPhoneForDisplay(formattedPhone));
     setCodeSent(true);
     setStatusMessage(
-      "SitGuru requested a text to your phone. It usually arrives within a minute.",
+      "SitGuru texted your code. It usually arrives within a minute.",
     );
     resetTurnstile();
   }
@@ -483,37 +506,77 @@ export default function PhoneCodeLogin({
 
     setIsVerifying(true);
 
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone: normalizedPhone,
-      token: cleanCode,
-      type: "sms",
-    });
+    try {
+      const response = await fetch("/api/auth/phone/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          code: cleanCode,
+        }),
+      });
 
-    if (error || !data.session) {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        session?: {
+          access_token?: string;
+          refresh_token?: string;
+        };
+        user?: {
+          id?: string;
+          email?: string | null;
+        };
+      } | null;
+
+      if (
+        !response.ok ||
+        !payload?.session?.access_token ||
+        !payload?.session?.refresh_token
+      ) {
+        setIsVerifying(false);
+        setErrorMessage(
+          payload?.error ||
+            "That SitGuru code did not work. Please check the latest text message and try again.",
+        );
+        return;
+      }
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: payload.session.access_token,
+        refresh_token: payload.session.refresh_token,
+      });
+
+      if (sessionError) {
+        setIsVerifying(false);
+        setErrorMessage(
+          sessionError.message ||
+            "SitGuru verified your code but could not start your session. Please try again.",
+        );
+        return;
+      }
+
+      try {
+        const userId = payload.user?.id;
+        const userEmail = payload.user?.email || null;
+
+        if (userId && canCreateUser) {
+          await syncProfileAfterPhoneLogin(userId, userEmail);
+        }
+      } catch (profileError) {
+        console.error("Phone login profile sync failed:", profileError);
+      }
+
+      setStatusMessage("Verified. Taking you to SitGuru...");
+      setIsVerifying(false);
+
+      router.replace(safeNextPath);
+      router.refresh();
+    } catch {
       setIsVerifying(false);
       setErrorMessage(
-        error?.message ||
-          "That SitGuru code did not work. Please check the latest text message and try again.",
+        "We could not verify that SitGuru code right now. Please try again.",
       );
-      return;
     }
-
-    try {
-      const userId = data.user?.id;
-      const userEmail = data.user?.email || null;
-
-      if (userId && canCreateUser) {
-        await syncProfileAfterPhoneLogin(userId, userEmail);
-      }
-    } catch (profileError) {
-      console.error("Phone login profile sync failed:", profileError);
-    }
-
-    setStatusMessage("Verified. Taking you to SitGuru...");
-    setIsVerifying(false);
-
-    router.replace(safeNextPath);
-    router.refresh();
   }
 
   return (
