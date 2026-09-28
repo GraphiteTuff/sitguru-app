@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { SendHorizontal, X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
 import { usePathname } from "next/navigation";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
@@ -161,7 +162,16 @@ const ALL_INTENT_CHIPS: ReadonlyArray<{
 ];
 
 const INTENT_CHIP_CLASS =
-  "min-h-[44px] px-4 py-2.5 bg-[#0D5C3A] text-white text-sm font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-[40px] px-3.5 py-2 bg-[#0D5C3A] text-white text-[13px] font-semibold rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+
+const PANEL_SHELL_CLASS =
+  "homepage-chat-panel homepage-chat-panel--messaging pointer-events-auto fixed inset-0 z-[10000] flex w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100dvh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl";
+
+type VisualViewportBox = {
+  top: number;
+  height: number;
+  keyboardOpen: boolean;
+};
 
 function sanitizeFirstName(raw: string): string {
   const extracted = extractVisitorPreferredName(raw);
@@ -314,6 +324,11 @@ export default function HomepageChatBubble() {
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
+  const [viewportBox, setViewportBox] = useState<VisualViewportBox>({
+    top: 0,
+    height: 0,
+    keyboardOpen: false,
+  });
 
   const ctaContext = useMemo<HomepageCtaContext>(
     () => ({
@@ -516,12 +531,46 @@ export default function HomepageChatBubble() {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, open]);
+  }, [messages, isLoading, open, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 180);
     return () => window.clearTimeout(t);
+  }, [open]);
+
+  /** Pin the open sheet to the visual viewport so iOS keyboard doesn't hide chat. */
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+
+    const syncViewport = () => {
+      const vv = window.visualViewport;
+      const height = Math.round(vv?.height ?? window.innerHeight);
+      const top = Math.round(vv?.offsetTop ?? 0);
+      const layoutHeight = window.innerHeight || height;
+      const keyboardOpen = layoutHeight - height > 80;
+      setViewportBox({ top, height, keyboardOpen });
+    };
+
+    syncViewport();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", syncViewport);
+    vv?.addEventListener("scroll", syncViewport);
+    window.addEventListener("resize", syncViewport);
+    return () => {
+      vv?.removeEventListener("resize", syncViewport);
+      vv?.removeEventListener("scroll", syncViewport);
+      window.removeEventListener("resize", syncViewport);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   /** Keep the composer focused so visitors can type the next message without re-clicking. */
@@ -533,6 +582,17 @@ export default function HomepageChatBubble() {
       el.focus({ preventScroll: true });
     }, delayMs);
   }
+
+  function resizeComposer() {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
+  }
+
+  useEffect(() => {
+    resizeComposer();
+  }, [input]);
 
   // After Rogue finishes streaming (or any load ends), restore caret to the input.
   const wasLoadingRef = useRef(false);
@@ -826,6 +886,216 @@ export default function HomepageChatBubble() {
   if (!mounted) return null;
 
   const streaming = isLoading;
+  const composerPlaceholder = isCommunityPage
+    ? "Message about events…"
+    : awaitingName
+      ? "Message Rogue…"
+      : "Message…";
+  const mobilePanelStyle =
+    viewportBox.height > 0
+      ? ({
+          top: viewportBox.top,
+          height: viewportBox.height,
+          bottom: "auto",
+        } as const)
+      : undefined;
+
+  const openPanelNode = open ? (
+    <div
+      className={PANEL_SHELL_CLASS}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rogue, Your Chief Treat Officer chat"
+      style={mobilePanelStyle}
+      data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
+    >
+      <header className="homepage-chat-panel__header relative shrink-0">
+        <div className="homepage-chat-panel__brand">
+          <span
+            className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
+            aria-hidden
+          >
+            <SitGuruAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="homepage-chat-panel__title">
+              Rogue, Your Chief Treat Officer 🦴
+            </p>
+            <p className="homepage-chat-panel__sub">
+              {isCommunityPage
+                ? "Pet Events expert — RSVP help & free signup paths 🐾"
+                : "I'm your adorable assistant here during your SitGuru journey 🐾"}
+            </p>
+          </div>
+        </div>
+        <div className="homepage-chat-panel__header-actions absolute top-2 right-2 z-20 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleEndAndClearChat}
+            className="homepage-chat-panel__clear hidden min-h-[44px] rounded-full px-3 text-xs font-bold text-white/90 underline-offset-2 hover:underline sm:inline-flex sm:items-center"
+            aria-label="End chat and clear history"
+            title="End & clear"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={handleMinimizeChat}
+            className="homepage-chat-panel__close"
+            aria-label="Close chat"
+            title="Close chat"
+          >
+            <X className="h-6 w-6 text-white" aria-hidden="true" />
+          </button>
+        </div>
+      </header>
+
+      <div
+        className="homepage-chat-panel__messages min-h-0 flex-1"
+        ref={listRef}
+      >
+        {messages.map((m) => {
+          if (m.role === "user") {
+            return (
+              <div
+                key={m.id}
+                className="homepage-chat-bubble homepage-chat-bubble--user"
+              >
+                {m.content}
+              </div>
+            );
+          }
+
+          if (m.role !== "assistant") return null;
+          if (!m.content && streaming) return null;
+
+          return (
+            <AssistantRow key={m.id}>
+              <div className="homepage-chat-bubble homepage-chat-bubble--ai">
+                <SafeAssistantBubble contentHint={m.content}>
+                  <CompanionAssistantBubbleBody
+                    content={m.content}
+                    ctaContext={ctaContext}
+                    socialSource="rogue_homepage_chat"
+                  />
+                </SafeAssistantBubble>
+              </div>
+            </AssistantRow>
+          );
+        })}
+
+        {streaming ? (
+          <AssistantRow>
+            <div
+              className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+              aria-live="polite"
+            >
+              <span />
+              <span />
+              <span />
+            </div>
+          </AssistantRow>
+        ) : null}
+      </div>
+
+      <div className="homepage-chat-panel__footer shrink-0">
+        {showMatchingChips && !viewportBox.keyboardOpen ? (
+          <div
+            className="homepage-chat-panel__chips"
+            role="toolbar"
+            aria-label="Matching details"
+          >
+            {CARE_MATCHING_CHIPS.map((chip) => (
+              <button
+                key={`${chip.group}-${chip.label}`}
+                type="button"
+                disabled={streaming}
+                onClick={() => void sendChip(chip.content)}
+                className={INTENT_CHIP_CLASS}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {showIntentChips &&
+        !showMatchingChips &&
+        !viewportBox.keyboardOpen ? (
+          <div
+            className="homepage-chat-panel__chips"
+            role="toolbar"
+            aria-label="Quick intents"
+          >
+            {intentChips.map((chip) => (
+              <button
+                key={`${chip.tone}-${chip.label}`}
+                type="button"
+                disabled={streaming}
+                onClick={() => void sendChip(chip.content)}
+                className={INTENT_CHIP_CLASS}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <form
+          className="homepage-chat-panel__composer"
+          onSubmit={onComposerSubmit}
+          autoComplete="off"
+        >
+          <label className="sr-only" htmlFor="rogue-homepage-chat-composer">
+            Message Rogue
+          </label>
+          <textarea
+            id="rogue-homepage-chat-composer"
+            ref={inputRef}
+            name="rogue-chat-message"
+            rows={1}
+            value={input}
+            placeholder={composerPlaceholder}
+            enterKeyHint="send"
+            inputMode="text"
+            autoComplete="off"
+            autoCorrect="on"
+            autoCapitalize="sentences"
+            spellCheck
+            data-form-type="other"
+            data-1p-ignore="true"
+            data-lpignore="true"
+            onChange={(event) => {
+              handleInputChange(event);
+              requestAnimationFrame(resizeComposer);
+            }}
+            onFocus={() => {
+              window.setTimeout(() => {
+                const el = listRef.current;
+                if (el) el.scrollTop = el.scrollHeight;
+              }, 80);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (streaming) return;
+                const form = e.currentTarget.form;
+                if (form) form.requestSubmit();
+              }
+            }}
+          />
+          <button
+            type="submit"
+            disabled={streaming || !input.trim()}
+            aria-label="Send message"
+            className="homepage-chat-panel__send"
+          >
+            <SendHorizontal className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </form>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div
@@ -848,174 +1118,7 @@ export default function HomepageChatBubble() {
         </button>
       ) : null}
 
-      {open ? (
-        <div
-          className="homepage-chat-panel fixed inset-0 z-[10000] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100vh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl"
-          role="dialog"
-          aria-label="Rogue, Your Chief Treat Officer chat"
-        >
-          <header className="homepage-chat-panel__header relative shrink-0">
-            <div className="homepage-chat-panel__brand">
-              <span
-                className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
-                aria-hidden
-              >
-                <SitGuruAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="homepage-chat-panel__title">
-                  Rogue, Your Chief Treat Officer 🦴
-                </p>
-                <p className="homepage-chat-panel__sub">
-                  {isCommunityPage
-                    ? "Pet Events expert — RSVP help & free signup paths 🐾"
-                    : "I'm your adorable assistant here during your SitGuru journey 🐾"}
-                </p>
-              </div>
-            </div>
-            <div className="homepage-chat-panel__header-actions absolute top-2 right-2 z-20 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleEndAndClearChat}
-                className="homepage-chat-panel__clear hidden min-h-[44px] rounded-full px-3 text-xs font-bold text-white/90 underline-offset-2 hover:underline sm:inline-flex sm:items-center"
-                aria-label="End chat and clear history"
-                title="End & clear"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={handleMinimizeChat}
-                className="homepage-chat-panel__close"
-                aria-label="Close chat"
-                title="Close chat"
-              >
-                <X className="h-6 w-6 text-white" aria-hidden="true" />
-              </button>
-            </div>
-          </header>
-
-          <div
-            className="homepage-chat-panel__messages min-h-0 flex-1"
-            ref={listRef}
-          >
-            {messages.map((m) => {
-              if (m.role === "user") {
-                return (
-                  <div
-                    key={m.id}
-                    className="homepage-chat-bubble homepage-chat-bubble--user"
-                  >
-                    {m.content}
-                  </div>
-                );
-              }
-
-              if (m.role !== "assistant") return null;
-              if (!m.content && streaming) return null;
-
-              return (
-                <AssistantRow key={m.id}>
-                  <div className="homepage-chat-bubble homepage-chat-bubble--ai">
-                    <SafeAssistantBubble contentHint={m.content}>
-                      <CompanionAssistantBubbleBody
-                        content={m.content}
-                        ctaContext={ctaContext}
-                        socialSource="rogue_homepage_chat"
-                      />
-                    </SafeAssistantBubble>
-                  </div>
-                </AssistantRow>
-              );
-            })}
-
-            {streaming ? (
-              <AssistantRow>
-                <div
-                  className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
-                  aria-live="polite"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </AssistantRow>
-            ) : null}
-          </div>
-
-          {showMatchingChips ? (
-            <div
-              className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
-              role="toolbar"
-              aria-label="Matching details"
-            >
-              {CARE_MATCHING_CHIPS.map((chip) => (
-                <button
-                  key={`${chip.group}-${chip.label}`}
-                  type="button"
-                  disabled={streaming}
-                  onClick={() => void sendChip(chip.content)}
-                  className={INTENT_CHIP_CLASS}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          ) : showIntentChips ? (
-            <div
-              className="flex shrink-0 flex-row items-center gap-2.5 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-3 scrollbar-none"
-              role="toolbar"
-              aria-label="Quick intents"
-            >
-              {intentChips.map((chip) => (
-                <button
-                  key={`${chip.tone}-${chip.label}`}
-                  type="button"
-                  disabled={streaming}
-                  onClick={() => void sendChip(chip.content)}
-                  className={INTENT_CHIP_CLASS}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <form
-            className="homepage-chat-panel__composer shrink-0"
-            onSubmit={onComposerSubmit}
-          >
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={input}
-              placeholder={
-                awaitingName
-                  ? "Type the name you go by…"
-                  : isCommunityPage
-                    ? "Ask about events, I'm Going, or joining as Pet Parent / Guru / Ambassador…"
-                    : "Ask about care, Gurus, or joining the pack…"
-              }
-              onChange={handleInputChange}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (streaming) return;
-                  const form = e.currentTarget.form;
-                  if (form) form.requestSubmit();
-                }
-              }}
-            />
-            <button
-              type="submit"
-              disabled={streaming || !input.trim()}
-              aria-label="Send message"
-            >
-              Send
-            </button>
-          </form>
-        </div>
-      ) : null}
+      {open && mounted ? createPortal(openPanelNode, document.body) : null}
 
       {!open ? (
         <button
