@@ -9,6 +9,7 @@ import {
   Search,
   UserRound,
 } from "lucide-react";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
 
 const ITEMS = [
   {
@@ -24,6 +25,7 @@ const ITEMS = [
     match: (path: string) =>
       path.startsWith("/search") ||
       path.startsWith("/find-care") ||
+      path.startsWith("/pet-gurus") ||
       path.startsWith("/book/"),
     icon: Search,
   },
@@ -50,10 +52,15 @@ const ITEMS = [
 
 export default function CustomerBottomNav() {
   const pathname = usePathname() || "";
+  useBrowserChromeInset();
 
   return (
     <nav
-      className="pointer-events-auto fixed inset-x-3 bottom-3 z-[60] grid grid-cols-5 gap-1 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden"
+      className="pointer-events-auto fixed inset-x-3 z-[60] grid grid-cols-5 gap-1 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden"
+      style={{
+        bottom:
+          "calc(0.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))",
+      }}
       aria-label="Pet Parent navigation"
       data-customer-bottom-nav
     >
