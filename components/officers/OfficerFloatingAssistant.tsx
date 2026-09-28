@@ -321,6 +321,7 @@ export default function OfficerFloatingAssistant({
   avatarObjectPosition = "center 18%",
   surface = "dashboard",
 }: OfficerFloatingAssistantProps) {
+  void composerPlaceholder;
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -740,7 +741,7 @@ export default function OfficerFloatingAssistant({
               value={input}
               onChange={setInput}
               onSubmit={onSubmit}
-              placeholder={composerPlaceholder || "Message…"}
+              placeholder="Message..."
               disabled={isLoading}
               inputId={`${officerId}-officer-chat-composer`}
               label={`Message ${displayName}`}

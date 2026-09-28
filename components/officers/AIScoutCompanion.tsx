@@ -449,40 +449,39 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
           <div
             ref={scrollerRef}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fffb] px-4 py-3 text-sm text-slate-700"
+            className="homepage-chat-panel__messages min-h-0 flex-1"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
-              return (
+              if (!isAssistant && message.role !== "user") return null;
+              return isAssistant ? (
                 <div
                   key={message.id}
-                  className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
+                  className="homepage-chat-bubble homepage-chat-bubble--ai"
                 >
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
-                      isAssistant
-                        ? "border border-emerald-100 bg-white text-slate-700"
-                        : "whitespace-pre-wrap bg-emerald-700 text-white"
-                    }`}
-                  >
-                    {isAssistant ? (
-                      <ScoutAssistantBody
-                        text={message.content}
-                        pagePath={requestBody.pagePath}
-                      />
-                    ) : (
-                      message.content
-                    )}
-                  </div>
+                  <ScoutAssistantBody
+                    text={message.content}
+                    pagePath={requestBody.pagePath}
+                  />
+                </div>
+              ) : (
+                <div
+                  key={message.id}
+                  className="homepage-chat-bubble homepage-chat-bubble--user"
+                >
+                  {message.content}
                 </div>
               );
             })}
             {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                {isPublic
-                  ? "Scout is lining up your next onboarding step…"
-                  : "Scout is sniffing your schedule…"}
-              </p>
+              <div
+                className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+                aria-live="polite"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -525,7 +524,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
               value={input}
               onChange={setInput}
               onSubmit={onSubmit}
-              placeholder="Message…"
+              placeholder="Message..."
               disabled={isLoading}
               inputId="scout-companion-chat-composer"
               label="Message Scout"

@@ -2106,22 +2106,21 @@ div.homepage-chat-panel__header,
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 1rem 0.9rem 1.15rem;
+  padding: 0.85rem 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  background:
-    radial-gradient(120% 80% at 100% 0%, rgba(13, 92, 58, 0.06), transparent 55%),
-    linear-gradient(180deg, #f7fbf8 0%, #eef6f1 100%);
+  gap: 0.45rem;
+  /* Quiet thread canvas — like iMessage, bubbles do the talking */
+  background: #f2f4f3;
 }
 
 .homepage-chat-panel__footer {
   display: flex;
   flex-direction: column;
   gap: 0;
-  border-top: 1px solid rgba(13, 92, 58, 0.12);
-  background: #fff;
-  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.04);
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f8faf9;
+  box-shadow: none;
 }
 
 .homepage-chat-panel__chips {
@@ -2132,10 +2131,10 @@ div.homepage-chat-panel__header,
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
-  padding: 0.55rem 0.7rem 0.2rem;
+  padding: 0.55rem 0.7rem 0.15rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  background: #fff;
+  background: #f8faf9;
 }
 
 .homepage-chat-panel__chips::-webkit-scrollbar {
@@ -2175,23 +2174,24 @@ div.homepage-chat-panel__header,
 }
 
 .homepage-chat-bubble {
-  max-width: min(88%, 22rem);
-  padding: 0.8rem 0.95rem;
+  max-width: min(78%, 20.5rem);
+  padding: 0.62rem 0.85rem;
   border-radius: 1.15rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.35;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: visible;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .homepage-chat-bubble--ai {
   align-self: flex-start;
-  background: #fff;
+  background: #e8ebe9;
   color: #0f172a;
-  border: 1px solid rgba(13, 92, 58, 0.12);
-  border-bottom-left-radius: 0.3rem;
+  border: 0;
+  border-bottom-left-radius: 0.25rem;
 }
 
 /* Admin Rogue: beat `.admin-theme p { color: #cbd5f5 }` washing out bubble copy. */
@@ -2227,7 +2227,7 @@ div.homepage-chat-panel__header,
   align-self: flex-end;
   background: var(--hcb-green);
   color: #fff;
-  border-bottom-right-radius: 0.3rem;
+  border-bottom-right-radius: 0.25rem;
 }
 
 .homepage-chat-typing {
@@ -2263,43 +2263,41 @@ div.homepage-chat-panel__header,
 .homepage-chat-panel__composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
+  gap: 0.45rem;
   align-items: end;
-  padding: 0.55rem 0.7rem;
-  padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
-  background: #fff;
+  padding: 0.45rem 0.65rem;
+  padding-bottom: max(0.55rem, env(safe-area-inset-bottom));
+  background: #f8faf9;
   min-width: 0;
 }
 
 .homepage-chat-panel__composer textarea {
   resize: none;
   border: 0;
-  border-radius: 1.35rem;
-  padding: 0.72rem 1rem;
+  border-radius: 1.4rem;
+  padding: 0.7rem 1rem;
   font: inherit;
   font-size: 1rem;
   line-height: 1.35;
-  min-height: 2.75rem;
+  min-height: 2.6rem;
   max-height: 7rem;
   outline: none;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  background: #f1f5f3;
+  background: #ffffff;
   color: #0f172a;
-  box-shadow: inset 0 0 0 1px rgba(13, 92, 58, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
   overflow-y: auto;
 }
 
 .homepage-chat-panel__composer textarea::placeholder {
-  color: #64748b;
+  color: #94a3b8;
   opacity: 1;
 }
 
 .homepage-chat-panel__composer textarea:focus {
-  box-shadow:
-    inset 0 0 0 1px rgba(13, 92, 58, 0.28),
-    0 0 0 3px rgba(13, 92, 58, 0.12);
+  box-shadow: inset 0 0 0 1.5px rgba(13, 92, 58, 0.45);
   background: #fff;
 }
 

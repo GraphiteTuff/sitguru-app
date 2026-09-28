@@ -582,7 +582,7 @@ export default function RogueFloatingAssistant() {
               value={input}
               onChange={setInput}
               onSubmit={onSubmit}
-              placeholder="Message…"
+              placeholder="Message..."
               disabled={isLoading}
               inputId="rogue-admin-chat-composer"
               label="Message Rogue"

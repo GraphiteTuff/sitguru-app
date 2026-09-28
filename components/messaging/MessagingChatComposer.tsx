@@ -29,7 +29,7 @@ export default function MessagingChatComposer({
   value,
   onChange,
   onSubmit,
-  placeholder = "Message…",
+  placeholder = "Message...",
   disabled = false,
   inputId = "sitguru-messaging-composer",
   label = "Message",

@@ -835,11 +835,7 @@ export default function HomepageChatBubble() {
   if (!mounted) return null;
 
   const streaming = isLoading;
-  const composerPlaceholder = isCommunityPage
-    ? "Message about events…"
-    : awaitingName
-      ? "Message Rogue…"
-      : "Message…";
+  const composerPlaceholder = "Message...";
   const mobilePanelStyle = messagingPanelStyle(viewportBox);
 
   const openPanelNode = open ? (

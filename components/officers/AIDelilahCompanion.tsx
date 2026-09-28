@@ -341,36 +341,32 @@ export default function AIDelilahCompanion() {
 
           <div
             ref={scrollerRef}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fbf8] px-4 py-3 text-sm text-slate-700"
+            className="homepage-chat-panel__messages min-h-0 flex-1"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
-              return (
+              if (!isAssistant && message.role !== "user") return null;
+              return isAssistant ? (
                 <div
                   key={message.id}
-                  className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
+                  className="homepage-chat-bubble homepage-chat-bubble--ai"
                 >
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
-                      isAssistant
-                        ? "border border-emerald-100 bg-white text-slate-700"
-                        : "whitespace-pre-wrap bg-[#0D5C3A] text-white"
-                    }`}
-                  >
-                    {isAssistant ? (
-                      <CompanionAssistantBubbleBody
-                        content={message.content}
-                        ctaContext={{
-                          pagePath: pathname || "/events",
-                          eventSlug: storedEvent?.slug,
-                          eventId: storedEvent?.id,
-                        }}
-                        socialSource="delilah_companion_chat"
-                      />
-                    ) : (
-                      message.content
-                    )}
-                  </div>
+                  <CompanionAssistantBubbleBody
+                    content={message.content}
+                    ctaContext={{
+                      pagePath: pathname || "/events",
+                      eventSlug: storedEvent?.slug,
+                      eventId: storedEvent?.id,
+                    }}
+                    socialSource="delilah_companion_chat"
+                  />
+                </div>
+              ) : (
+                <div
+                  key={message.id}
+                  className="homepage-chat-bubble homepage-chat-bubble--user"
+                >
+                  {message.content}
                 </div>
               );
             })}
@@ -400,9 +396,14 @@ export default function AIDelilahCompanion() {
             </details>
 
             {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                Delilah is fetching your next event move…
-              </p>
+              <div
+                className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+                aria-live="polite"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -443,7 +444,7 @@ export default function AIDelilahCompanion() {
               value={input}
               onChange={setInput}
               onSubmit={onSubmit}
-              placeholder="Message…"
+              placeholder="Message..."
               disabled={isLoading}
               inputId="delilah-companion-chat-composer"
               label="Message Delilah"
