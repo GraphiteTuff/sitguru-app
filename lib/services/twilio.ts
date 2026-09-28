@@ -1,7 +1,9 @@
 // lib/services/twilio.ts
 /**
- * Official Twilio SDK connector for SitGuru PawReport SMS.
- * Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
+ * Official Twilio connector for SitGuru SMS.
+ * Prefers TWILIO_MESSAGING_SERVICE_SID (A2P / 10DLC) over a raw From number.
+ * Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+ *      TWILIO_MESSAGING_SERVICE_SID and/or TWILIO_PHONE_NUMBER
  */
 
 import twilio from "twilio";
@@ -10,6 +12,7 @@ export type SendSmsResult = {
   ok: boolean;
   skipped?: boolean;
   sid?: string | null;
+  status?: string | null;
   error?: string;
 };
 
@@ -39,16 +42,21 @@ function getTwilioFromNumber() {
   );
 }
 
+function getTwilioMessagingServiceSid() {
+  return String(process.env.TWILIO_MESSAGING_SERVICE_SID || "").trim();
+}
+
 export function isTwilioConfigured() {
   return Boolean(
     String(process.env.TWILIO_ACCOUNT_SID || "").trim() &&
       String(process.env.TWILIO_AUTH_TOKEN || "").trim() &&
-      getTwilioFromNumber(),
+      (getTwilioMessagingServiceSid() || getTwilioFromNumber()),
   );
 }
 
 /**
  * Robust SMS wrapper — never throws to callers of the dispatcher.
+ * Prefers Messaging Service SID so US A2P / 10DLC traffic is registered.
  */
 export async function sendSms(
   to: string,
@@ -56,15 +64,21 @@ export async function sendSms(
 ): Promise<SendSmsResult> {
   try {
     const client = getTwilioClient();
+    const messagingServiceSid = getTwilioMessagingServiceSid();
     const from = getTwilioFromNumber();
     const normalizedTo = normalizeE164(to);
     const body = String(message || "").trim().slice(0, 1500);
 
     if (process.env.SIMULATE_WALK === "1") {
-      console.log("[SIMULATE_WALK][twilio] payload", { to: normalizedTo || to, from, body });
+      console.log("[SIMULATE_WALK][twilio] payload", {
+        to: normalizedTo || to,
+        messagingServiceSid: messagingServiceSid || null,
+        from: from || null,
+        body,
+      });
     }
 
-    if (!client || !from) {
+    if (!client || (!messagingServiceSid && !from)) {
       console.info("[twilio] skipped — credentials not configured");
       return {
         ok: false,
@@ -85,18 +99,47 @@ export async function sendSms(
       return { ok: false, skipped: true, error: "SMS message is empty." };
     }
 
-    const result = await client.messages.create({
+    const createParams: {
+      to: string;
+      body: string;
+      messagingServiceSid?: string;
+      from?: string;
+    } = {
       to: normalizedTo,
-      from,
       body,
-    });
+    };
 
-    return { ok: true, sid: result.sid || null };
+    if (messagingServiceSid) {
+      createParams.messagingServiceSid = messagingServiceSid;
+    } else {
+      createParams.from = from;
+    }
+
+    const result = await client.messages.create(createParams);
+
+    const status = String(result.status || "").trim() || null;
+    const failedStatuses = new Set([
+      "failed",
+      "undelivered",
+      "canceled",
+      "cancelled",
+    ]);
+
+    if (status && failedStatuses.has(status.toLowerCase())) {
+      return {
+        ok: false,
+        sid: result.sid || null,
+        status,
+        error: `Twilio message status was ${status}.`,
+      };
+    }
+
+    return { ok: true, sid: result.sid || null, status };
   } catch (error) {
     const messageText =
       error instanceof Error ? error.message : "Twilio SMS failed.";
     console.error("[twilio] sendSms error:", messageText);
-    return { ok: false, sid: null, error: messageText };
+    return { ok: false, sid: null, status: null, error: messageText };
   }
 }
 

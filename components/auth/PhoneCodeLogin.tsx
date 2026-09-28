@@ -196,17 +196,34 @@ function getDefaultPath(role: PhoneLoginRole) {
 function getPhoneLoginErrorMessage(errorMessage: string, allowCreateUser: boolean) {
   const cleanMessage = errorMessage.trim();
 
-  if (!allowCreateUser) {
-    const lowerMessage = cleanMessage.toLowerCase();
+  const lowerMessage = cleanMessage.toLowerCase();
 
+  if (!allowCreateUser) {
     if (
       lowerMessage.includes("signups not allowed") ||
       lowerMessage.includes("user not found") ||
-      lowerMessage.includes("invalid login credentials") ||
-      lowerMessage.includes("phone")
+      lowerMessage.includes("invalid login credentials")
     ) {
       return "We couldn’t find a SitGuru account with that phone number. Use Become a Pet Parent, Become a Guru, or Become an Ambassador to create one.";
     }
+  }
+
+  if (
+    lowerMessage.includes("sms") ||
+    lowerMessage.includes("twilio") ||
+    lowerMessage.includes("provider") ||
+    lowerMessage.includes("deliver") ||
+    lowerMessage.includes("hook")
+  ) {
+    return "SitGuru could not deliver the text message right now. Wait about a minute, then send a new code. Check that the phone can receive SMS and is not blocking unknown senders.";
+  }
+
+  if (
+    lowerMessage.includes("rate limit") ||
+    lowerMessage.includes("too many") ||
+    lowerMessage.includes("60 seconds")
+  ) {
+    return "Please wait about a minute before requesting another SitGuru code.";
   }
 
   return cleanMessage || "We could not send the SitGuru code. Please try again.";
@@ -359,7 +376,9 @@ export default function PhoneCodeLogin({
     setNormalizedPhone(formattedPhone);
     setDisplaySentPhone(formatPhoneForDisplay(formattedPhone));
     setCodeSent(true);
-    setStatusMessage("SitGuru code sent. Check your text messages.");
+    setStatusMessage(
+      "SitGuru requested a text to your phone. It usually arrives within a minute.",
+    );
     resetTurnstile();
   }
 
@@ -389,7 +408,9 @@ export default function PhoneCodeLogin({
       return;
     }
 
-    setStatusMessage("New SitGuru code sent. Use the latest text message.");
+    setStatusMessage(
+      "New SitGuru code requested. Use only the newest text — older codes may not work.",
+    );
     resetTurnstile();
   }
 
@@ -646,6 +667,19 @@ export default function PhoneCodeLogin({
             >
               Use the newest SitGuru code you received. Older codes may not
               verify.
+            </p>
+
+            <p
+              className="mt-2 text-sm font-semibold leading-6"
+              style={{
+                color: "#64748b",
+                WebkitTextFillColor: "#64748b",
+                opacity: 1,
+              }}
+            >
+              No text yet? Wait about a minute, complete the secure login check,
+              then tap Send a new SitGuru code. Check spam or blocked numbers,
+              and confirm this phone can receive SMS.
             </p>
 
             <button
