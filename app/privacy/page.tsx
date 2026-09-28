@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const lastUpdated = "May 21, 2026";
+const lastUpdated = "September 28, 2026";
 
 const quickSummary = [
   {
@@ -68,9 +68,10 @@ const sections = [
   {
     title: "3. Phone Numbers, Login Codes, and SMS Messages",
     body: [
-      "SitGuru may use phone numbers to help create accounts, sign users in, send one-time login or verification codes, support account security, communicate about account activity, and send service-related messages.",
-      "Transactional text messages may include login codes, account messages, booking-related updates, safety-related communications, support updates, or important service notices. Message and data rates may apply depending on your mobile carrier.",
-      "SitGuru does not use phone numbers to send marketing text messages unless permitted by law and, where required, with appropriate consent.",
+      "SitGuru may use phone numbers to help create accounts, sign users in, send one-time login or verification codes (account verification / 2FA), support account security, communicate about account activity, and send service-related messages.",
+      "Transactional text messages may include login codes, account messages, booking-related updates, safety-related communications, support updates, or important service notices. Message frequency varies. Message and data rates may apply depending on your mobile carrier.",
+      "SitGuru does not send marketing or promotional text messages unless you give affirmative consent (opt-in). Marketing emails, when sent where permitted by law, are separate from SMS and can be stopped with the unsubscribe link in those emails.",
+      "Text HELP to the SitGuru number for help, or email support@sitguru.com. Text STOP to cancel SMS messages from SitGuru. After you text STOP, you may still receive essential account or security notices only where required by law or needed to complete an active request you started.",
     ],
   },
   {
@@ -78,7 +79,7 @@ const sections = [
     body: [
       "We may use your information to operate, maintain, and improve SitGuru; create and manage accounts; support bookings and related services; communicate with Pet Parents and Pet Gurus; respond to questions and support requests; send transactional messages; improve user experience; protect the safety and integrity of the platform; detect fraud, abuse, or misuse; and comply with legal obligations.",
       "We may use information to support trust and safety reviews, verification steps, account protection, safety-related records, dispute handling, program routing, partner referrals, and community protection.",
-      "We may also use information to send updates, promotional materials, launch announcements, program information, or marketing communications where permitted by law. You may opt out of marketing emails at any time.",
+      "We may also use information to send updates, promotional materials, launch announcements, program information, or marketing communications where permitted by law. You may opt out of marketing emails at any time. Marketing or promotional SMS is sent only with your affirmative consent; text STOP to cancel those texts, or text HELP for help.",
     ],
   },
   {
@@ -126,6 +127,7 @@ const sections = [
     body: [
       "You may update certain account information by logging into your account, where that functionality is available.",
       "You may opt out of marketing emails by using the unsubscribe link in those communications.",
+      "For SMS: text STOP to cancel text messages from SitGuru, or text HELP for help. You can also contact support@sitguru.com. Message and data rates may apply. Message frequency varies.",
       "Depending on your location, you may have rights related to access, correction, deletion, portability, objection, or limitation of certain personal information. SitGuru will review and respond to applicable requests in accordance with governing law.",
       "To make a privacy-related request, contact us at support@sitguru.com.",
     ],
@@ -189,7 +191,7 @@ const dataHighlights = [
   {
     title: "Phone and SMS activity",
     description:
-      "Phone numbers may be used for account access, secure login codes, transactional messages, and safety-related notices.",
+      "Phone numbers may be used for account access, secure login codes, transactional messages, and safety-related notices. Marketing texts need opt-in. Text STOP to cancel or HELP for help.",
     icon: <Phone className="h-5 w-5" />,
   },
   {
