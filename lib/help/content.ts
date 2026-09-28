@@ -58,7 +58,12 @@ export const accountFaqs: HelpFaqItem[] = [
   {
     question: "How do phone login codes work?",
     answer:
-      "SitGuru may send a secure one-time code to your phone number to help you create an account, sign in, or protect account access. Do not share login codes with anyone.",
+      "SitGuru texts a secure 6-digit one-time code to your mobile number so you can create an account, sign in, or protect access. Codes usually arrive within a minute. Use only the newest code, and never share login codes with anyone.",
+  },
+  {
+    question: "What if my phone never gets the SitGuru login code?",
+    answer:
+      "Confirm the number is typed correctly, wait about a minute, then request a new code after completing the secure login check. Check that the phone can receive SMS and is not blocking unknown senders. If texts still do not arrive, contact SitGuru with the phone number on the account so we can check SMS delivery.",
   },
   {
     question: "What should I do if I cannot log in or reset my password?",
