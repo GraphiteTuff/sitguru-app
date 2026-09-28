@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: Promise<{ slug: string; format: string }>;
+  params: Promise<{ id: string; format: string }>;
 };
 
 const FORMATS = {
@@ -23,7 +23,7 @@ function isSocialFormat(value: string): value is SocialFormat {
 }
 
 export async function GET(_req: NextRequest, context: RouteContext) {
-  const { slug, format } = await context.params;
+  const { id: slug, format } = await context.params;
 
   if (!isSocialFormat(format)) {
     return new Response("Unknown format", { status: 400 });

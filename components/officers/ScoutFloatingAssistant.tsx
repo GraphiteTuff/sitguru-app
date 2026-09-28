@@ -141,11 +141,7 @@ export default function ScoutFloatingAssistant({
           ? "Scout here! Free to apply? Payments? Ask your Guru Matching Officer."
           : personalizedTip
       }
-      composerPlaceholder={
-        isPublic
-          ? "Ask Scout about applying, payments, services…"
-          : profile.composerPlaceholder
-      }
+      composerPlaceholder="Message..."
       footerLabel={
         isPublic
           ? "Public Guru FAQ · Exact marketing copy"
