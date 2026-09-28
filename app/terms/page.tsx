@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-const lastUpdated = "May 21, 2026";
+const lastUpdated = "September 28, 2026";
 
 const quickSummary = [
   {
@@ -63,7 +63,7 @@ const termHighlights = [
   {
     title: "Platform communication",
     description:
-      "Users may receive account, booking, support, trust and safety, login, and platform-related communications.",
+      "Users may receive account, booking, support, trust and safety, login, and platform-related communications. Marketing SMS needs opt-in; text STOP to cancel or HELP for help.",
     icon: <Mail className="h-5 w-5" />,
   },
   {
@@ -200,10 +200,11 @@ const sections = [
   {
     title: "13. Communications",
     body: [
-      "By using SitGuru, you consent to receive communications related to your account, login codes, bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other service-related notices.",
-      "SitGuru may communicate by email, text message, phone, in-platform messages, push notifications, or other available methods.",
-      "You may also receive marketing or promotional communications where permitted by law. You may opt out of promotional messages using available unsubscribe methods, though service-related messages may still be sent where necessary.",
-      "Message and data rates may apply for text messages depending on your mobile carrier.",
+      "By using SitGuru, you consent to receive service-related communications about your account, one-time login or verification codes (account verification / 2FA), bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other transactional notices.",
+      "SitGuru may communicate by email, text message, phone, in-platform messages, push notifications, or other available methods. Message frequency varies. Message and data rates may apply for text messages depending on your mobile carrier.",
+      "Marketing or promotional emails may be sent where permitted by law. You may opt out of promotional emails using the unsubscribe link in those messages. Service-related messages may still be sent where necessary.",
+      "SitGuru does not send marketing or promotional text messages unless you give affirmative consent (opt-in). This matches the Privacy Policy: marketing SMS requires consent; transactional SMS (including login codes) may still be used for account access and service notices.",
+      "Text HELP to the SitGuru number for help, or email support@sitguru.com. Text STOP to cancel SMS messages from SitGuru. After you text STOP, essential account or security notices may still be sent only where required by law or needed to complete an active request you started.",
     ],
   },
   {

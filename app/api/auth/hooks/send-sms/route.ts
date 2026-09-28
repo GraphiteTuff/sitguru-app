@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     return jsonError(400, "SMS hook payload was missing a phone number.");
   }
 
-  const body = `SitGuru code: ${otp}. Use this newest code to continue. Do not share it.`;
+  const body = `SitGuru code: ${otp}. Use this newest code to continue. Do not share it. Reply HELP for help, STOP to cancel.`;
 
   const result = await sendSms(phone, body);
 
