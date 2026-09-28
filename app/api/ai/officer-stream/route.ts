@@ -454,13 +454,18 @@ export async function POST(req: Request) {
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
     const careThread = joinRecentUserTexts(messages, lastUserText);
+    // Parent care-matching ZIP intake belongs on public Scout (directory /
+    // matching) — never on the signed-in Guru dashboard logistics surface.
+    // Trail Check says "assigned walks", which previously hijacked every reply
+    // into "For Dog Walking… city/state or ZIP".
     const scoutMatchingAsk =
-      officer === "scout"
+      officer === "scout" && surface === "public"
         ? buildCareMatchingAsk(careThread, viewer.firstName)
         : null;
     const lookupHint = inferLookupParamsFromChat(careThread);
     const scoutNeedsDirectory =
       officer === "scout" &&
+      surface === "public" &&
       !scoutMatchingAsk &&
       (looksLikeGuruDirectoryQuery(careThread) ||
         Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
@@ -487,10 +492,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const blockFaqForMatching =
+      surface === "public" && needsCareMatchingAsk(careThread);
     const instantFaqRaw =
       officer === "delilah"
         ? resolveDelilahInstantFaqAnswer(lastUserText)
-        : scoutNeedsDirectory || needsCareMatchingAsk(careThread)
+        : scoutNeedsDirectory || blockFaqForMatching
           ? null
           : resolveOfficerInstantFaqAnswer({
               officer: officer as "scout" | "taco",
