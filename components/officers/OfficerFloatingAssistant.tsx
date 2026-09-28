@@ -740,7 +740,7 @@ export default function OfficerFloatingAssistant({
               value={input}
               onChange={setInput}
               onSubmit={onSubmit}
-              placeholder="Message…"
+              placeholder={composerPlaceholder || "Message…"}
               disabled={isLoading}
               inputId={`${officerId}-officer-chat-composer`}
               label={`Message ${displayName}`}

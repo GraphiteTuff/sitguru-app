@@ -1967,7 +1967,6 @@ p {
     /* Desktop/tablet keep the floating card; ignore mobile VV top offset. */
     top: auto !important;
     bottom: 1.5rem !important;
-    height: min(680px, calc(100dvh - 3rem)) !important;
   }
 }
 

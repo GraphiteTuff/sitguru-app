@@ -65,6 +65,13 @@ export function messagingPanelStyle(
   viewportBox: MessagingViewportBox,
 ): { top: number; height: number; bottom: "auto" } | undefined {
   if (viewportBox.height <= 0) return undefined;
+  // Floating card layout owns sizing from sm and up — only pin on phones.
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 640px)").matches
+  ) {
+    return undefined;
+  }
   return {
     top: viewportBox.top,
     height: viewportBox.height,
