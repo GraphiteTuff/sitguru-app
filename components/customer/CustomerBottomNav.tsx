@@ -50,38 +50,58 @@ const ITEMS = [
   },
 ] as const;
 
+/**
+ * App-style Pet Parent tab bar — flush to the bottom (like native apps),
+ * large thumb targets, safe-area + Safari chrome cleared via CSS vars.
+ */
 export default function CustomerBottomNav() {
   const pathname = usePathname() || "";
   useBrowserChromeInset();
 
   return (
     <nav
-      className="pointer-events-auto fixed inset-x-3 z-[60] grid grid-cols-5 gap-1 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden"
+      className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden"
       style={{
-        bottom:
-          "calc(0.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))",
+        bottom: "var(--sg-chrome-bottom, 0px)",
+        paddingBottom:
+          "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
       }}
       aria-label="Pet Parent navigation"
       data-customer-bottom-nav
     >
-      {ITEMS.map((item) => {
-        const active = item.match(pathname);
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-black transition ${
-              active
-                ? "bg-[#0D5C3A] text-white shadow-sm"
-                : "text-slate-500 hover:bg-sky-50 hover:text-[#0D5C3A]"
-            }`}
-          >
-            <Icon className="h-5 w-5" aria-hidden />
-            <span className="leading-tight">{item.label}</span>
-          </Link>
-        );
-      })}
+      <div className="grid grid-cols-5 gap-0 px-1 pt-1">
+        {ITEMS.map((item) => {
+          const active = item.match(pathname);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-black leading-tight transition active:scale-[0.97] ${
+                active
+                  ? "text-[#0D5C3A]"
+                  : "text-slate-500 active:bg-slate-50"
+              }`}
+            >
+              <span
+                className={`grid h-8 w-12 place-items-center rounded-2xl transition ${
+                  active ? "bg-emerald-50" : "bg-transparent"
+                }`}
+              >
+                <Icon
+                  className={`h-[22px] w-[22px] ${
+                    active ? "stroke-[2.35]" : "stroke-[2]"
+                  }`}
+                  aria-hidden
+                />
+              </span>
+              <span className={active ? "text-[#0D5C3A]" : undefined}>
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

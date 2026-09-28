@@ -1,20 +1,21 @@
 /**
- * Pet Parent mobile chrome — which routes keep the floating bottom nav
+ * Pet Parent mobile chrome — which routes keep the bottom tab bar
  * and how Rogue / content should clear it.
+ *
+ * Tab bar is flush to the bottom (native-app style). Heights assume
+ * ~3.5rem tab row + safe-area + Safari chrome inset.
  */
 
-export const CUSTOMER_BOTTOM_NAV_CLEARANCE =
-  "calc(5.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
-
+/** Rogue FAB sits just above the flush tab bar. */
 export const CUSTOMER_FLOAT_STACK_BOTTOM =
-  "calc(6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
+  "calc(4.35rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
 export const CUSTOMER_FLOAT_STACK_BOTTOM_SOLO =
   "calc(1rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
-/** Content spacer so lists/forms scroll clear of the dock. */
+/** Content spacer so lists/forms scroll clear of the tab bar. */
 export const CUSTOMER_BOTTOM_NAV_CONTENT_PAD =
-  "calc(7.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
+  "calc(5.25rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
 export function isPetParentBottomNavPath(
   pathname: string | null | undefined,

@@ -23,7 +23,7 @@ export default function FloatingActionStack({
   useBrowserChromeInset();
 
   const mobileBottom = aboveBottomNav
-    ? "bottom-[calc(6.75rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))]"
+    ? "bottom-[calc(4.35rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))]"
     : "bottom-[calc(1rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))]";
 
   return (
