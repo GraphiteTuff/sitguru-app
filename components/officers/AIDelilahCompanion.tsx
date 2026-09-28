@@ -30,10 +30,15 @@ import {
 } from "@/lib/companions/open-companion-chat";
 import { COMMUNITY_EVENT_FAQ_CHIPS } from "@/lib/ai/community-events-faqs";
 import { readStoredCommunityEventCompanion } from "@/components/community/CommunityEventCompanionSeed";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
 import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
 } from "@/components/messaging/CompanionAssistantBubbleBody";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 import { X } from "lucide-react";
 
 const DELILAH_BRAND = "#0D5C3A";
@@ -82,6 +87,7 @@ export default function AIDelilahCompanion() {
   const [isOpen, setIsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportBox = useMessagingViewport(isOpen);
   const benefitsChip = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
   useEffect(() => {
@@ -136,7 +142,7 @@ export default function AIDelilahCompanion() {
   const {
     messages,
     input,
-    handleInputChange,
+    setInput,
     handleSubmit,
     append,
     isLoading,
@@ -158,7 +164,7 @@ export default function AIDelilahCompanion() {
     if (!isOpen) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isLoading, isOpen, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -253,6 +259,8 @@ export default function AIDelilahCompanion() {
           className={COMPANION_ROGUE_PANEL_CLASS}
           role="dialog"
           aria-label="Delilah AI Companion"
+          style={messagingPanelStyle(viewportBox)}
+          data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
         >
           <div
             data-companion-header
@@ -403,51 +411,50 @@ export default function AIDelilahCompanion() {
             ) : null}
           </div>
 
-          <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
-            <Link
-              href="/partners/dashboard/community/events?create=1"
-              className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
-            >
-              Create Event
-            </Link>
-            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {CHIPS.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => void runChip(chip)}
-                  className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
+          <div className="homepage-chat-panel__footer shrink-0">
+            {!viewportBox.keyboardOpen ? (
+              <>
+                <Link
+                  href="/partners/dashboard/community/events?create=1"
+                  className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
                 >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-            <form onSubmit={onSubmit} className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                rows={1}
-                placeholder="Ask Delilah about pet events, RSVPs, hosting…"
-                className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto rounded-xl border border-emerald-100 bg-[#f7fbf8] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    if (!isLoading && input.trim()) {
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }
-                }}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Send
-              </button>
-            </form>
+                  Create Event
+                </Link>
+                <div
+                  className="homepage-chat-panel__chips"
+                  role="toolbar"
+                  aria-label="Delilah quick prompts"
+                >
+                  {CHIPS.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => void runChip(chip)}
+                      className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <MessagingChatComposer
+              value={input}
+              onChange={setInput}
+              onSubmit={onSubmit}
+              placeholder="Message…"
+              disabled={isLoading}
+              inputId="delilah-companion-chat-composer"
+              label="Message Delilah"
+              inputRef={inputRef}
+              onInputFocus={() => {
+                window.setTimeout(() => {
+                  const el = scrollerRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 80);
+              }}
+            />
           </div>
         </div>
       ) : null}

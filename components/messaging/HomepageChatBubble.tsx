@@ -7,12 +7,17 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { SendHorizontal, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
 import { usePathname } from "next/navigation";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import { CompanionAssistantBubbleBody } from "@/components/messaging/CompanionAssistantBubbleBody";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
 import { type HomepageCtaContext } from "@/lib/chat/homepage-cta";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 import {
   COMMUNITY_EVENT_FAQ_CHIPS,
   isCommunityCompanionPath,
@@ -167,12 +172,6 @@ const INTENT_CHIP_CLASS =
 const PANEL_SHELL_CLASS =
   "homepage-chat-panel homepage-chat-panel--messaging pointer-events-auto fixed inset-0 z-[10000] flex w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100dvh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl";
 
-type VisualViewportBox = {
-  top: number;
-  height: number;
-  keyboardOpen: boolean;
-};
-
 function sanitizeFirstName(raw: string): string {
   const extracted = extractVisitorPreferredName(raw);
   if (extracted) return formatDisplayName(extracted);
@@ -324,11 +323,7 @@ export default function HomepageChatBubble() {
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
-  const [viewportBox, setViewportBox] = useState<VisualViewportBox>({
-    top: 0,
-    height: 0,
-    keyboardOpen: false,
-  });
+  const viewportBox = useMessagingViewport(open);
 
   const ctaContext = useMemo<HomepageCtaContext>(
     () => ({
@@ -349,7 +344,6 @@ export default function HomepageChatBubble() {
     setMessages,
     input,
     setInput,
-    handleInputChange,
     handleSubmit,
     append,
     isLoading,
@@ -539,40 +533,6 @@ export default function HomepageChatBubble() {
     return () => window.clearTimeout(t);
   }, [open]);
 
-  /** Pin the open sheet to the visual viewport so iOS keyboard doesn't hide chat. */
-  useEffect(() => {
-    if (!open || typeof window === "undefined") return;
-
-    const syncViewport = () => {
-      const vv = window.visualViewport;
-      const height = Math.round(vv?.height ?? window.innerHeight);
-      const top = Math.round(vv?.offsetTop ?? 0);
-      const layoutHeight = window.innerHeight || height;
-      const keyboardOpen = layoutHeight - height > 80;
-      setViewportBox({ top, height, keyboardOpen });
-    };
-
-    syncViewport();
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", syncViewport);
-    vv?.addEventListener("scroll", syncViewport);
-    window.addEventListener("resize", syncViewport);
-    return () => {
-      vv?.removeEventListener("resize", syncViewport);
-      vv?.removeEventListener("scroll", syncViewport);
-      window.removeEventListener("resize", syncViewport);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || typeof document === "undefined") return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
   /** Keep the composer focused so visitors can type the next message without re-clicking. */
   function focusComposer(delayMs = 0) {
     if (!open) return;
@@ -582,17 +542,6 @@ export default function HomepageChatBubble() {
       el.focus({ preventScroll: true });
     }, delayMs);
   }
-
-  function resizeComposer() {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
-  }
-
-  useEffect(() => {
-    resizeComposer();
-  }, [input]);
 
   // After Rogue finishes streaming (or any load ends), restore caret to the input.
   const wasLoadingRef = useRef(false);
@@ -891,14 +840,7 @@ export default function HomepageChatBubble() {
     : awaitingName
       ? "Message Rogue…"
       : "Message…";
-  const mobilePanelStyle =
-    viewportBox.height > 0
-      ? ({
-          top: viewportBox.top,
-          height: viewportBox.height,
-          bottom: "auto",
-        } as const)
-      : undefined;
+  const mobilePanelStyle = messagingPanelStyle(viewportBox);
 
   const openPanelNode = open ? (
     <div
@@ -1041,58 +983,22 @@ export default function HomepageChatBubble() {
           </div>
         ) : null}
 
-        <form
-          className="homepage-chat-panel__composer"
+        <MessagingChatComposer
+          value={input}
+          onChange={setInput}
           onSubmit={onComposerSubmit}
-          autoComplete="off"
-        >
-          <label className="sr-only" htmlFor="rogue-homepage-chat-composer">
-            Message Rogue
-          </label>
-          <textarea
-            id="rogue-homepage-chat-composer"
-            ref={inputRef}
-            name="rogue-chat-message"
-            rows={1}
-            value={input}
-            placeholder={composerPlaceholder}
-            enterKeyHint="send"
-            inputMode="text"
-            autoComplete="off"
-            autoCorrect="on"
-            autoCapitalize="sentences"
-            spellCheck
-            data-form-type="other"
-            data-1p-ignore="true"
-            data-lpignore="true"
-            onChange={(event) => {
-              handleInputChange(event);
-              requestAnimationFrame(resizeComposer);
-            }}
-            onFocus={() => {
-              window.setTimeout(() => {
-                const el = listRef.current;
-                if (el) el.scrollTop = el.scrollHeight;
-              }, 80);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (streaming) return;
-                const form = e.currentTarget.form;
-                if (form) form.requestSubmit();
-              }
-            }}
-          />
-          <button
-            type="submit"
-            disabled={streaming || !input.trim()}
-            aria-label="Send message"
-            className="homepage-chat-panel__send"
-          >
-            <SendHorizontal className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </form>
+          placeholder={composerPlaceholder}
+          disabled={streaming}
+          inputId="rogue-homepage-chat-composer"
+          label="Message Rogue"
+          inputRef={inputRef}
+          onInputFocus={() => {
+            window.setTimeout(() => {
+              const el = listRef.current;
+              if (el) el.scrollTop = el.scrollHeight;
+            }, 80);
+          }}
+        />
       </div>
     </div>
   ) : null;
