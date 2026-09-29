@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import {
+  isTwilioSmsOptOutError,
+  SMS_OPTED_OUT_USER_MESSAGE,
+  SMS_OTP_AUTH_DISCLOSURE,
+} from "@/lib/sms/disclosures";
 
 type PhoneLoginRole = "customer" | "guru" | "ambassador";
 type ProfileRole = "customer" | "guru" | "both";
@@ -208,6 +213,10 @@ function getPhoneLoginErrorMessage(errorMessage: string, allowCreateUser: boolea
     }
   }
 
+  if (isTwilioSmsOptOutError(cleanMessage)) {
+    return SMS_OPTED_OUT_USER_MESSAGE;
+  }
+
   if (
     lowerMessage.includes("sms") ||
     lowerMessage.includes("twilio") ||
@@ -215,7 +224,7 @@ function getPhoneLoginErrorMessage(errorMessage: string, allowCreateUser: boolea
     lowerMessage.includes("deliver") ||
     lowerMessage.includes("hook")
   ) {
-    return "SitGuru could not deliver the text message right now. Wait about a minute, then send a new code. Check that the phone can receive SMS and is not blocking unknown senders.";
+    return "SitGuru could not deliver the text message right now. Wait about a minute, then send a new code. Check that the phone can receive SMS and is not blocking unknown senders. You may use email login instead.";
   }
 
   if (
@@ -618,6 +627,17 @@ export default function PhoneCodeLogin({
             >
               Enter your U.S. mobile number. SitGuru sends it securely as +1
               format for your 6-digit code.
+            </p>
+
+            <p
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6"
+              style={{
+                color: "#334155",
+                WebkitTextFillColor: "#334155",
+                opacity: 1,
+              }}
+            >
+              {SMS_OTP_AUTH_DISCLOSURE}
             </p>
           </div>
 

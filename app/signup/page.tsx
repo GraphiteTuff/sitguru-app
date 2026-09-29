@@ -25,6 +25,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
+import {
+  buildAuthOtpSmsMetadata,
+  buildOngoingSmsConsentMetadata,
+  SMS_OTP_AUTH_DISCLOSURE,
+  SMS_PRIVACY_PATH,
+  SMS_TERMS_PATH,
+} from "@/lib/sms/disclosures";
 
 const BRAND_GREEN = "#0D5C3A";
 
@@ -987,11 +994,9 @@ function SignupPageContent() {
             signup_source: phoneSignupSource,
             signup_status: "pending_phone_verification",
             email: cleanOptionalEmail || null,
-            transactional_sms_opt_in: true,
-            sms_opt_in: true,
-            sms_consent: true,
-            sms_consent_at: new Date().toISOString(),
-            phone_notifications_enabled: true,
+            // OTP request authorizes the one-time auth SMS only — not ongoing SMS.
+            ...buildAuthOtpSmsMetadata(),
+            ...buildOngoingSmsConsentMetadata(smsRemindersOptIn),
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             referral_code: cleanReferralCode || null,
@@ -1102,11 +1107,8 @@ function SignupPageContent() {
           signup_source: phoneSignupSource,
           signup_status: "phone_verified",
           email: cleanOptionalEmail || null,
-          transactional_sms_opt_in: true,
-          sms_opt_in: true,
-          sms_consent: true,
-          sms_consent_at: new Date().toISOString(),
-          phone_notifications_enabled: true,
+          // Keep ongoing transactional SMS tied to the optional checkbox only.
+          ...buildOngoingSmsConsentMetadata(smsRemindersOptIn),
           zip_code: cleanZipCode,
           service_area: serviceArea.trim() || cleanZipCode,
           referral_code: cleanReferralCode || null,
@@ -1531,9 +1533,26 @@ function SignupPageContent() {
                     className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600"
                   />
                   <span>
-                    Send me transactional SMS about account setup, bookings, and
-                    safety. Message and data rates may apply. Reply STOP to opt
-                    out.
+                    Send me transactional SMS from SitGuru about account setup
+                    and security, login verification, bookings, safety, service
+                    updates, and customer support. Message frequency varies.
+                    Message and data rates may apply. Reply STOP to opt out or
+                    HELP for help. SMS consent is optional and is not a
+                    condition of purchase. See our{" "}
+                    <Link
+                      href={SMS_PRIVACY_PATH}
+                      className="font-black text-emerald-800 underline"
+                    >
+                      Privacy Policy
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                      href={SMS_TERMS_PATH}
+                      className="font-black text-emerald-800 underline"
+                    >
+                      Terms &amp; Conditions
+                    </Link>
+                    .
                   </span>
                 </label>
               ) : null}
@@ -1796,6 +1815,42 @@ function SignupPageContent() {
                 </label>
               ) : null}
 
+              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+                {SMS_OTP_AUTH_DISCLOSURE}
+              </p>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={smsRemindersOptIn}
+                  onChange={(event) =>
+                    setSmsRemindersOptIn(event.target.checked)
+                  }
+                  className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600"
+                />
+                <span>
+                  Optional: also send me ongoing transactional SMS from SitGuru
+                  about account setup and security, bookings, safety, service
+                  updates, and customer support. Message frequency varies.
+                  Message and data rates may apply. Reply STOP to opt out or
+                  HELP for help. Not a condition of purchase. See our{" "}
+                  <Link
+                    href={SMS_PRIVACY_PATH}
+                    className="font-black text-emerald-800 underline"
+                  >
+                    Privacy Policy
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href={SMS_TERMS_PATH}
+                    className="font-black text-emerald-800 underline"
+                  >
+                    Terms &amp; Conditions
+                  </Link>
+                  .
+                </span>
+              </label>
+
               <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
                 <input
                   type="checkbox"
@@ -1815,9 +1870,8 @@ function SignupPageContent() {
                   >
                     Privacy Policy
                   </Link>
-                  . By requesting a phone code, I also agree to receive
-                  transactional SMS for verification, bookings, and safety.
-                  Message and data rates may apply. Reply STOP to opt out.
+                  . I understand my profile may need more details before it is
+                  complete.
                 </span>
               </label>
 
