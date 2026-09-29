@@ -211,9 +211,33 @@ const sections = [
       "SitGuru SMS is operated by Graff Enterprises LLC doing business as SitGuru. SitGuru may send transactional text messages to mobile numbers you provide through the SitGuru website or mobile app.",
       "Transactional SMS may include one-time login and account-verification codes (OTP / 2FA), account setup and security notices, booking updates, service notices, safety notices, and customer-support or care-related replies needed to use the SitGuru pet-care marketplace.",
       "Message frequency varies. Message and data rates may apply depending on your mobile carrier.",
-      "Reply STOP to opt out of SitGuru SMS messages. Reply START to resume messages where supported. Reply HELP for help, or email support@sitguru.com.",
-      "Marketing or promotional SMS requires separate affirmative opt-in and is not authorized merely by creating an account or accepting these Terms. See our Privacy Policy at https://www.sitguru.com/privacy for how SitGuru handles phone numbers and SMS consent.",
-      "Carriers are not liable for delayed or undelivered messages.",
+      <>
+        Reply <strong className="font-bold text-slate-900">STOP</strong> to
+        opt out of SitGuru SMS messages. Reply START to resume messages where
+        supported. Reply{" "}
+        <strong className="font-bold text-slate-900">HELP</strong> for help,
+        or email support@sitguru.com.
+      </>,
+      <>
+        Marketing or promotional SMS requires separate affirmative opt-in and
+        is not authorized merely by creating an account or accepting these
+        Terms. See our{" "}
+        <Link
+          href="/privacy"
+          className="font-black text-emerald-800 underline underline-offset-2"
+        >
+          Privacy Policy
+        </Link>{" "}
+        at{" "}
+        <a
+          href="https://www.sitguru.com/privacy"
+          className="font-black text-emerald-800 underline underline-offset-2 break-all"
+        >
+          https://www.sitguru.com/privacy
+        </a>{" "}
+        for how SitGuru handles phone numbers and SMS consent.
+      </>,
+      "Carriers are not liable for any delayed or undelivered messages.",
     ],
   },
   {
@@ -519,9 +543,9 @@ export default function TermsPage() {
                   {section.title}
                 </h2>
                 <div className="mt-4 space-y-4">
-                  {section.body.map((paragraph) => (
+                  {section.body.map((paragraph, index) => (
                     <p
-                      key={paragraph}
+                      key={`${section.title}-${index}`}
                       className="text-base font-medium leading-8 text-slate-600"
                     >
                       {paragraph}
