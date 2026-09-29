@@ -1230,6 +1230,23 @@ export default function LoginScreen() {
                           value={phone}
                         />
                       </View>
+
+                      <Text
+                        style={[
+                          styles.methodHelper,
+                          { marginTop: 10 },
+                        ]}
+                      >
+                        By requesting a code, you
+                        agree to receive a one-time
+                        authentication text from
+                        SitGuru at the mobile number
+                        provided. Message and data
+                        rates may apply. Reply HELP
+                        for help or STOP to opt out.
+                        You may use email login
+                        instead.
+                      </Text>
                     </View>
                   ) : (
                     <View

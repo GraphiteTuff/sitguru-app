@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-const lastUpdated = "September 28, 2026";
+const lastUpdated = "September 29, 2026";
 
 const quickSummary = [
   {
@@ -63,7 +63,7 @@ const termHighlights = [
   {
     title: "Platform communication",
     description:
-      "Users may receive account, booking, support, trust and safety, login, and platform-related communications. Marketing SMS needs opt-in; text STOP to cancel or HELP for help.",
+      "Users may receive account, booking, support, trust and safety, login, and platform-related communications. Marketing SMS needs opt-in; reply STOP to opt out or HELP for help.",
     icon: <Mail className="h-5 w-5" />,
   },
   {
@@ -94,6 +94,7 @@ const sections = [
     title: "1. Acceptance of Terms",
     body: [
       "These Terms and Conditions govern your access to and use of SitGuru, including our website, platform, content, communications, accounts, booking-related tools, program pages, applications, and related services.",
+      "SitGuru is operated by Graff Enterprises LLC doing business as SitGuru.",
       "By accessing or using SitGuru, creating an account, browsing the platform, communicating through SitGuru, applying to a program, submitting information, or using any related service, you agree to be bound by these Terms and any policies referenced within them.",
       "If you do not agree to these Terms, you should not access or use SitGuru.",
     ],
@@ -200,11 +201,19 @@ const sections = [
   {
     title: "13. Communications",
     body: [
-      "By using SitGuru, you consent to receive service-related communications about your account, one-time login or verification codes (account verification / 2FA), bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other transactional notices.",
-      "SitGuru may communicate by email, text message, phone, in-platform messages, push notifications, or other available methods. Message frequency varies. Message and data rates may apply for text messages depending on your mobile carrier.",
-      "Marketing or promotional emails may be sent where permitted by law. You may opt out of promotional emails using the unsubscribe link in those messages. Service-related messages may still be sent where necessary.",
-      "SitGuru does not send marketing or promotional text messages unless you give affirmative consent (opt-in). This matches the Privacy Policy: marketing SMS requires consent; transactional SMS (including login codes) may still be used for account access and service notices.",
-      "Text HELP to the SitGuru number for help, or email support@sitguru.com. Text STOP to cancel SMS messages from SitGuru. After you text STOP, essential account or security notices may still be sent only where required by law or needed to complete an active request you started.",
+      "By using SitGuru, you may receive service-related communications about your account, bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other transactional notices by email, in-platform messages, push notifications, phone, or other available methods where appropriate.",
+      "Marketing or promotional emails may be sent where permitted by law. You may opt out of promotional emails using the unsubscribe link in those messages.",
+    ],
+  },
+  {
+    title: "13A. SMS / Text Messaging Terms",
+    body: [
+      "SitGuru SMS is operated by Graff Enterprises LLC doing business as SitGuru. SitGuru may send transactional text messages to mobile numbers you provide through the SitGuru website or mobile app.",
+      "Transactional SMS may include one-time login and account-verification codes (OTP / 2FA), account setup and security notices, booking updates, service notices, safety notices, and customer-support or care-related replies needed to use the SitGuru pet-care marketplace.",
+      "Message frequency varies. Message and data rates may apply depending on your mobile carrier.",
+      "Reply STOP to opt out of SitGuru SMS messages. Reply START to resume messages where supported. Reply HELP for help, or email support@sitguru.com.",
+      "Marketing or promotional SMS requires separate affirmative opt-in and is not authorized merely by creating an account or accepting these Terms. See our Privacy Policy at https://www.sitguru.com/privacy for how SitGuru handles phone numbers and SMS consent.",
+      "Carriers are not liable for delayed or undelivered messages.",
     ],
   },
   {

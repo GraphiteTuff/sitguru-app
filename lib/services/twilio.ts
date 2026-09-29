@@ -136,10 +136,20 @@ export async function sendSms(
 
     return { ok: true, sid: result.sid || null, status };
   } catch (error) {
+    const twilioError = error as {
+      message?: string;
+      code?: number | string;
+      status?: number | string;
+    };
+    const code = String(twilioError?.code || "").trim();
     const messageText =
-      error instanceof Error ? error.message : "Twilio SMS failed.";
-    console.error("[twilio] sendSms error:", messageText);
-    return { ok: false, sid: null, status: null, error: messageText };
+      error instanceof Error
+        ? error.message
+        : String(twilioError?.message || "Twilio SMS failed.");
+    // Prefer a stable code for opt-out / unsubscribed recipients (21610).
+    const errorText = code ? `${code}: ${messageText}` : messageText;
+    console.error("[twilio] sendSms error:", errorText);
+    return { ok: false, sid: null, status: null, error: errorText };
   }
 }
 
