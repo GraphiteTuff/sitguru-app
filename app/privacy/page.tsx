@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const lastUpdated = "May 21, 2026";
+const lastUpdated = "September 29, 2026";
 
 const quickSummary = [
   {
@@ -50,7 +50,7 @@ const sections = [
     title: "1. Overview",
     body: [
       "SitGuru respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how SitGuru collects, uses, stores, and shares information when you visit our website, create an account, join SitGuru, communicate with us, apply to a program, or use SitGuru services.",
-      "SitGuru is a pet care marketplace for Pet Parents and independent Pet Gurus. We collect information needed to create accounts, support pet care connections, organize care details, protect the community, improve the platform, and communicate with users.",
+      "SitGuru is operated by Graff Enterprises LLC doing business as SitGuru. SitGuru is a pet care marketplace for Pet Parents and independent Pet Gurus. We collect information needed to create accounts, support pet care connections, organize care details, protect the community, improve the platform, and communicate with users.",
       "By accessing or using SitGuru, you acknowledge that you have read and understand this Privacy Policy.",
     ],
   },
@@ -68,9 +68,11 @@ const sections = [
   {
     title: "3. Phone Numbers, Login Codes, and SMS Messages",
     body: [
-      "SitGuru may use phone numbers to help create accounts, sign users in, send one-time login or verification codes, support account security, communicate about account activity, and send service-related messages.",
-      "Transactional text messages may include login codes, account messages, booking-related updates, safety-related communications, support updates, or important service notices. Message and data rates may apply depending on your mobile carrier.",
-      "SitGuru does not use phone numbers to send marketing text messages unless permitted by law and, where required, with appropriate consent.",
+      "SitGuru may use phone numbers to help create accounts, sign users in, send one-time login or verification codes (account verification / 2FA / OTP), support account security, communicate about account activity, and send service-related messages.",
+      "Transactional text messages may include login and account-verification codes, account setup or security notices, booking and service updates, safety-related communications, support or customer-care replies, and other notices needed to use SitGuru. Message frequency varies. Message and data rates may apply depending on your mobile carrier.",
+      "SitGuru does not send marketing or promotional text messages unless you give separate affirmative consent (opt-in). Creating an account or accepting these terms does not by itself enroll you in marketing SMS. Marketing emails, when sent where permitted by law, are separate from SMS and can be stopped with the unsubscribe link in those emails.",
+      "SitGuru does not sell, share, rent, or provide mobile phone numbers or SMS opt-in/consent information to third parties or affiliates for their marketing or promotional purposes. Messaging infrastructure and other service providers may process information solely to deliver SitGuru services on our behalf; they are not authorized to use your mobile number or SMS consent for their own marketing.",
+      "Reply STOP to opt out of SitGuru SMS messages. Reply START to resume messages where supported. Reply HELP for help, or email support@sitguru.com.",
     ],
   },
   {
@@ -78,13 +80,14 @@ const sections = [
     body: [
       "We may use your information to operate, maintain, and improve SitGuru; create and manage accounts; support bookings and related services; communicate with Pet Parents and Pet Gurus; respond to questions and support requests; send transactional messages; improve user experience; protect the safety and integrity of the platform; detect fraud, abuse, or misuse; and comply with legal obligations.",
       "We may use information to support trust and safety reviews, verification steps, account protection, safety-related records, dispute handling, program routing, partner referrals, and community protection.",
-      "We may also use information to send updates, promotional materials, launch announcements, program information, or marketing communications where permitted by law. You may opt out of marketing emails at any time.",
+      "We may also use information to send updates, promotional materials, launch announcements, program information, or marketing communications where permitted by law. You may opt out of marketing emails at any time. Marketing or promotional SMS is sent only with your affirmative consent; reply STOP to cancel those texts, or reply HELP for help.",
     ],
   },
   {
     title: "5. How We Share Information",
     body: [
       "SitGuru may share information with service providers and vendors who help us operate the platform, including hosting providers, analytics tools, customer support tools, email service providers, messaging providers, payment processors, security providers, background or trust and safety providers, and similar business partners.",
+      "SitGuru does not sell, share, rent, or provide mobile phone numbers or SMS opt-in/consent information to third parties or affiliates for their marketing or promotional purposes.",
       "We may share information between users where necessary to support platform functionality, such as facilitating communication, bookings, account setup, care instructions, or service-related interactions between Pet Parents and Pet Gurus.",
       "For example, a Pet Parent may share pet care details with a Pet Guru, and a Pet Guru may share profile, service, location, availability, and experience details with Pet Parents.",
       `We may share limited program or referral information where reasonably needed to support Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, Ambassador activity, partner referrals, or workforce/community outreach.`,
@@ -126,6 +129,7 @@ const sections = [
     body: [
       "You may update certain account information by logging into your account, where that functionality is available.",
       "You may opt out of marketing emails by using the unsubscribe link in those communications.",
+      "For SMS: reply STOP to opt out of SitGuru text messages, or reply HELP for help. You can also contact support@sitguru.com. Message frequency varies. Message and data rates may apply.",
       "Depending on your location, you may have rights related to access, correction, deletion, portability, objection, or limitation of certain personal information. SitGuru will review and respond to applicable requests in accordance with governing law.",
       "To make a privacy-related request, contact us at support@sitguru.com.",
     ],
@@ -189,7 +193,7 @@ const dataHighlights = [
   {
     title: "Phone and SMS activity",
     description:
-      "Phone numbers may be used for account access, secure login codes, transactional messages, and safety-related notices.",
+      "Phone numbers may be used for account access, secure login codes, transactional messages, and safety-related notices. Marketing texts need opt-in. Reply STOP to opt out or HELP for help. SitGuru does not share SMS opt-in data for third-party marketing.",
     icon: <Phone className="h-5 w-5" />,
   },
   {

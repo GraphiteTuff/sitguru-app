@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyStandardWebhookPayload } from "@/lib/auth/standard-webhook";
+import {
+  formatSitGuruOtpSms,
+  isTwilioSmsOptOutError,
+  SMS_OPTED_OUT_USER_MESSAGE,
+} from "@/lib/sms/disclosures";
 import { sendSms } from "@/lib/services/twilio";
 
 export const runtime = "nodejs";
@@ -94,14 +99,16 @@ export async function POST(request: Request) {
     return jsonError(400, "SMS hook payload was missing a phone number.");
   }
 
-  const body = `SitGuru code: ${otp}. Use this newest code to continue. Do not share it.`;
+  const body = formatSitGuruOtpSms(otp);
 
   const result = await sendSms(phone, body);
 
   if (!result.ok) {
+    const optedOut = isTwilioSmsOptOutError(result.error);
     const retryable =
-      Boolean(result.skipped) ||
-      /timeout|temporar|unavailable|429|503/i.test(result.error || "");
+      !optedOut &&
+      (Boolean(result.skipped) ||
+        /timeout|temporar|unavailable|429|503/i.test(result.error || ""));
 
     console.error("[auth/send-sms-hook] Twilio send failed:", {
       userId: event.user?.id || null,
@@ -109,11 +116,14 @@ export async function POST(request: Request) {
       error: result.error || "unknown",
       status: result.status || null,
       sid: result.sid || null,
+      optedOut,
     });
 
     return jsonError(
-      retryable ? 503 : 500,
-      result.error || "SitGuru could not deliver the login SMS.",
+      optedOut ? 400 : retryable ? 503 : 500,
+      optedOut
+        ? SMS_OPTED_OUT_USER_MESSAGE
+        : result.error || "SitGuru could not deliver the login SMS.",
       retryable,
     );
   }

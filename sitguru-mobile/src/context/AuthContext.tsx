@@ -178,6 +178,15 @@ function friendlyAuthError(
     message.toLowerCase();
 
   if (
+    normalized.includes('21610') ||
+    normalized.includes('unsubscribed') ||
+    normalized.includes('opted out') ||
+    normalized.includes('blacklist')
+  ) {
+    return 'This phone number has opted out of SitGuru texts. Text START to the SitGuru number, then request a new login code, or use email login.';
+  }
+
+  if (
     normalized.includes(
       'invalid login',
     )

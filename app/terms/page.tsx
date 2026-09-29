@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-const lastUpdated = "May 21, 2026";
+const lastUpdated = "September 29, 2026";
 
 const quickSummary = [
   {
@@ -63,7 +63,7 @@ const termHighlights = [
   {
     title: "Platform communication",
     description:
-      "Users may receive account, booking, support, trust and safety, login, and platform-related communications.",
+      "Users may receive account, booking, support, trust and safety, login, and platform-related communications. Marketing SMS needs opt-in; reply STOP to opt out or HELP for help.",
     icon: <Mail className="h-5 w-5" />,
   },
   {
@@ -94,6 +94,7 @@ const sections = [
     title: "1. Acceptance of Terms",
     body: [
       "These Terms and Conditions govern your access to and use of SitGuru, including our website, platform, content, communications, accounts, booking-related tools, program pages, applications, and related services.",
+      "SitGuru is operated by Graff Enterprises LLC doing business as SitGuru.",
       "By accessing or using SitGuru, creating an account, browsing the platform, communicating through SitGuru, applying to a program, submitting information, or using any related service, you agree to be bound by these Terms and any policies referenced within them.",
       "If you do not agree to these Terms, you should not access or use SitGuru.",
     ],
@@ -200,10 +201,43 @@ const sections = [
   {
     title: "13. Communications",
     body: [
-      "By using SitGuru, you consent to receive communications related to your account, login codes, bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other service-related notices.",
-      "SitGuru may communicate by email, text message, phone, in-platform messages, push notifications, or other available methods.",
-      "You may also receive marketing or promotional communications where permitted by law. You may opt out of promotional messages using available unsubscribe methods, though service-related messages may still be sent where necessary.",
-      "Message and data rates may apply for text messages depending on your mobile carrier.",
+      "By using SitGuru, you may receive service-related communications about your account, bookings, messages, support requests, programs, payments, trust and safety, platform updates, and other transactional notices by email, in-platform messages, push notifications, phone, or other available methods where appropriate.",
+      "Marketing or promotional emails may be sent where permitted by law. You may opt out of promotional emails using the unsubscribe link in those messages.",
+    ],
+  },
+  {
+    title: "13A. SMS / Text Messaging Terms",
+    body: [
+      "SitGuru SMS is operated by Graff Enterprises LLC doing business as SitGuru. SitGuru may send transactional text messages to mobile numbers you provide through the SitGuru website or mobile app.",
+      "Transactional SMS may include one-time login and account-verification codes (OTP / 2FA), account setup and security notices, booking updates, service notices, safety notices, and customer-support or care-related replies needed to use the SitGuru pet-care marketplace.",
+      "Message frequency varies. Message and data rates may apply depending on your mobile carrier.",
+      <>
+        Reply <strong className="font-bold text-slate-900">STOP</strong> to
+        opt out of SitGuru SMS messages. Reply START to resume messages where
+        supported. Reply{" "}
+        <strong className="font-bold text-slate-900">HELP</strong> for help,
+        or email support@sitguru.com.
+      </>,
+      <>
+        Marketing or promotional SMS requires separate affirmative opt-in and
+        is not authorized merely by creating an account or accepting these
+        Terms. See our{" "}
+        <Link
+          href="/privacy"
+          className="font-black text-emerald-800 underline underline-offset-2"
+        >
+          Privacy Policy
+        </Link>{" "}
+        at{" "}
+        <a
+          href="https://www.sitguru.com/privacy"
+          className="font-black text-emerald-800 underline underline-offset-2 break-all"
+        >
+          https://www.sitguru.com/privacy
+        </a>{" "}
+        for how SitGuru handles phone numbers and SMS consent.
+      </>,
+      "Carriers are not liable for any delayed or undelivered messages.",
     ],
   },
   {
@@ -509,9 +543,9 @@ export default function TermsPage() {
                   {section.title}
                 </h2>
                 <div className="mt-4 space-y-4">
-                  {section.body.map((paragraph) => (
+                  {section.body.map((paragraph, index) => (
                     <p
-                      key={paragraph}
+                      key={`${section.title}-${index}`}
                       className="text-base font-medium leading-8 text-slate-600"
                     >
                       {paragraph}
