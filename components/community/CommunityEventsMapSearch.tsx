@@ -447,24 +447,22 @@ export default function CommunityEventsMapSearch({
 
   useEffect(() => {
     const preference = readCommunityLocationPreference();
-    if (preference.county || preference.city || preference.state) {
-      const next = {
-        ...EMPTY_FILTERS,
-        county: preference.county || "",
-        city: preference.city || "",
-        state: preference.state || "",
-      };
-      setDraft(next);
-      setFilters(next);
-      if (
-        Number.isFinite(preference.latitude) &&
-        Number.isFinite(preference.longitude)
-      ) {
-        setDeviceCenter({
-          latitude: preference.latitude as number,
-          longitude: preference.longitude as number,
-        });
-      }
+    const hasSavedArea = Boolean(
+      preference.county || preference.city || preference.state,
+    );
+
+    if (
+      Number.isFinite(preference.latitude) &&
+      Number.isFinite(preference.longitude)
+    ) {
+      setDeviceCenter({
+        latitude: preference.latitude as number,
+        longitude: preference.longitude as number,
+      });
+    }
+
+    // Keep the saved area as a chip the user can tap. Do not apply it yet.
+    if (hasSavedArea) {
       setNearbyChips(
         nearbyMetroChips({
           latitude: preference.latitude,
@@ -474,12 +472,28 @@ export default function CommunityEventsMapSearch({
           state: preference.state,
         }),
       );
-      setLocationReady(true);
+    }
+
+    // Places need a city. Events open with the full list until the user drills down.
+    if (initialView === "places") {
+      if (hasSavedArea) {
+        const next = {
+          ...EMPTY_FILTERS,
+          county: preference.county || "",
+          city: preference.city || "",
+          state: preference.state || "",
+        };
+        setDraft(next);
+        setFilters(next);
+        setLocationReady(true);
+        return;
+      }
+      void locateFromDevice();
       return;
     }
 
-    void locateFromDevice();
-  }, []);
+    setLocationReady(true);
+  }, [initialView]);
 
   useEffect(() => {
     if (view !== "places" || !locationReady) return;
@@ -762,7 +776,7 @@ export default function CommunityEventsMapSearch({
           <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
             {view === "places"
               ? "Patio brunches, cozy stays, sunny dog parks, and trusted pet care — on the same map as local events, with spots that love your pet back."
-              : "Search nearby pet friendly events — map on top on phones, side-by-side on desktop."}
+              : "Every upcoming pet event is open first. Pick a county, city, or metro when you want to narrow by area."}
           </p>
           <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
             {(
@@ -1062,6 +1076,23 @@ export default function CommunityEventsMapSearch({
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {view === "events" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = { ...draft, county: "", city: "", state: "" };
+                  setDraft(next);
+                  applySearch(next);
+                }}
+                className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                  !draft.county && !draft.city && !draft.state
+                    ? "bg-emerald-700 text-white"
+                    : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                }`}
+              >
+                All events
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -1122,7 +1153,11 @@ export default function CommunityEventsMapSearch({
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
               {view === "places"
                 ? `${placesLoading ? "Searching" : places.length} place${places.length === 1 ? "" : "s"} nearby`
-                : `${filtered.length} event${filtered.length === 1 ? "" : "s"} nearby`}
+                : `${filtered.length} event${filtered.length === 1 ? "" : "s"}${
+                    filters.county || filters.city || filters.state
+                      ? " nearby"
+                      : ""
+                  }`}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
               {activeFilterCount} active filter

@@ -73,16 +73,16 @@ export default async function CommunityPage({ searchParams }: PageProps) {
   ) as PlaceCategoryId | "";
   const [featuredEvents, partnerEvents, discovered] = await Promise.all([
     fetchFeaturedCommunityPageEvents({ limit: 3 }),
-    fetchPublicEvents({ limit: 40 }),
-    fetchDiscoveredHomepageEvents({ limit: 24 }),
+    fetchPublicEvents({ limit: 200 }),
+    fetchDiscoveredHomepageEvents({ limit: 120 }),
   ]);
 
   // Lift curated Bucks & Montgomery listings into the map/search (same set as homepage).
   const curated = getUpcomingCuratedBucksMontgomeryPetEvents();
   const mapEvents = mergeUniqueCommunityEvents(
-    mergeUniqueCommunityEvents(partnerEvents, curated, 80),
+    mergeUniqueCommunityEvents(partnerEvents, curated, 400),
     discovered.events,
-    80,
+    400,
   );
 
   return (
