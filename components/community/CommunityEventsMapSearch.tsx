@@ -31,11 +31,6 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
-import {
-  defaultMetroChips,
-  nearbyMetroChips,
-  type MetroChip,
-} from "@/lib/community/us-metros";
 import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
@@ -330,12 +325,22 @@ function placeToMapMarker(place: PetFriendlyPlace) {
   };
 }
 
-function syncCommunityView(view: "events" | "places", lane: PlaceLane, category: string) {
+function resultCountLabel(count: number, noun: string, nearby: boolean) {
+  const label = `${count} ${noun}${count === 1 ? "" : "s"}`;
+  return nearby ? `${label} nearby` : label;
+}
+
+function syncCommunityView(
+  view: "events" | "places",
+  lane: PlaceLane | "",
+  category: string,
+) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   if (view === "places") {
     url.searchParams.set("view", "places");
-    url.searchParams.set("lane", lane);
+    if (lane) url.searchParams.set("lane", lane);
+    else url.searchParams.delete("lane");
     if (category) url.searchParams.set("category", category);
     else url.searchParams.delete("category");
   } else {
@@ -349,16 +354,16 @@ function syncCommunityView(view: "events" | "places", lane: PlaceLane, category:
 export default function CommunityEventsMapSearch({
   events,
   initialView = "events",
-  initialLane = "eat",
+  initialLane = "",
   initialCategory = "",
 }: {
   events: CommunityEventWithPartner[];
   initialView?: "events" | "places";
-  initialLane?: PlaceLane;
+  initialLane?: PlaceLane | "";
   initialCategory?: PlaceCategoryId | "";
 }) {
   const [view, setView] = useState<"events" | "places">(initialView);
-  const [lane, setLane] = useState<PlaceLane>(initialLane);
+  const [lane, setLane] = useState<PlaceLane | "">(initialLane);
   const [placeCategory, setPlaceCategory] = useState<PlaceCategoryId | "">(
     initialCategory,
   );
@@ -373,7 +378,6 @@ export default function CommunityEventsMapSearch({
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [nearbyChips, setNearbyChips] = useState<MetroChip[]>(defaultMetroChips());
   const [locationReady, setLocationReady] = useState(false);
   const [locating, setLocating] = useState(false);
   const [deviceCenter, setDeviceCenter] = useState<{
@@ -405,7 +409,6 @@ export default function CommunityEventsMapSearch({
         city?: string;
         county?: string;
         state?: string;
-        nearby?: MetroChip[];
       };
       const next = {
         ...EMPTY_FILTERS,
@@ -416,17 +419,6 @@ export default function CommunityEventsMapSearch({
       setDraft(next);
       setFilters(next);
       setDeviceCenter({ latitude, longitude });
-      setNearbyChips(
-        Array.isArray(payload.nearby) && payload.nearby.length
-          ? payload.nearby
-          : nearbyMetroChips({
-              latitude,
-              longitude,
-              city: next.city,
-              county: next.county,
-              state: next.state,
-            }),
-      );
       saveCommunityLocationPreference({
         county: next.county,
         city: next.city,
@@ -437,7 +429,6 @@ export default function CommunityEventsMapSearch({
       });
       return true;
     } catch {
-      setNearbyChips(defaultMetroChips());
       return false;
     } finally {
       setLocating(false);
@@ -447,9 +438,6 @@ export default function CommunityEventsMapSearch({
 
   useEffect(() => {
     const preference = readCommunityLocationPreference();
-    const hasSavedArea = Boolean(
-      preference.county || preference.city || preference.state,
-    );
 
     if (
       Number.isFinite(preference.latitude) &&
@@ -461,42 +449,22 @@ export default function CommunityEventsMapSearch({
       });
     }
 
-    // Keep the saved area as a chip the user can tap. Do not apply it yet.
-    if (hasSavedArea) {
-      setNearbyChips(
-        nearbyMetroChips({
-          latitude: preference.latitude,
-          longitude: preference.longitude,
-          city: preference.city,
-          county: preference.county,
-          state: preference.state,
-        }),
-      );
-    }
-
-    // Places need a city. Events open with the full list until the user drills down.
-    if (initialView === "places") {
-      if (hasSavedArea) {
-        const next = {
-          ...EMPTY_FILTERS,
-          county: preference.county || "",
-          city: preference.city || "",
-          state: preference.state || "",
-        };
-        setDraft(next);
-        setFilters(next);
-        setLocationReady(true);
-        return;
-      }
-      void locateFromDevice();
-      return;
-    }
-
     setLocationReady(true);
-  }, [initialView]);
+  }, []);
+
+  const hasPlaceAnchor = Boolean(
+    filters.county || filters.city || filters.state || deviceCenter,
+  );
 
   useEffect(() => {
     if (view !== "places" || !locationReady) return;
+    if (!hasPlaceAnchor) {
+      setPlaces([]);
+      setPlacesLoading(false);
+      setPlacesError(null);
+      setPlacesErrorCode(null);
+      return;
+    }
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (filters.q) params.set("q", filters.q);
@@ -507,7 +475,7 @@ export default function CommunityEventsMapSearch({
       params.set("lat", String(deviceCenter.latitude));
       params.set("lng", String(deviceCenter.longitude));
     }
-    params.set("lane", lane);
+    if (lane) params.set("lane", lane);
     if (placeCategory) params.set("category", placeCategory);
     if (highlyFriendly) params.set("highlyFriendly", "true");
     if (dogsIndoors) params.set("dogsIndoors", "true");
@@ -561,6 +529,7 @@ export default function CommunityEventsMapSearch({
     filters.city,
     filters.state,
     locationReady,
+    hasPlaceAnchor,
     deviceCenter?.latitude,
     deviceCenter?.longitude,
   ]);
@@ -715,10 +684,16 @@ export default function CommunityEventsMapSearch({
   function changeView(next: "events" | "places") {
     setView(next);
     setHighlightedId(null);
+    if (next === "places") {
+      setLane("");
+      setPlaceCategory("");
+      syncCommunityView("places", "", "");
+      return;
+    }
     syncCommunityView(next, lane, placeCategory);
   }
 
-  function changeLane(next: PlaceLane, category: PlaceCategoryId | "" = "") {
+  function changeLane(next: PlaceLane | "", category: PlaceCategoryId | "" = "") {
     setView("places");
     setLane(next);
     setPlaceCategory(category);
@@ -775,8 +750,8 @@ export default function CommunityEventsMapSearch({
           </h2>
           <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
             {view === "places"
-              ? "Patio brunches, cozy stays, sunny dog parks, and trusted pet care — on the same map as local events, with spots that love your pet back."
-              : "Every upcoming pet event is open first. Pick a county, city, or metro when you want to narrow by area."}
+              ? "Eat & Drink, Stay, Play, and Pet Services are open together. Pick a lane, or use your location, when you want to narrow the list."
+              : "Every upcoming pet event is open first. Pick a county or city, or use your location, when you want to narrow by area."}
           </p>
           <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
             {(
@@ -947,7 +922,9 @@ export default function CommunityEventsMapSearch({
                     }
                     placeholder={
                       view === "places"
-                        ? LANE_SEARCH_PLACEHOLDERS[lane]
+                        ? lane
+                          ? LANE_SEARCH_PLACEHOLDERS[lane]
+                          : "Restaurants, stays, parks, vets…"
                         : "Adoption, meetup, festival…"
                     }
                     className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
@@ -976,6 +953,17 @@ export default function CommunityEventsMapSearch({
           {view === "places" ? (
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => changeLane("")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                    !lane
+                      ? "bg-emerald-700 text-white"
+                      : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                  }`}
+                >
+                  All places
+                </button>
                 {PLACE_LANES.map((item) => (
                   <button
                     key={item.id}
@@ -992,8 +980,11 @@ export default function CommunityEventsMapSearch({
                 ))}
               </div>
               <p className="text-xs font-semibold text-slate-500">
-                {PLACE_LANES.find((item) => item.id === lane)?.hint}
+                {lane
+                  ? PLACE_LANES.find((item) => item.id === lane)?.hint
+                  : "Restaurants, stays, parks, and pet services — pick a lane to narrow."}
               </p>
+              {lane ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -1021,6 +1012,7 @@ export default function CommunityEventsMapSearch({
                   </button>
                 ))}
               </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 {(
                   [
@@ -1103,61 +1095,23 @@ export default function CommunityEventsMapSearch({
               <LocateFixed className="h-3.5 w-3.5" />
               {locating ? "Finding you…" : "Use my location"}
             </button>
-            {nearbyChips.map((option) => {
-              const active =
-                (option.city &&
-                  draft.city.toLowerCase() === option.city.toLowerCase() &&
-                  (!option.state ||
-                    draft.state.toLowerCase() === option.state.toLowerCase())) ||
-                Boolean(
-                  option.county &&
-                    draft.county
-                      .toLowerCase()
-                      .includes(
-                        option.county.replace(/ County$/i, "").toLowerCase(),
-                      ) &&
-                    (!option.state ||
-                      draft.state.toLowerCase() === option.state.toLowerCase()),
-                );
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => {
-                    const next = {
-                      ...draft,
-                      county: option.county,
-                      city: option.city,
-                      state: option.state,
-                    };
-                    setDraft(next);
-                    setDeviceCenter({
-                      latitude: option.latitude,
-                      longitude: option.longitude,
-                    });
-                    applySearch(next);
-                  }}
-                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
-                    active
-                      ? "bg-emerald-700 text-white"
-                      : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
               {view === "places"
-                ? `${placesLoading ? "Searching" : places.length} place${places.length === 1 ? "" : "s"} nearby`
-                : `${filtered.length} event${filtered.length === 1 ? "" : "s"}${
-                    filters.county || filters.city || filters.state
-                      ? " nearby"
-                      : ""
-                  }`}
+                ? placesLoading
+                  ? "Searching places"
+                  : resultCountLabel(
+                      places.length,
+                      "place",
+                      Boolean(filters.county || filters.city || filters.state),
+                    )
+                : resultCountLabel(
+                    filtered.length,
+                    "event",
+                    Boolean(filters.county || filters.city || filters.state),
+                  )}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
               {activeFilterCount} active filter
@@ -1275,17 +1229,17 @@ export default function CommunityEventsMapSearch({
               ) : places.length === 0 ? (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-7">
                   <h3 className="text-xl font-bold text-slate-900">
-                    {!filters.city && !filters.county && !filters.state
-                      ? "Pick a city to see places nearby"
+                    {!hasPlaceAnchor
+                      ? "Use your location to see places"
                       : "No places match just yet"}
                   </h3>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    {!filters.city && !filters.county && !filters.state
-                      ? "Tap Use my location, choose a metro, or type any U.S. city and state."
-                      : "Try another county, city, or lane — Eat & Drink, Stay, Play, or Pet Services."}
+                    {!hasPlaceAnchor
+                      ? "Tap Use my location, or type a county, city, and state. Eat & Drink, Stay, Play, and Pet Services show together until you pick a lane."
+                      : "Try another area, or switch lanes — Eat & Drink, Stay, Play, or Pet Services."}
                   </p>
                 </div>
-              ) : (
+              ) : lane ? (
                 places.map((place) => (
                   <PlaceListCard
                     key={place.id}
@@ -1295,6 +1249,33 @@ export default function CommunityEventsMapSearch({
                     onSwitchLane={changeLane}
                   />
                 ))
+              ) : (
+                PLACE_LANES.map((item) => {
+                  const lanePlaces = places.filter((place) => place.lane === item.id);
+                  if (!lanePlaces.length) return null;
+                  return (
+                    <div key={item.id} className="space-y-4 sm:space-y-5">
+                      <div className="sticky top-20 z-[1] -mx-1 rounded-2xl border border-emerald-100 bg-emerald-50/95 px-4 py-2.5 backdrop-blur xl:static xl:mx-0">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+                          {item.label}
+                        </p>
+                        <p className="text-sm font-semibold text-emerald-900/80">
+                          {lanePlaces.length} place
+                          {lanePlaces.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      {lanePlaces.map((place) => (
+                        <PlaceListCard
+                          key={place.id}
+                          place={place}
+                          highlighted={highlightedId === place.id}
+                          onHighlight={() => setHighlightedId(place.id)}
+                          onSwitchLane={changeLane}
+                        />
+                      ))}
+                    </div>
+                  );
+                })
               )
             ) : filtered.length === 0 ? (
               <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">

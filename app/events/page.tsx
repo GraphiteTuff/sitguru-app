@@ -66,7 +66,8 @@ function first(value?: string | string[]) {
 export default async function CommunityPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const view = first(params?.view) === "places" ? "places" : "events";
-  const initialLane = parsePlaceLane(first(params?.lane));
+  const laneParam = first(params?.lane);
+  const initialLane = laneParam ? parsePlaceLane(laneParam) : "";
   const categoryParam = first(params?.category);
   const initialCategory = (
     getPlaceCategory(categoryParam) ? categoryParam : ""

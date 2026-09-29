@@ -3,6 +3,7 @@ import { COMMUNITY_MARKET_SEEDS } from "@/lib/community/market-seed";
 import { geocodeAddress } from "@/lib/geocoding/geocodeAddress";
 import {
   LANE_SEARCH_QUERIES,
+  PLACE_LANES,
   buildPetFriendlyProfile,
   categoriesForLane,
   getPlaceCategory,
@@ -681,6 +682,24 @@ async function loadMappedPlaces(
     return mapRaw(raw, input.category);
   }
 
+  // No lane yet: Eat, Stay, Play, and Pet Services together. One search per
+  // lane, then the user can drill into a lane or category.
+  if (!input.lane && !input.category) {
+    const batches = await Promise.all(
+      PLACE_LANES.map(async (item) => {
+        const raw = await discoverPlaces({
+          lane: item.id,
+          latitude: center.latitude,
+          longitude: center.longitude,
+          radiusMeters: center.radiusMeters,
+          openNow: input.openNow,
+        });
+        return mapRaw(raw, "");
+      }),
+    );
+    return batches.flat();
+  }
+
   // Nearby Search returns at most 20 mixed results. Searching the whole Eat
   // lane at once lets restaurants crowd out cafés and breweries. All fans
   // out per category, then we merge.
@@ -705,6 +724,12 @@ async function loadMappedPlaces(
   return batches.flat();
 }
 
+function placesQueryLabel(input: PlacesSearchInput, freeText?: string) {
+  if (freeText) return freeText;
+  if (input.lane) return LANE_SEARCH_QUERIES[input.lane];
+  return "pet friendly restaurants stays parks and pet services";
+}
+
 export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
   const center = await resolvePlacesCenter(input);
   const freeText = input.q?.trim();
@@ -713,7 +738,7 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
       places: [],
       center: null,
       source: "none" as const,
-      query: freeText || LANE_SEARCH_QUERIES[input.lane || "eat"],
+      query: placesQueryLabel(input, freeText),
       needsLocation: true,
     };
   }
@@ -729,7 +754,7 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
       state: input.state || "",
       latitude: input.latitude || "",
       longitude: input.longitude || "",
-      lane: input.lane || "eat",
+      lane: input.lane || "all",
       category: input.category || "",
       openNow: Boolean(input.openNow),
     }),
@@ -741,7 +766,7 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
       places: applyPlaceFilters(cached.places, input),
       center,
       source: "cache" as const,
-      query: textQuery || LANE_SEARCH_QUERIES[input.lane || "eat"],
+      query: textQuery || placesQueryLabel(input),
     };
   }
 
@@ -768,7 +793,7 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
     places: applyPlaceFilters(places, input),
     center,
     source: "google" as const,
-    query: textQuery || LANE_SEARCH_QUERIES[input.lane || "eat"],
+    query: textQuery || placesQueryLabel(input),
   };
 }
 

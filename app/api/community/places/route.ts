@@ -71,7 +71,8 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl;
-  const lane = parsePlaceLane(searchParams.get("lane"));
+  const laneParam = searchParams.get("lane");
+  const lane = laneParam ? parsePlaceLane(laneParam) : undefined;
   const category = (searchParams.get("category") || "") as PlaceCategoryId | "";
   const linkedEvents = await loadLinkedEvents();
 
