@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
+  clearReferralSeal,
   isReferralAcquisition,
   readTrustedReferralCapture,
   verifyReferralCapture,
@@ -2121,7 +2122,7 @@ export async function POST(request: NextRequest) {
       intent: requestedIntent,
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       userId,
       intent: result.intent || requestedIntent,
@@ -2153,6 +2154,12 @@ export async function POST(request: NextRequest) {
           ? "Your SitGuru Ambassador workspace is ready. Check your email for the next steps."
           : "Your SitGuru account and workspace are ready. Check your email for the next steps.",
     });
+
+    if (referral.applied || referral.status === "already_locked") {
+      clearReferralSeal(response);
+    }
+
+    return response;
   } catch (error) {
     return jsonError(
       error instanceof Error

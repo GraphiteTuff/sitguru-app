@@ -76,9 +76,9 @@ export default async function CustomerReferralPage({
   const requested = normalizeReferralCode(slug);
   const referral = await loadReferral(requested);
 
-  if (referral.active && referral.id) {
+  if (referral.active && referral.code) {
     await trackReferralClick({
-      referralCodeId: referral.id,
+      code: referral.code,
       landingPage: `/r/${requested || slug}`,
       utmSource: query.utm_source,
       utmMedium: query.utm_medium,
@@ -202,7 +202,7 @@ async function loadReferral(code: string): Promise<ReferralHit> {
 
     const bySlug = await supabase
       .from("referral_codes")
-      .select("id, code, slug, status")
+      .select("code, slug, status")
       .ilike("slug", code)
       .limit(1)
       .maybeSingle();
@@ -212,14 +212,13 @@ async function loadReferral(code: string): Promise<ReferralHit> {
       (
         await supabase
           .from("referral_codes")
-          .select("id, code, slug, status")
+          .select("code, slug, status")
           .ilike("code", code)
           .limit(1)
           .maybeSingle()
       ).data;
 
     const codeRow = byCode as {
-      id: string;
       code: string;
       slug: string | null;
       status: string;
@@ -252,7 +251,7 @@ async function loadReferral(code: string): Promise<ReferralHit> {
 
     const publicCode = normalizeReferralCode(card?.referral_code || codeRow?.code || code);
     return {
-      id: codeRow?.id || "",
+      id: "",
       code: publicCode,
       slug: codeRow?.slug || null,
       ambassadorName: card?.display_name || "a SitGuru Ambassador",

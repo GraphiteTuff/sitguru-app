@@ -45,7 +45,7 @@ The public page is a single column with one primary action, Find Pet Care (`/sea
 
 `supabase/migrations/20260930150000_ambassador_referral_first_booking.sql` keeps the first `booking_id` once it is set. It does not add the creator subtype.
 
-`supabase/migrations/20260930160000_referral_code_public_columns.sql` adds `referral_code_public` for `/g` and `/p`, and revokes anonymous and authenticated select on owner ids, emails, notes, and payout columns of `referral_codes`.
+`supabase/migrations/20260930170000_referral_public_id_and_events.sql` removes the referral-code row id from `referral_code_public` and drops the authenticated read-all policy on `referral_events`. Click tracking resolves the row id on the server from the public code. Pending referral cookies last `ATTRIBUTION_WINDOW_DAYS_DEFAULT` (30 days) and are cleared after a permanent acquisition is stored.
 
 ## Not in this slice
 

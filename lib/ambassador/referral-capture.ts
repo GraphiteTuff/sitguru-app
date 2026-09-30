@@ -180,3 +180,25 @@ export async function sealReferralOnResponse(
 
   return { code: normalized, capturedAt: stamp, mac };
 }
+
+const REFERRAL_SEAL_COOKIES = [
+  AMBASSADOR_REF_COOKIE,
+  AMBASSADOR_CODE_COOKIE,
+  AMBASSADOR_CAPTURED_AT_COOKIE,
+  AMBASSADOR_CAPTURE_MAC_COOKIE,
+];
+
+/** Drop the pending seal only after a permanent acquisition exists. */
+export function clearReferralSeal(response: CookieResponse) {
+  for (const name of REFERRAL_SEAL_COOKIES) {
+    response.cookies.set({
+      name,
+      value: "",
+      httpOnly: name !== AMBASSADOR_CODE_COOKIE,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0,
+    });
+  }
+}

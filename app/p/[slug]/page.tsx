@@ -28,7 +28,6 @@ type Partner = {
 };
 
 type ReferralCode = {
-  id: string;
   code: string;
   slug: string | null;
   display_name: string | null;
@@ -63,7 +62,7 @@ async function findPartnerByReferralSlug(slug: string) {
   const referralResponse = await supabase
     .from("referral_code_public")
     .select(
-      "id, code, slug, display_name, public_type, city, state, website, business_type, entity_type",
+      "code, slug, display_name, public_type, city, state, website, business_type, entity_type",
     )
     .eq("slug", slug)
     .maybeSingle();

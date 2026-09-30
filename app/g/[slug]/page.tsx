@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
 
 type ReferralCode = {
-  id: string;
   code: string;
   slug: string | null;
   campaign_type: string | null;
@@ -59,7 +58,7 @@ export default async function GuruReferralPage({
   const { data, error } = await supabase
     .from("referral_code_public")
     .select(
-      "id, code, slug, campaign_type, display_name, public_type, city, state, territory",
+      "code, slug, campaign_type, display_name, public_type, city, state, territory",
     )
     .eq("slug", params.slug)
     .maybeSingle();
@@ -71,7 +70,7 @@ export default async function GuruReferralPage({
   const referral = data as ReferralCode;
 
   await trackReferralClick({
-    referralCodeId: referral.id,
+    code: referral.code,
     landingPage: `/g/${params.slug}`,
     utmSource: searchParams?.utm_source,
     utmMedium: searchParams?.utm_medium,

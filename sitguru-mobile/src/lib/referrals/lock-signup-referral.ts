@@ -123,17 +123,30 @@ export async function lockNewAccountReferral(input: {
       source: 'mobile_app',
     };
 
-    const authed = await sitguruApiFetch('/api/auth/provision-signup', {
+    const authed = await sitguruApiFetch<{
+      appliedReferral?: { applied?: boolean; status?: string };
+    }>('/api/auth/provision-signup', {
       method: 'POST',
       auth: true,
       body,
     });
+    let result = authed;
     if (authed.status === 401) {
-      await sitguruApiFetch('/api/auth/provision-signup', {
+      result = await sitguruApiFetch<{
+        appliedReferral?: { applied?: boolean; status?: string };
+      }>('/api/auth/provision-signup', {
         method: 'POST',
         auth: false,
         body,
       });
+    }
+    const applied = result.data?.appliedReferral;
+    if (applied?.applied || applied?.status === 'already_locked') {
+      await AsyncStorage.multiRemove([
+        REFERRAL_STORAGE_KEY,
+        CAPTURED_AT_KEY,
+        CAPTURE_MAC_KEY,
+      ]);
     }
   } catch {
     // A failed lock must not block sign-in. The server also refuses old accounts.
