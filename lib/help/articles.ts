@@ -13,7 +13,8 @@ export type HelpCategory =
   | "Billing & Refunds"
   | "Account & Profiles"
   | "Booking & Cancellations"
-  | "Trust & Safety";
+  | "Trust & Safety"
+  | "Trust & Credentials";
 
 export type HelpArticle = {
   slug: string;
@@ -136,6 +137,62 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "holiday surge",
       "service rates",
     ],
+  },
+
+  {
+    slug: "about-verified-credentials",
+    href: "/help/trust-credentials/about",
+    title: "About SitGuru Verified Credentials",
+    summary:
+      "Credentials are optional highlights. Gurus can add training, insurance, bonding, memberships, or certifications they already have.",
+    audience: "all",
+    category: "Trust & Credentials",
+    tags: ["credentials", "optional", "verified", "guru profile"],
+    keywords: ["trust and credentials", "not required", "bookable", "highlights"],
+  },
+  {
+    slug: "pet-cpr-first-aid",
+    href: "/help/trust-credentials/pet-cpr",
+    title: "Pet CPR & First Aid Certification",
+    summary:
+      "Optional Pet CPR and First Aid highlights. Gurus can explore American Health Training or submit a certification they already have from any recognized provider.",
+    audience: "all",
+    category: "Trust & Credentials",
+    tags: ["cpr", "first aid", "training", "optional"],
+    keywords: ["american health training", "certificate", "pet emergency"],
+  },
+  {
+    slug: "insurance-and-bonding",
+    href: "/help/trust-credentials/insurance-and-bonding",
+    title: "Pet-Care Insurance & Bonding",
+    summary:
+      "Insurance and bonding are separate optional highlights. Private policy documents stay off the public profile.",
+    audience: "all",
+    category: "Trust & Credentials",
+    tags: ["insurance", "bonding", "coverage", "optional"],
+    keywords: ["liability", "bond", "expiration", "certificate of insurance"],
+  },
+  {
+    slug: "memberships-and-certifications",
+    href: "/help/trust-credentials/memberships",
+    title: "Professional Memberships & Certifications",
+    summary:
+      "PSI membership, Certified Professional Pet Sitter, and other pet-care credentials can be reviewed by SitGuru.",
+    audience: "all",
+    category: "Trust & Credentials",
+    tags: ["psi", "cpps", "membership", "certification"],
+    keywords: ["pet sitters international", "professional", "manual review"],
+  },
+  {
+    slug: "verified-by-sitguru",
+    href: "/help/trust-credentials/verified-by-sitguru",
+    title: "What Does Verified by SitGuru Mean?",
+    summary:
+      "It means SitGuru reviewed documentation for that credential. It does not mean SitGuru issued it or guarantees a Guru's performance.",
+    audience: "all",
+    category: "Trust & Credentials",
+    tags: ["verified by sitguru", "disclaimer", "trust"],
+    keywords: ["does not guarantee", "not the insurer", "not psi"],
   },
 
   /* —— Billing & Refunds —— */
@@ -428,6 +485,15 @@ export const HELP_CATEGORIES = [
     href: "/help/booking/requests-and-cancellations",
     hubHref: "/help/booking",
     category: "Booking & Cancellations" as HelpCategory,
+  },
+  {
+    id: "credentials",
+    title: "Trust & Credentials",
+    description:
+      "Optional Guru training, insurance, bonding, memberships, and what Verified by SitGuru means.",
+    href: "/help/trust-credentials/about",
+    hubHref: "/help/trust-credentials",
+    category: "Trust & Credentials" as HelpCategory,
   },
   {
     id: "safety",
