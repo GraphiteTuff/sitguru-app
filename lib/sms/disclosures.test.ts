@@ -20,7 +20,9 @@ describe("sms disclosures", () => {
 
   it("formats OTP SMS with HELP/STOP and SitGuru identity", () => {
     const body = formatSitGuruOtpSms("123456");
-    assert.match(body, /^SitGuru code: 123456\./);
+    assert.match(body, /^SitGuru: Your secure login code is 123456\./);
+    assert.match(body, /Happy tails are one step away!/);
+    assert.match(body, /Keep this code private/);
     assert.match(body, /HELP/);
     assert.match(body, /STOP/);
     assert.doesNotMatch(body, /\{\{otp\}\}/);
