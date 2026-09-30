@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
+import AmbassadorPerformanceClient from "@/components/ambassador/AmbassadorPerformanceClient";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
@@ -82,7 +82,7 @@ export default async function AmbassadorPerformancePortalPage() {
           Full dashboard
         </Link>
       </div>
-      <AmbassadorSelfServicePortal />
+      <AmbassadorPerformanceClient />
     </div>
   );
 }

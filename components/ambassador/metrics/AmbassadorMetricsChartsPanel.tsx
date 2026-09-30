@@ -1,10 +1,12 @@
 /**
  * Server-friendly metrics charts panel — gated by referralCode prop (no fetch).
+ * Supports optional demo override for previewing active chart animations.
  */
 
 "use client";
 
 import {
+  AMBASSADOR_METRICS_MOCK,
   CircuitBrokenAlert,
   MilestonePipelineChart,
   TrafficDistributionChart,
@@ -15,6 +17,8 @@ type AmbassadorMetricsChartsPanelProps = {
   clicksCount?: number;
   referralCount?: number;
   initHref?: string;
+  /** Dev / QA: force active charts with realistic mock numbers. */
+  isMockActive?: boolean;
   className?: string;
 };
 
@@ -23,12 +27,21 @@ export default function AmbassadorMetricsChartsPanel({
   clicksCount = 0,
   referralCount = 0,
   initHref = "/ambassador/dashboard/referrals",
+  isMockActive = false,
   className = "",
 }: AmbassadorMetricsChartsPanelProps) {
   const code = typeof referralCode === "string" ? referralCode.trim() : "";
-  const frozen = !code;
-  const liveClicks = frozen ? 0 : clicksCount;
-  const liveReferrals = frozen ? 0 : referralCount;
+  const frozen = isMockActive ? false : !code;
+  const liveClicks = isMockActive
+    ? AMBASSADOR_METRICS_MOCK.clicksCount
+    : frozen
+      ? 0
+      : clicksCount;
+  const liveReferrals = isMockActive
+    ? AMBASSADOR_METRICS_MOCK.referralCount
+    : frozen
+      ? 0
+      : referralCount;
 
   return (
     <div className={`w-full space-y-4 ${className}`}>
