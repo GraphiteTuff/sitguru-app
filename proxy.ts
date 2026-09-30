@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { publicReferralIsActive } from "@/lib/ambassador/public-referral-lookup";
 import {
   isHardcodedSuperUserEmail,
   normalizeAdminEmail,
@@ -361,31 +362,44 @@ export async function proxy(request: NextRequest) {
     isProtectedAmbassadorDashboardPath(pathname) &&
     !isAmbassadorLoginPath(pathname);
 
+  const pathMatch = pathname.match(/^\/r\/([^/]+)$/i);
+  let pathCode = "";
+  if (pathMatch?.[1]) {
+    try {
+      pathCode = decodeURIComponent(pathMatch[1])
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9_-]/g, "");
+    } catch {
+      pathCode = "";
+    }
+  }
+  const incomingCode = pathCode || normalizedRef;
+
   if (
     !requiresAdminAccess &&
     !requiresGuruAccess &&
     !requiresAmbassadorAccess
   ) {
     const passthrough = NextResponse.next();
-    if (normalizedRef) {
+    if (incomingCode && (await publicReferralIsActive(incomingCode))) {
+      const cookieOpts = {
+        sameSite: "lax" as const,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      };
       passthrough.cookies.set({
         name: "sitguru_ambassador_ref",
-        value: normalizedRef,
+        value: incomingCode,
         httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30,
+        ...cookieOpts,
       });
-      // Canonical cookie already consumed by signup + /r/ flows
       passthrough.cookies.set({
         name: "sitguru_ambassador_code",
-        value: normalizedRef,
+        value: incomingCode,
         httpOnly: false,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30,
+        ...cookieOpts,
       });
     }
     return passthrough;

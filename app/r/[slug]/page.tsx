@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
 import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
 import {
   creatorRoleLabel,
   isCreatorAmbassadorType,
+  isReservedReferralCode,
   normalizeReferralCode,
   publicReferralUrl,
 } from "@/lib/ambassador/creator-referral";
@@ -181,90 +181,86 @@ export default async function CustomerReferralPage({
   );
 }
 
+type PublicAmbassadorCard = {
+  referral_code?: string | null;
+  display_name?: string | null;
+  ambassador_type?: string | null;
+  city?: string | null;
+  state?: string | null;
+  territory?: string | null;
+  photo_url?: string | null;
+};
+
+function viewIsMissing(message: string) {
+  return /ambassador_public_referrals|schema cache|does not exist|PGRST205/i.test(message);
+}
+
 async function loadReferral(code: string): Promise<ReferralHit> {
-  if (!code) return inactive("");
+  if (!code || isReservedReferralCode(code)) return inactive(code);
   try {
-  const supabase = await createClient();
+    const supabase = await createClient();
 
-  const bySlug = await supabase
-    .from("referral_codes")
-    .select("id, code, slug, status, ambassador_id")
-    .ilike("slug", code)
-    .limit(1)
-    .maybeSingle();
+    const bySlug = await supabase
+      .from("referral_codes")
+      .select("id, code, slug, status")
+      .ilike("slug", code)
+      .limit(1)
+      .maybeSingle();
 
-  const byCode =
-    bySlug.data ||
-    (
-      await supabase
-        .from("referral_codes")
-        .select("id, code, slug, status, ambassador_id")
-        .ilike("code", code)
-        .limit(1)
-        .maybeSingle()
-    ).data;
+    const byCode =
+      bySlug.data ||
+      (
+        await supabase
+          .from("referral_codes")
+          .select("id, code, slug, status")
+          .ilike("code", code)
+          .limit(1)
+          .maybeSingle()
+      ).data;
 
-  const codeRow = byCode as {
-    id: string;
-    code: string;
-    slug: string | null;
-    status: string;
-    ambassador_id: string | null;
-  } | null;
+    const codeRow = byCode as {
+      id: string;
+      code: string;
+      slug: string | null;
+      status: string;
+    } | null;
 
-  if (codeRow && codeRow.status !== "active") return inactive(normalizeReferralCode(codeRow.code));
+    if (codeRow && codeRow.status !== "active") {
+      return inactive(normalizeReferralCode(codeRow.code));
+    }
 
-  const ambassadorId = codeRow?.ambassador_id || "";
-  let ambassador: unknown = null;
-  try {
-    const ambassadorQuery = supabaseAdmin
-      .from("ambassadors")
-      .select(
-        "id, display_name, full_name, ambassador_type, city, state, territory, status, ambassador_photo_url, photo_approved, referral_code",
-      );
-    const result = ambassadorId
-      ? await ambassadorQuery.eq("id", ambassadorId).maybeSingle()
-      : await ambassadorQuery.ilike("referral_code", code).maybeSingle();
-    ambassador = result.data;
-  } catch (error) {
-    console.error(
-      "[referral-page] ambassador lookup skipped:",
-      error instanceof Error ? error.message : "lookup_failed",
-    );
-  }
+    const cardQuery = await supabase
+      .from("ambassador_public_referrals")
+      .select("referral_code, display_name, ambassador_type, city, state, territory, photo_url")
+      .ilike("referral_code", normalizeReferralCode(codeRow?.code || code))
+      .limit(1)
+      .maybeSingle();
 
-  const person = ambassador as {
-    id?: string;
-    display_name?: string | null;
-    full_name?: string | null;
-    ambassador_type?: string | null;
-    city?: string | null;
-    state?: string | null;
-    territory?: string | null;
-    status?: string | null;
-    ambassador_photo_url?: string | null;
-    photo_approved?: boolean | null;
-    referral_code?: string | null;
-  } | null;
+    let card = (cardQuery.data || null) as PublicAmbassadorCard | null;
+    if (cardQuery.error) {
+      if (!viewIsMissing(cardQuery.error.message)) {
+        console.error("[referral-page] public card lookup failed:", cardQuery.error.message);
+      }
+      card = null;
+      if (!viewIsMissing(cardQuery.error.message) || !codeRow) {
+        return inactive(normalizeReferralCode(codeRow?.code || code));
+      }
+    }
 
-  const status = String(person?.status || "").toLowerCase();
-  const blocked = ["archived", "paused", "suspended", "inactive", "disabled", "declined"].includes(status);
-  if (!codeRow && (!person || blocked)) return inactive(code);
-  if (person && blocked) return inactive(normalizeReferralCode(person.referral_code || code));
+    if (!card && !codeRow) return inactive(code);
+    if (!card && codeRow && !cardQuery.error) return inactive(normalizeReferralCode(codeRow.code));
 
-  const publicCode = normalizeReferralCode(codeRow?.code || person?.referral_code || code);
-  return {
-    id: codeRow?.id || "",
-    code: publicCode,
-    slug: codeRow?.slug || null,
-    ambassadorName: person?.display_name || person?.full_name || "a SitGuru Ambassador",
-    ambassadorType: person?.ambassador_type || null,
-    photoUrl: person?.photo_approved ? person.ambassador_photo_url || null : null,
-    location:
-      person?.territory ||
-      [person?.city, person?.state].filter(Boolean).join(", "),
-    active: true,
-  };
+    const publicCode = normalizeReferralCode(card?.referral_code || codeRow?.code || code);
+    return {
+      id: codeRow?.id || "",
+      code: publicCode,
+      slug: codeRow?.slug || null,
+      ambassadorName: card?.display_name || "a SitGuru Ambassador",
+      ambassadorType: card?.ambassador_type || null,
+      photoUrl: card?.photo_url || null,
+      location: card?.territory || [card?.city, card?.state].filter(Boolean).join(", "),
+      active: true,
+    };
   } catch (error) {
     console.error(
       "[referral-page]",

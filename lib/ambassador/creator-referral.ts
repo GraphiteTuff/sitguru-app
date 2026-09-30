@@ -7,6 +7,9 @@ export const CREATOR_AMBASSADOR_TYPE = "creator_ambassador";
 
 export const ATTRIBUTION_WINDOW_DAYS_DEFAULT = 30;
 
+/** A brand-new Auth account may lock one Ambassador. Older accounts are not acquisitions. */
+export const ACQUISITION_LOCK_WINDOW_MS = 15 * 60 * 1000;
+
 /** Codes that would collide with SitGuru routes or API paths. */
 export const RESERVED_REFERRAL_CODES = [
   "admin",
@@ -95,6 +98,89 @@ export function funnelRate(numerator: number, denominator: number) {
     return 0;
   }
   return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+export function shouldLockAcquisition(
+  accountCreatedAt?: string | null,
+  now = Date.now(),
+) {
+  const created = Date.parse(String(accountCreatedAt || ""));
+  if (!Number.isFinite(created)) return false;
+  return now >= created && now - created <= ACQUISITION_LOCK_WINDOW_MS;
+}
+
+const QUALIFIED_BOOKING_STATUSES = new Set(["completed", "complete"]);
+const QUALIFIED_PAYMENT_STATUSES = new Set([
+  "paid",
+  "succeeded",
+  "complete",
+  "completed",
+]);
+
+/**
+ * A qualified Creator conversion is the first completed, paid booking
+ * on a new account's locked Ambassador. It does not pay a reward by itself.
+ */
+export function isQualifiedCreatorConversion(input: {
+  hasLockedReferral: boolean;
+  isNewAccount: boolean;
+  isSelfReferral: boolean;
+  isFirstQualifyingBooking: boolean;
+  bookingStatus?: string | null;
+  paymentStatus?: string | null;
+}) {
+  if (!input.hasLockedReferral || !input.isNewAccount || input.isSelfReferral) {
+    return false;
+  }
+  if (!input.isFirstQualifyingBooking) return false;
+  const bookingStatus = String(input.bookingStatus || "").trim().toLowerCase();
+  const paymentStatus = String(input.paymentStatus || "").trim().toLowerCase();
+  if (bookingStatus === "canceled" || bookingStatus === "cancelled") return false;
+  if (paymentStatus === "refunded") return false;
+  return (
+    QUALIFIED_BOOKING_STATUSES.has(bookingStatus) &&
+    QUALIFIED_PAYMENT_STATUSES.has(paymentStatus)
+  );
+}
+
+export function readCookieValue(
+  cookieHeader: string | null | undefined,
+  name: string,
+) {
+  const source = String(cookieHeader || "");
+  if (!source || !name) return "";
+  for (const part of source.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    const key = part.slice(0, separator).trim();
+    if (key !== name) continue;
+    const raw = part.slice(separator + 1).trim();
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return "";
+}
+
+/**
+ * Last touch before signup: an explicit link wins, then the validated cookie,
+ * then Auth metadata. Attribution is still locked by user id on the server.
+ */
+export function incomingAmbassadorCode(input: {
+  queryCode?: string | null;
+  cookieHeader?: string | null;
+  metadataCode?: string | null;
+}) {
+  const fromQuery = normalizeReferralCode(input.queryCode);
+  if (fromQuery) return fromQuery;
+  const fromCookie = normalizeReferralCode(
+    readCookieValue(input.cookieHeader, "sitguru_ambassador_code") ||
+      readCookieValue(input.cookieHeader, "sitguru_ambassador_ref"),
+  );
+  if (fromCookie) return fromCookie;
+  return normalizeReferralCode(input.metadataCode);
 }
 
 export function referralDateWindow(preset: string, now = new Date()) {

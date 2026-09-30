@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
+import { shouldLockAcquisition } from "@/lib/ambassador/creator-referral";
 import type {
   AmbassadorNetworkKpis,
   AmbassadorPerformanceRow,
@@ -253,24 +254,72 @@ export async function recordAmbassadorClick(params: {
   };
 }
 
+export async function loadLockedAmbassadorReferral(userId: string) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("ambassador_referrals")
+    .select("id, ambassador_id, referral_code, booking_id, booking_status, created_at")
+    .eq("referred_user_id", id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const row = data as {
+    id?: string;
+    ambassador_id?: string;
+    referral_code?: string | null;
+    booking_id?: string | null;
+    booking_status?: string | null;
+  };
+  if (!row.id || !row.ambassador_id) return null;
+
+  const { data: owner } = await supabaseAdmin
+    .from("ambassadors")
+    .select("user_id")
+    .eq("id", row.ambassador_id)
+    .maybeSingle();
+
+  return {
+    referralId: row.id,
+    ambassadorId: row.ambassador_id,
+    code: normalizeSlug(String(row.referral_code || "")),
+    bookingId: String(row.booking_id || ""),
+    bookingStatus: String(row.booking_status || ""),
+    ownerUserId: String((owner as { user_id?: string | null } | null)?.user_id || ""),
+  };
+}
+
+async function accountCreatedAt(userId: string, supplied?: string | null) {
+  if (supplied) return supplied;
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error || !data.user) return "";
+  return data.user.created_at || "";
+}
+
 export async function attributeSignupToAmbassador(params: {
   newUserId: string;
   referralSlug: string;
   referredRole?: string | null;
+  accountCreatedAt?: string | null;
 }) {
   const profile = await findAmbassadorProfileBySlug(params.referralSlug);
   if (!profile) return { ok: false as const, error: "Invalid referral code." };
 
-  const { data: existing } = await supabaseAdmin
-    .from("ambassador_referrals")
-    .select("id")
-    .eq("ambassador_id", profile.id)
-    .eq("referred_user_id", params.newUserId)
-    .limit(1)
-    .maybeSingle();
+  if (profile.user_id && profile.user_id === params.newUserId) {
+    return { ok: false as const, error: "self_referral" };
+  }
 
-  if (existing && (existing as { id?: string }).id) {
-    return { ok: true as const, ambassadorId: profile.id, rate: 0 };
+  const locked = await loadLockedAmbassadorReferral(params.newUserId);
+  if (locked) {
+    return { ok: true as const, ambassadorId: locked.ambassadorId, rate: 0, locked: true as const };
+  }
+
+  const createdAt = await accountCreatedAt(params.newUserId, params.accountCreatedAt);
+  if (!shouldLockAcquisition(createdAt)) {
+    return { ok: false as const, error: "existing_account" };
   }
 
   const { error } = await supabaseAdmin.from("ambassador_referrals").insert({
@@ -291,8 +340,8 @@ export async function attributeSignupToAmbassador(params: {
 }
 
 /**
- * Record / refresh commission when a referred customer starts checkout.
- * Captures booking value × profile commission rate with PENDING_AUDIT status.
+ * Attach a booking id to the account's locked Ambassador referral.
+ * Does not create a reward or payout. A later booking does not replace the first.
  */
 export async function recordAmbassadorBookingCommission(params: {
   referralSlug: string;
@@ -311,19 +360,35 @@ export async function recordAmbassadorBookingCommission(params: {
     return { ok: false as const, error: "Booking has no Pet Parent account." };
   }
 
-  const { data: existing } = await supabaseAdmin
-    .from("ambassador_referrals")
-    .select("id")
-    .eq("ambassador_id", profile.id)
-    .eq("referred_user_id", payerUserId)
-    .limit(1)
-    .maybeSingle();
+  if (profile.user_id && profile.user_id === payerUserId) {
+    return { ok: false as const, error: "self_referral" };
+  }
 
-  const referralId = (existing as { id?: string } | null)?.id;
-  if (!referralId) {
+  const locked = await loadLockedAmbassadorReferral(payerUserId);
+  if (!locked || locked.ambassadorId !== profile.id) {
     return {
       ok: false as const,
       error: "This account does not have a locked Ambassador referral.",
+    };
+  }
+
+  const referralId = locked.referralId;
+  if (locked.bookingId && locked.bookingId !== params.bookingId) {
+    return {
+      ok: true as const,
+      ambassadorId: profile.id,
+      rate: 0,
+      commissionEarned: 0,
+      referralId,
+    };
+  }
+  if (locked.bookingStatus.toLowerCase() === "completed") {
+    return {
+      ok: true as const,
+      ambassadorId: profile.id,
+      rate: 0,
+      commissionEarned: 0,
+      referralId,
     };
   }
 

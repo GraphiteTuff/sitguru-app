@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=86400",
         "Content-Disposition": download
-          ? `attachment; filename="sitguru-${code || "referral"}.png"`
+          ? `attachment; filename="sitguru-${(code || "referral").toLowerCase()}-qr.png"`
           : "inline",
       },
     });

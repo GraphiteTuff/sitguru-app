@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
+import {
+  incomingAmbassadorCode,
+  shouldLockAcquisition,
+} from "@/lib/ambassador/creator-referral";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -256,20 +260,21 @@ function getTrackingContext(
 function getIncomingAmbassadorCode(
   requestUrl: URL,
   metadata: Record<string, unknown>,
+  cookieHeader: string | null,
 ) {
-  return (
-    cleanText(requestUrl.searchParams.get("ambassador_referral_code")) ||
-    cleanText(requestUrl.searchParams.get("ref")) ||
-    cleanText(requestUrl.searchParams.get("referral_code")) ||
-    cleanText(requestUrl.searchParams.get("code_ref")) ||
-    getMetadataString(metadata, [
+  return incomingAmbassadorCode({
+    queryCode:
+      cleanText(requestUrl.searchParams.get("ambassador_referral_code")) ||
+      cleanText(requestUrl.searchParams.get("ref")) ||
+      cleanText(requestUrl.searchParams.get("referral_code")) ||
+      cleanText(requestUrl.searchParams.get("code_ref")),
+    cookieHeader,
+    metadataCode: getMetadataString(metadata, [
       "ambassador_referral_code",
       "referral_code",
       "invite_code",
-    ])
-  )
-    .toUpperCase()
-    .replace(/[^A-Z0-9-]/g, "");
+    ]),
+  });
 }
 
 function buildFullName(
@@ -660,7 +665,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (explicitIntent) {
+  const accountIsNew = shouldLockAcquisition(user.created_at);
+  const existingAccountLogin = !accountIsNew && hasExistingSitGuruAccess;
+
+  if (explicitIntent && !existingAccountLogin) {
     const email = cleanText(user.email).toLowerCase();
     const phone = cleanText(user.phone) || getMetadataString(metadata, ["phone"]);
     const fullName = buildFullName(metadata, email);
@@ -675,6 +683,7 @@ export async function GET(request: Request) {
     const ambassadorReferralCode = getIncomingAmbassadorCode(
       requestUrl,
       metadata,
+      request.headers.get("cookie"),
     );
 
     try {
@@ -726,7 +735,7 @@ export async function GET(request: Request) {
 
   const safeNextPath = getSafeNextPath(nextParam, type);
 
-  if (explicitIntent) {
+  if (explicitIntent && !existingAccountLogin) {
     return NextResponse.redirect(
       new URL(
         safeNextPath || getIntentRedirectPath(explicitIntent),

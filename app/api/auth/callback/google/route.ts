@@ -15,6 +15,7 @@ import {
   redirectUrlForRole,
   type OneTapRole,
 } from "@/lib/auth/google-one-tap";
+import { shouldLockAcquisition } from "@/lib/ambassador/creator-referral";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -158,49 +159,53 @@ export async function POST(request: NextRequest) {
 
     const user = signInData.user;
     const accessToken = signInData.session.access_token;
+    const accountIsNew = shouldLockAcquisition(user.created_at);
 
-    try {
-      const admin = createSupabaseAdminClient();
-      await admin.auth.admin.updateUserById(user.id, {
-        user_metadata: {
-          ...(user.user_metadata || {}),
-          full_name: name || user.user_metadata?.full_name || null,
-          avatar_url: picture || user.user_metadata?.avatar_url || null,
-          picture: picture || user.user_metadata?.picture || null,
-          google_id: googleId || user.user_metadata?.google_id || null,
-          account_intent: intent,
-          signup_intent: intent,
-          signup_role: intent === "pet_parent" ? "customer" : intent,
-          signup_source: "google_one_tap",
-        },
-      });
-
-      await admin
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            email,
-            full_name: name || null,
-            avatar_url: picture || null,
-            role: intent === "pet_parent" ? "customer" : intent,
+    if (accountIsNew) {
+      try {
+        const admin = createSupabaseAdminClient();
+        await admin.auth.admin.updateUserById(user.id, {
+          user_metadata: {
+            ...(user.user_metadata || {}),
+            full_name: name || user.user_metadata?.full_name || null,
+            avatar_url: picture || user.user_metadata?.avatar_url || null,
+            picture: picture || user.user_metadata?.picture || null,
+            google_id: googleId || user.user_metadata?.google_id || null,
+            account_intent: intent,
+            signup_intent: intent,
+            signup_role: intent === "pet_parent" ? "customer" : intent,
+            signup_source: "google_one_tap",
+            ambassador_referral_code: referralCode || null,
           },
-          { onConflict: "id" },
-        );
-    } catch (profileError) {
-      console.error("Google One-Tap profile upsert soft-fail:", profileError);
-    }
+        });
 
-    const origin = request.nextUrl.origin;
-    await provisionWorkspace({
-      origin,
-      accessToken,
-      userId: user.id,
-      email,
-      intent,
-      referralCode,
-      fullName: name,
-    });
+        await admin
+          .from("profiles")
+          .upsert(
+            {
+              id: user.id,
+              email,
+              full_name: name || null,
+              avatar_url: picture || null,
+              role: intent === "pet_parent" ? "customer" : intent,
+            },
+            { onConflict: "id" },
+          );
+      } catch (profileError) {
+        console.error("Google One-Tap profile upsert soft-fail:", profileError);
+      }
+
+      const origin = request.nextUrl.origin;
+      await provisionWorkspace({
+        origin,
+        accessToken,
+        userId: user.id,
+        email,
+        intent,
+        referralCode,
+        fullName: name,
+      });
+    }
 
     return NextResponse.json({
       success: true,

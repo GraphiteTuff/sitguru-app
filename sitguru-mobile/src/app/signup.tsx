@@ -30,6 +30,7 @@ import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuth';
 import { sitguruApiFetch } from '@/lib/data/api';
+import { rememberSignupIntent } from '@/lib/referrals/lock-signup-referral';
 
 const REFERRAL_STORAGE_KEY = 'sitguru.ambassadorReferralCode';
 
@@ -274,6 +275,7 @@ export default function SignupScreen() {
 
     setMessage(null);
     setSuccess(null);
+    await rememberSignupIntent(signupIntent);
 
     const result =
       provider === 'google'

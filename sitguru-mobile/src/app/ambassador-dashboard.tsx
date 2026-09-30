@@ -57,6 +57,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { getSitGuruApiBaseUrl } from '@/lib/data/api';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
   isSupabaseConfigured,
@@ -289,8 +290,11 @@ export default function AmbassadorDashboardScreen() {
       'partner_code',
     ]);
 
+  const referralOrigin = (
+    getSitGuruApiBaseUrl() || 'https://www.sitguru.com'
+  ).replace(/\/$/, '');
   const referralLink = referralCode
-    ? `https://www.sitguru.com/r/${encodeURIComponent(referralCode)}`
+    ? `${referralOrigin}/r/${encodeURIComponent(referralCode)}`
     : '';
 
   const points = Math.max(

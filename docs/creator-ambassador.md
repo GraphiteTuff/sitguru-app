@@ -10,11 +10,17 @@ The QR image encodes that URL only. It does not encode an internal id. Download 
 
 ## Attribution
 
+- `/r/{CODE}` sets the attribution cookie only after the code is on the public Ambassador card. An invalid code does not replace a valid cookie.
+- OAuth (Google, Apple, and email callback) reads that cookie. The lock is the authenticated user id, not the email address.
 - A newer valid link can replace the code before the person creates an account.
-- After signup locks a code on the account, a later link does not move it.
-- An existing account is not a new Pet Parent acquisition.
-- Phone and desktop do not share a cookie. Signup accepts an optional referral code.
-- The Expo app stores `sitguru.ambassadorReferralCode` and sends it with a new signup.
+- After signup locks a code on the account, a later link does not move it. Checkout and booking use that locked code.
+- An account older than 15 minutes is not a new Pet Parent acquisition.
+- Phone and desktop do not share a cookie. The Expo app stores `sitguru.ambassadorReferralCode` and sends it only when the Auth user was just created.
+- A qualified conversion is the first completed, paid booking on that lock. This slice does not create a reward or payout.
+
+## Public page
+
+`/r/{CODE}` reads `ambassador_public_referrals` with the anon key. That view exposes display name, code, type, city, state, territory, and an approved photo. It does not expose email, phone, notes, payout data, or user id. The service role is not used to render the page.
 
 ## Mobile and web
 
@@ -23,6 +29,8 @@ The public page is a single column with one primary action, Find Pet Care (`/sea
 ## Database
 
 `supabase/migrations/20260930_creator_ambassador_type.sql` adds the creator subtype and optional social columns. It is not applied automatically. Existing Ambassador types stay valid.
+
+`supabase/migrations/20260930140000_ambassador_public_referrals.sql` is the public card view plus one acquisition per referred user. It does not change Ambassador type values.
 
 ## Not in this slice
 

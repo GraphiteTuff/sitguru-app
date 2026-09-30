@@ -3,11 +3,14 @@ import { describe, it } from "node:test";
 import {
   existingAccountRewardEligible,
   funnelRate,
+  incomingAmbassadorCode,
   isCreatorAmbassadorType,
+  isQualifiedCreatorConversion,
   isReservedReferralCode,
   normalizeReferralCode,
   publicReferralPath,
   resolveReferralAttribution,
+  shouldLockAcquisition,
 } from "./creator-referral";
 
 describe("creator referral codes", () => {
@@ -75,5 +78,73 @@ describe("creator attribution", () => {
   it("returns zero conversion when a step has no traffic", () => {
     assert.equal(funnelRate(0, 0), 0);
     assert.equal(funnelRate(1, 4), 25);
+  });
+
+  it("reads the ambassador cookie when the OAuth redirect has no ref query", () => {
+    const code = incomingAmbassadorCode({
+      queryCode: "",
+      cookieHeader: "sitguru_ambassador_code=ziggy; other=1",
+      metadataCode: "old",
+    });
+    assert.equal(code, "ZIGGY");
+  });
+
+  it("keeps an explicit link ahead of an older cookie", () => {
+    const code = incomingAmbassadorCode({
+      queryCode: "toad",
+      cookieHeader: "sitguru_ambassador_code=ZIGGY",
+    });
+    assert.equal(code, "TOAD");
+  });
+
+  it("locks a referral only for a brand-new account", () => {
+    const now = Date.parse("2026-09-30T12:00:00.000Z");
+    assert.equal(
+      shouldLockAcquisition("2026-09-30T11:50:00.000Z", now),
+      true,
+    );
+    assert.equal(
+      shouldLockAcquisition("2026-01-01T00:00:00.000Z", now),
+      false,
+    );
+  });
+
+  it("qualifies only the first completed paid booking", () => {
+    const base = {
+      hasLockedReferral: true,
+      isNewAccount: true,
+      isSelfReferral: false,
+      isFirstQualifyingBooking: true,
+      bookingStatus: "completed",
+      paymentStatus: "paid",
+    };
+    assert.equal(isQualifiedCreatorConversion(base), true);
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, isSelfReferral: true }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, isNewAccount: false }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, bookingStatus: "canceled" }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, paymentStatus: "refunded" }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, paymentStatus: "unpaid" }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({
+        ...base,
+        isFirstQualifyingBooking: false,
+      }),
+      false,
+    );
   });
 });
