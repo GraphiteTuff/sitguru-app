@@ -22,7 +22,7 @@ type GuruDashboardHeaderProps = {
   profileCompletion?: number | null;
 };
 
-const GURU_DASHBOARD_LOGO = "/images/sitguru-logo-cropped.png";
+const GURU_DASHBOARD_LOGO = "/images/sitguru-logo-halloween.webp";
 
 const navItems = [
   { label: "Dashboard", href: "/guru/dashboard", key: "dashboard" },
@@ -113,14 +113,14 @@ export default function GuruDashboardHeader({
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
         <Link
           href="/guru/dashboard"
-          className="inline-flex h-14 w-[190px] shrink-0 items-center justify-start rounded-2xl px-1 transition hover:opacity-90 sm:w-[215px] lg:h-16 lg:w-[235px]"
+          className="inline-flex h-auto shrink-0 items-center justify-start rounded-2xl px-1 transition hover:opacity-90"
           aria-label="Go to SitGuru Guru dashboard"
         >
           <Image
             src={GURU_DASHBOARD_LOGO}
             alt="SitGuru"
-            width={310}
-            height={118}
+            width={852}
+            height={326}
             priority
             className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
           />

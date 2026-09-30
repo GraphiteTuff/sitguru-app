@@ -180,10 +180,7 @@ export default function Footer() {
         <div className="rounded-[32px] border border-emerald-100 bg-white/90 p-5 shadow-xl shadow-emerald-900/[0.05] sm:p-6 lg:p-8">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div className="max-w-xl">
-              <SiteLogo
-                wrapperClassName="w-[190px] sm:w-[210px] lg:w-[230px]"
-                imageClassName="h-80 w-auto"
-              />
+              <SiteLogo wrapperClassName="w-full max-w-[280px]" />
 
               <p className="mt-4 max-w-lg text-sm font-semibold leading-7 text-slate-600 sm:text-base">
                 Trusted pet care made simple. SitGuru helps Pet Parents find
