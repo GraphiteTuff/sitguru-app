@@ -841,10 +841,10 @@ export default function Header({ user = null }: HeaderProps) {
           aria-label="Go to SitGuru homepage"
         >
           <Image
-            src="/images/sitguru-logo-cropped.png"
+            src="/images/sitguru-logo-halloween.webp"
             alt="SitGuru"
-            width={260}
-            height={93}
+            width={852}
+            height={326}
             priority
             className="h-auto max-h-12 w-auto bg-transparent object-contain lg:max-h-14"
             style={{ background: "transparent" }}
