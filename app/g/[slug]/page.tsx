@@ -5,46 +5,14 @@ import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
 
 type ReferralCode = {
   id: string;
-  owner_user_id: string | null;
-  owner_type:
-    | "customer"
-    | "guru"
-    | "partner"
-    | "affiliate"
-    | "ambassador"
-    | "admin";
-  partner_id: string | null;
-  ambassador_id: string | null;
   code: string;
   slug: string | null;
-  campaign_type:
-    | "general"
-    | "customer_referral"
-    | "guru_referral"
-    | "partner_referral"
-    | "affiliate"
-    | "ambassador"
-    | "rescue_donation";
-  status: "active" | "paused" | "disabled";
-  created_at: string;
-  partners: {
-    id: string;
-    business_name: string;
-    partner_type: string;
-    city: string | null;
-    state: string | null;
-    status: "active" | "paused" | "suspended" | "archived";
-  } | null;
-  ambassadors: {
-    id: string;
-    display_name: string;
-    ambassador_type: string;
-    city: string | null;
-    state: string | null;
-    territory: string | null;
-    tier: "bronze" | "silver" | "gold" | "city_captain";
-    status: "active" | "paused" | "suspended" | "archived";
-  } | null;
+  campaign_type: string | null;
+  display_name: string | null;
+  public_type: string | null;
+  city: string | null;
+  state: string | null;
+  territory: string | null;
 };
 
 type PageProps = {
@@ -68,46 +36,18 @@ function formatLabel(value: string | null | undefined) {
 }
 
 function getDisplayName(referral: ReferralCode) {
-  if (referral.ambassadors?.display_name) {
-    return referral.ambassadors.display_name;
-  }
-
-  if (referral.partners?.business_name) {
-    return referral.partners.business_name;
-  }
-
-  return "a SitGuru Partner";
+  return referral.display_name || "a SitGuru Partner";
 }
 
 function getProgramLabel(referral: ReferralCode) {
-  if (referral.ambassadors) {
-    return formatLabel(referral.ambassadors.ambassador_type);
-  }
-
-  if (referral.partners) {
-    return formatLabel(referral.partners.partner_type);
-  }
-
-  return formatLabel(referral.campaign_type);
+  return formatLabel(referral.public_type || referral.campaign_type);
 }
 
 function getLocation(referral: ReferralCode) {
-  if (referral.ambassadors) {
-    return (
-      referral.ambassadors.territory ||
-      [referral.ambassadors.city, referral.ambassadors.state]
-        .filter(Boolean)
-        .join(", ")
-    );
-  }
-
-  if (referral.partners) {
-    return [referral.partners.city, referral.partners.state]
-      .filter(Boolean)
-      .join(", ");
-  }
-
-  return "";
+  return (
+    referral.territory ||
+    [referral.city, referral.state].filter(Boolean).join(", ")
+  );
 }
 
 export default async function GuruReferralPage({
@@ -117,32 +57,11 @@ export default async function GuruReferralPage({
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("referral_codes")
+    .from("referral_code_public")
     .select(
-      `
-        *,
-        partners (
-          id,
-          business_name,
-          partner_type,
-          city,
-          state,
-          status
-        ),
-        ambassadors (
-          id,
-          display_name,
-          ambassador_type,
-          city,
-          state,
-          territory,
-          tier,
-          status
-        )
-      `
+      "id, code, slug, campaign_type, display_name, public_type, city, state, territory",
     )
     .eq("slug", params.slug)
-    .eq("status", "active")
     .maybeSingle();
 
   if (error || !data) {
@@ -150,14 +69,6 @@ export default async function GuruReferralPage({
   }
 
   const referral = data as ReferralCode;
-
-  if (referral.partners && referral.partners.status !== "active") {
-    notFound();
-  }
-
-  if (referral.ambassadors && referral.ambassadors.status !== "active") {
-    notFound();
-  }
 
   await trackReferralClick({
     referralCodeId: referral.id,

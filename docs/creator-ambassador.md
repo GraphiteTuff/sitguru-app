@@ -45,12 +45,12 @@ The public page is a single column with one primary action, Find Pet Care (`/sea
 
 `supabase/migrations/20260930150000_ambassador_referral_first_booking.sql` keeps the first `booking_id` once it is set. It does not add the creator subtype.
 
+`supabase/migrations/20260930160000_referral_code_public_columns.sql` adds `referral_code_public` for `/g` and `/p`, and revokes anonymous and authenticated select on owner ids, emails, notes, and payout columns of `referral_codes`.
+
 ## Not in this slice
 
 Completed-booking rewards, payouts, and a public creator application stay on the existing rewards tables until the booking lifecycle writes `ambassador_referrals.completed_booking_at`. Do not pay for a click.
 
 ## Follow-up before Creator rewards
-
-`ambassador_public_referrals` is the public card. Anonymous clients can still read active `referral_codes` rows, including `owner_user_id`, through the policy "Public can view active referral codes". `/g/{slug}` selects every column on that table, and `/p/{slug}` selects `owner_user_id`, so those pages need to change before that read is revoked. A logged-in non-admin can read the same active rows.
 
 The 15-minute fresh-session check only decides whether a returning Google or Apple login should skip workspace setup. It does not decide whether the account is a new acquisition.
