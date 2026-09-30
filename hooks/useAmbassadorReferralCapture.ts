@@ -21,12 +21,23 @@ function readRefParam(searchParams: URLSearchParams | null) {
   return "";
 }
 
+function readPathCode(pathname: string | null) {
+  if (!pathname) return "";
+  const match = pathname.match(/^\/r\/([^/]+)$/i);
+  if (!match?.[1]) return "";
+  try {
+    return decodeURIComponent(match[1]).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+  } catch {
+    return "";
+  }
+}
+
 export function useAmbassadorReferralCapture() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const code = readRefParam(searchParams);
+    const code = readRefParam(searchParams) || readPathCode(pathname);
     if (!code) return;
 
     // Avoid duplicate fires for the same code in this browser tab session

@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordAmbassadorClick } from "@/lib/ambassador/ledger";
 import {
-  AMBASSADOR_CODE_COOKIE,
-  AMBASSADOR_REF_COOKIE,
-  AMBASSADOR_REF_COOKIE_MAX_AGE_SEC,
-} from "@/lib/ambassador/ledger-types";
+  readTrustedReferralCapture,
+  referralCaptureTimestamp,
+  sealReferralOnResponse,
+  signReferralCapture,
+  trustedClientIp,
+  trustedUserAgent,
+} from "@/lib/ambassador/referral-capture";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,18 +40,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const forwarded = req.headers.get("x-forwarded-for") || "";
-    const ipAddress =
-      safeString(body?.ipAddress) ||
-      forwarded.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      null;
-
+    const header = (name: string) => req.headers.get(name);
     const result = await recordAmbassadorClick({
       slug,
-      ipAddress,
-      userAgent:
-        safeString(body?.userAgent) || req.headers.get("user-agent") || null,
+      ipAddress: trustedClientIp(header),
+      userAgent: trustedUserAgent(header),
       landingPath: safeString(body?.landingPath) || null,
       referrer: safeString(body?.referrer) || null,
       utmSource: safeString(body?.utmSource) || null,
@@ -64,34 +60,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cookieHeader = req.headers.get("cookie");
+    const existing = await readTrustedReferralCapture(cookieHeader);
+    const capturedAt = referralCaptureTimestamp({
+      incomingCode: result.referralCode,
+      existingCode: existing?.code,
+      existingCapturedAt: existing?.capturedAt,
+      existingTrusted: Boolean(existing),
+    });
+    const captureMac = await signReferralCapture(result.referralCode, capturedAt);
     const response = NextResponse.json({
       ok: true,
-      clickId: result.clickId,
-      ambassadorId: result.ambassadorId,
       referralCode: result.referralCode,
+      capturedAt,
+      captureMac,
     });
-
-    const cookieOpts = {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: AMBASSADOR_REF_COOKIE_MAX_AGE_SEC,
-    };
-
-    // Ledger cookie (httpOnly) + canonical signup cookie used by /r/ and signup
-    response.cookies.set({
-      name: AMBASSADOR_REF_COOKIE,
-      value: result.referralCode,
-      httpOnly: true,
-      ...cookieOpts,
-    });
-    response.cookies.set({
-      name: AMBASSADOR_CODE_COOKIE,
-      value: result.referralCode,
-      httpOnly: false,
-      ...cookieOpts,
-    });
-
+    await sealReferralOnResponse(
+      response,
+      result.referralCode,
+      capturedAt,
+      cookieHeader,
+    );
     return response;
   } catch (error) {
     const message =

@@ -4,10 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  AMBASSADOR_CODE_COOKIE,
-  AMBASSADOR_REF_COOKIE,
-} from "@/lib/ambassador/ledger-types";
 import { createCheckoutPaymentIntent } from "@/lib/billing/createCheckoutIntent";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
@@ -35,15 +31,6 @@ type CreateIntentBody = {
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function readAmbassadorCookie(request: NextRequest): string {
-  return (
-    cleanText(request.cookies.get(AMBASSADOR_CODE_COOKIE)?.value) ||
-    cleanText(request.cookies.get(AMBASSADOR_REF_COOKIE)?.value) ||
-    cleanText(request.cookies.get("sitguru_ambassador_code")?.value) ||
-    cleanText(request.cookies.get("sitguru_ambassador_ref")?.value)
-  );
 }
 
 async function resolveRequestUser(request: NextRequest) {
@@ -82,7 +69,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cookieCode = readAmbassadorCookie(request);
+    const { loadLockedAmbassadorReferral } = await import(
+      "@/lib/ambassador/ledger"
+    );
+    const locked = await loadLockedAmbassadorReferral(user.id);
+    const lockedCode =
+      locked?.code && locked.ownerUserId !== user.id ? locked.code : undefined;
     const result = await createCheckoutPaymentIntent({
       bookingId: cleanText(body.bookingId),
       userId: user.id,
@@ -91,7 +83,7 @@ export async function POST(request: NextRequest) {
       daysCount: Number(body.daysCount),
       additionalPets: Number(body.additionalPets) || 0,
       holidaySurge: Boolean(body.holidaySurge),
-      ambassadorCode: cleanText(body.ambassadorCode) || cookieCode || undefined,
+      ambassadorCode: lockedCode,
       pawperksPointsToRedeem: Number(body.pawperksPointsToRedeem) || 0,
       saveCard: Boolean(body.saveCard),
       currency: cleanText(body.currency) || "usd",

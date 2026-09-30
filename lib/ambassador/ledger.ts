@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
+import { isReferralAcquisition } from "@/lib/ambassador/referral-capture";
 import type {
   AmbassadorNetworkKpis,
   AmbassadorPerformanceRow,
@@ -34,96 +35,92 @@ export function buildAmbassadorReferralLink(slug: string) {
  * Resolve ledger profile by slug, creating it from public.ambassadors when needed
  * so the performance ledger extends the live workspace table.
  */
+const INACTIVE_AMBASSADOR_STATUSES = new Set([
+  "archived",
+  "inactive",
+  "rejected",
+  "declined",
+  "not_a_fit",
+  "paused",
+  "suspended",
+]);
+
+function profileFromAmbassador(row: {
+  id?: string;
+  user_id?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  referral_code?: string | null;
+  status?: string | null;
+  city?: string | null;
+  state?: string | null;
+} | null) {
+  if (!row?.id || !row.referral_code) return null;
+  const status = String(row.status || "").toLowerCase();
+  if (INACTIVE_AMBASSADOR_STATUSES.has(status)) return null;
+  const code = normalizeSlug(row.referral_code);
+  return {
+    id: row.id,
+    user_id: row.user_id || "",
+    ambassador_record_id: row.id,
+    referral_code_slug: code,
+    display_name: row.full_name || row.email || code,
+    region: [row.city, row.state].filter(Boolean).join(", "),
+    commission_rate_per_booking: 0,
+    lifetime_payouts_sum: 0,
+    is_active: true,
+  } as AmbassadorProfileRow;
+}
+
 export async function findAmbassadorProfileBySlug(slug: string) {
   const code = normalizeSlug(slug);
   if (!code) return null;
 
-  const { data, error } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("*")
-    .eq("referral_code_slug", code)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!error && data) return data as AmbassadorProfileRow;
-
-  // Fallback: live ambassadors.referral_code → upsert ledger profile
-  const { data: ambassador } = await supabaseAdmin
+  const { data: ambassador, error } = await supabaseAdmin
     .from("ambassadors")
-    .select("id,user_id,full_name,email,referral_code,status,dashboard_enabled")
+    .select("id,user_id,full_name,email,referral_code,status,city,state")
     .ilike("referral_code", code)
     .maybeSingle();
 
-  const row = ambassador as {
-    id?: string;
-    user_id?: string;
-    full_name?: string;
-    email?: string;
-    referral_code?: string;
-    status?: string;
-    dashboard_enabled?: boolean;
-  } | null;
-
-  if (!row?.user_id || !row.id) return null;
-  const status = String(row.status || "").toLowerCase();
-  if (status === "archived" || status === "inactive" || status === "rejected") {
+  if (error) {
+    console.warn("[ambassador-ledger] ambassador lookup failed:", error.message);
     return null;
   }
 
-  const payload = {
-    user_id: row.user_id,
-    ambassador_record_id: row.id,
-    referral_code_slug: code,
-    display_name: row.full_name || row.email || code,
-    is_active: true,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data: upserted, error: upsertError } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .upsert(payload, { onConflict: "user_id" })
-    .select("*")
-    .maybeSingle();
-
-  if (upsertError || !upserted) {
-    console.warn(
-      "[ambassador-ledger] profile upsert from ambassadors failed:",
-      upsertError?.message,
-    );
-    return null;
-  }
-
-  return upserted as AmbassadorProfileRow;
+  return profileFromAmbassador(
+    (ambassador || null) as {
+      id?: string;
+      user_id?: string | null;
+      full_name?: string | null;
+      email?: string | null;
+      referral_code?: string | null;
+      status?: string | null;
+      city?: string | null;
+      state?: string | null;
+    } | null,
+  );
 }
 
 export async function findAmbassadorProfileByUserId(userId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!error && data) return data as AmbassadorProfileRow;
-
-  // Bootstrap ledger row from live ambassadors workspace if missing
-  const { data: ambassador } = await supabaseAdmin
+  const { data: ambassador, error } = await supabaseAdmin
     .from("ambassadors")
-    .select("id,user_id,full_name,email,referral_code,status")
+    .select("id,user_id,full_name,email,referral_code,status,city,state")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const row = ambassador as {
-    id?: string;
-    user_id?: string;
-    full_name?: string;
-    email?: string;
-    referral_code?: string;
-    status?: string;
-  } | null;
+  if (error) {
+    console.warn("[ambassador-ledger] ambassador user lookup failed:", error.message);
+    return null;
+  }
 
-  if (!row?.user_id || !row.referral_code) return null;
-
-  return findAmbassadorProfileBySlug(String(row.referral_code));
+  return profileFromAmbassador(
+    (ambassador || null) as {
+      id?: string;
+      user_id?: string | null;
+      referral_code?: string | null;
+      status?: string | null;
+    } | null,
+  );
 }
 
 async function ensureLegacyReferralCodeId(params: {
@@ -146,10 +143,12 @@ async function ensureLegacyReferralCodeId(params: {
   const now = new Date().toISOString();
   const insertPayload: Record<string, unknown> = {
     code,
-    owner_user_id: params.userId,
+    slug: code.toLowerCase(),
+    owner_user_id: params.userId || null,
+    owner_type: "ambassador",
     ambassador_id: params.ambassadorRecordId || null,
-    type: "ambassador",
-    is_active: true,
+    status: "active",
+    campaign_type: "ambassador",
     created_at: now,
     updated_at: now,
   };
@@ -234,27 +233,6 @@ export async function recordAmbassadorClick(params: {
     return { ok: false as const, error: "Unknown or inactive referral code." };
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("ambassador_clicks")
-    .insert({
-      ambassador_id: profile.id,
-      ip_address: params.ipAddress || null,
-      user_agent: params.userAgent || null,
-      landing_path: params.landingPath || null,
-      referrer: params.referrer || null,
-      utm_source: params.utmSource || null,
-      utm_medium: params.utmMedium || null,
-      utm_campaign: params.utmCampaign || null,
-      session_id: params.sessionId || null,
-    })
-    .select("click_id")
-    .maybeSingle();
-
-  if (error) {
-    return { ok: false as const, error: error.message };
-  }
-
-  // Extend existing tracking stack — do not silo clicks only in the new table
   if (!params.skipLegacyDualWrite) {
     await dualWriteLegacyReferralClick({
       profile,
@@ -270,55 +248,106 @@ export async function recordAmbassadorClick(params: {
 
   return {
     ok: true as const,
-    clickId: String((data as { click_id?: string } | null)?.click_id || ""),
+    clickId: "",
     ambassadorId: profile.id,
     referralCode: profile.referral_code_slug,
   };
+}
+
+export async function loadLockedAmbassadorReferral(userId: string) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("ambassador_referrals")
+    .select("id, ambassador_id, referral_code, booking_id, booking_status, created_at")
+    .eq("referred_user_id", id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const row = data as {
+    id?: string;
+    ambassador_id?: string;
+    referral_code?: string | null;
+    booking_id?: string | null;
+    booking_status?: string | null;
+  };
+  if (!row.id || !row.ambassador_id) return null;
+
+  const { data: owner } = await supabaseAdmin
+    .from("ambassadors")
+    .select("user_id")
+    .eq("id", row.ambassador_id)
+    .maybeSingle();
+
+  return {
+    referralId: row.id,
+    ambassadorId: row.ambassador_id,
+    code: normalizeSlug(String(row.referral_code || "")),
+    bookingId: String(row.booking_id || ""),
+    bookingStatus: String(row.booking_status || ""),
+    ownerUserId: String((owner as { user_id?: string | null } | null)?.user_id || ""),
+  };
+}
+
+async function accountCreatedAt(userId: string, supplied?: string | null) {
+  if (supplied) return supplied;
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error || !data.user) return "";
+  return data.user.created_at || "";
 }
 
 export async function attributeSignupToAmbassador(params: {
   newUserId: string;
   referralSlug: string;
   referredRole?: string | null;
+  accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
 }) {
   const profile = await findAmbassadorProfileBySlug(params.referralSlug);
   if (!profile) return { ok: false as const, error: "Invalid referral code." };
 
-  const rate = asNumber(profile.commission_rate_per_booking);
-  const { error } = await supabaseAdmin.from("ambassador_referrals").upsert(
-    {
-      ambassador_id: profile.id,
-      new_user_id: params.newUserId,
-      referred_role: params.referredRole || null,
-      total_booking_value: 0,
-      commission_earned: 0,
-      payout_status: "PENDING_AUDIT" satisfies AmbassadorPayoutStatus,
-    },
-    { onConflict: "ambassador_id,new_user_id", ignoreDuplicates: true },
-  );
-
-  if (error) {
-    // Unique index may not be recognized as onConflict target on older PostgREST —
-    // fall back to insert-ignore pattern
-    const insert = await supabaseAdmin.from("ambassador_referrals").insert({
-      ambassador_id: profile.id,
-      new_user_id: params.newUserId,
-      referred_role: params.referredRole || null,
-      total_booking_value: 0,
-      commission_earned: rate > 0 ? 0 : 0,
-      payout_status: "PENDING_AUDIT",
-    });
-    if (insert.error && !/duplicate|unique/i.test(insert.error.message)) {
-      return { ok: false as const, error: insert.error.message };
-    }
+  if (profile.user_id && profile.user_id === params.newUserId) {
+    return { ok: false as const, error: "self_referral" };
   }
 
-  return { ok: true as const, ambassadorId: profile.id, rate };
+  const locked = await loadLockedAmbassadorReferral(params.newUserId);
+  if (locked) {
+    return { ok: true as const, ambassadorId: locked.ambassadorId, rate: 0, locked: true as const };
+  }
+
+  const createdAt = await accountCreatedAt(params.newUserId, params.accountCreatedAt);
+  if (
+    !isReferralAcquisition({
+      accountCreatedAt: createdAt,
+      referralCapturedAt: params.referralCapturedAt,
+    })
+  ) {
+    return { ok: false as const, error: "existing_account" };
+  }
+
+  const { error } = await supabaseAdmin.from("ambassador_referrals").insert({
+    ambassador_id: profile.id,
+    referral_code: profile.referral_code_slug,
+    referral_type: params.referredRole || "pet_parent",
+    referred_user_id: params.newUserId,
+    status: "signed_up",
+    booking_status: "none",
+    signup_date: new Date().toISOString(),
+  });
+
+  if (error && !/duplicate|unique/i.test(error.message)) {
+    return { ok: false as const, error: error.message };
+  }
+
+  return { ok: true as const, ambassadorId: profile.id, rate: 0 };
 }
 
 /**
- * Record / refresh commission when a referred customer starts checkout.
- * Captures booking value × profile commission rate with PENDING_AUDIT status.
+ * Attach a booking id to the account's locked Ambassador referral.
+ * Does not create a reward or payout. A later booking does not replace the first.
  */
 export async function recordAmbassadorBookingCommission(params: {
   referralSlug: string;
@@ -332,78 +361,79 @@ export async function recordAmbassadorBookingCommission(params: {
     return { ok: false as const, error: "Unknown or inactive ambassador code." };
   }
 
-  const bookingTotal = Math.max(0, asNumber(params.bookingTotal));
-  const rate = asNumber(profile.commission_rate_per_booking);
-  const commissionEarned =
-    Math.round(bookingTotal * rate * 100) / 100;
   const payerUserId = params.payerUserId?.trim() || null;
-  const notes = `booking:${params.bookingId};rate:${rate}`;
-
-  if (payerUserId) {
-    const { data: existing } = await supabaseAdmin
-      .from("ambassador_referrals")
-      .select("referral_id,total_booking_value,commission_earned")
-      .eq("ambassador_id", profile.id)
-      .eq("new_user_id", payerUserId)
-      .maybeSingle();
-
-    if (existing?.referral_id) {
-      const prevValue = asNumber(
-        (existing as { total_booking_value?: number }).total_booking_value,
-      );
-      const prevCommission = asNumber(
-        (existing as { commission_earned?: number }).commission_earned,
-      );
-      const { error } = await supabaseAdmin
-        .from("ambassador_referrals")
-        .update({
-          total_booking_value: Math.round((prevValue + bookingTotal) * 100) / 100,
-          commission_earned:
-            Math.round((prevCommission + commissionEarned) * 100) / 100,
-          payout_status: "PENDING_AUDIT" satisfies AmbassadorPayoutStatus,
-          notes,
-          referred_role: params.referredRole || null,
-        })
-        .eq("referral_id", existing.referral_id);
-
-      if (error) {
-        return { ok: false as const, error: error.message };
-      }
-
-      return {
-        ok: true as const,
-        ambassadorId: profile.id,
-        rate,
-        commissionEarned,
-        referralId: String(existing.referral_id),
-      };
-    }
+  if (!payerUserId) {
+    return { ok: false as const, error: "Booking has no Pet Parent account." };
   }
 
-  const { data, error } = await supabaseAdmin
+  if (profile.user_id && profile.user_id === payerUserId) {
+    return { ok: false as const, error: "self_referral" };
+  }
+
+  const locked = await loadLockedAmbassadorReferral(payerUserId);
+  if (!locked || locked.ambassadorId !== profile.id) {
+    return {
+      ok: false as const,
+      error: "This account does not have a locked Ambassador referral.",
+    };
+  }
+
+  const referralId = locked.referralId;
+  if (locked.bookingId && locked.bookingId !== params.bookingId) {
+    return {
+      ok: true as const,
+      ambassadorId: profile.id,
+      rate: 0,
+      commissionEarned: 0,
+      referralId,
+    };
+  }
+  if (locked.bookingStatus.toLowerCase() === "completed") {
+    return {
+      ok: true as const,
+      ambassadorId: profile.id,
+      rate: 0,
+      commissionEarned: 0,
+      referralId,
+    };
+  }
+
+  const { data: updated, error } = await supabaseAdmin
     .from("ambassador_referrals")
-    .insert({
-      ambassador_id: profile.id,
-      new_user_id: payerUserId,
-      referred_role: params.referredRole || null,
-      total_booking_value: bookingTotal,
-      commission_earned: commissionEarned,
-      payout_status: "PENDING_AUDIT" satisfies AmbassadorPayoutStatus,
-      notes,
+    .update({
+      booking_id: params.bookingId,
+      booking_status: "started",
+      updated_at: new Date().toISOString(),
     })
-    .select("referral_id")
+    .eq("id", referralId)
+    .is("booking_id", null)
+    .select("id")
     .maybeSingle();
 
   if (error) {
     return { ok: false as const, error: error.message };
   }
 
+  if (!updated) {
+    const current = await loadLockedAmbassadorReferral(payerUserId);
+    if (current?.bookingId) {
+      return {
+        ok: true as const,
+        ambassadorId: profile.id,
+        rate: 0,
+        commissionEarned: 0,
+        referralId,
+      };
+    }
+    return { ok: false as const, error: "The first booking could not be locked." };
+  }
+
   return {
     ok: true as const,
     ambassadorId: profile.id,
-    rate,
-    commissionEarned,
-    referralId: String((data as { referral_id?: string } | null)?.referral_id || ""),
+    rate: 0,
+    commissionEarned: 0,
+    referralId,
   };
 }
 
@@ -597,27 +627,34 @@ export async function loadSelfServiceStats(userId: string) {
   const since = new Date();
   since.setDate(since.getDate() - 56);
 
-  const [{ data: clicks }, { data: referrals }, { data: payouts }] =
+  const { data: codeRow } = await supabaseAdmin
+    .from("referral_codes")
+    .select("id")
+    .eq("ambassador_id", profile.id)
+    .limit(1)
+    .maybeSingle();
+  const referralCodeId = (codeRow as { id?: string } | null)?.id || "";
+
+  const [{ data: clicks }, { data: referrals }, { data: rewards }] =
     await Promise.all([
-      supabaseAdmin
-        .from("ambassador_clicks")
-        .select("created_at")
-        .eq("ambassador_id", profile.id)
-        .gte("created_at", since.toISOString()),
+      referralCodeId
+        ? supabaseAdmin
+            .from("referral_clicks")
+            .select("created_at")
+            .eq("referral_code_id", referralCodeId)
+            .gte("created_at", since.toISOString())
+        : Promise.resolve({ data: [] as Array<{ created_at?: string }> }),
       supabaseAdmin
         .from("ambassador_referrals")
-        .select(
-          "created_at,commission_earned,payout_status,total_booking_value,referred_role",
-        )
+        .select("created_at,status,booking_status,referral_type")
         .eq("ambassador_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(500),
       supabaseAdmin
-        .from("ambassador_referrals")
-        .select("commission_earned,paid_at,payout_batch_id,payout_status")
+        .from("ambassador_rewards")
+        .select("amount,status,paid_at")
         .eq("ambassador_id", profile.id)
-        .eq("payout_status", "PAID")
-        .order("paid_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(50),
     ]);
 
@@ -638,21 +675,26 @@ export async function loadSelfServiceStats(userId: string) {
     weeks.push({
       label,
       signups: inWeek.length,
-      earnings: inWeek.reduce(
-        (s, r) => s + asNumber((r as { commission_earned?: number }).commission_earned),
-        0,
-      ),
+      earnings: 0,
     });
   }
 
-  const pendingCommissions = (referrals || [])
-    .filter((r) =>
-      ["PENDING_AUDIT", "APPROVED"].includes(
-        String((r as { payout_status?: string }).payout_status || ""),
-      ),
+  const pendingCommissions = (rewards || [])
+    .filter((reward) => {
+      const status = String((reward as { status?: string }).status || "").toLowerCase();
+      return status === "pending" || status === "approved" || status === "pending_audit";
+    })
+    .reduce(
+      (sum, reward) => sum + asNumber((reward as { amount?: number }).amount),
+      0,
+    );
+  const lifetimePaid = (rewards || [])
+    .filter(
+      (reward) =>
+        String((reward as { status?: string }).status || "").toLowerCase() === "paid",
     )
     .reduce(
-      (s, r) => s + asNumber((r as { commission_earned?: number }).commission_earned),
+      (sum, reward) => sum + asNumber((reward as { amount?: number }).amount),
       0,
     );
 
@@ -662,12 +704,17 @@ export async function loadSelfServiceStats(userId: string) {
     clicksTotal: (clicks || []).length,
     referralsTotal: (referrals || []).length,
     pendingCommissions,
-    lifetimePaid: asNumber(profile.lifetime_payouts_sum),
+    lifetimePaid,
     weekly: weeks,
-    payoutReceipts: (payouts || []).map((p) => ({
-      amount: asNumber((p as { commission_earned?: number }).commission_earned),
-      paidAt: String((p as { paid_at?: string }).paid_at || ""),
-      batchId: String((p as { payout_batch_id?: string }).payout_batch_id || ""),
-    })),
+    payoutReceipts: (rewards || [])
+      .filter(
+        (reward) =>
+          String((reward as { status?: string }).status || "").toLowerCase() === "paid",
+      )
+      .map((reward) => ({
+        amount: asNumber((reward as { amount?: number }).amount),
+        paidAt: String((reward as { paid_at?: string }).paid_at || ""),
+        batchId: "",
+      })),
   };
 }

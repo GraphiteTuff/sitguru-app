@@ -1,6 +1,8 @@
 // lib/ambassador/ledger-types.ts
 /** Brand Ambassador performance ledger types */
 
+import { ATTRIBUTION_WINDOW_DAYS_DEFAULT } from "@/lib/ambassador/creator-referral";
+
 export type AmbassadorPayoutStatus =
   | "PENDING_AUDIT"
   | "APPROVED"
@@ -65,8 +67,9 @@ export type AmbassadorNetworkKpis = {
   pendingPayoutPool: number;
   topPerformingRegion: string;
 };
-
 export const AMBASSADOR_REF_COOKIE = "sitguru_ambassador_ref";
 /** Canonical cookie already used by /r/ short links + signup capture */
 export const AMBASSADOR_CODE_COOKIE = "sitguru_ambassador_code";
-export const AMBASSADOR_REF_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 days
+/** Pending referral attribution window. After this, a stored code cannot create an acquisition. */
+export const AMBASSADOR_REF_COOKIE_MAX_AGE_SEC =
+  ATTRIBUTION_WINDOW_DAYS_DEFAULT * 24 * 60 * 60;

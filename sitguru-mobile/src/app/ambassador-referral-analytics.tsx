@@ -45,6 +45,7 @@ import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { getSitGuruApiBaseUrl } from '@/lib/data/api';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -1043,10 +1044,11 @@ export default function AmbassadorReferralAnalyticsScreen() {
     data.ambassador?.referral_code,
   );
   const referralSlug = firstText(data.referralCode?.slug);
+  const referralOrigin = (
+    getSitGuruApiBaseUrl() || 'https://www.sitguru.com'
+  ).replace(/\/$/, '');
   const referralLink = referralCode
-    ? referralSlug
-      ? `https://www.sitguru.com/r/${encodeURIComponent(referralSlug)}`
-      : `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`
+    ? `${referralOrigin}/r/${encodeURIComponent(referralSlug || referralCode)}`
     : '';
 
   function go(path: string) {

@@ -40,13 +40,12 @@ export async function GET() {
     accountType.includes("ambassador");
 
   if (!allowed) {
-    // Also allow if they have an ambassador_profiles row
-    const { data: ledgerProfile } = await supabaseAdmin
-      .from("ambassador_profiles")
+    const { data: ambassador } = await supabaseAdmin
+      .from("ambassadors")
       .select("id")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!ledgerProfile?.id) {
+    if (!ambassador?.id) {
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
   }

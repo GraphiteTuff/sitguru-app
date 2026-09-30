@@ -64,8 +64,8 @@ export default function AmbassadorSelfServicePortal() {
 
   const frozen = !hasReferralCode(data);
   const displayLink = (
-    data?.referralLink || "https://sitguru.com/r/YOUR_CODE"
-  ).replace(/^https?:\/\//, "://");
+    data?.referralLink || "https://www.sitguru.com/r/YOUR_CODE"
+  ).replace(/^https?:\/\//, "");
 
   async function copyLink() {
     const full =
@@ -120,10 +120,10 @@ export default function AmbassadorSelfServicePortal() {
           type="button"
           onClick={() => void copyLink()}
           disabled={frozen}
-          className={`mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50 ${
             frozen
               ? "bg-amber-200 text-amber-950"
-              : "bg-white text-emerald-950"
+              : "bg-white text-[#0D5C3A]"
           }`}
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
