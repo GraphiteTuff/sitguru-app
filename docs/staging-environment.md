@@ -2,7 +2,9 @@
 
 Staging is a separate Supabase project, a separate web host, and Stripe **test** mode. It is where `npx tsx scripts/test-ambassador-referral.ts` is allowed to create users and bookings. Production stays `https://www.sitguru.com` and Supabase project `mmtjhxnzuglbyumbsjhs`.
 
-There is no SitGuru staging project today. The other project in this Supabase organization, Pawnecto, is not SitGuru staging. Do not point this app at it.
+SitGuru Staging exists and is empty. Project ref: `ehdvngkqddttcwhjubwu`, region `us-west-1`, same organization as production. Pawnecto is a different project. Do not point this app at Pawnecto or at production `mmtjhxnzuglbyumbsjhs`.
+
+The first migration, `202601_account_status_and_deletion_flow.sql`, failed on that empty database because `public.profiles` does not exist. No migration in this repo creates `public.profiles`. Several later files are only `SELECT 1`. SitGuru cannot be rebuilt from these migration files alone. Do not import a production data dump to fill that gap. A schema-only baseline, reviewed so it contains no customer rows, has to be added before the rest of the migrations can run. `20260930_creator_ambassador_type.sql` stays unapplied.
 
 The harness prints this before it writes anything, and exits if the checks fail:
 
@@ -36,7 +38,7 @@ The QA command also needs `SITGURU_QA_ENV=staging`, `SITGURU_QA_BASE_URL` equal 
 
 ## Supabase
 
-Create one new project named SitGuru Staging. Do not clone production data.
+The staging project is `ehdvngkqddttcwhjubwu`. Do not clone production data into it.
 
 Apply the SQL files in `supabase/migrations` in filename order **except** `20260930_creator_ambassador_type.sql`. That Creator subtype file stays unapplied. One-off production person patches in that folder are updates and deletes aimed at existing ids. On an empty staging database they change nothing. Do not add a data dump.
 
