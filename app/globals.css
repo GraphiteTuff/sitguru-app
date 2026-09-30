@@ -2373,3 +2373,182 @@ div.homepage-chat-panel__header,
   object-fit: cover;
   object-position: 50% 22%;
 }
+
+/*
+ * Trust & Credentials surfaces.
+ * Light tokens match the public SitGuru page.
+ * Dark tokens match the Expo palette in sitguru-mobile/src/constants/theme.ts.
+ */
+.trust-credentials {
+  --tc-text: #18211c;
+  --tc-muted: #66736b;
+  --tc-card: #ffffff;
+  --tc-soft: #f7fbf8;
+  --tc-border: #e6ded2;
+  --tc-green: #0d5c3a;
+  --tc-green-ink: #0d5c3a;
+  --tc-chip: #f4fbf7;
+  --tc-danger-bg: #fff1f2;
+  --tc-danger: #be123c;
+  --tc-ok-bg: #ecfdf5;
+  color: var(--tc-text);
+}
+
+.trust-credentials :focus-visible {
+  outline: 2px solid var(--tc-green);
+  outline-offset: 2px;
+}
+
+.trust-credentials button:disabled,
+.trust-credentials input:disabled,
+.trust-credentials select:disabled,
+.trust-credentials textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.trust-credentials input,
+.trust-credentials select,
+.trust-credentials textarea {
+  background: var(--tc-card);
+  color: var(--tc-text);
+  border-color: var(--tc-border);
+}
+
+.trust-credentials input::placeholder,
+.trust-credentials textarea::placeholder {
+  color: var(--tc-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .trust-surface {
+    color-scheme: dark;
+    --tc-text: #f7faf8;
+    --tc-muted: #b8c5bd;
+    --tc-card: #101d17;
+    --tc-soft: #172a20;
+    --tc-border: #23372c;
+    --tc-green: #75c69a;
+    --tc-green-ink: #a4e3bc;
+    --tc-chip: #1e3b2b;
+    --tc-danger-bg: #3d211b;
+    --tc-danger: #ff806d;
+    --tc-ok-bg: #1e3b2b;
+    background-color: #08110d !important;
+    color: #f7faf8 !important;
+    border-color: #23372c !important;
+  }
+
+  .trust-surface h1,
+  .trust-surface h2,
+  .trust-surface h3,
+  .trust-surface h4,
+  .admin-theme .trust-surface h1,
+  .admin-theme .trust-surface h2,
+  .admin-theme .trust-surface h3,
+  .admin-theme .trust-surface h4,
+  .admin-theme .public-page .trust-surface h1,
+  .admin-theme .public-page .trust-surface h2,
+  .admin-theme .public-page .trust-surface h3,
+  .guru-theme .public-page .trust-surface h1,
+  .guru-theme .public-page .trust-surface h2,
+  .guru-theme .public-page .trust-surface h3,
+  .public-page .trust-surface .text-slate-950,
+  .admin-theme .public-page .trust-surface .text-slate-950,
+  .guru-theme .public-page .trust-surface .text-slate-950,
+  .trust-surface .text-slate-950,
+  .trust-surface .text-slate-900,
+  .trust-surface .text-slate-800 {
+    color: #f7faf8 !important;
+  }
+
+  .trust-surface .text-slate-700,
+  .trust-surface .text-slate-600,
+  .trust-surface .text-slate-500,
+  .admin-theme .public-page .trust-surface .text-slate-700,
+  .admin-theme .public-page .trust-surface .text-slate-600,
+  .admin-theme .public-page .trust-surface .text-slate-500,
+  .guru-theme .public-page .trust-surface .text-slate-700,
+  .guru-theme .public-page .trust-surface .text-slate-600,
+  .guru-theme .public-page .trust-surface .text-slate-500,
+  .trust-surface p,
+  .trust-surface label,
+  .trust-surface legend,
+  .trust-surface dd,
+  .trust-surface dt,
+  .trust-surface li {
+    color: #b8c5bd !important;
+  }
+
+  .trust-surface .text-\[\#0D5C3A\],
+  .trust-surface summary,
+  .trust-surface a:not(.bg-\[\#0D5C3A\]) {
+    color: #a4e3bc !important;
+  }
+
+  .trust-surface article,
+  .trust-surface form,
+  .trust-surface details,
+  .trust-surface .bg-white,
+  .trust-surface .bg-slate-50,
+  .trust-surface .bg-slate-100 {
+    background-color: #101d17 !important;
+    border-color: #23372c !important;
+    color: #f7faf8 !important;
+  }
+
+  .trust-surface .bg-\[\#F7FBF8\],
+  .trust-surface .bg-\[\#F4FBF7\],
+  .trust-surface .bg-emerald-50 {
+    background-color: #172a20 !important;
+    color: #f7faf8 !important;
+  }
+
+  .trust-surface input,
+  .trust-surface select,
+  .trust-surface textarea,
+  .admin-theme .trust-surface input,
+  .admin-theme .trust-surface select,
+  .admin-theme .trust-surface textarea,
+  .admin-theme .public-page .trust-surface input,
+  .guru-theme .public-page .trust-surface input {
+    background: #0d1a14 !important;
+    color: #f7faf8 !important;
+    border-color: #405247 !important;
+  }
+
+  .trust-surface .bg-rose-50,
+  .trust-surface .text-rose-700 {
+    background-color: #3d211b !important;
+    color: #ff806d !important;
+  }
+
+  .trust-credentials button.bg-\[\#0D5C3A\],
+  .trust-credentials a.bg-\[\#0D5C3A\],
+  .trust-surface button.bg-\[\#0D5C3A\],
+  .trust-surface a.bg-\[\#0D5C3A\] {
+    background-color: #0d5c3a !important;
+    color: #ffffff !important;
+  }
+
+  .trust-credentials button.bg-\[\#0D5C3A\]:hover,
+  .trust-credentials a.bg-\[\#0D5C3A\]:hover,
+  .trust-surface button.bg-\[\#0D5C3A\]:hover,
+  .trust-surface a.bg-\[\#0D5C3A\]:hover {
+    background-color: #0f4d38 !important;
+    filter: none;
+  }
+
+  .trust-credentials a.bg-\[\#F4FBF7\],
+  fieldset.trust-credentials label {
+    background-color: #1e3b2b !important;
+    color: #a4e3bc !important;
+    border-color: #405247 !important;
+  }
+
+  .trust-credentials a.bg-white {
+    background-color: #101d17 !important;
+    color: #b8c5bd !important;
+    border-color: #405247 !important;
+  }
+}

@@ -20,7 +20,7 @@ export function CredentialChips({
   const destination = href.includes("#") ? href : `${href}#trust-credentials`;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2" aria-label="Verified credentials">
+    <div className="trust-credentials mt-3 flex flex-wrap gap-2" aria-label="Verified credentials">
       {chips.map((chip) => (
         <Link
           key={chip.id}

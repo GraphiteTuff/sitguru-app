@@ -671,6 +671,7 @@ export default function GuruProfileScreen() {
                     ownerUserId={String(
                       (selectedGuru as { user_id?: string | null }).user_id || '',
                     )}
+                    isDark={isDark}
                   />
                 </View>
 

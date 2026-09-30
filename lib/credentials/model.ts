@@ -201,14 +201,19 @@ export function selectSearchChips(
   };
 }
 
-/** Empty filters keep every Guru, including those with no credentials. */
+/**
+ * Empty filters keep every Guru, including those with no credentials.
+ * Multiple selections require every selected type (AND).
+ * Pass only current verified filter keys; pending, rejected, and expired
+ * credentials must not be included.
+ */
 export function guruMatchesCredentialFilters(
   filterKeys: string[],
   selected: string[],
 ) {
   const chosen = selected.map((item) => item.trim()).filter(Boolean);
   if (!chosen.length) return true;
-  return chosen.some((key) => filterKeys.includes(key));
+  return chosen.every((key) => filterKeys.includes(key));
 }
 
 export function canGuruSetStatus(nextStatus: string) {
@@ -226,6 +231,75 @@ export function publicCredentialHasPrivateFields(
   value: Record<string, unknown>,
 ) {
   return PRIVATE_CREDENTIAL_KEYS.some((key) => key in value && value[key]);
+}
+
+/** American Health Training is a training option, not a SitGuru partner. */
+export const AMERICAN_HEALTH_TRAINING = {
+  slug: "american-health-training",
+  analyticsProvider: "american_health_training",
+  publicUrl: "https://www.americanhealthtraining.com/",
+  trainingUrl: "https://www.americanhealthtraining.com/pet-cpr/",
+  isPartner: false,
+  logoAuthorized: false,
+  affiliateEnabled: false,
+  referralEnabled: false,
+} as const;
+
+const BLOCKED_URL_PARAMS = ["utm_", "gclid", "gbraid", "gad_source", "gad_campaignid"];
+
+export function credentialAnalyticsSlug(slug?: string | null) {
+  return String(slug || "").trim().replace(/-/g, "_");
+}
+
+/** Reject ad-tracking links. Explore actions use the configured course URL only. */
+export function isCleanProviderUrl(url: string) {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:") return false;
+  for (const key of parsed.searchParams.keys()) {
+    const name = key.toLowerCase();
+    if (BLOCKED_URL_PARAMS.some((blocked) => name === blocked || name.startsWith(blocked))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function cleanProviderExploreUrl(
+  trainingUrl?: string | null,
+  publicUrl?: string | null,
+) {
+  for (const candidate of [trainingUrl, publicUrl]) {
+    const url = String(candidate || "").trim();
+    if (!url) continue;
+    try {
+      if (isCleanProviderUrl(url)) return url;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Future AHT LMS/API fields belong in credential_providers.metadata
+ * until American Health Training provides an authorized integration:
+ * integration_type, external_provider_id, referral_url,
+ * verification_endpoint, webhook_enabled, api_enabled.
+ * partner_url, promo_code, and verification_url_template already exist as columns.
+ */
+export const FUTURE_PROVIDER_METADATA_KEYS = [
+  "integration_type",
+  "external_provider_id",
+  "referral_url",
+  "verification_endpoint",
+  "webhook_enabled",
+  "api_enabled",
+] as const;
+
+/** Use a date only when the certificate itself shows one. */
+export function expirationFromCertificate(explicit?: string | null) {
+  const text = String(explicit || "").trim();
+  return text || null;
 }
 
 export function safeCredentialAnalytics(input: {

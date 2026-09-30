@@ -2678,7 +2678,7 @@ function SearchPageContent() {
               </div>
 
               {credentialFiltersEnabled ? (
-                <fieldset className="min-w-[220px]">
+                <fieldset className="trust-credentials min-w-[220px]">
                   <legend className="mb-2 block text-sm font-semibold text-slate-800">
                     Trust & Credentials
                   </legend>

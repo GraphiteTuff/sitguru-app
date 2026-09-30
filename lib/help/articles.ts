@@ -155,7 +155,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     href: "/help/trust-credentials/pet-cpr",
     title: "Pet CPR & First Aid Certification",
     summary:
-      "Gurus may add existing Pet CPR or First Aid training, or explore a training provider. Only reviewed credentials appear publicly.",
+      "Optional Pet CPR and First Aid highlights. Gurus can explore American Health Training or submit a certification they already have from any recognized provider.",
     audience: "all",
     category: "Trust & Credentials",
     tags: ["cpr", "first aid", "training", "optional"],

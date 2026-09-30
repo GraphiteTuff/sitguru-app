@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics/track";
 import { credentialIcon } from "@/components/credentials/credential-icons";
-import { GURU_EMPTY_CREDENTIAL_COPY } from "@/lib/credentials/model";
+import { credentialAnalyticsSlug, formatValidThrough, GURU_EMPTY_CREDENTIAL_COPY } from "@/lib/credentials/model";
 
 type Provider = {
   id: string;
@@ -68,6 +68,7 @@ export default function GuruTrustCredentialsPanel() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [activeSlug, setActiveSlug] = useState("");
+  const [detailId, setDetailId] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -78,17 +79,33 @@ export default function GuruTrustCredentialsPanel() {
       return;
     }
     setWorkspace(payload);
-    void trackEvent({
-      eventName: "credentials_section_viewed",
-      eventType: "credentials",
-      role: "guru",
-      source: "guru_dashboard",
-      metadata: { source_surface: "guru_dashboard", platform: "web" },
-    });
   }
 
   useEffect(() => {
-    void load().catch(() => setError("SitGuru could not open Trust & Credentials."));
+    let cancelled = false;
+    fetch("/api/guru/credentials", { cache: "no-store" })
+      .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+      .then(({ ok, payload }: { ok: boolean; payload: Workspace & { error?: string } }) => {
+        if (cancelled) return;
+        if (!ok) {
+          setError(payload.error || "SitGuru could not open Trust & Credentials.");
+          return;
+        }
+        setWorkspace(payload);
+        void trackEvent({
+          eventName: "credentials_section_viewed",
+          eventType: "credentials",
+          role: "guru",
+          source: "guru_dashboard",
+          metadata: { source_surface: "guru_dashboard", platform: "web" },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setError("SitGuru could not open Trust & Credentials.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const activeType = useMemo(
@@ -190,7 +207,7 @@ export default function GuruTrustCredentialsPanel() {
   if (!workspace.enabled) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="trust-credentials trust-surface space-y-6">
       <header>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">Trust & Credentials</p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
@@ -232,36 +249,40 @@ export default function GuruTrustCredentialsPanel() {
                   <div key={item.id} className="rounded-2xl bg-[#F7FBF8] px-3 py-3 text-sm">
                     <p className="font-black text-slate-900">{STATUS_COPY[item.status] || item.status}</p>
                     {item.providerName ? <p className="font-semibold text-slate-600">{item.providerName}</p> : null}
+                    {item.status === "verified" ? (
+                      <p className="font-black text-[#0D5C3A]">Verified by SitGuru</p>
+                    ) : null}
+                    {item.expirationDate ? (
+                      <p className="font-semibold text-slate-600">
+                        Valid through {formatValidThrough(item.expirationDate)}
+                      </p>
+                    ) : null}
                     {item.rejectionReason ? <p className="mt-1 font-semibold text-slate-600">{item.rejectionReason}</p> : null}
                     {item.expiringSoon ? (
                       <p className="mt-1 font-semibold text-slate-600">Time for a quick credential refresh.</p>
+                    ) : null}
+                    {item.status === "verified" ? (
+                      <button type="button" className="mt-2 min-h-11 text-sm font-black text-[#0D5C3A]" onClick={() => setDetailId(detailId === item.id ? "" : item.id)}>
+                        View Details
+                      </button>
+                    ) : null}
+                    {detailId === item.id ? (
+                      <dl className="mt-2 grid gap-1 text-sm text-slate-700">
+                        <div><dt className="font-black">Credential</dt><dd>{item.credentialName}</dd></div>
+                        {item.issueDate ? <div><dt className="font-black">Completed</dt><dd>{item.issueDate}</dd></div> : null}
+                        {item.reference ? <div><dt className="font-black">Reference, private to you</dt><dd>{item.reference}</dd></div> : null}
+                      </dl>
                     ) : null}
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-black text-white"
-                  onClick={() => {
-                    setActiveSlug(type.slug);
-                    void trackEvent({
-                      eventName: "credential_add_started",
-                      eventType: "credentials",
-                      role: "guru",
-                      source: "guru_dashboard",
-                      metadata: { credential_type: type.slug, platform: "web", source_surface: "guru_dashboard" },
-                    });
-                  }}
-                >
-                  {type.add_label}
-                </button>
                 {provider?.exploreUrl ? (
                   <a
                     href={provider.exploreUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex min-h-11 items-center text-sm font-black text-[#0D5C3A]"
+                    className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-black text-white"
                     onClick={() => {
                       void trackEvent({
                         eventName: "credential_provider_explore_clicked",
@@ -269,17 +290,38 @@ export default function GuruTrustCredentialsPanel() {
                         role: "guru",
                         source: "guru_dashboard",
                         metadata: {
-                          credential_type: type.slug,
-                          provider: provider.slug,
+                          credential_type: credentialAnalyticsSlug(type.slug),
+                          provider: credentialAnalyticsSlug(provider.slug),
                           platform: "web",
                           source_surface: "guru_dashboard",
                         },
                       });
                     }}
                   >
-                    {type.explore_label || "Learn More"} →
+                    {type.explore_label || "Learn More"}
                   </a>
                 ) : null}
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 items-center rounded-full border border-[#0D5C3A] px-4 text-sm font-black text-[#0D5C3A]"
+                  onClick={() => {
+                    setActiveSlug(type.slug);
+                    void trackEvent({
+                      eventName: "credential_add_started",
+                      eventType: "credentials",
+                      role: "guru",
+                      source: "guru_dashboard",
+                      metadata: {
+                        credential_type: credentialAnalyticsSlug(type.slug),
+                        provider: credentialAnalyticsSlug(provider?.slug),
+                        platform: "web",
+                        source_surface: "guru_dashboard",
+                      },
+                    });
+                  }}
+                >
+                  {type.add_label}
+                </button>
               </div>
               <a href="/help/trust-credentials" className="mt-3 inline-flex text-xs font-bold text-slate-500 underline">
                 How Trust & Credentials works
@@ -290,15 +332,19 @@ export default function GuruTrustCredentialsPanel() {
       </div>
 
       {activeType ? (
-        <form onSubmit={onSubmit} className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm">
-          <h2 className="text-2xl font-black text-slate-950">Add {activeType.display_name}</h2>
+        <form key={activeType.slug} onSubmit={onSubmit} className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm">
+          <h2 className="text-2xl font-black text-slate-950">Add {activeType.public_badge_label}</h2>
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Have something worth showing off? Share what you already have. SitGuru reviews it before it appears publicly.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-bold text-slate-800">
               Provider
-              <select name="providerId" className="mt-1 min-h-12 w-full rounded-2xl border border-slate-300 px-3" defaultValue="">
+              <select
+                name="providerId"
+                className="mt-1 min-h-12 w-full rounded-2xl border border-slate-300 px-3"
+                defaultValue={workspace.providers.find((item) => item.slug === activeType.default_provider_slug)?.id || ""}
+              >
                 <option value="">Choose a provider</option>
                 {workspace.providers.map((provider) => (
                   <option key={provider.id} value={provider.id}>{provider.provider_name}</option>
@@ -328,6 +374,9 @@ export default function GuruTrustCredentialsPanel() {
             <label className="text-sm font-bold text-slate-800">
               Expiration date
               <input name="expirationDate" type="date" required={activeType.requires_expiration} className="mt-1 min-h-12 w-full rounded-2xl border border-slate-300 px-3" />
+              {activeType.requires_expiration ? null : (
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Only if the certificate shows an expiration date.</span>
+              )}
             </label>
             {activeType.slug === "liability-insurance" || activeType.slug === "bonding" ? (
               <>

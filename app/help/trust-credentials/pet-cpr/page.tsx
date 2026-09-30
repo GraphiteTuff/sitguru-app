@@ -10,11 +10,15 @@ export default function PetCprHelpPage() {
   return (
     <CredentialHelpArticle
       title="Pet CPR & First Aid Certification"
-      summary="Add training you already have, or explore a provider if you are curious."
+      summary="Already certified? Show it. Curious about training? Explore a provider. Either way, it stays optional."
     >
       <p>Pet CPR and First Aid is optional. SitGuru does not require it to keep a Guru profile or accept bookings.</p>
-      <p>A Guru can add an existing eligible certificate, including the provider, completion date, and a document or verification link. American Health Training is one training option. Other recognized providers can be added too.</p>
-      <p>SitGuru reviews the supporting information. Only a verified credential is shown on the public profile.</p>
+      <p>
+        Interested in Pet CPR & First Aid training? SitGuru Gurus can explore certification options from providers such as American Health Training. Training is completed directly with the provider and is optional. If you already hold a Pet CPR or First Aid credential, you can submit it for review and add it to your Guru profile after verification.
+      </p>
+      <p>American Health Training provides that training and certification. SitGuru does not issue it, and American Health Training is not an official SitGuru partner.</p>
+      <p>Other recognized Pet CPR providers can be submitted too. SitGuru reviews the information you send. Only a verified credential appears on the public profile.</p>
+      <p>Add an expiration date only when the certificate itself shows one. SitGuru does not invent an expiration.</p>
     </CredentialHelpArticle>
   );
 }

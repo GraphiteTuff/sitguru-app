@@ -3,9 +3,14 @@ import { describe, it } from "node:test";
 import {
   GURU_EMPTY_CREDENTIAL_COPY,
   NEGATIVE_CREDENTIAL_PHRASES,
+  AMERICAN_HEALTH_TRAINING,
   canGuruSetStatus,
   chooseExpirationNotice,
+  cleanProviderExploreUrl,
+  credentialAnalyticsSlug,
+  expirationFromCertificate,
   guruMatchesCredentialFilters,
+  isCleanProviderUrl,
   isCurrentPublicCredential,
   isExpiringSoon,
   isExpiredCredential,
@@ -104,13 +109,83 @@ describe("trust credentials visibility", () => {
 });
 
 describe("trust credentials search", () => {
-  it("keeps zero-credential Gurus when no filter is selected", () => {
+  it("requires every selected credential and ignores non-current ones", () => {
+    const today = "2026-09-30";
+    const current = [
+      record({
+        id: "cpr",
+        typeSlug: "pet-cpr-first-aid",
+        filterKey: "pet_cpr",
+        expirationDate: null,
+      }),
+      record({
+        id: "ins",
+        typeSlug: "liability-insurance",
+        filterKey: "insured",
+        expirationDate: "2027-08-20",
+      }),
+      record({
+        id: "bond",
+        typeSlug: "bonding",
+        filterKey: "bonded",
+        expirationDate: "2027-01-01",
+      }),
+      record({
+        id: "pending",
+        status: "submitted",
+        filterKey: "psi",
+        expirationDate: null,
+      }),
+      record({
+        id: "rejected",
+        status: "rejected",
+        filterKey: "professional",
+        expirationDate: null,
+      }),
+      record({
+        id: "expired",
+        filterKey: "insured",
+        expirationDate: "2026-01-01",
+      }),
+    ];
+    const keys = current
+      .map((item) => toPublicCredential(item, today)?.filterKey)
+      .filter((key): key is string => Boolean(key));
+
+    assert.deepEqual(keys.sort(), ["bonded", "insured", "pet_cpr"]);
+    assert.equal(guruMatchesCredentialFilters(keys, []), true);
     assert.equal(guruMatchesCredentialFilters([], []), true);
-    assert.equal(guruMatchesCredentialFilters([], ["insured"]), false);
-    assert.equal(guruMatchesCredentialFilters(["pet_cpr"], ["insured"]), false);
+    assert.equal(guruMatchesCredentialFilters(keys, ["pet_cpr"]), true);
+    assert.equal(guruMatchesCredentialFilters(keys, ["pet_cpr", "insured"]), true);
     assert.equal(
-      guruMatchesCredentialFilters(["insured", "bonded"], ["insured"]),
+      guruMatchesCredentialFilters(keys, ["pet_cpr", "insured", "bonded"]),
       true,
+    );
+    assert.equal(
+      guruMatchesCredentialFilters(keys, ["pet_cpr", "insured", "psi"]),
+      false,
+    );
+    assert.equal(guruMatchesCredentialFilters([], ["insured"]), false);
+    assert.equal(
+      guruMatchesCredentialFilters(
+        current
+          .filter((item) => item.status === "submitted")
+          .map((item) => toPublicCredential(item, today)?.filterKey)
+          .filter((key): key is string => Boolean(key)),
+        ["psi"],
+      ),
+      false,
+    );
+    assert.equal(
+      toPublicCredential(record({ status: "rejected" }), today),
+      null,
+    );
+    assert.equal(
+      toPublicCredential(
+        record({ expirationDate: "2026-01-01" }),
+        today,
+      ),
+      null,
     );
   });
 
@@ -133,6 +208,97 @@ describe("trust credentials search", () => {
     );
     assert.equal(visible.chips.length, 3);
     assert.equal(visible.extraCount, 1);
+  });
+});
+
+describe("american health training", () => {
+  it("uses the clean course URL and stays non-partner", () => {
+    assert.equal(
+      AMERICAN_HEALTH_TRAINING.trainingUrl,
+      "https://www.americanhealthtraining.com/pet-cpr/",
+    );
+    assert.equal(AMERICAN_HEALTH_TRAINING.isPartner, false);
+    assert.equal(AMERICAN_HEALTH_TRAINING.logoAuthorized, false);
+    assert.equal(
+      isCleanProviderUrl(AMERICAN_HEALTH_TRAINING.trainingUrl),
+      true,
+    );
+    assert.equal(
+      isCleanProviderUrl(
+        "https://www.americanhealthtraining.com/pet-cpr/?utm_source=ads&gclid=abc&gbraid=1&gad_source=1",
+      ),
+      false,
+    );
+    assert.equal(
+      cleanProviderExploreUrl(
+        "https://www.americanhealthtraining.com/pet-cpr/?utm_campaign=spring",
+        AMERICAN_HEALTH_TRAINING.publicUrl,
+      ),
+      AMERICAN_HEALTH_TRAINING.publicUrl,
+    );
+    assert.equal(
+      cleanProviderExploreUrl(AMERICAN_HEALTH_TRAINING.trainingUrl, null),
+      AMERICAN_HEALTH_TRAINING.trainingUrl,
+    );
+    assert.equal(
+      credentialAnalyticsSlug("pet-cpr-first-aid"),
+      "pet_cpr_first_aid",
+    );
+    assert.equal(
+      credentialAnalyticsSlug(AMERICAN_HEALTH_TRAINING.slug),
+      "american_health_training",
+    );
+  });
+
+  it("does not invent an expiration and still accepts an explicit date", () => {
+    assert.equal(expirationFromCertificate(null), null);
+    assert.equal(expirationFromCertificate(""), null);
+    assert.equal(expirationFromCertificate("2028-04-01"), "2028-04-01");
+    const aht = toPublicCredential(
+      record({
+        typeSlug: "pet-cpr-first-aid",
+        filterKey: "pet_cpr",
+        chipLabel: "CPR & First Aid",
+        badgeLabel: "Pet CPR & First Aid Certified",
+        providerName: "American Health Training",
+        expirationDate: null,
+        reference: "AHT-998877",
+        storagePath: "user/cert.pdf",
+      }),
+      "2026-09-30",
+    );
+    assert.equal(aht?.providerName, "American Health Training");
+    assert.equal(aht?.validThrough, null);
+    assert.equal(aht?.chipLabel, "CPR & First Aid");
+    assert.equal(JSON.stringify(aht).includes("AHT-998877"), false);
+    assert.equal(JSON.stringify(aht).includes("cert.pdf"), false);
+    const other = toPublicCredential(
+      record({
+        id: "other-cpr",
+        typeSlug: "pet-cpr-first-aid",
+        filterKey: "pet_cpr",
+        providerName: "Other recognized provider",
+        expirationDate: null,
+      }),
+      "2026-09-30",
+    );
+    assert.equal(
+      guruMatchesCredentialFilters(
+        [aht?.filterKey || "", other?.filterKey || ""],
+        ["pet_cpr"],
+      ),
+      true,
+    );
+    assert.equal(
+      toPublicCredential(
+        record({
+          filterKey: "pet_cpr",
+          expirationDate: "2026-01-01",
+        }),
+        "2026-09-30",
+      ),
+      null,
+    );
   });
 });
 

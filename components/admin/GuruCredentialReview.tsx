@@ -82,8 +82,34 @@ export default function GuruCredentialReview() {
   }
 
   useEffect(() => {
-    void load(tab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    fetch(`/api/admin/credentials?tab=${tab}`, { cache: "no-store" })
+      .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+      .then((result: {
+        ok: boolean;
+        payload: {
+          credentials?: Credential[];
+          providers?: Provider[];
+          settings?: Record<string, string>;
+          error?: string;
+        };
+      }) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setError(result.payload.error || "Unable to load the review queue.");
+          return;
+        }
+        setCredentials(result.payload.credentials || []);
+        setProviders(result.payload.providers || []);
+        setSettings(result.payload.settings || {});
+        setError("");
+      })
+      .catch(() => {
+        if (!cancelled) setError("Unable to load the review queue.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tab]);
 
   async function review(id: string, action: "verify" | "reject" | "revoke", reason?: string) {
@@ -152,7 +178,7 @@ export default function GuruCredentialReview() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="trust-credentials trust-surface space-y-6">
       <header>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">Admin</p>
         <h1 className="mt-2 text-3xl font-black text-slate-950">Guru Credentials</h1>

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +11,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { trackMobileEvent } from '@/lib/analytics/track';
 import { sitguruApiFetch, getSitGuruApiBaseUrl } from '@/lib/data/api';
 import { getSupabaseAccessToken } from '@/lib/supabase';
 
@@ -37,10 +42,27 @@ type Owned = {
   id: string;
   typeSlug: string;
   status: string;
+  credentialName?: string | null;
   providerName: string | null;
+  expirationDate?: string | null;
   rejectionReason: string | null;
   expiringSoon: boolean;
 };
+
+function analyticsSlug(slug?: string | null) {
+  return String(slug || '').replace(/-/g, '_');
+}
+
+function validThrough(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
 
 const STATUS: Record<string, string> = {
   submitted: "Submitted — we're reviewing it.",
@@ -58,6 +80,8 @@ export default function GuruCredentialsScreen() {
   const [active, setActive] = useState<CredentialType | null>(null);
   const [reference, setReference] = useState('');
   const [providerName, setProviderName] = useState('');
+  const [pendingFile, setPendingFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [providerId, setProviderId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -97,6 +121,7 @@ export default function GuruCredentialsScreen() {
         method: 'POST',
         body: {
           typeSlug: active.slug,
+          providerId: providerId || null,
           credentialName: active.public_badge_label,
           customProviderName: providerName,
           reference,
@@ -109,26 +134,33 @@ export default function GuruCredentialsScreen() {
       setError(result.error || 'SitGuru could not save this highlight.');
       return;
     }
+    if (pendingFile) {
+      const uploaded = await uploadEvidence(result.data.credential.id, pendingFile);
+      if (!uploaded) {
+        setError('The highlight was saved. The document needs another try.');
+        setPendingFile(null);
+        await load();
+        return;
+      }
+    }
     setMessage("Submitted — we're reviewing it.");
     setActive(null);
     setReference('');
     setProviderName('');
+    setPendingFile(null);
     await load();
   }
 
-  async function attachPhoto(credentialId: string) {
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    if (picked.canceled || !picked.assets[0]) return;
-    const asset = picked.assets[0];
+  async function uploadEvidence(
+    credentialId: string,
+    file: { uri: string; name: string; type: string },
+  ) {
     const token = await getSupabaseAccessToken();
     const body = new FormData();
     body.append('file', {
-      uri: asset.uri,
-      name: 'credential.jpg',
-      type: 'image/jpeg',
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
     } as unknown as Blob);
     const response = await fetch(
       `${getSitGuruApiBaseUrl()}/api/guru/credentials/${credentialId}/document`,
@@ -138,12 +170,71 @@ export default function GuruCredentialsScreen() {
         body,
       },
     );
-    if (!response.ok) {
-      setError('The highlight was saved. The photo needs another try.');
+    return response.ok;
+  }
+
+  async function choosePhoto() {
+    const file = await pickPhotoFile();
+    if (!file) return;
+    setPendingFile(file);
+    setError('');
+  }
+
+  async function pickPhotoFile() {
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+    });
+    if (picked.canceled || !picked.assets[0]) return null;
+    const asset = picked.assets[0];
+    const type = asset.mimeType || 'image/jpeg';
+    if (type === 'image/heic' || type === 'image/heif') {
+      setError('Save HEIC photos as JPG or PNG before uploading.');
+      return null;
+    }
+    return {
+      uri: asset.uri,
+      name: asset.fileName || (type === 'image/png' ? 'credential.png' : 'credential.jpg'),
+      type: type === 'image/png' ? 'image/png' : 'image/jpeg',
+    };
+  }
+
+  async function pickDocumentFile() {
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/jpeg', 'image/png'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (picked.canceled || !picked.assets?.[0]) return null;
+    const asset = picked.assets[0];
+    if (asset.size && asset.size > 8 * 1024 * 1024) {
+      setError('Upload a PDF, JPG, or PNG up to 8 MB.');
+      return null;
+    }
+    return {
+      uri: asset.uri,
+      name: asset.name || 'credential.pdf',
+      type: asset.mimeType || 'application/pdf',
+    };
+  }
+
+  async function attachExisting(credentialId: string, kind: 'photo' | 'file') {
+    const file = kind === 'photo' ? await pickPhotoFile() : await pickDocumentFile();
+    if (!file) return;
+    const uploaded = await uploadEvidence(credentialId, file);
+    if (!uploaded) {
+      setError('That document needs another try.');
       return;
     }
     setMessage('Document added.');
     await load();
+  }
+
+  async function chooseFile() {
+    const file = await pickDocumentFile();
+    if (!file) return;
+    setPendingFile(file);
+    setError('');
   }
 
   const palette = {
@@ -154,7 +245,12 @@ export default function GuruCredentialsScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={styles.content}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }} edges={['bottom']}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.eyebrow}>Trust & Credentials</Text>
       <Text style={[styles.title, { color: palette.text }]}>Show Pet Parents what makes you, you. 🐾</Text>
       <Text style={[styles.body, { color: palette.muted }]}>
@@ -176,57 +272,137 @@ export default function GuruCredentialsScreen() {
         const owned = credentials.filter((item) => item.typeSlug === type.slug);
         return (
           <View key={type.slug} style={[styles.card, { backgroundColor: palette.card }]}>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>{type.display_name}</Text>
+            <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={3}>{type.display_name}</Text>
             <Text style={[styles.body, { color: palette.muted }]}>{type.description}</Text>
             {owned.map((item) => (
               <View key={item.id}>
                 <Text style={styles.status}>{STATUS[item.status] || item.status}</Text>
+                {item.providerName ? <Text style={[styles.body, { color: palette.muted }]}>{item.providerName}</Text> : null}
+                {item.status === 'verified' ? <Text style={styles.status}>Verified by SitGuru</Text> : null}
+                {validThrough(item.expirationDate) ? (
+                  <Text style={[styles.body, { color: palette.muted }]}>Valid through {validThrough(item.expirationDate)}</Text>
+                ) : null}
                 {item.rejectionReason ? <Text style={[styles.body, { color: palette.muted }]}>{item.rejectionReason}</Text> : null}
                 {item.expiringSoon ? <Text style={[styles.body, { color: palette.muted }]}>Time for a quick credential refresh.</Text> : null}
-                <Pressable accessibilityRole="button" onPress={() => void attachPhoto(item.id)} style={styles.secondary}>
-                  <Text style={styles.secondaryText}>Add photo</Text>
-                </Pressable>
+                {['draft', 'submitted', 'rejected', 'expired'].includes(item.status) ? (
+                  <View style={styles.uploadRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose photo"
+                      onPress={() => void attachExisting(item.id, 'photo')}
+                      style={styles.secondary}
+                    >
+                      <Text style={styles.secondaryText}>Choose Photo</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose file"
+                      onPress={() => void attachExisting(item.id, 'file')}
+                      style={styles.secondary}
+                    >
+                      <Text style={styles.secondaryText}>Choose File</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
             ))}
+            {provider?.exploreUrl ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={type.explore_label || 'Explore Certification'}
+                onPress={() => {
+                  void trackMobileEvent({
+                    eventName: 'credential_provider_explore_clicked',
+                    eventType: 'credentials',
+                    role: 'guru',
+                    source: 'guru_credentials',
+                    metadata: {
+                      credential_type: analyticsSlug(type.slug),
+                      provider: analyticsSlug(provider.slug),
+                      platform: 'mobile',
+                      source_surface: 'guru_credentials',
+                    },
+                  });
+                  void Linking.openURL(provider.exploreUrl || '');
+                }}
+                style={styles.primary}
+              >
+                <Text style={styles.primaryText}>{type.explore_label || 'Learn More'}</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={type.add_label}
-              onPress={() => setActive(type)}
-              style={styles.primary}
+              onPress={() => {
+                setActive(type);
+                const match = providers.find((item) => item.slug === type.default_provider_slug);
+                setProviderId(match?.id || '');
+                setProviderName(match ? '' : providerName);
+              }}
+              style={styles.outline}
             >
-              <Text style={styles.primaryText}>{type.add_label}</Text>
+              <Text style={styles.outlineText}>{type.add_label}</Text>
             </Pressable>
-            {provider?.exploreUrl ? (
-              <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(provider.exploreUrl || '')}>
-                <Text style={styles.link}>{type.explore_label || 'Learn More'} →</Text>
-              </Pressable>
-            ) : null}
           </View>
         );
       })}
       {active ? (
         <View style={[styles.card, { backgroundColor: palette.card }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>Add {active.display_name}</Text>
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Add {active.public_badge_label}</Text>
+          {active.slug === 'pet-cpr-first-aid' ? (
+            <Text style={[styles.body, { color: palette.muted }]}>
+              American Health Training can be selected, or choose another recognized provider. Nothing here is required.
+            </Text>
+          ) : null}
+          {providers.map((item) => (
+            <Pressable
+              key={item.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: providerId === item.id }}
+              accessibilityLabel={item.provider_name}
+              onPress={() => setProviderId(item.id)}
+              style={[styles.outline, providerId === item.id && styles.outlineSelected]}
+            >
+              <Text style={styles.outlineText}>{item.provider_name}</Text>
+            </Pressable>
+          ))}
           <TextInput
+            accessibilityLabel="Provider name"
             value={providerName}
             onChangeText={setProviderName}
             placeholder="Provider name"
             placeholderTextColor="#94A3B8"
-            style={[styles.input, { color: palette.text }]}
+            style={[styles.input, { color: palette.text, borderColor: isDark ? '#405247' : '#CBD5E1' }]}
           />
           <TextInput
+            accessibilityLabel="Reference number, kept private"
             value={reference}
             onChangeText={setReference}
             placeholder="Reference number, kept private"
             placeholderTextColor="#94A3B8"
-            style={[styles.input, { color: palette.text }]}
+            style={[styles.input, { color: palette.text, borderColor: isDark ? '#405247' : '#CBD5E1' }]}
           />
-          <Pressable accessibilityRole="button" disabled={busy} onPress={() => void submit()} style={styles.primary}>
+          <View style={styles.uploadRow}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Choose photo" onPress={() => void choosePhoto()} style={styles.secondary}>
+              <Text style={styles.secondaryText}>Choose Photo</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Choose file" onPress={() => void chooseFile()} style={styles.secondary}>
+              <Text style={styles.secondaryText}>Choose File</Text>
+            </Pressable>
+          </View>
+          {pendingFile ? (
+            <Text style={[styles.body, { color: palette.muted }]} numberOfLines={2}>
+              Ready to attach: {pendingFile.name}
+            </Text>
+          ) : null}
+          <Pressable accessibilityRole="button" accessibilityLabel="Submit for review" disabled={busy} onPress={() => void submit()} style={styles.primary}>
             <Text style={styles.primaryText}>{busy ? 'Sending…' : 'Submit for review'}</Text>
           </Pressable>
         </View>
       ) : null}
     </ScrollView>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -247,7 +423,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryText: { color: '#FFFFFF', fontWeight: '800' },
-  secondary: { minHeight: 44, justifyContent: 'center' },
+  outline: {
+    minHeight: 48,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#0D5C3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  outlineSelected: { backgroundColor: '#E8F6EE' },
+  outlineText: { color: '#0D5C3A', fontWeight: '800', textAlign: 'center' },
+  uploadRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  secondary: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
   secondaryText: { color: '#0D5C3A', fontWeight: '800' },
   link: { color: '#0D5C3A', fontWeight: '800' },
   input: {

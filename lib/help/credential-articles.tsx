@@ -18,7 +18,7 @@ export function CredentialHelpArticle({
       backHref="/help/trust-credentials"
       backLabel="Back to Trust & Credentials"
     >
-      <div className="space-y-4 text-base font-semibold leading-7 text-slate-700">{children}</div>
+      <div className="trust-credentials trust-surface space-y-4 rounded-3xl p-5 text-base font-semibold leading-7 text-slate-700">{children}</div>
     </HelpArticleChrome>
   );
 }

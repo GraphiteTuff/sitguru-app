@@ -48,7 +48,7 @@ export default function HomepageTrustSection() {
   }, []);
 
   return (
-    <section className="bg-[#F7FBF8] py-14 sm:py-16" aria-labelledby="homepage-trust-heading">
+    <section className="trust-credentials trust-surface bg-[#F7FBF8] py-14 sm:py-16" aria-labelledby="homepage-trust-heading">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
           Trust & Credentials

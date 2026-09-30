@@ -82,8 +82,7 @@ export function TrustCredentialHighlights({
 
   return (
     <View style={[styles.card, isDark && styles.cardDark]}>
-      <Text style={styles.eyebrow}>Trust & Credentials</Text>
-      <Text style={[styles.title, isDark && styles.titleDark]}>Professional highlights</Text>
+      <Text style={[styles.title, isDark && styles.titleDark]}>Professional Highlights</Text>
       {pack.highlights.map((item) => (
         <View key={item.id} style={styles.item}>
           <Text style={[styles.itemTitle, isDark && styles.titleDark]}>

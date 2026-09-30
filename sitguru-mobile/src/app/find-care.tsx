@@ -893,7 +893,7 @@ export default function FindCareScreen() {
           credentialIndex[String(guru.id || "")] ||
           credentialIndex[String((guru as { user_id?: string | null }).user_id || "")] ||
           [];
-        if (!credentialFilters.some((key) => keys.includes(key))) return false;
+        if (!credentialFilters.every((key) => keys.includes(key))) return false;
       }
 
       if (filters.maxAllInHourly !== null) {
@@ -2100,6 +2100,7 @@ export default function FindCareScreen() {
                           isAcademyCertified={certifiedGuruUserIds.has(
                             getGuruUserId(guru),
                           )}
+                          isDark={isDark}
                           key={String(guru.id)}
                           onBook={handleBookingAction}
                           onFavorite={handleToggleFavorite}
@@ -2688,6 +2689,7 @@ function GuruDiscoveryCard({
   distanceOrigin,
   index,
   isAcademyCertified,
+  isDark,
   onBook,
   onFavorite,
   onView,
@@ -2700,6 +2702,7 @@ function GuruDiscoveryCard({
   distanceOrigin: MapCoordinate | null;
   index: number;
   isAcademyCertified: boolean;
+  isDark: boolean;
   onBook: (guru: PublicGuruProfile) => void;
   onFavorite: (guru: PublicGuruProfile) => void;
   onView: (guru: PublicGuruProfile) => void;
@@ -2796,6 +2799,7 @@ function GuruDiscoveryCard({
           guruId={String(guru.id || "")}
           ownerUserId={String((guru as { user_id?: string | null }).user_id || "")}
           variant="chips"
+          isDark={isDark}
         />
         <View style={styles.guruProfileChipRow}>
           {founding ? (

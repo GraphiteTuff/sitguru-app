@@ -4,6 +4,7 @@ import { dispatchNotification } from "@/lib/notifications";
 import {
   canGuruSetStatus,
   chooseExpirationNotice,
+  cleanProviderExploreUrl,
   isExpiringSoon,
   maskReference,
   safeCredentialAnalytics,
@@ -318,7 +319,7 @@ export async function getGuruCredentialWorkspace(userId: string) {
     providers: catalog.providers.map((provider) => ({
       ...provider,
       exploreUrl: settingEnabled(catalog.settings, "credential_partner_links_enabled")
-        ? provider.training_url || provider.public_url
+        ? cleanProviderExploreUrl(provider.training_url, provider.public_url)
         : null,
       partnerLabel: provider.is_partner ? "SitGuru Partner" : null,
     })),

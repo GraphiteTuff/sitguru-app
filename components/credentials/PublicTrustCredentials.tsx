@@ -33,17 +33,14 @@ export default async function PublicTrustCredentials({
   return (
     <section
       id="trust-credentials"
-      className="mt-6 rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
+      className="trust-credentials trust-surface mt-6 rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
       aria-labelledby="trust-credentials-heading"
     >
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
-        Trust & Credentials
-      </p>
       <h2
         id="trust-credentials-heading"
-        className="mt-2 text-3xl font-black tracking-[-0.03em] text-slate-950"
+        className="text-3xl font-black tracking-[-0.03em] text-slate-950"
       >
-        Professional highlights
+        Professional Highlights
       </h2>
       <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
         These are optional credentials this Guru chose to share. SitGuru reviewed the ones marked verified.
