@@ -9,7 +9,8 @@
     "lint": "eslint",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
-    "seed-social-baseline": "tsx scripts/seed-social-baseline.ts"
+    "seed-social-baseline": "tsx scripts/seed-social-baseline.ts",
+    "get-meta-token": "tsx scripts/get-meta-token.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
