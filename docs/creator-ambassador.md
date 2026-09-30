@@ -49,7 +49,7 @@ The public page is a single column with one primary action, Find Pet Care (`/sea
 
 `supabase/migrations/20260930180000_referral_events_revoke_client_writes.sql` revokes insert, update, and delete on `referral_events` from anonymous and ordinary signed-in users. A browser cannot write a referral code, user id, email, IP address, or booking id into that table. `POST /api/ambassador/track-click` accepts the public code only. The server takes the IP address and user agent from the request and does not return the Ambassador row id. Clicks are analytics. They do not create an acquisition or a reward. The same code is tracked once per browser tab. There is no server rate limit yet.
 
-Staging proof for signup and booking is `scripts/test-ambassador-referral.ts`. It refuses the production Supabase project, a dummy service role, live Stripe, and `www.sitguru.com`. It does not run unless `SITGURU_QA_ENV` is `staging`, `development`, or `test`.
+Staging proof for signup and booking is `scripts/test-ambassador-referral.ts`. It refuses the production Supabase project, a dummy service role, live Stripe, and `www.sitguru.com`. Setup is in `docs/staging-environment.md`. The harness does not run until that staging project exists.
 
 ## Not in this slice
 

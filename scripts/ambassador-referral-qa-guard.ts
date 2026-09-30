@@ -5,6 +5,9 @@
 
 export const PRODUCTION_SUPABASE_PROJECT_REFS = ["mmtjhxnzuglbyumbsjhs"] as const;
 
+/** Approved application hosts. Production sitguru.com is never in this list. */
+export const APPROVED_QA_HOSTS = ["localhost", "127.0.0.1", "::1", "staging.sitguru.com"] as const;
+
 const ALLOWED_QA_ENVS = new Set(["staging", "development", "test"]);
 
 export type QaEnvironmentInput = {
@@ -21,6 +24,7 @@ export type QaEnvironmentDecision = {
   ok: boolean;
   reasons: string[];
   payments: "stripe_test" | "skipped";
+  summary: string[];
 };
 
 function text(value: string | null | undefined) {
@@ -33,6 +37,25 @@ function hostOf(value: string) {
   } catch {
     return "";
   }
+}
+
+export function supabaseProjectRef(url: string) {
+  const host = hostOf(url);
+  const match = host.match(/^([a-z0-9-]+)\.supabase\.co$/);
+  return match?.[1] || host || "unknown";
+}
+
+function approvedApplicationHost(hostname: string) {
+  if ((APPROVED_QA_HOSTS as readonly string[]).includes(hostname)) return true;
+  if (hostname.endsWith(".staging.sitguru.com")) return true;
+  if (
+    hostname.endsWith(".vercel.app") &&
+    hostname.includes("sitguru") &&
+    (hostname.includes("staging") || hostname.includes("preview"))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function assessAmbassadorReferralQaEnvironment(
@@ -79,12 +102,13 @@ export function assessAmbassadorReferralQaEnvironment(
   } else if (
     baseHost === "sitguru.com" ||
     baseHost === "www.sitguru.com" ||
-    (baseHost.endsWith(".sitguru.com") &&
-      !baseHost.includes("staging") &&
-      !baseHost.includes("preview") &&
-      !baseHost.includes("localhost"))
+    PRODUCTION_SUPABASE_PROJECT_REFS.some((ref) => baseHost.includes(ref))
   ) {
     reasons.push("SITGURU_QA_BASE_URL points at production SitGuru.");
+  } else if (!approvedApplicationHost(baseHost)) {
+    reasons.push(
+      "SITGURU_QA_BASE_URL is not an approved host. Use localhost, staging.sitguru.com, or a SitGuru staging/preview Vercel host.",
+    );
   }
 
   const emailAllowed =
@@ -104,5 +128,14 @@ export function assessAmbassadorReferralQaEnvironment(
     payments = "stripe_test";
   }
 
-  return { ok: reasons.length === 0, reasons, payments };
+  const stripeLabel =
+    payments === "stripe_test" ? "TEST" : stripeSecretKey ? "REFUSED" : "NOT CONFIGURED";
+  const summary = [
+    `Environment: ${reasons.length === 0 ? qaEnv.toUpperCase() : "REFUSED"}`,
+    `Application: ${baseHost || "missing"}`,
+    `Supabase: ${supabaseUrl ? supabaseProjectRef(supabaseUrl) : "missing"}`,
+    `Stripe: ${stripeLabel}`,
+  ];
+
+  return { ok: reasons.length === 0, reasons, payments, summary };
 }

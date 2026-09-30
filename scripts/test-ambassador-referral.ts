@@ -375,6 +375,8 @@ async function main() {
     emailDomain: env("SITGURU_QA_EMAIL_DOMAIN") || "example.com",
   });
 
+  for (const line of decision.summary) console.log(line);
+
   if (!decision.ok) {
     console.error("BLOCKED — SAFE STAGING ENVIRONMENT REQUIRED");
     for (const reason of decision.reasons) console.error(`- ${reason}`);

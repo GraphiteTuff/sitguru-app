@@ -50,4 +50,28 @@ describe("ambassador referral QA guard", () => {
     assert.equal(decision.ok, false);
     assert.match(decision.reasons.join(" "), /production SitGuru/);
   });
+
+  it("allows staging.sitguru.com and prints a secret-free summary", () => {
+    const decision = assessAmbassadorReferralQaEnvironment({
+      ...STAGING,
+      baseUrl: "https://staging.sitguru.com",
+      stripeSecretKey: "sk_test_example",
+    });
+    assert.equal(decision.ok, true);
+    assert.deepEqual(decision.summary, [
+      "Environment: STAGING",
+      "Application: staging.sitguru.com",
+      "Supabase: staging-project",
+      "Stripe: TEST",
+    ]);
+  });
+
+  it("refuses an unapproved host", () => {
+    const decision = assessAmbassadorReferralQaEnvironment({
+      ...STAGING,
+      baseUrl: "https://example.com",
+    });
+    assert.equal(decision.ok, false);
+    assert.equal(decision.summary[0], "Environment: REFUSED");
+  });
 });
