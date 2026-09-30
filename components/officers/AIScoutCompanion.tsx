@@ -22,6 +22,7 @@ import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
 import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
@@ -34,6 +35,10 @@ import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 import { X } from "lucide-react";
 import {
   getBotConfig,
@@ -173,6 +178,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportBox = useMessagingViewport(isOpen);
 
   const firstName = user?.firstName || "Guru";
   const greeting = isPublic
@@ -228,7 +234,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const {
     messages,
     input,
-    handleInputChange,
+    setInput,
     handleSubmit,
     append,
     isLoading,
@@ -271,7 +277,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     if (!isOpen) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isLoading, isOpen, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -361,6 +367,8 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           role="dialog"
           aria-label="Scout AI Companion"
           data-scout-public={isPublic ? "true" : "false"}
+          style={messagingPanelStyle(viewportBox)}
+          data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
         >
           <div
             data-companion-header
@@ -441,40 +449,39 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
           <div
             ref={scrollerRef}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fffb] px-4 py-3 text-sm text-slate-700"
+            className="homepage-chat-panel__messages min-h-0 flex-1"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
-              return (
+              if (!isAssistant && message.role !== "user") return null;
+              return isAssistant ? (
                 <div
                   key={message.id}
-                  className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
+                  className="homepage-chat-bubble homepage-chat-bubble--ai"
                 >
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
-                      isAssistant
-                        ? "border border-emerald-100 bg-white text-slate-700"
-                        : "whitespace-pre-wrap bg-emerald-700 text-white"
-                    }`}
-                  >
-                    {isAssistant ? (
-                      <ScoutAssistantBody
-                        text={message.content}
-                        pagePath={requestBody.pagePath}
-                      />
-                    ) : (
-                      message.content
-                    )}
-                  </div>
+                  <ScoutAssistantBody
+                    text={message.content}
+                    pagePath={requestBody.pagePath}
+                  />
+                </div>
+              ) : (
+                <div
+                  key={message.id}
+                  className="homepage-chat-bubble homepage-chat-bubble--user"
+                >
+                  {message.content}
                 </div>
               );
             })}
             {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                {isPublic
-                  ? "Scout is lining up your next onboarding step…"
-                  : "Scout is sniffing your schedule…"}
-              </p>
+              <div
+                className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+                aria-live="polite"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -483,57 +490,52 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
             ) : null}
           </div>
 
-          <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
-            {isPublic ? (
-              <Link
-                href="/signup?role=guru&next=/guru/dashboard"
-                className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-emerald-800 px-3 text-xs font-black text-white transition hover:bg-emerald-900"
-              >
-                Start Free Guru Profile
-              </Link>
-            ) : null}
-            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {chips.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => void runChip(chip)}
-                  className="shrink-0 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+          <div className="homepage-chat-panel__footer shrink-0">
+            {!viewportBox.keyboardOpen ? (
+              <>
+                {isPublic ? (
+                  <Link
+                    href="/signup?role=guru&next=/guru/dashboard"
+                    className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-emerald-800 px-3 text-xs font-black text-white transition hover:bg-emerald-900"
+                  >
+                    Start Free Guru Profile
+                  </Link>
+                ) : null}
+                <div
+                  className="homepage-chat-panel__chips"
+                  role="toolbar"
+                  aria-label="Scout quick prompts"
                 >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-            <form onSubmit={onSubmit} className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                rows={1}
-                placeholder={
-                  isPublic
-                    ? "Ask Scout about applying, checks, payouts…"
-                    : "Ask Scout about your schedule…"
-                }
-                className="min-h-[40px] flex-1 resize-none rounded-xl border border-emerald-100 bg-[#f7fffb] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    if (!isLoading && input.trim()) {
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }
-                }}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Send
-              </button>
-            </form>
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => void runChip(chip)}
+                      className="shrink-0 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <MessagingChatComposer
+              value={input}
+              onChange={setInput}
+              onSubmit={onSubmit}
+              placeholder="Message..."
+              disabled={isLoading}
+              inputId="scout-companion-chat-composer"
+              label="Message Scout"
+              inputRef={inputRef}
+              onInputFocus={() => {
+                window.setTimeout(() => {
+                  const el = scrollerRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 80);
+              }}
+            />
           </div>
         </div>
       ) : null}

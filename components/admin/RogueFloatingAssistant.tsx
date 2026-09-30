@@ -16,6 +16,11 @@ import {
 import { createPortal } from "react-dom";
 import { useChat } from "ai/react";
 import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 
 const BRAND_GREEN = "#0D5C3A";
 const BRAND_GREEN_DEEP = "#09462C";
@@ -275,11 +280,12 @@ export default function RogueFloatingAssistant() {
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportBox = useMessagingViewport(open);
 
   const {
     messages,
     input,
-    handleInputChange,
+    setInput,
     handleSubmit,
     append,
     isLoading,
@@ -308,7 +314,7 @@ export default function RogueFloatingAssistant() {
     if (!open) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, open]);
+  }, [messages, isLoading, open, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (open) {
@@ -374,6 +380,7 @@ export default function RogueFloatingAssistant() {
   const panelSize = expanded
     ? "sm:h-[min(820px,92dvh)] sm:w-[min(560px,96vw)]"
     : "sm:h-[600px] sm:w-[400px]";
+  const panelStyle = messagingPanelStyle(viewportBox);
 
   const ui = (
     <div
@@ -424,9 +431,11 @@ export default function RogueFloatingAssistant() {
 
       {open ? (
         <div
-          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
+          className={`homepage-chat-panel homepage-chat-panel--messaging pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
           role="dialog"
           aria-label="Rogue, Chief Treat Officer admin assistant"
+          style={panelStyle}
+          data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
         >
           {/* Use div (not header) so `.admin-theme header { background: white }` cannot hide title. */}
           <div
@@ -477,31 +486,6 @@ export default function RogueFloatingAssistant() {
                 <X className="h-5 w-5 text-white" aria-hidden="true" />
               </button>
             </div>
-          </div>
-
-          <div
-            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
-            role="toolbar"
-            aria-label="Quick admin reports"
-          >
-            {QUICK_CHIPS.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                disabled={isLoading}
-                onClick={() => void runChip(chip)}
-                className={CHIP_CLASS}
-              >
-                {chip.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={clearChat}
-              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
-            >
-              Clear
-            </button>
           </div>
 
           <div
@@ -566,40 +550,56 @@ export default function RogueFloatingAssistant() {
             ) : null}
           </div>
 
-          <form
-            onSubmit={onSubmit}
-            className="homepage-chat-panel__composer shrink-0"
-          >
-            <textarea
-              ref={inputRef}
-              rows={1}
+          <div className="homepage-chat-panel__footer shrink-0">
+            {!viewportBox.keyboardOpen ? (
+              <div
+                className="homepage-chat-panel__chips"
+                role="toolbar"
+                aria-label="Quick admin reports"
+              >
+                {QUICK_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => void runChip(chip)}
+                    className={CHIP_CLASS}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={clearChat}
+                  className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+
+            <MessagingChatComposer
               value={input}
-              onChange={handleInputChange}
-              placeholder="Ask Rogue about payouts, growth, audits…"
+              onChange={setInput}
+              onSubmit={onSubmit}
+              placeholder="Message..."
               disabled={isLoading}
-              aria-label="Message Rogue"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (isLoading) return;
-                  const form = e.currentTarget.form;
-                  if (form) form.requestSubmit();
-                }
+              inputId="rogue-admin-chat-composer"
+              label="Message Rogue"
+              inputRef={inputRef}
+              onInputFocus={() => {
+                window.setTimeout(() => {
+                  const el = scrollerRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 80);
               }}
             />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              aria-label="Send to Rogue"
-            >
-              {isLoading ? "…" : "Send"}
-            </button>
-          </form>
 
-          <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            <Sparkles size={12} />
-            Read-only admin snapshots · Markdown reports
-          </p>
+            <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <Sparkles size={12} />
+              Read-only admin snapshots · Markdown reports
+            </p>
+          </div>
         </div>
       ) : null}
     </div>
