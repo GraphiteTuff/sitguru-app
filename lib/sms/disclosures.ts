@@ -21,7 +21,7 @@ export const SMS_OTP_AUTH_DISCLOSURE =
   "By requesting a code, you agree to receive a one-time authentication text from SitGuru at the mobile number provided. Message and data rates may apply. Reply HELP for help or STOP to opt out. You may use email login instead.";
 
 export const SMS_OTP_MESSAGE_TEMPLATE =
-  "SitGuru code: {{otp}}. Use this newest code to continue. Do not share it. Reply HELP for help, STOP to opt out.";
+  "SitGuru: Your secure login code is {{otp}}. Happy tails are one step away! Keep this code private. Reply HELP for help, STOP to opt out.";
 
 export function formatSitGuruOtpSms(otp: string) {
   return SMS_OTP_MESSAGE_TEMPLATE.replace("{{otp}}", String(otp || "").trim());
