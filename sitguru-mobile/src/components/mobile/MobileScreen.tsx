@@ -3,15 +3,16 @@ import { useState } from 'react';
 import {
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MobileSpace } from '@/constants/mobile-layout';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { useTheme } from '@/hooks/use-theme';
 
 type MobileScreenProps = {
@@ -30,6 +31,7 @@ type MobileScreenProps = {
 /**
  * Mobile-first screen shell: vertical scroll only, glass footer over content,
  * no horizontal overflow. Prefer this over phone-chrome frames.
+ * Scroll events drive the floating tab bar compact/expand motion.
  */
 export default function MobileScreen({
   children,
@@ -43,6 +45,7 @@ export default function MobileScreen({
 }: MobileScreenProps) {
   const theme = useTheme();
   const [footerHeight, setFooterHeight] = useState(0);
+  const tabBarScroll = useFloatingTabBarScroll();
   const bottomPad = footer
     ? Math.max(footerHeight, scrollBottomInset) + MobileSpace.sm
     : scrollBottomInset;
@@ -53,7 +56,7 @@ export default function MobileScreen({
       style={[styles.safe, { backgroundColor: theme.colors.screen }, style]}
     >
       <View style={styles.shell}>
-        <ScrollView
+        <Animated.ScrollView
           automaticallyAdjustKeyboardInsets
           bounces
           contentContainerStyle={[
@@ -79,9 +82,10 @@ export default function MobileScreen({
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
           style={styles.scroll}
+          {...tabBarScroll}
         >
           <View style={styles.inner}>{children}</View>
-        </ScrollView>
+        </Animated.ScrollView>
 
         {footer ? (
           <View
@@ -130,6 +134,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     bottom: 0,
     left: 0,
+    overflow: 'visible',
     position: 'absolute',
     right: 0,
     width: '100%',

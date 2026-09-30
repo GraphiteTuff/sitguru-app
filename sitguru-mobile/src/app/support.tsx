@@ -47,6 +47,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -613,6 +614,8 @@ function ActionButton({
 }
 
 export default function SupportScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const colorScheme = useColorScheme();
   const themePreference = useThemePreference();
   const theme = getAppTheme(colorScheme === 'dark' ? 'dark' : 'light');
@@ -1475,6 +1478,7 @@ export default function SupportScreen() {
               ) : null}
 
               <ScrollView
+              {...tabBarScroll}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}>

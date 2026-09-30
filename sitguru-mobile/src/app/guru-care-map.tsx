@@ -21,6 +21,7 @@ import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -304,6 +305,8 @@ const DARK_NATIVE_MAP_STYLE = [
 
 
 export default function GuruCareMapScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
@@ -517,6 +520,7 @@ export default function GuruCareMapScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl

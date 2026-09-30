@@ -48,6 +48,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
@@ -668,6 +669,7 @@ async function loadPetContext({
 }
 
 export default function ConversationScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
   const params = useLocalSearchParams<{
     conversationId?: string;
     guruId?: string;
@@ -1545,6 +1547,7 @@ export default function ConversationScreen() {
                 {notice ? <NoticeCard notice={notice} styles={styles} /> : null}
 
                 <ScrollView
+                  {...tabBarScroll}
                   ref={threadRef}
                   contentContainerStyle={styles.messageList}
                   keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}

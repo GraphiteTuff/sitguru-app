@@ -26,6 +26,7 @@ import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import {
@@ -39,6 +40,8 @@ import { useThemeMode } from '@/hooks/use-theme';
 const BRAND_GREEN = '#0D5C3A';
 
 export default function PawPerksScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const isDark = useThemeMode() === 'dark';
   const isWebPreview = Platform.OS === 'web';
   const palette = getPalette(isDark);
@@ -130,6 +133,7 @@ export default function PawPerksScreen() {
             >
               <View style={styles.screen}>
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl

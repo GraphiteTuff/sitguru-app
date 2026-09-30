@@ -43,6 +43,7 @@ import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -881,6 +882,8 @@ function Button({
 }
 
 export default function ReviewsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const params = useLocalSearchParams<{
     bookingId?: string;
     guruId?: string;
@@ -1343,6 +1346,7 @@ export default function ReviewsScreen() {
                 ) : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>

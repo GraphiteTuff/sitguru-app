@@ -45,6 +45,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -285,6 +286,8 @@ const REALTIME_TABLES = [
 ];
 
 export default function GuruDashboardScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -923,6 +926,7 @@ export default function GuruDashboardScreen() {
                 ) : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={
                     styles.scrollContent
                   }

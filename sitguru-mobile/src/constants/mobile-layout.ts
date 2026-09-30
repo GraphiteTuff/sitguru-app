@@ -14,11 +14,12 @@ export const MobileSpace = {
   xxl: 24,
 } as const;
 
-/** Extra scroll padding so content clears sticky footers + bottom nav. */
+/** Extra scroll padding so content clears sticky footers + floating nav. */
 export const StickyFooterClearance = {
   actionOnly: 88,
-  actionPlusNav: 148,
-  navOnly: 84,
+  actionPlusNav: 168,
+  /** Capsule (~66) + float gap + home-indicator breathing room. */
+  navOnly: 98,
 } as const;
 
 /**
