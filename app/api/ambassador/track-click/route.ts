@@ -6,10 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordAmbassadorClick } from "@/lib/ambassador/ledger";
 import {
-  AMBASSADOR_CODE_COOKIE,
-  AMBASSADOR_REF_COOKIE,
-  AMBASSADOR_REF_COOKIE_MAX_AGE_SEC,
-} from "@/lib/ambassador/ledger-types";
+  readTrustedReferralCapture,
+  referralCaptureTimestamp,
+  sealReferralOnResponse,
+  signReferralCapture,
+} from "@/lib/ambassador/referral-capture";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -64,34 +65,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cookieHeader = req.headers.get("cookie");
+    const existing = await readTrustedReferralCapture(cookieHeader);
+    const capturedAt = referralCaptureTimestamp({
+      incomingCode: result.referralCode,
+      existingCode: existing?.code,
+      existingCapturedAt: existing?.capturedAt,
+      existingTrusted: Boolean(existing),
+    });
+    const captureMac = await signReferralCapture(result.referralCode, capturedAt);
     const response = NextResponse.json({
       ok: true,
       clickId: result.clickId,
       ambassadorId: result.ambassadorId,
       referralCode: result.referralCode,
+      capturedAt,
+      captureMac,
     });
-
-    const cookieOpts = {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: AMBASSADOR_REF_COOKIE_MAX_AGE_SEC,
-    };
-
-    // Ledger cookie (httpOnly) + canonical signup cookie used by /r/ and signup
-    response.cookies.set({
-      name: AMBASSADOR_REF_COOKIE,
-      value: result.referralCode,
-      httpOnly: true,
-      ...cookieOpts,
-    });
-    response.cookies.set({
-      name: AMBASSADOR_CODE_COOKIE,
-      value: result.referralCode,
-      httpOnly: false,
-      ...cookieOpts,
-    });
-
+    await sealReferralOnResponse(
+      response,
+      result.referralCode,
+      capturedAt,
+      cookieHeader,
+    );
     return response;
   } catch (error) {
     const message =

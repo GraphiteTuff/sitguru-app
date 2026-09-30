@@ -5,7 +5,7 @@
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
-import { shouldLockAcquisition } from "@/lib/ambassador/creator-referral";
+import { isReferralAcquisition } from "@/lib/ambassador/referral-capture";
 import type {
   AmbassadorNetworkKpis,
   AmbassadorPerformanceRow,
@@ -304,6 +304,7 @@ export async function attributeSignupToAmbassador(params: {
   referralSlug: string;
   referredRole?: string | null;
   accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
 }) {
   const profile = await findAmbassadorProfileBySlug(params.referralSlug);
   if (!profile) return { ok: false as const, error: "Invalid referral code." };
@@ -318,7 +319,12 @@ export async function attributeSignupToAmbassador(params: {
   }
 
   const createdAt = await accountCreatedAt(params.newUserId, params.accountCreatedAt);
-  if (!shouldLockAcquisition(createdAt)) {
+  if (
+    !isReferralAcquisition({
+      accountCreatedAt: createdAt,
+      referralCapturedAt: params.referralCapturedAt,
+    })
+  ) {
     return { ok: false as const, error: "existing_account" };
   }
 
@@ -392,17 +398,34 @@ export async function recordAmbassadorBookingCommission(params: {
     };
   }
 
-  const { error } = await supabaseAdmin
+  const { data: updated, error } = await supabaseAdmin
     .from("ambassador_referrals")
     .update({
       booking_id: params.bookingId,
       booking_status: "started",
       updated_at: new Date().toISOString(),
     })
-    .eq("id", referralId);
+    .eq("id", referralId)
+    .is("booking_id", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return { ok: false as const, error: error.message };
+  }
+
+  if (!updated) {
+    const current = await loadLockedAmbassadorReferral(payerUserId);
+    if (current?.bookingId) {
+      return {
+        ok: true as const,
+        ambassadorId: profile.id,
+        rate: 0,
+        commissionEarned: 0,
+        referralId,
+      };
+    }
+    return { ok: false as const, error: "The first booking could not be locked." };
   }
 
   return {

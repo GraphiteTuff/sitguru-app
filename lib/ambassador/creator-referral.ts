@@ -7,8 +7,30 @@ export const CREATOR_AMBASSADOR_TYPE = "creator_ambassador";
 
 export const ATTRIBUTION_WINDOW_DAYS_DEFAULT = 30;
 
-/** A brand-new Auth account may lock one Ambassador. Older accounts are not acquisitions. */
-export const ACQUISITION_LOCK_WINDOW_MS = 15 * 60 * 1000;
+/**
+ * OAuth login guard only. A returning Google or Apple login inside this window
+ * is still treated as a fresh session so SitGuru can finish a signup that just
+ * started. It is not the Ambassador acquisition rule.
+ */
+export const FRESH_AUTH_SESSION_MS = 15 * 60 * 1000;
+
+/**
+ * Clock skew between this server and Supabase Auth.
+ * An account created before the referral was captured is an existing account.
+ */
+export const REFERRAL_CAPTURE_SKEW_MS = 15 * 1000;
+
+export function isReferralAcquisition(input: {
+  accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
+  skewMs?: number;
+}) {
+  const created = Date.parse(String(input.accountCreatedAt || ""));
+  const captured = Date.parse(String(input.referralCapturedAt || ""));
+  if (!Number.isFinite(created) || !Number.isFinite(captured)) return false;
+  const skew = input.skewMs ?? REFERRAL_CAPTURE_SKEW_MS;
+  return created + skew >= captured;
+}
 
 /** Codes that would collide with SitGuru routes or API paths. */
 export const RESERVED_REFERRAL_CODES = [
@@ -82,15 +104,12 @@ export function resolveReferralAttribution(input: {
   return { code: "", locked: false as const, replaced: false };
 }
 
-/** Existing accounts can be measured. They are not new-customer rewards. */
+/** Same acquisition rule as signup. Existing accounts are not new-customer rewards. */
 export function existingAccountRewardEligible(input: {
   accountCreatedAt?: string | null;
   referralCapturedAt?: string | null;
 }) {
-  const created = Date.parse(String(input.accountCreatedAt || ""));
-  const captured = Date.parse(String(input.referralCapturedAt || ""));
-  if (!Number.isFinite(created) || !Number.isFinite(captured)) return false;
-  return captured <= created + 10 * 60 * 1000;
+  return isReferralAcquisition(input);
 }
 
 export function funnelRate(numerator: number, denominator: number) {
@@ -100,14 +119,17 @@ export function funnelRate(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
-export function shouldLockAcquisition(
+export function isFreshAuthSession(
   accountCreatedAt?: string | null,
   now = Date.now(),
 ) {
   const created = Date.parse(String(accountCreatedAt || ""));
   if (!Number.isFinite(created)) return false;
-  return now >= created && now - created <= ACQUISITION_LOCK_WINDOW_MS;
+  return now >= created && now - created <= FRESH_AUTH_SESSION_MS;
 }
+
+/** @deprecated Use isFreshAuthSession. This does not decide referral acquisition. */
+export const shouldLockAcquisition = isFreshAuthSession;
 
 const QUALIFIED_BOOKING_STATUSES = new Set(["completed", "complete"]);
 const QUALIFIED_PAYMENT_STATUSES = new Set([

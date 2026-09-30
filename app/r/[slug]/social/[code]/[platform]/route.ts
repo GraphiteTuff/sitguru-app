@@ -273,13 +273,15 @@ export async function GET(
     maxAge: 10 * 60,
   });
 
-  response.cookies.set("sitguru_ambassador_code", referralCode, {
-    httpOnly: false,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  const { sealReferralOnResponse } = await import(
+    "@/lib/ambassador/referral-capture"
+  );
+  await sealReferralOnResponse(
+    response,
+    referralCode,
+    undefined,
+    request.headers.get("cookie"),
+  );
 
   response.cookies.set(
     "sitguru_referral_source",

@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Asset } from "expo-asset";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -728,7 +727,9 @@ export default function FindCareScreen() {
       .toUpperCase()
       .replace(/[^A-Z0-9_-]/g, "");
     if (!code) return;
-    void AsyncStorage.setItem("sitguru.ambassadorReferralCode", code);
+    void import("@/lib/referrals/lock-signup-referral").then(
+      ({ rememberAmbassadorReferral }) => rememberAmbassadorReferral(code),
+    );
   }, [initialRefParam]);
 
   const initialServiceParam = Array.isArray(routeParams.service)

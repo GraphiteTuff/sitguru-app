@@ -15,7 +15,7 @@ import {
   redirectUrlForRole,
   type OneTapRole,
 } from "@/lib/auth/google-one-tap";
-import { shouldLockAcquisition } from "@/lib/ambassador/creator-referral";
+import { isFreshAuthSession } from "@/lib/ambassador/creator-referral";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,6 +52,7 @@ async function provisionWorkspace(options: {
   intent: ReturnType<typeof intentFromOneTapRole>;
   referralCode: string;
   fullName: string;
+  cookieHeader?: string | null;
 }) {
   try {
     const response = await fetch(
@@ -61,6 +62,7 @@ async function provisionWorkspace(options: {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${options.accessToken}`,
+          ...(options.cookieHeader ? { Cookie: options.cookieHeader } : {}),
         },
         body: JSON.stringify({
           userId: options.userId,
@@ -159,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     const user = signInData.user;
     const accessToken = signInData.session.access_token;
-    const accountIsNew = shouldLockAcquisition(user.created_at);
+    const accountIsNew = isFreshAuthSession(user.created_at);
 
     if (accountIsNew) {
       try {
@@ -204,6 +206,7 @@ export async function POST(request: NextRequest) {
         intent,
         referralCode,
         fullName: name,
+        cookieHeader: request.headers.get("cookie"),
       });
     }
 

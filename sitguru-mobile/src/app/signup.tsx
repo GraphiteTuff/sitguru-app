@@ -141,10 +141,12 @@ export default function SignupScreen() {
       .replace(/[^A-Z0-9_-]/g, '');
     if (fromRoute) {
       setReferralCode(fromRoute);
-      void AsyncStorage.setItem(REFERRAL_STORAGE_KEY, fromRoute);
+      void import('@/lib/referrals/lock-signup-referral').then(
+        ({ rememberAmbassadorReferral }) => rememberAmbassadorReferral(fromRoute),
+      );
       return;
     }
-    void AsyncStorage.getItem(REFERRAL_STORAGE_KEY).then((stored) => {
+    void AsyncStorage.getItem(REFERRAL_STORAGE_KEY).then((stored: string | null) => {
       if (stored) setReferralCode(stored);
     });
   }, [params.ref]);
@@ -209,6 +211,10 @@ export default function SignupScreen() {
             : signupIntent === 'multiple'
               ? 'both'
               : 'pet_parent';
+      const [capturedAt, captureMac] = await Promise.all([
+        AsyncStorage.getItem('sitguru.ambassadorReferralCapturedAt'),
+        AsyncStorage.getItem('sitguru.ambassadorReferralCaptureMac'),
+      ]);
       const provisionBody = {
         userId: result.userId,
         intent,
@@ -216,6 +222,8 @@ export default function SignupScreen() {
         email: cleanEmail,
         ambassadorReferralCode: cleanReferral,
         referralCode: cleanReferral,
+        referralCapturedAt: capturedAt || undefined,
+        referralCaptureMac: captureMac || undefined,
         source: 'mobile_app',
       };
       void sitguruApiFetch('/api/auth/provision-signup', {

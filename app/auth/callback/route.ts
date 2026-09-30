@@ -4,7 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
 import {
   incomingAmbassadorCode,
-  shouldLockAcquisition,
+  isFreshAuthSession,
 } from "@/lib/ambassador/creator-referral";
 
 export const dynamic = "force-dynamic";
@@ -429,6 +429,7 @@ async function callProvisioningRoute({
   serviceArea,
   ambassadorReferralCode,
   source,
+  cookieHeader,
 }: {
   requestUrl: URL;
   accessToken: string;
@@ -441,6 +442,7 @@ async function callProvisioningRoute({
   serviceArea: string;
   ambassadorReferralCode: string;
   source: string;
+  cookieHeader?: string | null;
 }) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -448,6 +450,10 @@ async function callProvisioningRoute({
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader;
   }
 
   const response = await fetch(
@@ -665,7 +671,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const accountIsNew = shouldLockAcquisition(user.created_at);
+  const accountIsNew = isFreshAuthSession(user.created_at);
   const existingAccountLogin = !accountIsNew && hasExistingSitGuruAccess;
 
   if (explicitIntent && !existingAccountLogin) {
@@ -707,6 +713,7 @@ export async function GET(request: Request) {
         serviceArea,
         ambassadorReferralCode,
         source: tracking.source,
+        cookieHeader: request.headers.get("cookie"),
       });
 
       await enrichCanonicalReferralEvent({

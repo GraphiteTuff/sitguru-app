@@ -203,9 +203,8 @@ export function openSitGuruDeepLink(rawUrl: string) {
 
   const ref = target.params?.ref;
   if (ref) {
-    void import('@react-native-async-storage/async-storage').then(
-      ({ default: AsyncStorage }) =>
-        AsyncStorage.setItem('sitguru.ambassadorReferralCode', ref),
+    void import('@/lib/referrals/lock-signup-referral').then(
+      ({ rememberAmbassadorReferral }) => rememberAmbassadorReferral(ref),
     );
   }
 

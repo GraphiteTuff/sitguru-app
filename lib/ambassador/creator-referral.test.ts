@@ -97,7 +97,7 @@ describe("creator attribution", () => {
     assert.equal(code, "TOAD");
   });
 
-  it("locks a referral only for a brand-new account", () => {
+  it("keeps a short fresh-session window for OAuth workspace setup only", () => {
     const now = Date.parse("2026-09-30T12:00:00.000Z");
     assert.equal(
       shouldLockAcquisition("2026-09-30T11:50:00.000Z", now),
@@ -137,6 +137,17 @@ describe("creator attribution", () => {
     );
     assert.equal(
       isQualifiedCreatorConversion({ ...base, paymentStatus: "unpaid" }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({
+        ...base,
+        paymentStatus: "partially_refunded",
+      }),
+      false,
+    );
+    assert.equal(
+      isQualifiedCreatorConversion({ ...base, bookingStatus: "confirmed" }),
       false,
     );
     assert.equal(

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { shouldLockAcquisition } from "@/lib/ambassador/creator-referral";
+import {
+  isReferralAcquisition,
+  readTrustedReferralCapture,
+  verifyReferralCapture,
+} from "@/lib/ambassador/referral-capture";
 import {
   enqueueProfileCompletionReminders,
   sendImmediateProfileCompletionNotice,
@@ -28,6 +32,8 @@ type ProvisionSignupBody = {
   ambassadorReferralCode?: string;
 
   source?: string;
+  referralCapturedAt?: string;
+  referralCaptureMac?: string;
   referralSource?: string;
   referralPlatform?: string;
   referralMedium?: string;
@@ -1626,6 +1632,7 @@ async function recordReferralAttribution({
   referredName,
   intent,
   accountCreatedAt,
+  referralCapturedAt,
 }: {
   resolution: ReferralResolution;
   body: ProvisionSignupBody;
@@ -1635,6 +1642,7 @@ async function recordReferralAttribution({
   referredName: string;
   intent: AccountIntent;
   accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
 }): Promise<ReferralCaptureResult> {
   const tracking = getTrackingValues(body, metadata);
   const emptyWrites = {
@@ -1694,7 +1702,12 @@ async function recordReferralAttribution({
     };
   }
 
-  if (!shouldLockAcquisition(accountCreatedAt)) {
+  if (
+    !isReferralAcquisition({
+      accountCreatedAt,
+      referralCapturedAt,
+    })
+  ) {
     return {
       submittedCode: resolution.submittedCode,
       applied: false,
@@ -1705,7 +1718,7 @@ async function recordReferralAttribution({
       medium: tracking.medium,
       campaign: tracking.campaign,
       warning:
-        "Existing SitGuru accounts are not new Ambassador acquisitions.",
+        "This SitGuru account was created before the referral, so it is not a new acquisition.",
       writes: emptyWrites,
     };
   }
@@ -1986,11 +1999,20 @@ export async function POST(request: NextRequest) {
       metadata.ambassador_code,
       metadata.referred_by_code,
     );
-    const cookieReferralCode = firstText(
-      request.cookies.get("sitguru_ambassador_code")?.value,
-      request.cookies.get("sitguru_ambassador_ref")?.value,
+    const trustedCapture = await readTrustedReferralCapture(
+      request.headers.get("cookie"),
     );
-    const incomingReferralCode = cookieReferralCode || submittedReferralCode;
+    const bodyCaptureTrusted = await verifyReferralCapture({
+      code: submittedReferralCode,
+      capturedAt: body.referralCapturedAt,
+      mac: body.referralCaptureMac,
+    });
+    const incomingReferralCode =
+      trustedCapture?.code || submittedReferralCode;
+    const referralCapturedAt =
+      trustedCapture?.capturedAt ||
+      (bodyCaptureTrusted ? cleanText(body.referralCapturedAt) : "") ||
+      new Date().toISOString();
 
     const referralResolution = await resolveReferralCode(
       incomingReferralCode,
@@ -2059,6 +2081,7 @@ export async function POST(request: NextRequest) {
       referredName,
       intent: requestedIntent,
       accountCreatedAt: authUser.created_at,
+      referralCapturedAt,
     });
 
     // One locked acquisition per user id. A newer cookie cannot add a second row.
@@ -2077,6 +2100,7 @@ export async function POST(request: NextRequest) {
           referralSlug: resolvedAmbassadorReferralCode,
           referredRole: requestedIntent,
           accountCreatedAt: authUser.created_at,
+          referralCapturedAt,
         });
       }
     } catch (ledgerError) {

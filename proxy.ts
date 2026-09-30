@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicReferralIsActive } from "@/lib/ambassador/public-referral-lookup";
+import { sealReferralOnResponse } from "@/lib/ambassador/referral-capture";
 import {
   isHardcodedSuperUserEmail,
   normalizeAdminEmail,
@@ -383,24 +384,12 @@ export async function proxy(request: NextRequest) {
   ) {
     const passthrough = NextResponse.next();
     if (incomingCode && (await publicReferralIsActive(incomingCode))) {
-      const cookieOpts = {
-        sameSite: "lax" as const,
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30,
-      };
-      passthrough.cookies.set({
-        name: "sitguru_ambassador_ref",
-        value: incomingCode,
-        httpOnly: true,
-        ...cookieOpts,
-      });
-      passthrough.cookies.set({
-        name: "sitguru_ambassador_code",
-        value: incomingCode,
-        httpOnly: false,
-        ...cookieOpts,
-      });
+      await sealReferralOnResponse(
+        passthrough,
+        incomingCode,
+        undefined,
+        request.headers.get("cookie"),
+      );
     }
     return passthrough;
   }

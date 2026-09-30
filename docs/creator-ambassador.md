@@ -10,13 +10,24 @@ The QR image encodes that URL only. It does not encode an internal id. Download 
 
 ## Attribution
 
-- `/r/{CODE}` sets the attribution cookie only after the code is on the public Ambassador card. An invalid code does not replace a valid cookie.
-- OAuth (Google, Apple, and email callback) reads that cookie. The lock is the authenticated user id, not the email address.
-- A newer valid link can replace the code before the person creates an account.
-- After signup locks a code on the account, a later link does not move it. Checkout and booking use that locked code.
-- An account older than 15 minutes is not a new Pet Parent acquisition.
-- Phone and desktop do not share a cookie. The Expo app stores `sitguru.ambassadorReferralCode` and sends it only when the Auth user was just created.
-- A qualified conversion is the first completed, paid booking on that lock. This slice does not create a reward or payout.
+- `/r/{CODE}` sets the attribution cookies only after the code is on the public Ambassador card. An invalid code does not replace a valid cookie.
+- The server records the capture time and an HMAC of the code plus that time. A browser cannot backdate it. Opening the same code again keeps that original time. A different valid code may replace the pending seal before signup. Expo stores the same seal from `POST /api/ambassador/track-click` in AsyncStorage, so it survives backgrounding and the OAuth browser.
+- A new acquisition is an Auth user created at or after that capture time, plus 15 seconds of clock skew. An account that already existed when the link was opened is not a new acquisition.
+- A 15-minute fresh-session check still stops a returning Google or Apple login from being reprovisioned. That check is not the acquisition rule.
+- The lock is the authenticated user id, not the email address.
+- A newer valid link can replace the pending code before the person creates an account.
+- After signup locks a code, a later link does not move it. Checkout and booking read the locked row and ignore a newer cookie or request body. The first booking id stays.
+- Referral cookies last 30 days, `Path=/`, `SameSite=Lax`, and `Secure` in production. `sitguru_ambassador_code` is readable by the signup form. The capture time and HMAC are HttpOnly.
+- A qualified conversion is the first completed, paid booking on that lock. Clicks, signups, and unfinished bookings do not create a reward or payout.
+
+## Cookies
+
+| Cookie | HttpOnly | Secure | SameSite | Max-Age |
+| --- | --- | --- | --- | --- |
+| `sitguru_ambassador_ref` | yes | production | Lax | 30 days |
+| `sitguru_ambassador_code` | no | production | Lax | 30 days |
+| `sitguru_ambassador_captured_at` | yes | production | Lax | 30 days |
+| `sitguru_ambassador_capture_mac` | yes | production | Lax | 30 days |
 
 ## Public page
 
@@ -32,6 +43,14 @@ The public page is a single column with one primary action, Find Pet Care (`/sea
 
 `supabase/migrations/20260930140000_ambassador_public_referrals.sql` is the public card view plus one acquisition per referred user. It does not change Ambassador type values.
 
+`supabase/migrations/20260930150000_ambassador_referral_first_booking.sql` keeps the first `booking_id` once it is set. It does not add the creator subtype.
+
 ## Not in this slice
 
 Completed-booking rewards, payouts, and a public creator application stay on the existing rewards tables until the booking lifecycle writes `ambassador_referrals.completed_booking_at`. Do not pay for a click.
+
+## Follow-up before Creator rewards
+
+`ambassador_public_referrals` is the public card. Anonymous clients can still read active `referral_codes` rows, including `owner_user_id`, through the policy "Public can view active referral codes". `/g/{slug}` selects every column on that table, and `/p/{slug}` selects `owner_user_id`, so those pages need to change before that read is revoked. A logged-in non-admin can read the same active rows.
+
+The 15-minute fresh-session check only decides whether a returning Google or Apple login should skip workspace setup. It does not decide whether the account is a new acquisition.
