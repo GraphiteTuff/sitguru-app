@@ -57,6 +57,7 @@ import {
   CARE_MATCHING_CHIPS,
   hasMatchingIntakeMarker,
 } from "@/lib/chat/care-matching-intake";
+import { isCompactRogueLauncherPath } from "@/lib/customer/pet-parent-chrome";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
@@ -299,6 +300,7 @@ async function auditTranscriptToBackend(params: {
 export default function HomepageChatBubble() {
   const pathname = usePathname();
   const isCommunityPage = isCommunityCompanionPath(pathname);
+  const compactLauncher = isCompactRogueLauncherPath(pathname);
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
@@ -832,7 +834,7 @@ export default function HomepageChatBubble() {
       className="homepage-chat-bubble-root"
       style={{ ["--hcb-green" as string]: BRAND_GREEN }}
     >
-      {!open ? (
+      {!open && !compactLauncher ? (
         <button
           type="button"
           className="homepage-chat-tip"
