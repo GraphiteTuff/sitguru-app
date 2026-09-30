@@ -467,7 +467,7 @@ function getGuruTier(
     label: "Rising Guru",
     shortLabel: "Rising",
     description:
-      "You are on the path to becoming bookable. Finish your profile, payout, and trust steps so pet families can choose you with confidence. Guru Academy is optional and unlocks your Certified Guru badge.",
+      "You are on the path to becoming bookable. Finish your profile and trust steps so pet families can choose you with confidence. Guru Academy is optional and unlocks your Certified Guru badge.",
     icon: "🐾",
     stars: 2,
     badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-800",
@@ -958,24 +958,14 @@ async function getGuruPaymentSetupSummary(
   }
 
   const connectedCount = Number(stripeReady) + Number(paypalReady);
-  const statusLabel =
-    connectedCount === 2
-      ? "PayPal + Stripe ready"
-      : paypalReady
-        ? "PayPal ready"
-        : stripeReady
-          ? "Stripe ready"
-          : paypalStarted || stripeStarted
-            ? "Finish setup"
-            : "Not started";
   const helper =
     connectedCount === 2
       ? "Both payout options are connected."
       : connectedCount === 1
-        ? "You are ready to get paid. Add the second option anytime."
+        ? "You’re ready to earn. Add another option anytime."
         : paypalStarted || stripeStarted
-          ? "Finish one payout setup before your first paid booking."
-          : "Pick PayPal or Stripe. You only need one to get started.";
+          ? "Finish the quick secure setup when you’re ready to accept a paid booking."
+          : "Optional for now — set up payouts when you’re ready to accept paid bookings.";
 
   return {
     stripeReady,
@@ -983,7 +973,16 @@ async function getGuruPaymentSetupSummary(
     stripeStarted,
     paypalStarted,
     connectedCount,
-    statusLabel,
+    statusLabel:
+      connectedCount === 2
+        ? "Ready"
+        : paypalReady
+          ? "Ready"
+          : stripeReady
+            ? "Ready"
+            : paypalStarted || stripeStarted
+              ? "Almost done"
+              : "Later",
     helper,
   };
 }
@@ -1748,26 +1747,30 @@ function GuruSetupChecklist({
       icon: "📋",
     },
     {
-      title: "Get paid",
+      title: "Earn later",
       status:
         paymentSetup.connectedCount > 0
           ? "complete"
           : paymentStarted
             ? "pending"
-            : "needs_action",
+            : "optional",
       statusLabel: paymentSetup.statusLabel,
       helper: paymentSetup.helper,
       href: "/guru/dashboard/earnings",
-      icon: "💸",
+      icon: "💚",
     },
   ];
 
   const completedSteps = steps.filter(
-    (step) => step.status === "complete",
+    (step) => step.status === "complete" || step.status === "optional",
   ).length;
   const nextStep =
-    steps.find((step) => step.status !== "complete") || steps[0];
-  const allComplete = completedSteps === steps.length;
+    steps.find(
+      (step) => step.status !== "complete" && step.status !== "optional",
+    ) || steps[0];
+  const allComplete = steps.every(
+    (step) => step.status === "complete" || step.status === "optional",
+  );
 
   const tone = (status: string) => {
     if (status === "complete") {
@@ -1775,6 +1778,13 @@ function GuruSetupChecklist({
         card: "border-emerald-200 bg-emerald-50",
         dot: "bg-emerald-600",
         label: "!text-emerald-800",
+      };
+    }
+    if (status === "optional") {
+      return {
+        card: "border-slate-200 bg-white",
+        dot: "bg-slate-300",
+        label: "!text-slate-600",
       };
     }
 
@@ -1801,12 +1811,12 @@ function GuruSetupChecklist({
             Quick setup check
           </p>
           <h2 className="mt-1 text-2xl font-black tracking-tight !text-emerald-950 sm:text-3xl">
-            {allComplete ? "You’re ready to roll" : "Finish your Guru setup"}
+            {allComplete ? "You’re ready to roll" : "Easy Guru setup"}
           </h2>
           <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
             {allComplete
-              ? "Your profile, pricing, safety, packet, and payment setup are ready."
-              : "Keep this moving without losing access to the rest of your dashboard."}
+              ? "Your profile basics are in place. Payouts can wait until you accept a paid booking."
+              : "A few quick steps — no pressure. You can keep exploring your dashboard anytime."}
           </p>
         </div>
 
@@ -2142,14 +2152,20 @@ export default async function GuruDashboardPage() {
               tone={serviceRatesReady ? "emerald" : "amber"}
             />
             <DashboardSnapshotCard
-              eyebrow="Get paid"
-              title="Payment setup"
-              value={`${paymentSetup.connectedCount}/2`}
+              eyebrow="Earnings"
+              title="Payouts when ready"
+              value={
+                paymentSetup.connectedCount > 0
+                  ? "Ready"
+                  : paymentSetup.stripeStarted || paymentSetup.paypalStarted
+                    ? "Almost"
+                    : "Later"
+              }
               helper={paymentSetup.helper}
               href="/guru/dashboard/earnings"
-              actionLabel="Review payments"
-              icon="💸"
-              tone={paymentSetup.connectedCount > 0 ? "emerald" : "amber"}
+              actionLabel="View earnings"
+              icon="💚"
+              tone={paymentSetup.connectedCount > 0 ? "emerald" : "slate"}
             />
           </div>
         </section>
