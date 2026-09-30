@@ -1,0 +1,6 @@
+Contact: mailto:support@sitguru.com
+Contact: mailto:jason@sitguru.com
+Expires: 2027-08-13T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://www.sitguru.com/.well-known/security.txt
+Policy: https://www.sitguru.com/privacy
