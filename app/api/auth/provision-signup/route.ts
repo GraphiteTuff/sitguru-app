@@ -6,6 +6,7 @@ import {
   readTrustedReferralCapture,
   verifyReferralCapture,
 } from "@/lib/ambassador/referral-capture";
+import { shouldClearPendingReferral } from "@/lib/ambassador/creator-referral";
 import {
   enqueueProfileCompletionReminders,
   sendImmediateProfileCompletionNotice,
@@ -2155,7 +2156,7 @@ export async function POST(request: NextRequest) {
           : "Your SitGuru account and workspace are ready. Check your email for the next steps.",
     });
 
-    if (referral.applied || referral.status === "already_locked") {
+    if (shouldClearPendingReferral(referral)) {
       clearReferralSeal(response);
     }
 

@@ -1,24 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { sitguruApiFetch } from '@/lib/data/api';
+import {
+  isNewAcquisitionAccount,
+  shouldAttemptMobileAcquisition,
+  shouldClearStoredReferral,
+  shouldReplaceStoredReferralSeal,
+} from '@/lib/referrals/referral-storage-policy';
 
 const REFERRAL_STORAGE_KEY = 'sitguru.ambassadorReferralCode';
 const CAPTURED_AT_KEY = 'sitguru.ambassadorReferralCapturedAt';
 const CAPTURE_MAC_KEY = 'sitguru.ambassadorReferralCaptureMac';
 const SIGNUP_INTENT_KEY = 'sitguru.signupIntent';
-const NEW_ACCOUNT_MS = 15 * 60 * 1000;
-const CAPTURE_SKEW_MS = 15 * 1000;
 
 type ProvisionIntent = 'pet_parent' | 'guru' | 'ambassador' | 'both';
 
-export function isNewAcquisitionAccount(
-  createdAt?: string | null,
-  now = Date.now(),
-) {
-  const created = Date.parse(String(createdAt || ''));
-  if (!Number.isFinite(created)) return false;
-  return now >= created && now - created <= NEW_ACCOUNT_MS;
-}
+export { isNewAcquisitionAccount };
 
 function normalizeCode(value: string | null | undefined) {
   return String(value || '')
@@ -47,7 +44,16 @@ export async function rememberAmbassadorReferral(code: string) {
     );
     const existingAt = await AsyncStorage.getItem(CAPTURED_AT_KEY);
     const existingMac = await AsyncStorage.getItem(CAPTURE_MAC_KEY);
-    if (existingCode === normalized && existingAt && existingMac) return;
+    if (
+      !shouldReplaceStoredReferralSeal({
+        existingCode,
+        incomingCode: normalized,
+        existingCapturedAt: existingAt,
+        existingMac,
+      })
+    ) {
+      return;
+    }
 
     await AsyncStorage.setItem(REFERRAL_STORAGE_KEY, normalized);
     const response = await sitguruApiFetch<{
@@ -96,15 +102,12 @@ export async function lockNewAccountReferral(input: {
 
     const capturedAt = await AsyncStorage.getItem(CAPTURED_AT_KEY);
     const captureMac = await AsyncStorage.getItem(CAPTURE_MAC_KEY);
-    const created = Date.parse(String(input.createdAt || ''));
-    const captured = Date.parse(String(capturedAt || ''));
-    const capturedBeforeAccount =
-      Number.isFinite(created) &&
-      Number.isFinite(captured) &&
-      created + CAPTURE_SKEW_MS >= captured;
-    if (Number.isFinite(captured)) {
-      if (!capturedBeforeAccount) return;
-    } else if (!isNewAcquisitionAccount(input.createdAt)) {
+    if (
+      !shouldAttemptMobileAcquisition({
+        createdAt: input.createdAt,
+        capturedAt,
+      })
+    ) {
       return;
     }
 
@@ -141,7 +144,12 @@ export async function lockNewAccountReferral(input: {
       });
     }
     const applied = result.data?.appliedReferral;
-    if (applied?.applied || applied?.status === 'already_locked') {
+    if (
+      shouldClearStoredReferral({
+        applied: applied?.applied,
+        status: applied?.status,
+      })
+    ) {
       await AsyncStorage.multiRemove([
         REFERRAL_STORAGE_KEY,
         CAPTURED_AT_KEY,

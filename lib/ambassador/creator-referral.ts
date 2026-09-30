@@ -104,6 +104,18 @@ export function resolveReferralAttribution(input: {
   return { code: "", locked: false as const, replaced: false };
 }
 
+/**
+ * Pending referral cookies and mobile storage are removed only after the
+ * server has stored a permanent acquisition, or confirmed one already exists.
+ * Existing-account, self-referral, and failed requests keep the pending seal.
+ */
+export function shouldClearPendingReferral(input: {
+  applied?: boolean;
+  status?: string | null;
+}) {
+  return input.applied === true || input.status === "already_locked";
+}
+
 /** Same acquisition rule as signup. Existing accounts are not new-customer rewards. */
 export function existingAccountRewardEligible(input: {
   accountCreatedAt?: string | null;

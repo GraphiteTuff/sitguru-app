@@ -4,13 +4,32 @@ import {
   readCookieValue,
   REFERRAL_CAPTURE_SKEW_MS,
 } from "@/lib/ambassador/creator-referral";
-
-export { isReferralAcquisition, REFERRAL_CAPTURE_SKEW_MS };
 import {
   AMBASSADOR_CODE_COOKIE,
   AMBASSADOR_REF_COOKIE,
   AMBASSADOR_REF_COOKIE_MAX_AGE_SEC,
 } from "@/lib/ambassador/ledger-types";
+
+export { isReferralAcquisition, REFERRAL_CAPTURE_SKEW_MS };
+
+/** First hop of the proxy chain. A request body cannot supply this. */
+export function trustedClientIp(
+  getHeader: (name: string) => string | null,
+) {
+  const forwarded = getHeader("x-forwarded-for") || "";
+  const first = forwarded.split(",")[0]?.trim() || "";
+  if (first) return first;
+  const real = getHeader("x-real-ip")?.trim() || "";
+  return real || null;
+}
+
+/** The User-Agent header. A request body cannot supply this. */
+export function trustedUserAgent(
+  getHeader: (name: string) => string | null,
+) {
+  const value = getHeader("user-agent")?.trim() || "";
+  return value || null;
+}
 
 /** HttpOnly. The browser cannot mint this timestamp. */
 export const AMBASSADOR_CAPTURED_AT_COOKIE = "sitguru_ambassador_captured_at";

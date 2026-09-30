@@ -10,6 +10,8 @@ import {
   referralCaptureTimestamp,
   sealReferralOnResponse,
   signReferralCapture,
+  trustedClientIp,
+  trustedUserAgent,
 } from "@/lib/ambassador/referral-capture";
 
 export const dynamic = "force-dynamic";
@@ -38,18 +40,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const forwarded = req.headers.get("x-forwarded-for") || "";
-    const ipAddress =
-      safeString(body?.ipAddress) ||
-      forwarded.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      null;
-
+    const header = (name: string) => req.headers.get(name);
     const result = await recordAmbassadorClick({
       slug,
-      ipAddress,
-      userAgent:
-        safeString(body?.userAgent) || req.headers.get("user-agent") || null,
+      ipAddress: trustedClientIp(header),
+      userAgent: trustedUserAgent(header),
       landingPath: safeString(body?.landingPath) || null,
       referrer: safeString(body?.referrer) || null,
       utmSource: safeString(body?.utmSource) || null,
@@ -76,8 +71,6 @@ export async function POST(req: NextRequest) {
     const captureMac = await signReferralCapture(result.referralCode, capturedAt);
     const response = NextResponse.json({
       ok: true,
-      clickId: result.clickId,
-      ambassadorId: result.ambassadorId,
       referralCode: result.referralCode,
       capturedAt,
       captureMac,

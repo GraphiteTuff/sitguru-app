@@ -8,6 +8,7 @@ import {
   isQualifiedCreatorConversion,
   isReservedReferralCode,
   normalizeReferralCode,
+  shouldClearPendingReferral,
   publicReferralPath,
   resolveReferralAttribution,
   shouldLockAcquisition,
@@ -155,6 +156,26 @@ describe("creator attribution", () => {
         ...base,
         isFirstQualifyingBooking: false,
       }),
+      false,
+    );
+  });
+
+  it("clears a pending referral only after a permanent lock", () => {
+    assert.equal(shouldClearPendingReferral({ applied: true, status: "applied" }), true);
+    assert.equal(
+      shouldClearPendingReferral({ applied: false, status: "already_locked" }),
+      true,
+    );
+    assert.equal(
+      shouldClearPendingReferral({ applied: false, status: "existing_account" }),
+      false,
+    );
+    assert.equal(
+      shouldClearPendingReferral({ applied: false, status: "self_referral" }),
+      false,
+    );
+    assert.equal(
+      shouldClearPendingReferral({ applied: false, status: "recording_warning" }),
       false,
     );
   });

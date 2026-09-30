@@ -4,6 +4,8 @@ import {
   isReferralAcquisition,
   referralCaptureTimestamp,
   signReferralCapture,
+  trustedClientIp,
+  trustedUserAgent,
   verifyReferralCapture,
 } from "./referral-capture";
 
@@ -124,5 +126,29 @@ describe("referral capture signature", () => {
       }),
       false,
     );
+  });
+});
+
+describe("click request metadata", () => {
+  it("reads the client address from the proxy header", () => {
+    const headers = new Map([
+      ["x-forwarded-for", "203.0.113.10, 198.51.100.4"],
+      ["x-real-ip", "198.51.100.8"],
+    ]);
+    assert.equal(
+      trustedClientIp((name) => headers.get(name) || null),
+      "203.0.113.10",
+    );
+    assert.equal(trustedClientIp(() => null), null);
+  });
+
+  it("reads the user agent from the request header", () => {
+    assert.equal(
+      trustedUserAgent((name) =>
+        name === "user-agent" ? "SitGuru-QA/1.0" : null,
+      ),
+      "SitGuru-QA/1.0",
+    );
+    assert.equal(trustedUserAgent(() => null), null);
   });
 });
