@@ -1635,6 +1635,21 @@ export default function GuruDashboardScreen() {
 
                   <BubblePressable
                     accessibilityRole="button"
+                    accessibilityLabel="Open Trust and Credentials"
+                    onPress={() => router.push('/guru-credentials')}
+                    scaleTo={0.97}
+                    style={styles.successCard}
+                  >
+                    <View style={styles.successCopy}>
+                      <Text style={styles.successTitle}>Trust & Credentials</Text>
+                      <Text style={styles.successText}>
+                        Show Pet Parents what makes you, you. Optional training, insurance, bonding, and certifications.
+                      </Text>
+                    </View>
+                  </BubblePressable>
+
+                  <BubblePressable
+                    accessibilityRole="button"
                     onPress={() =>
                       router.push(
                         '/guru-success-center',

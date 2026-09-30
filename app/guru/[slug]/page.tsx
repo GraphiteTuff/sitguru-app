@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import GuruProfileLiveRefresh from "@/components/gurus/GuruProfileLiveRefresh";
+import PublicTrustCredentials from "@/components/credentials/PublicTrustCredentials";
 import {
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
@@ -3684,6 +3685,10 @@ function PublicGuruProfilePage({
             <p className="mt-4 whitespace-pre-line text-base font-bold leading-8 !text-slate-700">
               {friendlyBio}
             </p>
+            <PublicTrustCredentials
+              guruId={guruProfile.id != null ? String(guruProfile.id) : null}
+              ownerUserId={guruProfile.user_id || null}
+            />
           </div>
 
           <aside className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">

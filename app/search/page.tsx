@@ -19,6 +19,12 @@ import QuickBookOverlay, {
 } from "@/components/booking/QuickBookOverlay";
 import GuruSearchMatchBadge from "@/components/search/GuruSearchCard";
 import { trackEvent } from "@/lib/analytics/track";
+import { CredentialChips } from "@/components/credentials/CredentialChips";
+import {
+  CREDENTIAL_FILTERS,
+  guruMatchesCredentialFilters,
+  type PublicCredentialHighlight,
+} from "@/lib/credentials/model";
 import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
 import { supabase } from "@/lib/supabase";
 import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
@@ -1781,6 +1787,18 @@ function SearchPageContent() {
   const [error, setError] = useState("");
 
   const [serviceFilter, setServiceFilter] = useState(initialService);
+  const [credentialFilters, setCredentialFilters] = useState<string[]>([]);
+  const [credentialFiltersEnabled, setCredentialFiltersEnabled] = useState(true);
+  const [credentialChips, setCredentialChips] = useState<
+    Record<
+      string,
+      {
+        chips: PublicCredentialHighlight[];
+        extraCount: number;
+        highlights: PublicCredentialHighlight[];
+      }
+    >
+  >({});
   const [zipFilter, setZipFilter] = useState(initialZip);
   const [cityFilter, setCityFilter] = useState(initialCity);
   const [stateFilter, setStateFilter] = useState(initialState);
@@ -2214,6 +2232,33 @@ function SearchPageContent() {
     };
   }, [gurus, guruZipLookupsByZip]);
 
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        gurus.flatMap((guru) => [String(guru.id || ""), String(guru.user_id || "")]).filter(Boolean),
+      ),
+    ).slice(0, 150);
+    if (!ids.length) return;
+
+    let cancelled = false;
+    void fetch(`/api/public/credentials?guruIds=${encodeURIComponent(ids.join(","))}`)
+      .then((response) => response.json())
+      .then((payload: {
+        enabled?: boolean;
+        filtersEnabled?: boolean;
+        chipsByGuruId?: typeof credentialChips;
+      }) => {
+        if (cancelled) return;
+        setCredentialChips(payload.chipsByGuruId || {});
+        setCredentialFiltersEnabled(payload.enabled !== false && payload.filtersEnabled !== false);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gurus]);
+
   const filteredGurus = useMemo(() => {
     const query = normalizeText(searchTerm);
     const city = normalizeText(cityFilter);
@@ -2268,13 +2313,21 @@ function SearchPageContent() {
           ? true
           : !state || guruState.includes(state);
         const matchesSelectedService = matchesService(guru, serviceFilter);
+        const chipPack =
+          credentialChips[String(guru.id || "")] ||
+          credentialChips[String(guru.user_id || "")];
+        const matchesCredentials = guruMatchesCredentialFilters(
+          (chipPack?.highlights || []).map((highlight) => highlight.filterKey),
+          credentialFilters,
+        );
 
         return (
           matchesText &&
           matchesCareRadius &&
           matchesManualCityFilter &&
           matchesManualStateFilter &&
-          matchesSelectedService
+          matchesSelectedService &&
+          matchesCredentials
         );
       })
       .map((guru) =>
@@ -2321,6 +2374,8 @@ function SearchPageContent() {
     guruZipLookupsByZip,
     selectedGuruId,
     selectedGuruSlug,
+    credentialChips,
+    credentialFilters,
   ]);
 
   const providerMapMarkers = useMemo(
@@ -2443,6 +2498,7 @@ function SearchPageContent() {
     setCityFilter("");
     setStateFilter("");
     setSearchTerm("");
+    setCredentialFilters([]);
   }
 
   function trackGuruHover(guru: GuruRow, mapMarkerId: string) {
@@ -2620,6 +2676,51 @@ function SearchPageContent() {
                   className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
+
+              {credentialFiltersEnabled ? (
+                <fieldset className="min-w-[220px]">
+                  <legend className="mb-2 block text-sm font-semibold text-slate-800">
+                    Trust & Credentials
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {CREDENTIAL_FILTERS.map((filter) => {
+                      const selected = credentialFilters.includes(filter.key);
+                      return (
+                        <label
+                          key={filter.key}
+                          className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-bold ${selected ? "border-[#0D5C3A] bg-[#F4FBF7] text-[#0D5C3A]" : "border-slate-200 bg-white text-slate-700"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={selected}
+                            onChange={() => {
+                              setCredentialFilters((current) => {
+                                const next = current.includes(filter.key)
+                                  ? current.filter((key) => key !== filter.key)
+                                  : [...current, filter.key];
+                                void trackEvent({
+                                  eventName: "credential_filter_used",
+                                  eventType: "credentials",
+                                  role: "customer",
+                                  source: "find_care",
+                                  metadata: {
+                                    credential_type: filter.key,
+                                    platform: "web",
+                                    source_surface: "find_care",
+                                  },
+                                });
+                                return next;
+                              });
+                            }}
+                          />
+                          {filter.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : null}
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
@@ -2929,6 +3030,22 @@ function SearchPageContent() {
                                 <p className="mt-1 line-clamp-1 text-sm text-slate-500">
                                   {guruDisplayLocation}
                                 </p>
+
+                                <CredentialChips
+                                  chips={
+                                    (
+                                      credentialChips[String(guru.id || "")] ||
+                                      credentialChips[String(guru.user_id || "")]
+                                    )?.chips || []
+                                  }
+                                  extraCount={
+                                    (
+                                      credentialChips[String(guru.id || "")] ||
+                                      credentialChips[String(guru.user_id || "")]
+                                    )?.extraCount || 0
+                                  }
+                                  href={getGuruHref(guru)}
+                                />
 
                                 <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
                                   {guruRadius}-mile service radius

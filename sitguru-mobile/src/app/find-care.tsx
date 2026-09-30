@@ -17,6 +17,8 @@ import {
   Zap,
 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TrustCredentialHighlights } from "@/components/credentials/TrustCredentialHighlights";
+import { sitguruApiFetch } from "@/lib/data/api";
 import {
   Alert,
   Image,
@@ -776,6 +778,8 @@ export default function FindCareScreen() {
   const [filters, setFilters] = useState<SearchFilters>(
     () => sessionSearchPreferences?.filters ?? DEFAULT_SEARCH_FILTERS,
   );
+  const [credentialFilters, setCredentialFilters] = useState<string[]>([]);
+  const [credentialIndex, setCredentialIndex] = useState<Record<string, string[]>>({});
   const [openSheet, setOpenSheet] = useState<"sort" | "filters" | null>(null);
   const [feeRules, setFeeRules] = useState<MarketplaceFeeRule[]>([]);
   const [certifiedGuruUserIds, setCertifiedGuruUserIds] = useState<Set<string>>(
@@ -790,7 +794,39 @@ export default function FindCareScreen() {
       ? `ZIP ${homeLocation.zipCode}`
       : "your care area";
   const sourceGurus = dynamicGurus;
-  const activeFilterCount = countActiveFilters(filters, selectedService);
+  const activeFilterCount =
+    countActiveFilters(filters, selectedService) + credentialFilters.length;
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        sourceGurus
+          .flatMap((guru) => [
+            String(guru.id || ""),
+            String((guru as { user_id?: string | null }).user_id || ""),
+          ])
+          .filter(Boolean),
+      ),
+    ).slice(0, 120);
+    if (!ids.length) return;
+    let cancelled = false;
+    void sitguruApiFetch<{
+      enabled?: boolean;
+      chipsByGuruId?: Record<string, { highlights?: { filterKey: string }[] }>;
+    }>(`/api/public/credentials?guruIds=${encodeURIComponent(ids.join(","))}`, {
+      auth: false,
+    }).then((result) => {
+      if (cancelled || !result.data?.chipsByGuruId) return;
+      const next: Record<string, string[]> = {};
+      for (const [key, pack] of Object.entries(result.data.chipsByGuruId)) {
+        next[key] = (pack.highlights || []).map((item) => item.filterKey);
+      }
+      setCredentialIndex(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceGurus]);
   const hasActiveFilters =
     Boolean(searchQuery.trim()) || activeFilterCount > 0;
 
@@ -852,6 +888,14 @@ export default function FindCareScreen() {
         return false;
       }
 
+      if (credentialFilters.length) {
+        const keys =
+          credentialIndex[String(guru.id || "")] ||
+          credentialIndex[String((guru as { user_id?: string | null }).user_id || "")] ||
+          [];
+        if (!credentialFilters.some((key) => keys.includes(key))) return false;
+      }
+
       if (filters.maxAllInHourly !== null) {
         const allInHourly = getGuruPriceDisplay(guru, feeRules).allInHourly;
         if (allInHourly === null || allInHourly > filters.maxAllInHourly) {
@@ -861,7 +905,7 @@ export default function FindCareScreen() {
 
       return true;
     });
-  }, [feeRules, filters, searchMatchedGurus, selectedService]);
+  }, [credentialFilters, credentialIndex, feeRules, filters, searchMatchedGurus, selectedService]);
 
   const displayedGurus = useMemo(() => {
     // "Recommended" keeps the screen's original ordering: nearest-first inside a
@@ -1259,6 +1303,7 @@ export default function FindCareScreen() {
   }
 
   function handleClearFilters() {
+    setCredentialFilters([]);
     setFilters(DEFAULT_SEARCH_FILTERS);
     setSelectedService(services[0]);
     setNoticeMessage("");
@@ -1270,6 +1315,7 @@ export default function FindCareScreen() {
   }
 
   function handleClearSortAndFilters() {
+    setCredentialFilters([]);
     setFilters(DEFAULT_SEARCH_FILTERS);
     setSelectedService(services[0]);
     setSortKey("recommended");
@@ -2236,9 +2282,11 @@ export default function FindCareScreen() {
                 ) : (
                   <FiltersSheet
                     activeFilterCount={activeFilterCount}
+                    credentialFilters={credentialFilters}
                     feeDisclosureLabel={feeDisclosureLabel}
                     filters={filters}
                     matchCount={displayedGurus.length}
+                    onChangeCredentialFilters={setCredentialFilters}
                     onChangeFilters={handleChangeFilters}
                     onClear={handleClearFilters}
                     onClose={() => setOpenSheet(null)}
@@ -2357,11 +2405,21 @@ function SortSheet({
   );
 }
 
+const MOBILE_CREDENTIAL_FILTERS = [
+  { key: "pet_cpr", label: "Pet CPR & First Aid" },
+  { key: "insured", label: "Insured" },
+  { key: "bonded", label: "Bonded" },
+  { key: "psi", label: "PSI Member" },
+  { key: "professional", label: "Professional Certification" },
+];
+
 function FiltersSheet({
   activeFilterCount,
+  credentialFilters,
   feeDisclosureLabel,
   filters,
   matchCount,
+  onChangeCredentialFilters,
   onChangeFilters,
   onClear,
   onClose,
@@ -2371,9 +2429,11 @@ function FiltersSheet({
   styles,
 }: {
   activeFilterCount: number;
+  credentialFilters: string[];
   feeDisclosureLabel: string;
   filters: SearchFilters;
   matchCount: number;
+  onChangeCredentialFilters: (keys: string[]) => void;
   onChangeFilters: (filters: SearchFilters) => void;
   onClear: () => void;
   onClose: () => void;
@@ -2423,6 +2483,31 @@ function FiltersSheet({
         style={styles.sheetScroll}
       >
         <View style={styles.sheetGroup}>
+          <Text style={styles.sheetGroupLabel}>Trust & Credentials</Text>
+          <View style={styles.sheetOptionList}>
+            {MOBILE_CREDENTIAL_FILTERS.map((option) => {
+              const selected = credentialFilters.includes(option.key);
+              return (
+                <BubblePressable
+                  key={option.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={option.label}
+                  onPress={() =>
+                    onChangeCredentialFilters(
+                      selected
+                        ? credentialFilters.filter((key) => key !== option.key)
+                        : [...credentialFilters, option.key],
+                    )
+                  }
+                  style={styles.sheetOptionRow}
+                >
+                  <Text style={styles.sheetOptionLabel}>{option.label}</Text>
+                  {selected ? <Text style={styles.sheetOptionLabelSelected}>On</Text> : null}
+                </BubblePressable>
+              );
+            })}
+          </View>
           <Text style={styles.sheetGroupLabel}>Minimum rating</Text>
           <View style={styles.sheetChipRow}>
             {ratingFilterOptions.map((option) => {
@@ -2707,6 +2792,11 @@ function GuruDiscoveryCard({
       </BubblePressable>
 
       <View style={styles.guruProfilePanel}>
+        <TrustCredentialHighlights
+          guruId={String(guru.id || "")}
+          ownerUserId={String((guru as { user_id?: string | null }).user_id || "")}
+          variant="chips"
+        />
         <View style={styles.guruProfileChipRow}>
           {founding ? (
             <View style={[styles.guruProfileChip, styles.guruProfileChipFounding]}>

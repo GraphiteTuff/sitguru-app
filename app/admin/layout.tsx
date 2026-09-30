@@ -101,6 +101,7 @@ const navSections = [
       { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
       { label: "Pet Parents", href: adminRoutes.petParents, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
+      { label: "Guru Credentials", href: "/admin/guru-credentials", icon: ShieldCheck },
       { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
       {
         label: "Ambassador Ledger",
@@ -240,6 +241,7 @@ const topHeaderLinks = [
   { label: "Bookings", href: adminRoutes.bookings },
   { label: "Pet Parents", href: adminRoutes.petParents },
   { label: "Gurus", href: adminRoutes.gurus },
+  { label: "Guru Credentials", href: "/admin/guru-credentials" },
   { label: "Ambassadors", href: adminRoutes.ambassadors },
   { label: "Human Resources", href: adminRoutes.hr },
   { label: "SitGuru University", href: adminRoutes.universityTraining },
@@ -585,6 +587,7 @@ function AdminFooter() {
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Pet Parents", href: adminRoutes.petParents },
         { label: "Gurus", href: adminRoutes.gurus },
+        { label: "Guru Credentials", href: "/admin/guru-credentials" },
         { label: "Ambassadors", href: adminRoutes.ambassadors },
         { label: "Human Resources", href: adminRoutes.hr },
         { label: "SitGuru University", href: adminRoutes.universityTraining },

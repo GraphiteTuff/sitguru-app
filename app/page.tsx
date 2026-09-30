@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepageAppsComingSoon from "@/components/marketing/HomepageAppsComingSoon";
+import HomepageTrustSection from "@/components/credentials/HomepageTrustSection";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -2323,6 +2324,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomepageTrustSection />
 
       <section
         aria-label="SitGuru premium payment integrations"

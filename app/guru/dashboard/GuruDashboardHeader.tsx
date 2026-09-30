@@ -13,6 +13,7 @@ import {
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import {
+  Award,
   Bell,
   BookOpen,
   CalendarDays,
@@ -114,6 +115,12 @@ const navItems = [
     icon: MessageCircle,
   },
   {
+    label: "Credentials",
+    href: "/guru/dashboard/credentials",
+    tab: "credentials",
+    icon: Award,
+  },
+  {
     label: "My Profile",
     href: "/guru/dashboard/profile",
     tab: "profile",
@@ -135,6 +142,7 @@ const navItems = [
 
 const guruAccountMenuLinks = [
   { label: "Dashboard", href: "/guru/dashboard" },
+  { label: "Trust & Credentials", href: "/guru/dashboard/credentials" },
   { label: "Update Profile", href: "/guru/dashboard/profile" },
   { label: "Bookings", href: "/guru/dashboard/bookings" },
   { label: "Referrals", href: "/guru/dashboard/referrals" },
