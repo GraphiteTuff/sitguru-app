@@ -1,0 +1,111 @@
+/**
+ * Shared Creator Ambassador referral rules.
+ * Extends the existing Ambassador code system. No second referral program.
+ */
+
+export const CREATOR_AMBASSADOR_TYPE = "creator_ambassador";
+
+export const ATTRIBUTION_WINDOW_DAYS_DEFAULT = 30;
+
+/** Codes that would collide with SitGuru routes or API paths. */
+export const RESERVED_REFERRAL_CODES = [
+  "admin",
+  "api",
+  "ambassador",
+  "book",
+  "booking",
+  "creator",
+  "guru",
+  "help",
+  "login",
+  "pet",
+  "pets",
+  "r",
+  "search",
+  "signup",
+  "support",
+] as const;
+
+export function normalizeReferralCode(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "");
+}
+
+export function isReservedReferralCode(value: string | null | undefined) {
+  const code = normalizeReferralCode(value);
+  if (code.length < 2 || code.length > 32) return true;
+  return RESERVED_REFERRAL_CODES.some((reserved) => reserved.toUpperCase() === code);
+}
+
+export function isCreatorAmbassadorType(value: string | null | undefined) {
+  const raw = String(value || "").trim().toLowerCase();
+  return raw === CREATOR_AMBASSADOR_TYPE || raw === "creator";
+}
+
+export function creatorRoleLabel(ambassadorType: string | null | undefined) {
+  return isCreatorAmbassadorType(ambassadorType)
+    ? "Creator Ambassador"
+    : "Ambassador";
+}
+
+export function publicReferralPath(code: string) {
+  const normalized = normalizeReferralCode(code);
+  return normalized ? `/r/${encodeURIComponent(normalized)}` : "/search";
+}
+
+export function publicReferralUrl(origin: string, code: string) {
+  const base = String(origin || "https://www.sitguru.com").replace(/\/$/, "");
+  return `${base}${publicReferralPath(code)}`;
+}
+
+/**
+ * Before registration, a newer valid click may replace the stored code.
+ * After a valid code is locked onto the account, later clicks do not move it.
+ */
+export function resolveReferralAttribution(input: {
+  lockedCode?: string | null;
+  incomingCode?: string | null;
+}) {
+  const locked = normalizeReferralCode(input.lockedCode);
+  const incoming = normalizeReferralCode(input.incomingCode);
+  if (locked) {
+    return { code: locked, locked: true as const, replaced: false };
+  }
+  if (incoming) {
+    return { code: incoming, locked: false as const, replaced: true };
+  }
+  return { code: "", locked: false as const, replaced: false };
+}
+
+/** Existing accounts can be measured. They are not new-customer rewards. */
+export function existingAccountRewardEligible(input: {
+  accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
+}) {
+  const created = Date.parse(String(input.accountCreatedAt || ""));
+  const captured = Date.parse(String(input.referralCapturedAt || ""));
+  if (!Number.isFinite(created) || !Number.isFinite(captured)) return false;
+  return captured <= created + 10 * 60 * 1000;
+}
+
+export function funnelRate(numerator: number, denominator: number) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+    return 0;
+  }
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+export function referralDateWindow(preset: string, now = new Date()) {
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  if (preset === "7d") start.setDate(start.getDate() - 6);
+  else if (preset === "90d") start.setDate(start.getDate() - 89);
+  else if (preset === "year") start.setMonth(0, 1);
+  else if (preset === "all") return { start: null as Date | null, end };
+  else start.setDate(start.getDate() - 29);
+  return { start, end };
+}

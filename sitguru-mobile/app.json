@@ -159,6 +159,16 @@
               "scheme": "https",
               "host": "sitguru.com",
               "pathPrefix": "/mobile"
+            },
+            {
+              "scheme": "https",
+              "host": "sitguru.com",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sitguru.com",
+              "pathPrefix": "/r"
             }
           ],
           "category": [
@@ -177,6 +187,16 @@
               "scheme": "https",
               "host": "sitguru.com",
               "pathPrefix": "/mobile"
+            },
+            {
+              "scheme": "https",
+              "host": "sitguru.com",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sitguru.com",
+              "pathPrefix": "/r"
             }
           ],
           "category": [

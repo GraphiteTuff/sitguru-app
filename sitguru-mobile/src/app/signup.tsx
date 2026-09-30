@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
@@ -28,6 +29,9 @@ import SocialAuthButton from '@/components/SocialAuthButton';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuth';
+import { sitguruApiFetch } from '@/lib/data/api';
+
+const REFERRAL_STORAGE_KEY = 'sitguru.ambassadorReferralCode';
 
 type SignupIntent =
   | 'pet-parent'
@@ -115,11 +119,13 @@ export default function SignupScreen() {
     intent?: string;
     next?: string;
     source?: string;
+    ref?: string;
   }>();
 
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [signupIntent, setSignupIntent] = useState<SignupIntent>(
     resolveIntent(params.intent),
@@ -127,6 +133,20 @@ export default function SignupScreen() {
   useEffect(() => {
     setSignupIntent(resolveIntent(params.intent));
   }, [params.intent]);
+  useEffect(() => {
+    const fromRoute = String(params.ref || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '');
+    if (fromRoute) {
+      setReferralCode(fromRoute);
+      void AsyncStorage.setItem(REFERRAL_STORAGE_KEY, fromRoute);
+      return;
+    }
+    void AsyncStorage.getItem(REFERRAL_STORAGE_KEY).then((stored) => {
+      if (stored) setReferralCode(stored);
+    });
+  }, [params.ref]);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -170,10 +190,46 @@ export default function SignupScreen() {
       return;
     }
 
+    const cleanReferral = referralCode
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '');
     const result = await signUp(cleanEmail, password, {
       first_name: firstName.trim(),
       signup_intent: signupIntent,
+      referral_code: cleanReferral || undefined,
     });
+    if (!result.error && result.userId && cleanReferral) {
+      const intent =
+        signupIntent === 'guru'
+          ? 'guru'
+          : signupIntent === 'ambassador'
+            ? 'ambassador'
+            : signupIntent === 'multiple'
+              ? 'both'
+              : 'pet_parent';
+      const provisionBody = {
+        userId: result.userId,
+        intent,
+        fullName: firstName.trim(),
+        email: cleanEmail,
+        ambassadorReferralCode: cleanReferral,
+        referralCode: cleanReferral,
+        source: 'mobile_app',
+      };
+      void sitguruApiFetch('/api/auth/provision-signup', {
+        method: 'POST',
+        auth: true,
+        body: provisionBody,
+      }).then((response) => {
+        if (response.status !== 401) return;
+        return sitguruApiFetch('/api/auth/provision-signup', {
+          method: 'POST',
+          auth: false,
+          body: provisionBody,
+        });
+      });
+    }
 
     if (result.error) {
       setMessage(normalizeSignupError(result.error));
@@ -442,6 +498,27 @@ export default function SignupScreen() {
                         style={styles.input}
                         textContentType="emailAddress"
                         value={email}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>
+                      Referral code, optional
+                    </Text>
+                    <View style={styles.inputShell}>
+                      <TextInput
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        onChangeText={(value) => {
+                          setReferralCode(value.toUpperCase());
+                          setMessage(null);
+                        }}
+                        placeholder="ZIGGY"
+                        placeholderTextColor={SitGuruColors.textSoft}
+                        returnKeyType="next"
+                        style={styles.input}
+                        value={referralCode}
                       />
                     </View>
                   </View>

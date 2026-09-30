@@ -44,6 +44,7 @@ WebBrowser.maybeCompleteAuthSession();
 type SignupMetadata = {
   first_name?: string;
   signup_intent?: string;
+  referral_code?: string;
 };
 
 type SocialProvider =
@@ -140,6 +141,7 @@ type AuthContextValue = {
     error: string | null;
     needsEmailConfirmation:
       boolean;
+    userId?: string | null;
   }>;
 
   signOut: () => Promise<{
@@ -1797,6 +1799,12 @@ export function AuthProvider({
                       metadata.signup_intent,
                   }
                 : {}),
+              ...(metadata?.referral_code
+                ? {
+                    ambassador_referral_code:
+                      metadata.referral_code.trim(),
+                  }
+                : {}),
             },
             emailRedirectTo:
               oauthRedirectUrl(),
@@ -1840,6 +1848,10 @@ export function AuthProvider({
           needsEmailConfirmation:
             !data.session &&
             Boolean(data.user),
+          userId:
+            data.session?.user.id ||
+            data.user?.id ||
+            null,
         };
       },
       [loadProfileAndRoles],

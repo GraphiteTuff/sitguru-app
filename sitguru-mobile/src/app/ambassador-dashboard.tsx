@@ -290,7 +290,7 @@ export default function AmbassadorDashboardScreen() {
     ]);
 
   const referralLink = referralCode
-    ? `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`
+    ? `https://www.sitguru.com/r/${encodeURIComponent(referralCode)}`
     : '';
 
   const points = Math.max(
@@ -428,8 +428,8 @@ export default function AmbassadorDashboardScreen() {
 
     try {
       await Share.share({
-        message: `Check out SitGuru with my link: ${referralLink}`,
-        title: 'Share SitGuru',
+        message: `Find trusted pet care with SitGuru. ${referralLink}`,
+        title: 'SitGuru',
         url: referralLink,
       });
     } catch {
@@ -667,6 +667,11 @@ export default function AmbassadorDashboardScreen() {
                         <Text style={styles.codeValue}>
                           {referralCode || 'Not assigned'}
                         </Text>
+                        {referralLink ? (
+                          <Text style={styles.codeDetail}>
+                            {referralLink.replace(/^https?:\/\//, '')}
+                          </Text>
+                        ) : null}
                       </View>
                       <Text style={styles.codeDetail}>
                         Drop it in texts, socials, QR flyers, campus events,
