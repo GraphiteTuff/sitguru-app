@@ -193,9 +193,9 @@ export default function AmbassadorDashboardPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8 lg:px-10">
           <Link href="/" className="flex items-center gap-2">
             <img
-              src="/images/sitguru-logo-cropped.png"
+              src="/images/sitguru-logo-header.png"
               alt="SitGuru"
-              className="h-10 w-auto"
+              className="h-12 w-auto object-contain object-left"
             />
           </Link>
 

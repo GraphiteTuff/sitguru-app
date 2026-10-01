@@ -131,14 +131,12 @@ export default function CustomerDashboardHeader({
           className="flex min-w-fit items-center gap-3"
           aria-label="SitGuru Customer Dashboard"
         >
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/sitguru-logo-cropped.png"
-              alt="SitGuru"
-              className="h-9 w-9 object-contain"
-            />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/sitguru-logo-header.png"
+            alt="SitGuru"
+            className="h-11 w-auto object-contain object-left"
+          />
 
           <div className="hidden leading-tight sm:block">
             <p className="text-sm font-black tracking-tight text-emerald-950">

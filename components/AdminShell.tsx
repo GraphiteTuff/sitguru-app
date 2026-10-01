@@ -210,9 +210,9 @@ export default function AdminShell({ children }: AdminShellProps) {
               className="inline-flex items-center gap-3 rounded-2xl transition hover:opacity-90"
             >
               <img
-                src="/images/sitguru-logo-cropped.png"
+                src="/images/sitguru-logo-header.png"
                 alt="SitGuru"
-                className="h-10 w-auto bg-transparent object-contain"
+                className="h-12 w-auto bg-transparent object-contain object-left"
               />
             </Link>
 

@@ -1238,11 +1238,11 @@ function SignupPageContent() {
             </div>
 
             <Image
-              src="/images/sitguru-logo-cropped.png"
+              src="/images/sitguru-logo-header.png"
               alt="SitGuru"
-              width={180}
-              height={48}
-              className="h-10 w-auto object-contain brightness-0 invert"
+              width={727}
+              height={445}
+              className="h-12 w-auto object-contain brightness-0 invert"
               priority
             />
 
@@ -1345,11 +1345,11 @@ function SignupPageContent() {
             </div>
 
             <Image
-              src="/images/sitguru-logo-cropped.png"
+              src="/images/sitguru-logo-header.png"
               alt="SitGuru"
-              width={120}
-              height={36}
-              className="hidden h-9 w-auto object-contain sm:block"
+              width={727}
+              height={445}
+              className="hidden h-12 w-auto object-contain sm:block"
               priority
             />
           </div>

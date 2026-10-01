@@ -21,12 +21,12 @@ export default function SitGuruDarkLogo({
       aria-label="Go to SitGuru home"
     >
       <Image
-        src="/images/sitguru-logo-dark.png"
+        src="/images/sitguru-logo-on-dark.png"
         alt="SitGuru"
-        width={300}
-        height={112}
+        width={731}
+        height={449}
         priority={priority}
-        className={`h-auto w-[170px] sm:w-[210px] lg:w-[240px] ${imageClassName}`}
+        className={`h-14 w-auto object-contain object-left sm:h-16 ${imageClassName}`}
       />
     </Link>
   );

@@ -347,12 +347,12 @@ function AdminLogo() {
       aria-label="Back to SitGuru homepage"
     >
       <Image
-        src="/images/sitguru-logo-cropped.png"
+        src="/images/sitguru-logo-header.png"
         alt="SitGuru"
-        width={320}
-        height={114}
+        width={727}
+        height={445}
         priority
-        className="h-auto w-[118px] bg-transparent object-contain"
+        className="h-12 w-auto bg-transparent object-contain object-left"
       />
     </Link>
   );

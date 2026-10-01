@@ -498,12 +498,12 @@ export default function GuruDashboardHeader({
           aria-label="SitGuru Guru Dashboard"
         >
           <Image
-            src="/images/sitguru-logo-cropped.png"
+            src="/images/sitguru-logo-header.png"
             alt="SitGuru"
-            width={190}
-            height={68}
+            width={727}
+            height={445}
             priority
-            className="h-auto max-h-11 w-auto bg-transparent object-contain lg:max-h-12"
+            className="h-14 w-auto bg-transparent object-contain object-left lg:h-16"
             style={{ background: "transparent" }}
           />
         </Link>

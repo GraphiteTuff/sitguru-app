@@ -16,15 +16,15 @@ export default function SiteLogo({
 }: SiteLogoProps) {
   const logo = (
     <div
-      className={`flex shrink-0 items-center justify-start overflow-hidden ${wrapperClassName}`}
+      className={`flex shrink-0 items-center justify-start ${wrapperClassName}`}
     >
       <Image
-        src="/images/sitguru-logo-cropped.png"
+        src="/images/sitguru-logo-footer.png"
         alt="SitGuru logo"
-        width={1003}
-        height={357}
+        width={799}
+        height={517}
         priority={priority}
-        className={`h-full w-auto max-w-none object-contain ${imageClassName}`}
+        className={`h-auto w-full object-contain object-left ${imageClassName}`}
       />
     </div>
   );
