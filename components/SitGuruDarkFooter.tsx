@@ -21,7 +21,7 @@ export default function SitGuruDarkFooter({
         <div className="space-y-3">
           <SitGuruDarkLogo
             href={dashboardHref}
-            imageClassName="!h-16 w-auto sm:!h-20"
+            imageClassName="w-[165px] sm:w-[190px]"
           />
 
           <p className="max-w-md text-sm leading-6 text-slate-400">
