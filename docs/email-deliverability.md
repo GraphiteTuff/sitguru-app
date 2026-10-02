@@ -17,6 +17,28 @@ This document is the operational source of truth for SitGuru email streams, auth
 | **Resend** (app transactional / marketing) | **REQUIRES RESEND DASHBOARD VERIFICATION** — DNS evidence present; dashboard Verified status not proven in-repo |
 | **Supabase Auth** | **REQUIRES DASHBOARD CHECK** — templates in repo; SMTP/From only in Supabase Dashboard |
 
+### Remote migration provenance (`email_suppressions`)
+
+| Field | Value |
+|-------|-------|
+| Project name | **SitGuru** |
+| Project ref | **`mmtjhxnzuglbyumbsjhs`** |
+| API host | `mmtjhxnzuglbyumbsjhs.supabase.co` |
+| Environment | **production** (not Staging) |
+| Evidence | Linked project in `supabase/.temp/`; `next.config.ts` / prisma README treat this ref as live; migration version `20261002215629` / name `email_suppressions` appears in this project's migration list |
+| Staging check | Project **SitGuru Staging** (`ehdvngkqddttcwhjubwu`) does **not** have `email_suppressions` |
+
+**This DDL was applied to production.** No customer rows were written (table empty at inspection). Do not re-apply.
+
+Read-only table inspection (production):
+
+- Table exists; RLS **enabled**; **0** RLS policies (anon/authenticated PostgREST access denied by default)
+- Columns: `id`, `email_normalized`, `reason`, `source_event`, `provider_message_id`, `provider_event_id`, `metadata`, `created_at`, `updated_at`
+- Constraints: PK(`id`), UNIQUE(`email_normalized`), CHECK(`reason` in hard_bounce/complaint/manual/provider_suppressed)
+- Indexes: reason, provider_event_id (partial)
+- Server writes expected via `service_role` (bypasses RLS); webhook uses `supabaseAdmin`
+- No accidental public write path via policies (none granted for anon/auth policies)
+
 ---
 
 ## 1. Architecture overview
