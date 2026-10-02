@@ -1,9 +1,11 @@
 import Link from "next/link";
 import {
+  CalendarDays,
   ClipboardCheck,
   FileText,
   Flag,
   Handshake,
+  Library,
   Megaphone,
   PlusCircle,
   Rocket,
@@ -101,7 +103,7 @@ function RecentList({
             <Link
               key={item.id}
               href={item.href}
-              className="block rounded-2xl border border-slate-100 bg-slate-50 p-3"
+              className="block rounded-2xl border border-slate-100 bg-slate-50 p-3 transition hover:border-emerald-200 hover:bg-emerald-50/40"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate font-black text-slate-950">
@@ -127,6 +129,17 @@ function RecentList({
   );
 }
 
+function DeskChip({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900"
+    >
+      {label}
+    </Link>
+  );
+}
+
 export default async function SalesMarketingAdminPage() {
   const actor = await getAdminIdentity();
 
@@ -149,6 +162,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "emerald" as const,
       icon: <Users size={18} />,
       trend: data.trends.signupLeads,
+      href: routes.signupLeads,
     },
     {
       label: "Referrals logged",
@@ -157,6 +171,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "violet" as const,
       icon: <TrendingUp size={18} />,
       trend: data.trends.referrals,
+      href: routes.referrals,
     },
     {
       label: "Outreach",
@@ -165,6 +180,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "sky" as const,
       icon: <Handshake size={18} />,
       trend: data.trends.outreachContacts,
+      href: routes.outreach,
     },
     {
       label: "Tasks",
@@ -173,6 +189,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "slate" as const,
       icon: <ClipboardCheck size={18} />,
       trend: data.trends.tasksTotal,
+      href: routes.dailyTracker,
     },
     {
       label: "CEO review",
@@ -181,6 +198,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "amber" as const,
       icon: <Flag size={18} />,
       trend: data.trends.tasksAwaitingCeo,
+      href: routes.ceoReview,
     },
     {
       label: "Blocked / help",
@@ -189,6 +207,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "rose" as const,
       icon: <Flag size={18} />,
       trend: data.trends.tasksBlockedOrHelp,
+      href: routes.ceoReview,
     },
     {
       label: "Campaigns",
@@ -197,6 +216,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "emerald" as const,
       icon: <Megaphone size={18} />,
       trend: data.trends.campaigns,
+      href: routes.campaigns,
     },
     {
       label: "Launch signups",
@@ -205,6 +225,7 @@ export default async function SalesMarketingAdminPage() {
       tone: "sky" as const,
       icon: <Rocket size={18} />,
       trend: data.trends.launchSignups,
+      href: routes.launchSignups,
     },
   ];
 
@@ -241,28 +262,10 @@ export default async function SalesMarketingAdminPage() {
       icon: Handshake,
     },
     {
-      href: routes.content,
-      label: "Content",
-      detail: `${number(data.metrics.contentItems)} planner items`,
-      icon: FileText,
-    },
-    {
       href: routes.campaigns,
       label: "Campaigns",
       detail: `${number(data.metrics.campaigns)} campaigns`,
       icon: Megaphone,
-    },
-    {
-      href: routes.referrals,
-      label: "Referrals",
-      detail: `${number(data.metrics.referrals)} logged`,
-      icon: TrendingUp,
-    },
-    {
-      href: routes.partners,
-      label: "Partners",
-      detail: `${number(data.metrics.partnerApplications)} applications`,
-      icon: Handshake,
     },
   ];
 
@@ -286,7 +289,7 @@ export default async function SalesMarketingAdminPage() {
           href={routes.dashboard}
           className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
         >
-          Admin HQ
+          Admin Portal
         </Link>
         <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
           {actor.email}
@@ -295,6 +298,28 @@ export default async function SalesMarketingAdminPage() {
           {data.isLive ? "Live sources" : "Preview sources"}
         </span>
       </div>
+
+      {needsCeoAttention ? (
+        <GrowthCard className="min-w-0 border-amber-200 bg-amber-50/70">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-amber-950">
+                Queue needs attention
+              </p>
+              <p className="mt-1 text-sm font-semibold text-amber-900/80">
+                {number(data.metrics.tasksAwaitingCeo)} awaiting CEO ·{" "}
+                {number(data.metrics.tasksBlockedOrHelp)} blocked or need help
+              </p>
+            </div>
+            <Link
+              href={routes.ceoReview}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-amber-700 px-4 text-sm font-black !text-white transition hover:bg-amber-800"
+            >
+              Open CEO review
+            </Link>
+          </div>
+        </GrowthCard>
+      ) : null}
 
       <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((tile) => (
@@ -306,11 +331,65 @@ export default async function SalesMarketingAdminPage() {
             tone={tile.tone}
             icon={tile.icon}
             trend={tile.trend}
+            href={tile.href}
           />
         ))}
       </section>
 
       <AdminWorkplaceActions actions={actions} />
+
+      <GrowthCard className="min-w-0">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-black text-slate-950">More desks</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Reviews, content, and sibling growth tools.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <DeskChip href={routes.weeklyReview} label="Weekly review" />
+          <DeskChip href={routes.monthlyReview} label="Monthly review" />
+          <DeskChip href={routes.content} label="Content planner" />
+          <DeskChip href={routes.proofLibrary} label="Proof library" />
+          <DeskChip href={routes.referrals} label="Referrals" />
+          <DeskChip href={routes.partners} label="Partners" />
+          <DeskChip href={routes.launchSignups} label="Launch signups" />
+          <DeskChip href={routes.emailUpdates} label="Email updates" />
+          <DeskChip href={routes.ambassadorLeads} label="Ambassador leads" />
+          <DeskChip href={routes.analytics} label="Analytics" />
+        </div>
+        <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="flex items-center gap-2 text-sm font-black text-slate-950">
+              <CalendarDays size={16} className="text-emerald-700" />
+              Reviews
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              {number(data.metrics.weeklyReviews)} weekly ·{" "}
+              {number(data.metrics.monthlyReviews)} monthly
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="flex items-center gap-2 text-sm font-black text-slate-950">
+              <FileText size={16} className="text-emerald-700" />
+              Content
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              {number(data.metrics.contentItems)} planner items
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="flex items-center gap-2 text-sm font-black text-slate-950">
+              <Library size={16} className="text-emerald-700" />
+              Proof
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              {number(data.metrics.proofItems)} library items
+            </p>
+          </div>
+        </div>
+      </GrowthCard>
 
       <section className="grid min-w-0 gap-4 xl:grid-cols-3">
         <RecentList
@@ -393,6 +472,12 @@ export default async function SalesMarketingAdminPage() {
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
             >
               Ambassadors
+            </Link>
+            <Link
+              href={routes.launchSignups}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              Launch Signups
             </Link>
           </>
         }

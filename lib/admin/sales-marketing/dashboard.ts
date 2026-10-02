@@ -338,7 +338,7 @@ export async function getSalesMarketingDashboardData(): Promise<SalesMarketingDa
           getText(row, ["lead_type"], "Signup lead"),
         status: getText(row, ["status", "lead_status", "priority_level"], "New"),
         date: getDate(row),
-        href: "/admin/sales-marketing/signup-leads",
+        href: `/admin/sales-marketing/signup-leads#lead-${getText(row, ["id"], `lead-${index}`)}`,
       };
     });
 

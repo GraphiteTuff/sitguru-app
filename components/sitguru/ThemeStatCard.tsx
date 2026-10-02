@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import type { KpiTrend } from "@/lib/sitguru/kpi-trend";
@@ -80,6 +81,7 @@ export function ThemeStatCard({
   icon,
   trend,
   trendTitle,
+  href,
   className = "",
 }: {
   label: string;
@@ -89,11 +91,12 @@ export function ThemeStatCard({
   icon?: ReactNode;
   trend?: KpiTrend | null;
   trendTitle?: string;
+  href?: string;
   className?: string;
 }) {
   const theme = tones[tone];
 
-  return (
+  const card = (
     <div
       className={`rounded-[1.5rem] border p-4 shadow-sm ${theme.card} ${className}`}
     >
@@ -121,6 +124,18 @@ export function ThemeStatCard({
         </p>
       ) : null}
     </div>
+  );
+
+  if (!href) return card;
+
+  return (
+    <Link
+      href={href}
+      className="block min-w-0 rounded-[1.5rem] transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+      aria-label={`Open ${label}`}
+    >
+      {card}
+    </Link>
   );
 }
 

@@ -238,13 +238,20 @@ export function StatusPill({ value }: { value: string }) {
     tone.includes("ready") ||
     tone.includes("active") ||
     tone.includes("posted") ||
-    tone.includes("connected")
+    tone.includes("connected") ||
+    tone.includes("clear")
       ? "bg-emerald-50 text-emerald-800"
-      : tone.includes("review") || tone.includes("pending")
-        ? "bg-amber-50 text-amber-800"
-        : tone.includes("pause") || tone.includes("draft")
-          ? "bg-slate-100 text-slate-700"
-          : "bg-sky-50 text-sky-800";
+      : tone.includes("block") ||
+          tone.includes("help") ||
+          tone.includes("urgent")
+        ? "bg-rose-50 text-rose-800"
+        : tone.includes("review") ||
+            tone.includes("pending") ||
+            tone.includes("await")
+          ? "bg-amber-50 text-amber-800"
+          : tone.includes("pause") || tone.includes("draft")
+            ? "bg-slate-100 text-slate-700"
+            : "bg-sky-50 text-sky-800";
 
   return (
     <span
