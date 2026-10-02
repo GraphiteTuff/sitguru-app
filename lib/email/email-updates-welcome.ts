@@ -1,8 +1,12 @@
-import { sendSitGuruEmail } from "@/lib/email/resend";
+import {
+  marketingUnsubscribeHeadersForToken,
+  sendSitGuruEmail,
+} from "@/lib/email/resend";
 import {
   SITGURU_EMAIL_FONT_FAMILY,
   SITGURU_EMAIL_FONT_HEAD,
 } from "@/lib/email/brand-font";
+import { getEmailBaseUrl } from "@/lib/email/config";
 
 type WelcomeEmailParams = {
   to: string;
@@ -11,11 +15,7 @@ type WelcomeEmailParams = {
 };
 
 function getBaseUrl() {
-  const raw =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "https://www.sitguru.com";
-  return raw.replace(/\/$/, "");
+  return getEmailBaseUrl();
 }
 
 function escapeHtml(value: string) {
@@ -332,5 +332,7 @@ export async function sendEmailUpdatesWelcome(params: WelcomeEmailParams) {
     subject: content.subject,
     html: content.html,
     text: content.text,
+    isMarketing: true,
+    headers: marketingUnsubscribeHeadersForToken(params.unsubscribeToken),
   });
 }

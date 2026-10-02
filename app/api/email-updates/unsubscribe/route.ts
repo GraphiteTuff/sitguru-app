@@ -110,7 +110,22 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    // RFC 8058 one-click may POST with body `List-Unsubscribe=One-Click`
+    // (form-urlencoded or plain) and the token in the List-Unsubscribe URL query.
+    const contentType = req.headers.get("content-type") || "";
+    let body: Record<string, unknown> = {};
+    if (contentType.includes("application/json")) {
+      body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    } else if (
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("text/plain")
+    ) {
+      // Consume body; token comes from query string for one-click.
+      await req.text().catch(() => "");
+    } else {
+      body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    }
+
     const token =
       safeString(body.token) ||
       safeString(req.nextUrl.searchParams.get("token"));
