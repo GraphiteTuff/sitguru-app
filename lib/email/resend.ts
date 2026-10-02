@@ -9,6 +9,7 @@ import {
   normalizeEmailAddress,
   sanitizeEmailHeaderValue,
 } from "@/lib/email/headers";
+import { isEmailSuppressedForMarketing } from "@/lib/email/suppression";
 
 type SendEmailParams = {
   to: string;
@@ -93,6 +94,11 @@ export async function sendSitGuruEmail({
     if (!resolvedHeaders?.["List-Unsubscribe"]) {
       throw new Error(
         "Marketing email requires List-Unsubscribe headers.",
+      );
+    }
+    if (await isEmailSuppressedForMarketing(safeTo)) {
+      throw new Error(
+        "Recipient is suppressed for marketing email (bounce/complaint).",
       );
     }
   }

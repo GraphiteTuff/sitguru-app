@@ -77,7 +77,15 @@ describe("personal mailbox protection", () => {
     );
     assert.equal(isProtectedPersonalFrom("jason@sitguru.com"), true);
     assert.equal(
+      isProtectedPersonalFrom("Jason Graff <Jason@SitGuru.com>"),
+      true,
+    );
+    assert.equal(
       isProtectedPersonalFrom("SitGuru Support <support@sitguru.com>"),
+      false,
+    );
+    assert.equal(
+      isProtectedPersonalFrom("SitGuru <alerts@sitguru.com>"),
       false,
     );
   });
@@ -87,13 +95,20 @@ describe("personal mailbox protection", () => {
     assert.match(RECOMMENDED_SENDER_ARCHITECTURE.support, /support@sitguru\.com/);
     assert.ok(EMAIL_ENV_VAR_NAMES.includes("RESEND_API_KEY"));
     assert.ok(EMAIL_ENV_VAR_NAMES.includes("RESEND_FROM_EMAIL"));
+    assert.ok(EMAIL_ENV_VAR_NAMES.includes("RESEND_WEBHOOK_SECRET"));
   });
 });
 
-describe("recruiting / template https hygiene expectations", () => {
-  it("requires canonical SitGuru links to use https", () => {
-    const canonical = "https://sitguru.com";
-    assert.match(canonical, /^https:\/\//);
-    assert.doesNotMatch(canonical, /^http:\/\//);
+describe("marketing vs transactional header rules", () => {
+  it("builds marketing unsubscribe headers and keeps auth-style https only", () => {
+    const headers = buildMarketingUnsubscribeHeaders({
+      unsubscribeUrl:
+        "https://www.sitguru.com/api/email-updates/unsubscribe?token=abc",
+    });
+    assert.match(headers["List-Unsubscribe"], /^<https:\/\//);
+    assert.equal(
+      headers["List-Unsubscribe-Post"],
+      "List-Unsubscribe=One-Click",
+    );
   });
 });
