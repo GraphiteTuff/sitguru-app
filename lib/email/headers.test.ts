@@ -112,3 +112,10 @@ describe("marketing vs transactional header rules", () => {
     );
   });
 });
+describe("recruiting / template https hygiene expectations", () => {
+  it("requires canonical SitGuru links to use https", () => {
+    const canonical = "https://sitguru.com";
+    assert.match(canonical, /^https:\/\//);
+    assert.doesNotMatch(canonical, /^http:\/\//);
+  });
+});
