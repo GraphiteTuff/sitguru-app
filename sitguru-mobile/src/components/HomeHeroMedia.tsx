@@ -1,18 +1,21 @@
 /* eslint-disable react-hooks/refs -- RN Animated.Value is the supported fade driver; .current is read to pass that driver into styles, not to store React state. */
 import { useEventListener } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { Pause, Play } from 'lucide-react-native';
+import { useIsFocused } from 'expo-router';
+import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
+import { Pause, Play, Volume2, VolumeX } from 'lucide-react-native';
 import {
   Component,
   type ErrorInfo,
   type ReactNode,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from 'react';
 import {
   Animated,
+  AppState,
   Image,
   type ImageSourcePropType,
   Platform,
@@ -21,19 +24,29 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
+import {
+  HOME_HERO_CLIP_SETTINGS,
+  HOME_HERO_VIDEO_LABELS,
+} from '@/components/home-hero-clips';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 
-export const HOME_HERO_VIDEO_LABELS = [
-  'Dog Walking',
-  'Drop-In Visits',
-  'Join the SitGuru Community',
-] as const;
+export { HOME_HERO_CLIP_SETTINGS, HOME_HERO_VIDEO_LABELS };
 
-const HERO_PLAYBACK_RATES = [1, 1, 0.9] as const;
 const HERO_TRANSITION_MS = 420;
+/** Share of the 16:9 frame kept visible on a tall phone before we stop zooming out. */
+const HOWLWEEN_TARGET_VISIBLE_WIDTH = 0.66;
+
+export type HomeHeroClip = {
+  source: number;
+  poster: ImageSourcePropType;
+  label: string;
+  playbackRate: number;
+  hasAudioControl: boolean;
+  framing: 'standard' | 'howlween';
+};
 
 type HomeHeroMediaProps = {
-  sources: number[];
-  poster: ImageSourcePropType;
+  clips: readonly HomeHeroClip[];
   activeIndex: number;
   onActiveIndexChange: (index: number) => void;
   onTransitionChange?: (isTransitioning: boolean) => void;
@@ -118,20 +131,46 @@ function PosterFallback({ poster }: { poster: ImageSourcePropType }) {
   );
 }
 
+function howlweenScaleFor(width: number, height: number) {
+  if (width <= 0 || height <= 0) return 1;
+
+  const coverVisibleFraction = width / (height * (16 / 9));
+  if (coverVisibleFraction >= HOWLWEEN_TARGET_VISIBLE_WIDTH) return 1;
+
+  return coverVisibleFraction / HOWLWEEN_TARGET_VISIBLE_WIDTH;
+}
+
+function applyClipAudio(player: VideoPlayer, audible: boolean) {
+  player.muted = !audible;
+  player.volume = audible ? 1 : 0;
+}
+
 function ActiveHeroClip({
   source,
   playbackRate,
   paused,
+  audible,
+  useBanner,
+  bannerTop,
+  bannerHeight,
   onEnded,
+  onPlayer,
 }: {
   source: number;
   playbackRate: number;
   paused: boolean;
+  audible: boolean;
+  useBanner: boolean;
+  bannerTop: number;
+  bannerHeight: number;
   onEnded: () => void;
+  onPlayer: (player: VideoPlayer | null) => void;
 }) {
   const player = useVideoPlayer(source, (nextPlayer) => {
     nextPlayer.loop = false;
-    nextPlayer.muted = true;
+    nextPlayer.staysActiveInBackground = false;
+    nextPlayer.showNowPlayingNotification = false;
+    applyClipAudio(nextPlayer, audible);
     nextPlayer.playbackRate = playbackRate;
     if (!paused) {
       nextPlayer.play();
@@ -139,54 +178,137 @@ function ActiveHeroClip({
   });
 
   useEffect(() => {
+    onPlayer(player);
+    return () => onPlayer(null);
+  }, [onPlayer, player]);
+
+  useEffect(() => {
     // expo-video documents a mutable player; rate/play/pause are not React state.
     // eslint-disable-next-line react-hooks/immutability -- VideoPlayer is an external mutable host object
     player.playbackRate = playbackRate;
+    applyClipAudio(player, audible);
+
     if (paused) {
       player.pause();
-    } else {
-      player.play();
+      return;
     }
-  }, [paused, playbackRate, player]);
+
+    try {
+      const pending = player.play() as void | Promise<void>;
+      if (pending && typeof pending.then === 'function') {
+        void pending.catch(() => {
+          if (!player.muted) {
+            applyClipAudio(player, false);
+            player.play();
+          }
+        });
+      }
+    } catch {
+      if (!player.muted) {
+        applyClipAudio(player, false);
+        try {
+          player.play();
+        } catch {
+          player.pause();
+        }
+      }
+    }
+  }, [audible, paused, playbackRate, player]);
 
   useEventListener(player, 'playToEnd', onEnded);
 
   return (
-    <VideoView
-      contentFit="cover"
-      nativeControls={false}
-      player={player}
-      playsInline
+    <View
       pointerEvents="none"
-      style={styles.fill}
-      surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
-      useExoShutter={false}
-    />
+      style={
+        useBanner
+          ? [styles.howlweenBanner, { top: bannerTop, height: bannerHeight }]
+          : styles.fill
+      }
+    >
+      <VideoView
+        contentFit="cover"
+        fullscreenOptions={{ enable: false }}
+        nativeControls={false}
+        player={player}
+        playsInline
+        pointerEvents="none"
+        style={useBanner ? styles.bannerVideo : styles.fill}
+        surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
+        useExoShutter={false}
+      />
+    </View>
   );
 }
 
 function RotatingHeroVideo({
-  sources,
-  poster,
+  clips,
   activeIndex,
   onActiveIndexChange,
   onTransitionChange,
+  topInset: _topInset = 0,
   bottomInset = 0,
 }: HomeHeroMediaProps) {
   const opacity = useRef(new Animated.Value(1)).current;
   const rotatingRef = useRef(false);
+  const playerRef = useRef<VideoPlayer | null>(null);
+  const userStartedRef = useRef(false);
+  const reduceMotion = useReducedMotion();
+  const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [paused, setPaused] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
 
-  const source = sources[activeIndex] ?? sources[0];
-  const playbackRate = HERO_PLAYBACK_RATES[activeIndex] ?? 1;
+  const clip = clips[activeIndex] ?? clips[0];
+  const screenActive = isFocused && appActive;
+  const playbackPaused = paused || !screenActive;
+  const audible = Boolean(clip?.hasAudioControl && audioEnabled && screenActive && !playbackPaused);
+  const useHowlweenBanner =
+    clip?.framing === 'howlween' && howlweenScaleFor(frameSize.width, frameSize.height) < 0.995;
+  const bannerHeight = frameSize.width * (9 / 16);
+  const bannerTop = Math.max(0, (frameSize.height - bannerHeight) * 0.42);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const active = nextState === 'active';
+      setAppActive(active);
+
+      const player = playerRef.current;
+      if (!player) return;
+
+      if (!active) {
+        applyClipAudio(player, false);
+        player.pause();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion && !userStartedRef.current) {
+      setPaused(true);
+    }
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      const player = playerRef.current;
+      if (!player) return;
+      applyClipAudio(player, false);
+      player.pause();
+    }
+  }, [isFocused]);
 
   function rotateToNext() {
-    if (rotatingRef.current || sources.length < 2) {
+    if (rotatingRef.current || clips.length < 2) {
       return;
     }
 
     rotatingRef.current = true;
     onTransitionChange?.(true);
+    applyClipAudioSafe();
 
     Animated.timing(opacity, {
       toValue: 0,
@@ -199,7 +321,7 @@ function RotatingHeroVideo({
         return;
       }
 
-      const nextIndex = (activeIndex + 1) % sources.length;
+      const nextIndex = (activeIndex + 1) % clips.length;
       onActiveIndexChange(nextIndex);
       onTransitionChange?.(false);
 
@@ -213,62 +335,146 @@ function RotatingHeroVideo({
     });
   }
 
+  function applyClipAudioSafe() {
+    const player = playerRef.current;
+    if (!player) return;
+    applyClipAudio(player, false);
+  }
+
+  const handlePlayer = useCallback((player: VideoPlayer | null) => {
+    playerRef.current = player;
+  }, []);
+
   function togglePlayback() {
-    setPaused((current) => !current);
+    if (playbackPaused) {
+      userStartedRef.current = true;
+      setPaused(false);
+      return;
+    }
+
+    setPaused(true);
+    playerRef.current?.pause();
+  }
+
+  function toggleHalloweenAudio() {
+    if (!clip?.hasAudioControl) return;
+
+    const nextEnabled = !audioEnabled;
+    setAudioEnabled(nextEnabled);
+    const player = playerRef.current;
+    if (!player || !screenActive) return;
+
+    const playSound = nextEnabled && !paused;
+    applyClipAudio(player, playSound);
+    if (playSound) {
+      userStartedRef.current = true;
+      setPaused(false);
+      try {
+        player.play();
+      } catch {
+        applyClipAudio(player, false);
+        setAudioEnabled(false);
+      }
+    }
+  }
+
+  if (!clip) {
+    return <View style={styles.root} />;
   }
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setFrameSize((current) =>
+          current.width === width && current.height === height ? current : { width, height },
+        );
+      }}
+    >
       <Image
         accessible={false}
         alt=""
-        source={poster}
+        source={clip.poster}
+        blurRadius={useHowlweenBanner ? 28 : 0}
         resizeMode="cover"
         style={styles.fill}
       />
 
       <Animated.View style={[styles.fill, { opacity }]}>
         <ActiveHeroClip
-          key={activeIndex}
-          source={source}
-          playbackRate={playbackRate}
-          paused={paused}
+          key={`${clip.source}-${activeIndex}`}
+          source={clip.source}
+          playbackRate={clip.playbackRate}
+          paused={playbackPaused}
+          audible={audible}
+          useBanner={useHowlweenBanner}
+          bannerTop={bannerTop}
+          bannerHeight={bannerHeight}
           onEnded={() => {
-            if (!paused) {
+            if (!paused && screenActive) {
               rotateToNext();
             }
           }}
+          onPlayer={handlePlayer}
         />
       </Animated.View>
 
       <HeroScrim />
 
-      <BubblePressable
-        accessibilityLabel={paused ? 'Play homepage videos' : 'Pause homepage videos'}
-        accessibilityRole="button"
-        hitSlop={10}
-        onPress={togglePlayback}
-        scaleTo={0.88}
-        style={[styles.playButton, { bottom: Math.max(bottomInset, 12) + 18 }]}
+      <View
+        style={[
+          styles.controls,
+          { top: Math.max(_topInset, 0) + 96 },
+        ]}
       >
-        {paused ? (
-          <Play color="#FFFFFF" size={18} strokeWidth={2.5} fill="#FFFFFF" />
-        ) : (
-          <Pause color="#FFFFFF" size={18} strokeWidth={2.5} fill="#FFFFFF" />
-        )}
-      </BubblePressable>
+        {clip.hasAudioControl ? (
+          <BubblePressable
+            accessibilityLabel={audible ? 'Mute Halloween music' : 'Play Halloween music'}
+            accessibilityRole="button"
+            accessibilityState={{ selected: audible }}
+            hitSlop={8}
+            onPress={toggleHalloweenAudio}
+            scaleTo={0.88}
+            style={styles.controlButton}
+          >
+            {audible ? (
+              <Volume2 color="#FFFFFF" size={18} strokeWidth={2.4} />
+            ) : (
+              <VolumeX color="#FFFFFF" size={18} strokeWidth={2.4} />
+            )}
+          </BubblePressable>
+        ) : null}
+
+        <BubblePressable
+          accessibilityLabel={playbackPaused ? 'Play homepage videos' : 'Pause homepage videos'}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={togglePlayback}
+          scaleTo={0.88}
+          style={styles.controlButton}
+        >
+          {playbackPaused ? (
+            <Play color="#FFFFFF" size={18} strokeWidth={2.5} fill="#FFFFFF" />
+          ) : (
+            <Pause color="#FFFFFF" size={18} strokeWidth={2.5} fill="#FFFFFF" />
+          )}
+        </BubblePressable>
+      </View>
     </View>
   );
 }
 
 /**
- * Website-matching full-bleed hero: three videos rotate on end with a soft fade.
+ * Website-matching full-bleed hero. Howl-ween leads the rotation and is the
+ * only clip with a soundtrack control.
  */
 export default function HomeHeroMedia(props: HomeHeroMediaProps) {
-  const fallback = <PosterFallback poster={props.poster} />;
+  const poster = props.clips[props.activeIndex]?.poster ?? props.clips[0]?.poster;
+  if (!poster) return null;
 
   return (
-    <HeroMediaErrorBoundary fallback={fallback}>
+    <HeroMediaErrorBoundary fallback={<PosterFallback poster={poster} />}>
       <RotatingHeroVideo {...props} />
     </HeroMediaErrorBoundary>
   );
@@ -286,10 +492,12 @@ const styles = StyleSheet.create({
   },
   fill: {
     bottom: 0,
+    height: '100%',
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
+    width: '100%',
   },
   shade: {
     backgroundColor: 'rgba(0,0,0,0.14)',
@@ -306,7 +514,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
-  playButton: {
+  controls: {
+    flexDirection: 'row',
+    gap: 8,
+    position: 'absolute',
+    right: 18,
+    zIndex: 5,
+  },
+  howlweenBanner: {
+    left: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 0,
+    width: '100%',
+  },
+  bannerVideo: {
+    height: '100%',
+    width: '100%',
+  },
+  controlButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
     borderColor: 'rgba(255,255,255,0.25)',
@@ -314,9 +540,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
-    position: 'absolute',
-    right: 18,
     width: 44,
-    zIndex: 5,
   },
 });
