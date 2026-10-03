@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:email": "tsx --test lib/email/resend-webhook.test.ts",
+    "test:email": "tsx --test lib/email/resend-webhook.test.ts lib/email/headers.test.ts lib/email/suppression.test.ts lib/email/email-updates-welcome.test.ts",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
     "diagnose-payments": "tsx scripts/diagnose-payments.ts",
