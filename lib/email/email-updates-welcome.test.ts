@@ -61,18 +61,29 @@ describe("email updates welcome", () => {
     }
   });
 
-  it("links Facebook, Instagram, TikTok, X, and YouTube as separate anchors", () => {
+  it("puts each official social icon inside its own anchor", () => {
     const { html } = welcome();
-    assert.match(html, new RegExp(`href="${SOCIAL.facebook}"`));
-    assert.match(html, new RegExp(`href="${SOCIAL.instagram}"`));
-    assert.match(html, new RegExp(`href="${SOCIAL.tiktok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
-    assert.match(html, new RegExp(`href="${SOCIAL.x}"`));
-    assert.match(html, new RegExp(`href="${SOCIAL.youtube.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
-    assert.match(html, />\s*Facebook\s*</);
-    assert.match(html, />\s*Instagram\s*</);
-    assert.match(html, />\s*TikTok\s*</);
-    assert.match(html, />\s*X\s*</);
-    assert.match(html, />\s*YouTube\s*</);
+    const escapeRegExp = (value: string) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const icons = [
+      ["instagram", SOCIAL.instagram, "Instagram"],
+      ["facebook", SOCIAL.facebook, "Facebook"],
+      ["x", SOCIAL.x, "X"],
+      ["youtube", SOCIAL.youtube, "YouTube"],
+      ["tiktok", SOCIAL.tiktok, "TikTok"],
+    ] as const;
+    for (const [file, url, alt] of icons) {
+      const anchor = html.match(
+        new RegExp(`<a href="${escapeRegExp(url)}"[\\s\\S]*?</a>`),
+      );
+      assert.ok(anchor, url);
+      assert.match(anchor[0], /<img\b/);
+      assert.match(
+        anchor[0],
+        new RegExp(`src="https://www\\.sitguru\\.com/images/email/social/${file}\\.png"`),
+      );
+      assert.match(anchor[0], new RegExp(`alt="${alt}"`));
+    }
   });
 
   it("does not include a LinkedIn URL", () => {
@@ -157,13 +168,17 @@ describe("email updates welcome", () => {
   it("keeps the approved copy, CTA, and a useful plain-text version", () => {
     const { html, text } = welcome();
     assert.match(html, /Welcome to the SitGuru community — trusted pet care starts here\./);
-    assert.match(html, /Hi Ava&lt;script&gt; — we’re so happy to have you here\./);
+    assert.match(html, /We’re so happy to have you here! SitGuru connects pet parents with trusted, caring sitters/);
+    assert.match(html, /class="text-brand"[^>]*>SitGuru</);
+    assert.match(html, /Verified sitters and real pet lovers\./);
+    assert.match(html, /Tips, resources, and fellow pet parents\./);
     assert.doesNotMatch(html, /<script>/);
-    assert.match(html, /Explore SitGuru/);
+    assert.doesNotMatch(html, /Ava/);
+    assert.match(html, /Explore SitGuru →/);
     assert.match(html, /href="https:\/\/www\.sitguru\.com\/"/);
-    assert.match(html, /width="210"/);
+    assert.match(html, /sitguru-logo-cropped\.png" width="320"/);
     assert.match(text, /Welcome to the SitGuru community!/);
-    assert.match(text, /Hi Ava<script> — we’re so happy to have you here\./);
+    assert.match(text, /We’re so happy to have you here!/);
     assert.match(text, /Explore SitGuru:\nhttps:\/\/www\.sitguru\.com\//);
     assert.match(text, /Woof and purrs,/);
     assert.match(text, /Trusted Pet Care\. Simplified\./);
