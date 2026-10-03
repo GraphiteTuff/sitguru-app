@@ -1316,9 +1316,13 @@ function buildOutboundFromHeader(senderName: string, senderEmail?: string) {
   const name = asString(senderName) || "SitGuru Admin";
   const emailMatch = supportFrom.match(/<([^>]+)>/);
   const supportEmail = emailMatch?.[1] || "support@sitguru.com";
-  const safeName = name.replace(/[<>"]/g, "").trim() || "SitGuru Admin";
+  // Strip CR/LF as well as angle brackets / quotes (header injection hygiene).
+  const safeName =
+    name.replace(/[\r\n\u0000]/g, " ").replace(/[<>"]/g, "").replace(/\s+/g, " ").trim() ||
+    "SitGuru Admin";
 
   // Keep verified Resend domain; show selected sender as display name.
+  // Never allow jason@sitguru.com as the Resend From mailbox.
   if (asString(senderEmail).toLowerCase() === "support@sitguru.com") {
     return `SitGuru Support <${supportEmail}>`;
   }

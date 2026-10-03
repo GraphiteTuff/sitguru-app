@@ -302,7 +302,7 @@ SitGuru is currently speaking with candidates interested in becoming pet care si
 
 You can sign up now for free and begin creating your Guru profile here:
 
-https://www.sitguru.com/become-a-guru?ref=${referralCode}
+https://sitguru.com/become-a-guru?ref=${referralCode}
 
 Referral Code: ${referralCode}
 
@@ -315,8 +315,10 @@ Please reply and let us know if you are still interested in moving forward.
 Thank you,
 
 Jason Graff
-Founder, SitGuru
-https://www.sitguru.com`,
+Founder & CEO
+SitGuru
+jason@sitguru.com
+https://sitguru.com`,
   );
 
   return `mailto:${lead.email}?subject=${subject}&body=${body}`;
