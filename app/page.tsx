@@ -655,6 +655,65 @@ function syncHeroPlayback(
   return true;
 }
 
+const HOWLWEEN_BAT_PATH =
+  "M50 30 L45 16 L36 12 L28 2 L24 12 L14 6 L6 0 L12 14 L2 16 L0 22 L14 22 L10 32 L22 26 L32 34 L42 42 L50 30 L58 42 L68 34 L78 26 L90 32 L86 22 L100 22 L98 16 L88 14 L94 0 L86 6 L76 12 L72 2 L64 12 L55 16 Z";
+
+const howlweenGutter = (amount: number) =>
+  `calc((100% - min(100%, 78vh * 16 / 9)) / 2 * ${amount})`;
+
+const HOWLWEEN_BATS: ReadonlyArray<{
+  top: string;
+  left?: string;
+  right?: string;
+  size: number;
+  rotate: number;
+  flip?: boolean;
+  opacity: number;
+}> = [
+  { top: "4%", left: howlweenGutter(0.08), size: 30, rotate: -22, opacity: 0.95 },
+  { top: "16%", left: howlweenGutter(0.34), size: 40, rotate: 12, flip: true, opacity: 0.9 },
+  { top: "31%", left: howlweenGutter(0.1), size: 24, rotate: -8, opacity: 0.78 },
+  { top: "43%", left: howlweenGutter(0.4), size: 34, rotate: 18, opacity: 0.92 },
+  { top: "56%", left: howlweenGutter(0.06), size: 44, rotate: -14, flip: true, opacity: 0.96 },
+  { top: "70%", left: howlweenGutter(0.32), size: 28, rotate: 26, opacity: 0.82 },
+  { top: "84%", left: howlweenGutter(0.12), size: 34, rotate: -18, flip: true, opacity: 0.9 },
+  { top: "5%", right: howlweenGutter(0.1), size: 38, rotate: 16, flip: true, opacity: 0.94 },
+  { top: "18%", right: howlweenGutter(0.36), size: 26, rotate: -20, opacity: 0.8 },
+  { top: "31%", right: howlweenGutter(0.08), size: 42, rotate: 8, opacity: 0.96 },
+  { top: "46%", right: howlweenGutter(0.38), size: 22, rotate: -24, flip: true, opacity: 0.74 },
+  { top: "58%", right: howlweenGutter(0.14), size: 40, rotate: 14, opacity: 0.9 },
+  { top: "73%", right: howlweenGutter(0.34), size: 30, rotate: -12, flip: true, opacity: 0.84 },
+  { top: "86%", right: howlweenGutter(0.08), size: 36, rotate: 20, opacity: 0.92 },
+];
+
+function HowlweenBatField() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 h-[min(78vh,56.25vw)] overflow-hidden text-white"
+      aria-hidden="true"
+    >
+      {HOWLWEEN_BATS.map((bat, index) => (
+        <svg
+          key={index}
+          viewBox="0 0 100 48"
+          className="absolute"
+          style={{
+            top: bat.top,
+            left: bat.left,
+            right: bat.right,
+            width: bat.size,
+            height: bat.size * 0.48,
+            opacity: bat.opacity,
+            transform: `rotate(${bat.rotate}deg) scaleX(${bat.flip ? -1 : 1})`,
+          }}
+        >
+          <path fill="currentColor" d={HOWLWEEN_BAT_PATH} />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 function HeroSoundIcon({ audible }: { audible: boolean }) {
   return (
     <svg
@@ -2314,10 +2373,11 @@ export default function HomePage() {
             : "relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]"
         }
       >
+        {howlweenStage ? <HowlweenBatField /> : null}
         <div
           className={
             howlweenStage
-              ? "relative mx-auto aspect-video w-full max-w-[calc(78vh*16/9)] bg-black"
+              ? "relative z-10 mx-auto aspect-video w-full max-w-[calc(78vh*16/9)] bg-black"
               : "absolute inset-0"
           }
         >
