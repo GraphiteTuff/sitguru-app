@@ -44,7 +44,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import ProfileMediaStudio from '@/components/account/ProfileMediaStudio';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { useThemePreference } from '@/hooks/use-color-scheme';
@@ -102,7 +102,6 @@ export default function AccountScreen() {
   const [activeSection, setActiveSection] =
     useState<AccountSectionKey>('profile');
   const [refreshing, setRefreshing] = useState(false);
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const {
     preferences: notificationPreferences,
     options: notificationOptions,
@@ -157,6 +156,15 @@ export default function AccountScreen() {
     : ['pet_parent', 'guru', 'ambassador'];
 
   const currentRole: AppRole = primaryRole ?? 'pet_parent';
+
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole,
+    enabled: isAuthenticated,
+  });
 
   const statusLabel = profileError
     ? 'Needs attention'
@@ -366,13 +374,16 @@ export default function AccountScreen() {
                           : 'Log in'
                       }
                       accessibilityRole="button"
+                      haptic="none"
+                      delayLongPress={avatarPressProps.delayLongPress}
+                      onLongPress={avatarPressProps.onLongPress}
                       onPress={() => {
-                        if (isAuthenticated) {
-                          setWorkspaceSwitcherOpen(true);
+                        if (!isAuthenticated) {
+                          router.push('/login');
                           return;
                         }
 
-                        router.push('/login');
+                        avatarPressProps.onPress?.();
                       }}
                       scaleTo={0.88}
                       style={styles.profileButton}>
@@ -462,7 +473,7 @@ export default function AccountScreen() {
                         <SitGuruButton
                           flex
                           label="Switch workspace"
-                          onPress={() => setWorkspaceSwitcherOpen(true)}
+                          onPress={openFullMenu}
                           size="compact"
                           variant="secondary"
                         />
@@ -996,13 +1007,7 @@ export default function AccountScreen() {
 
               <SitGuruTabBar active="profile" />
 
-              {isAuthenticated ? (
-                <SitGuruWorkspaceSwitcher
-                  currentRole={currentRole}
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
-                />
-              ) : null}
+              {isAuthenticated ? workspaceMenus : null}
             </View>
           </View>
 
