@@ -790,7 +790,9 @@ function HeroVisual({
   }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
 
   useEffect(() => {
+    let started = false;
     const unlockSound = (event: Event) => {
+      if (started) return;
       const target = event.target;
       if (target instanceof Element && target.closest('button[aria-label*="Halloween music"]')) return;
 
@@ -799,20 +801,17 @@ function HeroVisual({
       if (!video || !clip.hasPromotionalAudio || !promotionalAudioEnabledRef.current) return;
       if (!video.muted && video.volume > 0 && !video.paused) return;
 
-      video.muted = false;
-      video.defaultMuted = false;
-      video.volume = 1;
-      video.playbackRate = clip.playbackRate;
-      video.removeAttribute("muted");
+      started = true;
       setSoundOutputMuted(false);
-      if (video.paused) {
-        void video.play().catch(() => undefined);
-      }
+      syncHeroPlayback(video, clip, true);
+      void video.play().catch(() => undefined);
     };
-    window.addEventListener("pointerdown", unlockSound, true);
+    window.addEventListener("click", unlockSound, true);
+    window.addEventListener("touchend", unlockSound, true);
     window.addEventListener("keydown", unlockSound, true);
     return () => {
-      window.removeEventListener("pointerdown", unlockSound, true);
+      window.removeEventListener("click", unlockSound, true);
+      window.removeEventListener("touchend", unlockSound, true);
       window.removeEventListener("keydown", unlockSound, true);
       if (handoffTimerRef.current !== null) {
         window.clearTimeout(handoffTimerRef.current);
