@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
@@ -686,10 +686,12 @@ const HOWLWEEN_BATS: ReadonlyArray<{
   { top: "86%", right: howlweenGutter(0.08), size: 36, rotate: 20, opacity: 0.92 },
 ];
 
-function HowlweenBatField() {
+function HowlweenBatField({ visible }: { visible: boolean }) {
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 h-[min(78vh,56.25vw)] overflow-hidden text-white"
+      className={`pointer-events-none absolute inset-x-0 top-0 h-[min(78vh,56.25vw)] overflow-hidden text-white transition-opacity duration-1000 ease-in-out motion-reduce:transition-none ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
       aria-hidden="true"
     >
       {HOWLWEEN_BATS.map((bat, index) => (
@@ -742,11 +744,9 @@ function HeroSoundIcon({ audible }: { audible: boolean }) {
 function HeroVisual({
   onActiveVideoChange,
   onVideoTransitionChange,
-  onHowlweenStageHold,
 }: {
   onActiveVideoChange: (index: number) => void;
   onVideoTransitionChange: (isTransitioning: boolean) => void;
-  onHowlweenStageHold: (hold: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const promotionalAudioEnabledRef = useRef(true);
@@ -758,7 +758,7 @@ function HeroVisual({
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
   const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
-  const [awaitingSoundGesture, setAwaitingSoundGesture] = useState(false);
+  const [soundOutputMuted, setSoundOutputMuted] = useState(false);
   const [handoffStill, setHandoffStill] = useState<string | null>(null);
   const [handoffFrameClassName, setHandoffFrameClassName] = useState<string | undefined>();
   const [handoffPositionClassName, setHandoffPositionClassName] = useState("");
@@ -768,9 +768,8 @@ function HeroVisual({
   const activeVideo = heroVideos[activeVideoIndex] ?? heroVideos[0];
   const videoFrameReady = readyVideoSrc === activeVideo.src;
   const heroAudioAudible =
-    activeVideo.hasPromotionalAudio &&
-    promotionalAudioEnabled &&
-    !awaitingSoundGesture;
+    activeVideo.hasPromotionalAudio && promotionalAudioEnabled;
+  const videoMuted = !heroAudioAudible || soundOutputMuted;
 
   function setHalloweenAudioEnabled(enabled: boolean) {
     promotionalAudioEnabledRef.current = enabled;
@@ -780,11 +779,14 @@ function HeroVisual({
   useEffect(() => {
     activeVideoRef.current = activeVideo;
     onActiveVideoChange(activeVideoIndex);
-    if (activeVideo.hasPromotionalAudio) onHowlweenStageHold(true);
-  }, [activeVideo, activeVideoIndex, onActiveVideoChange, onHowlweenStageHold]);
+  }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
 
   useEffect(() => {
-    const unlockSound = () => setAwaitingSoundGesture(false);
+    const unlockSound = () => {
+      if (!promotionalAudioEnabledRef.current) return;
+      if (!activeVideoRef.current.hasPromotionalAudio) return;
+      setSoundOutputMuted(false);
+    };
     window.addEventListener("pointerdown", unlockSound);
     return () => {
       window.removeEventListener("pointerdown", unlockSound);
@@ -793,19 +795,6 @@ function HeroVisual({
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (awaitingSoundGesture || !promotionalAudioEnabled) return;
-    const video = videoRef.current;
-    if (!video || !activeVideo.hasPromotionalAudio) return;
-
-    syncHeroPlayback(video, activeVideo, true);
-    void video.play().catch(() => {
-      setAwaitingSoundGesture(true);
-      prepareSilentBackgroundVideo(video);
-      void video.play().catch(() => setIsVideoPaused(true));
-    });
-  }, [activeVideo, awaitingSoundGesture, promotionalAudioEnabled]);
 
   const rotateToNextVideo = useCallback(() => {
     const video = videoRef.current;
@@ -830,7 +819,6 @@ function HeroVisual({
       video.pause();
     }
 
-    const leavingPromotionalStage = activeVideoRef.current.hasPromotionalAudio;
     setHandoffStill(still);
     setHandoffFrameClassName(activeVideoRef.current.frameClassName);
     setHandoffPositionClassName(activeVideoRef.current.objectPositionClassName);
@@ -845,7 +833,6 @@ function HeroVisual({
       setHandoffStill(null);
       setHandoffFading(false);
       handoffTimerRef.current = null;
-      if (leavingPromotionalStage) onHowlweenStageHold(false);
     }, 1100);
     onVideoTransitionChange(true);
     window.setTimeout(() => onVideoTransitionChange(false), 420);
@@ -860,7 +847,7 @@ function HeroVisual({
 
       return currentIndex;
     });
-  }, [onHowlweenStageHold, onVideoTransitionChange]);
+  }, [onVideoTransitionChange]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -882,7 +869,9 @@ function HeroVisual({
       queueMicrotask(markVideoUnavailable);
     }
 
-    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current);
+    const wantSound =
+      promotionalAudioEnabledRef.current && !soundOutputMuted;
+    syncHeroPlayback(video, activeVideo, wantSound);
 
     if (prefersReducedMotion() && holdForReducedMotionRef.current) {
       video.pause();
@@ -892,8 +881,8 @@ function HeroVisual({
       }
     } else if (!userPausedRef.current) {
       void video.play().catch(() => {
-        if (!video.muted) {
-          setAwaitingSoundGesture(true);
+        if (activeVideo.hasPromotionalAudio && promotionalAudioEnabledRef.current) {
+          setSoundOutputMuted(true);
           prepareSilentBackgroundVideo(video);
           void video.play().catch(() => setIsVideoPaused(true));
           return;
@@ -906,13 +895,17 @@ function HeroVisual({
     return () => {
       video.removeEventListener("error", markVideoUnavailable);
     };
-  }, [activeVideo, rotateToNextVideo]);
+  }, [activeVideo, rotateToNextVideo, soundOutputMuted]);
 
   function playActiveVideo() {
     const video = videoRef.current;
     if (!video) return;
 
-    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current);
+    syncHeroPlayback(
+      video,
+      activeVideo,
+      promotionalAudioEnabledRef.current && !soundOutputMuted,
+    );
     void video
       .play()
       .then(() => {
@@ -921,8 +914,8 @@ function HeroVisual({
         onVideoTransitionChange(false);
       })
       .catch(() => {
-        if (!video.muted) {
-          setAwaitingSoundGesture(true);
+        if (activeVideo.hasPromotionalAudio && promotionalAudioEnabledRef.current) {
+          setSoundOutputMuted(true);
           prepareSilentBackgroundVideo(video);
           void video
             .play()
@@ -973,6 +966,7 @@ function HeroVisual({
 
     const nextEnabled = !promotionalAudioEnabledRef.current;
     setHalloweenAudioEnabled(nextEnabled);
+    if (nextEnabled) setSoundOutputMuted(false);
     syncHeroPlayback(video, activeVideo, nextEnabled);
 
     if (!nextEnabled || prefersReducedMotion() || !video.paused) return;
@@ -984,8 +978,9 @@ function HeroVisual({
         if (!video.paused) setIsVideoPaused(false);
       })
       .catch(() => {
+        setSoundOutputMuted(true);
         prepareSilentBackgroundVideo(video);
-        setHalloweenAudioEnabled(false);
+        void video.play().catch(() => setIsVideoPaused(true));
       });
   }
 
@@ -1010,7 +1005,8 @@ function HeroVisual({
         } ${videoFrameReady ? "opacity-100" : "opacity-0"}`}
         poster={activeVideo.poster}
         autoPlay
-        muted={!heroAudioAudible}
+        muted={videoMuted}
+        defaultMuted={videoMuted}
         playsInline
         disableRemotePlayback
         disablePictureInPicture
@@ -2111,10 +2107,114 @@ export default function HomePage() {
   const [source, setSource] = useState("direct");
   const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
   const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
-  const [howlweenStage, setHowlweenStage] = useState(true);
-  const holdHowlweenStage = useCallback((hold: boolean) => {
-    setHowlweenStage(hold);
-  }, []);
+  const howlweenStage = Boolean(
+    heroVideos[activeHeroVideoIndex]?.hasPromotionalAudio,
+  );
+  const heroSectionRef = useRef<HTMLElement | null>(null);
+  const heroStageRef = useRef<HTMLDivElement | null>(null);
+  const heroCopyRef = useRef<HTMLDivElement | null>(null);
+  const heroMotionRef = useRef<{
+    section: number;
+    stage: DOMRect;
+    copy: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const section = heroSectionRef.current;
+    const stage = heroStageRef.current;
+    const copy = heroCopyRef.current;
+    if (!section || !stage || !copy) return;
+
+    const nextSection = section.getBoundingClientRect().height;
+    const nextStage = stage.getBoundingClientRect();
+    const nextCopy = copy.getBoundingClientRect().top;
+    const previous = heroMotionRef.current;
+    const remember = () => {
+      heroMotionRef.current = {
+        section: nextSection,
+        stage: nextStage,
+        copy: nextCopy,
+      };
+    };
+
+    if (!previous) {
+      remember();
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      remember();
+      return;
+    }
+
+    const widthDelta = Math.abs(previous.stage.width - nextStage.width);
+    const heightDelta = Math.abs(previous.stage.height - nextStage.height);
+    if (widthDelta < 2 && heightDelta < 2) {
+      remember();
+      return;
+    }
+
+    const duration = 1400;
+    const easing = "cubic-bezier(0.22, 1, 0.36, 1)";
+    const sectionBox = section.getBoundingClientRect();
+
+    section.style.transition = "none";
+    section.style.height = `${previous.section}px`;
+    stage.style.transition = "none";
+    stage.style.position = "absolute";
+    stage.style.margin = "0";
+    stage.style.maxWidth = "none";
+    stage.style.aspectRatio = "auto";
+    stage.style.right = "auto";
+    stage.style.bottom = "auto";
+    stage.style.left = `${previous.stage.left - sectionBox.left}px`;
+    stage.style.top = `${previous.stage.top - sectionBox.top}px`;
+    stage.style.width = `${previous.stage.width}px`;
+    stage.style.height = `${previous.stage.height}px`;
+    copy.style.transition = "none";
+    copy.style.transform = `translate3d(0, ${previous.copy - nextCopy}px, 0)`;
+
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const origin = section.getBoundingClientRect();
+        stage.style.transition = `left ${duration}ms ${easing}, top ${duration}ms ${easing}, width ${duration}ms ${easing}, height ${duration}ms ${easing}`;
+        stage.style.left = `${nextStage.left - origin.left}px`;
+        stage.style.top = `${nextStage.top - origin.top}px`;
+        stage.style.width = `${nextStage.width}px`;
+        stage.style.height = `${nextStage.height}px`;
+        section.style.transition = `height ${duration}ms ${easing}`;
+        section.style.height = `${nextSection}px`;
+        copy.style.transition = `transform ${duration}ms ${easing}`;
+        copy.style.transform = "translate3d(0, 0, 0)";
+      });
+    });
+
+    const clearStyles = () => {
+      window.cancelAnimationFrame(frame);
+      section.style.height = "";
+      section.style.transition = "";
+      stage.style.transition = "";
+      stage.style.position = "";
+      stage.style.margin = "";
+      stage.style.maxWidth = "";
+      stage.style.aspectRatio = "";
+      stage.style.right = "";
+      stage.style.bottom = "";
+      stage.style.left = "";
+      stage.style.top = "";
+      stage.style.width = "";
+      stage.style.height = "";
+      copy.style.transition = "";
+      copy.style.transform = "";
+    };
+    const timeout = window.setTimeout(() => {
+      clearStyles();
+      remember();
+    }, duration + 80);
+    return () => {
+      window.clearTimeout(timeout);
+      clearStyles();
+    };
+  }, [howlweenStage]);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
   const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
@@ -2367,14 +2467,16 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-950">
       <section
+        ref={heroSectionRef}
         className={
           howlweenStage
             ? "relative overflow-hidden bg-slate-950"
             : "relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]"
         }
       >
-        {howlweenStage ? <HowlweenBatField /> : null}
+        <HowlweenBatField visible={howlweenStage} />
         <div
+          ref={heroStageRef}
           className={
             howlweenStage
               ? "relative z-10 mx-auto aspect-video w-full max-w-[calc(78vh*16/9)] bg-black"
@@ -2384,11 +2486,11 @@ export default function HomePage() {
           <HeroVisual
             onActiveVideoChange={setActiveHeroVideoIndex}
             onVideoTransitionChange={setIsHeroVideoTransitioning}
-            onHowlweenStageHold={holdHowlweenStage}
           />
         </div>
 
         <div
+          ref={heroCopyRef}
           className={
             howlweenStage
               ? "relative z-10 mx-auto flex w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
@@ -2405,10 +2507,8 @@ export default function HomePage() {
             <div>
               <div
                 aria-live="polite"
-                className={`inline-flex min-h-7 items-center rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur transition-all duration-300 ease-out motion-reduce:transition-none ${
-                  isHeroVideoTransitioning
-                    ? "translate-y-1 opacity-0"
-                    : "translate-y-0 opacity-100"
+                className={`inline-flex min-h-7 items-center rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur transition-opacity duration-700 ease-out motion-reduce:transition-none ${
+                  isHeroVideoTransitioning ? "opacity-0" : "opacity-100"
                 }`}
               >
                 <span key={activeHeroVideoIndex}>
