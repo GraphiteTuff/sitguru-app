@@ -123,6 +123,11 @@ export default function RootLayout({
       <body
         className={`${plusJakartaSans.className} site-shell min-h-screen bg-[#f8fcfd] text-slate-900 antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(location.pathname==="/"&&navigator.audioSession){navigator.audioSession.type="playback"}}catch(e){}`,
+          }}
+        />
         <Script id="google-tag-manager" strategy="afterInteractive">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

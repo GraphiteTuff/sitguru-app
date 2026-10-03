@@ -16,6 +16,9 @@ export function setAmbientAudioSession() {
 
   const session = (navigator as NavigatorWithAudioSession).audioSession;
   if (!session) return;
+  // The homepage Howl-ween clip is real playback. Don't let a later
+  // ambient reset silence it after the page has already opened.
+  if (session.type === "playback" && window.location.pathname === "/") return;
 
   try {
     session.type = "ambient";
