@@ -632,7 +632,6 @@ function syncHeroPlayback(
   options?: { honorActivation?: boolean },
 ) {
   setHeroAudioSession(promotionalAudioEnabled && videoConfig.hasPromotionalAudio);
-  video.playbackRate = videoConfig.playbackRate;
   video.playsInline = true;
   video.disableRemotePlayback = true;
   video.disablePictureInPicture = true;
@@ -657,6 +656,14 @@ function syncHeroPlayback(
 
 function autoplayWasBlocked(error: unknown) {
   return error instanceof DOMException && error.name === "NotAllowedError";
+}
+
+function applyHeroPlaybackRate(video: HTMLVideoElement, videoConfig: HeroVideo) {
+  // Howl-ween's clock is 1/12288. Assigning playbackRate before metadata is
+  // loaded makes Safari run that clip fast and drop its audio.
+  if (video.readyState < HTMLMediaElement.HAVE_METADATA) return;
+  if (videoConfig.playbackRate === 1 || video.playbackRate === videoConfig.playbackRate) return;
+  video.playbackRate = videoConfig.playbackRate;
 }
 
 const HOWLWEEN_BAT_PATH =
@@ -763,6 +770,7 @@ function HeroVisual({
   const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
   const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
   const [soundOutputMuted, setSoundOutputMuted] = useState(false);
+  const soundOutputMutedRef = useRef(false);
   const [handoffStill, setHandoffStill] = useState<string | null>(null);
   const [handoffFrameClassName, setHandoffFrameClassName] = useState<string | undefined>();
   const [handoffPositionClassName, setHandoffPositionClassName] = useState("");
@@ -780,6 +788,11 @@ function HeroVisual({
     setPromotionalAudioEnabled(enabled);
   }
 
+  function updateSoundOutputMuted(muted: boolean) {
+    soundOutputMutedRef.current = muted;
+    setSoundOutputMuted(muted);
+  }
+
   useEffect(() => {
     activeVideoRef.current = activeVideo;
     onActiveVideoChange(activeVideoIndex);
@@ -787,14 +800,17 @@ function HeroVisual({
 
   function beginHeroPlayback(video: HTMLVideoElement, videoConfig: HeroVideo) {
     const wantSound = Boolean(
-      videoConfig.hasPromotionalAudio && promotionalAudioEnabledRef.current,
+      videoConfig.hasPromotionalAudio &&
+        promotionalAudioEnabledRef.current &&
+        !soundOutputMutedRef.current,
     );
     syncHeroPlayback(video, videoConfig, wantSound);
+    applyHeroPlaybackRate(video, videoConfig);
 
     const markPlaying = () => {
       if (video.paused) return;
       setIsVideoPaused(false);
-      if (wantSound) setSoundOutputMuted(false);
+      if (wantSound && !video.muted && video.volume > 0) updateSoundOutputMuted(false);
       onVideoTransitionChange(false);
     };
 
@@ -807,8 +823,9 @@ function HeroVisual({
         return;
       }
 
-      setSoundOutputMuted(true);
+      updateSoundOutputMuted(true);
       prepareSilentBackgroundVideo(video);
+      applyHeroPlaybackRate(video, videoConfig);
       return video.play().then(markPlaying).catch(() => {
         if (video.paused) setIsVideoPaused(true);
       });
@@ -816,7 +833,10 @@ function HeroVisual({
   }
 
   useEffect(() => {
-    const unlockSound = () => {
+    const unlockSound = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('button[aria-label*="Halloween music"]')) return;
+
       const video = videoRef.current;
       const clip = activeVideoRef.current;
       if (!video || !clip.hasPromotionalAudio || !promotionalAudioEnabledRef.current) return;
@@ -826,7 +846,7 @@ function HeroVisual({
       video.defaultMuted = false;
       video.volume = 1;
       video.removeAttribute("muted");
-      setSoundOutputMuted(false);
+      updateSoundOutputMuted(false);
       if (video.paused) {
         void video.play().catch(() => undefined);
       }
@@ -918,8 +938,9 @@ function HeroVisual({
     syncHeroPlayback(
       video,
       activeVideo,
-      promotionalAudioEnabledRef.current && !soundOutputMuted,
+      promotionalAudioEnabledRef.current && !soundOutputMutedRef.current,
     );
+    applyHeroPlaybackRate(video, activeVideo);
 
     if (prefersReducedMotion() && holdForReducedMotionRef.current) {
       video.pause();
@@ -934,7 +955,7 @@ function HeroVisual({
     return () => {
       video.removeEventListener("error", markVideoUnavailable);
     };
-  }, [activeVideo, rotateToNextVideo, soundOutputMuted]);
+  }, [activeVideo, rotateToNextVideo]);
 
   function playActiveVideo() {
     const video = videoRef.current;
@@ -973,8 +994,9 @@ function HeroVisual({
     const hearingSound = !video.muted && video.volume > 0;
     const nextEnabled = !hearingSound;
     setHalloweenAudioEnabled(nextEnabled);
-    setSoundOutputMuted(false);
+    updateSoundOutputMuted(false);
     syncHeroPlayback(video, activeVideo, nextEnabled);
+    applyHeroPlaybackRate(video, activeVideo);
 
     if (!nextEnabled) return;
 
@@ -983,7 +1005,7 @@ function HeroVisual({
     void video.play().then(() => {
       if (!video.paused) setIsVideoPaused(false);
     }).catch(() => {
-      setSoundOutputMuted(true);
+      updateSoundOutputMuted(true);
       prepareSilentBackgroundVideo(video);
       void video.play().catch(() => setIsVideoPaused(true));
     });
@@ -1016,10 +1038,13 @@ function HeroVisual({
         disablePictureInPicture
         preload="auto"
         aria-hidden="true"
+        onLoadedMetadata={(event) => {
+          applyHeroPlaybackRate(event.currentTarget, activeVideo);
+        }}
         onLoadedData={() => setReadyVideoSrc(activeVideo.src)}
         onPlaying={() => setReadyVideoSrc(activeVideo.src)}
         onCanPlay={(event) => {
-          event.currentTarget.playbackRate = activeVideo.playbackRate;
+          applyHeroPlaybackRate(event.currentTarget, activeVideo);
           if (prefersReducedMotion() && holdForReducedMotionRef.current) {
             event.currentTarget.pause();
             event.currentTarget.currentTime = 0;
