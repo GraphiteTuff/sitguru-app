@@ -632,6 +632,7 @@ function syncHeroPlayback(
   options?: { honorActivation?: boolean },
 ) {
   setHeroAudioSession(promotionalAudioEnabled && videoConfig.hasPromotionalAudio);
+  video.playbackRate = videoConfig.playbackRate;
   video.playsInline = true;
   video.disableRemotePlayback = true;
   video.disablePictureInPicture = true;
@@ -658,12 +659,8 @@ function autoplayWasBlocked(error: unknown) {
   return error instanceof DOMException && error.name === "NotAllowedError";
 }
 
-function applyHeroPlaybackRate(video: HTMLVideoElement, videoConfig: HeroVideo) {
-  // Howl-ween's clock is 1/12288. Assigning playbackRate before metadata is
-  // loaded makes Safari run that clip fast and drop its audio.
-  if (video.readyState < HTMLMediaElement.HAVE_METADATA) return;
-  if (videoConfig.playbackRate === 1 || video.playbackRate === videoConfig.playbackRate) return;
-  video.playbackRate = videoConfig.playbackRate;
+function heroPlayWasInterrupted(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 const HOWLWEEN_BAT_PATH =
@@ -770,7 +767,6 @@ function HeroVisual({
   const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
   const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
   const [soundOutputMuted, setSoundOutputMuted] = useState(false);
-  const soundOutputMutedRef = useRef(false);
   const [handoffStill, setHandoffStill] = useState<string | null>(null);
   const [handoffFrameClassName, setHandoffFrameClassName] = useState<string | undefined>();
   const [handoffPositionClassName, setHandoffPositionClassName] = useState("");
@@ -788,49 +784,10 @@ function HeroVisual({
     setPromotionalAudioEnabled(enabled);
   }
 
-  function updateSoundOutputMuted(muted: boolean) {
-    soundOutputMutedRef.current = muted;
-    setSoundOutputMuted(muted);
-  }
-
   useEffect(() => {
     activeVideoRef.current = activeVideo;
     onActiveVideoChange(activeVideoIndex);
   }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
-
-  function beginHeroPlayback(video: HTMLVideoElement, videoConfig: HeroVideo) {
-    const wantSound = Boolean(
-      videoConfig.hasPromotionalAudio &&
-        promotionalAudioEnabledRef.current &&
-        !soundOutputMutedRef.current,
-    );
-    syncHeroPlayback(video, videoConfig, wantSound);
-    applyHeroPlaybackRate(video, videoConfig);
-
-    const markPlaying = () => {
-      if (video.paused) return;
-      setIsVideoPaused(false);
-      if (wantSound && !video.muted && video.volume > 0) updateSoundOutputMuted(false);
-      onVideoTransitionChange(false);
-    };
-
-    return video.play().then(markPlaying).catch((error: unknown) => {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      // A play() before the file is ready can reject even when sound is allowed.
-      // Leave the preference on so the canplay retry starts the music.
-      if (!wantSound || !autoplayWasBlocked(error) || video.readyState < 2) {
-        if (video.paused && video.readyState >= 2) setIsVideoPaused(true);
-        return;
-      }
-
-      updateSoundOutputMuted(true);
-      prepareSilentBackgroundVideo(video);
-      applyHeroPlaybackRate(video, videoConfig);
-      return video.play().then(markPlaying).catch(() => {
-        if (video.paused) setIsVideoPaused(true);
-      });
-    });
-  }
 
   useEffect(() => {
     const unlockSound = (event: Event) => {
@@ -845,8 +802,9 @@ function HeroVisual({
       video.muted = false;
       video.defaultMuted = false;
       video.volume = 1;
+      video.playbackRate = clip.playbackRate;
       video.removeAttribute("muted");
-      updateSoundOutputMuted(false);
+      setSoundOutputMuted(false);
       if (video.paused) {
         void video.play().catch(() => undefined);
       }
@@ -935,12 +893,8 @@ function HeroVisual({
       queueMicrotask(markVideoUnavailable);
     }
 
-    syncHeroPlayback(
-      video,
-      activeVideo,
-      promotionalAudioEnabledRef.current && !soundOutputMutedRef.current,
-    );
-    applyHeroPlaybackRate(video, activeVideo);
+    const wantSound = promotionalAudioEnabledRef.current && !soundOutputMuted;
+    syncHeroPlayback(video, activeVideo, wantSound);
 
     if (prefersReducedMotion() && holdForReducedMotionRef.current) {
       video.pause();
@@ -948,19 +902,73 @@ function HeroVisual({
       if (video.paused) {
         queueMicrotask(() => setIsVideoPaused(true));
       }
-    } else if (!userPausedRef.current && video.readyState >= 2) {
-      void beginHeroPlayback(video, activeVideo);
+    } else if (!userPausedRef.current) {
+      void video.play().catch((error: unknown) => {
+        if (heroPlayWasInterrupted(error)) return;
+        if (
+          activeVideo.hasPromotionalAudio &&
+          promotionalAudioEnabledRef.current &&
+          autoplayWasBlocked(error)
+        ) {
+          setSoundOutputMuted(true);
+          prepareSilentBackgroundVideo(video);
+          void video.play().catch(() => setIsVideoPaused(true));
+          return;
+        }
+
+        if (video.paused && video.readyState >= 2) setIsVideoPaused(true);
+      });
     }
 
     return () => {
       video.removeEventListener("error", markVideoUnavailable);
     };
-  }, [activeVideo, rotateToNextVideo]);
+  }, [activeVideo, rotateToNextVideo, soundOutputMuted]);
 
   function playActiveVideo() {
     const video = videoRef.current;
     if (!video) return;
-    void beginHeroPlayback(video, activeVideo);
+
+    syncHeroPlayback(
+      video,
+      activeVideo,
+      promotionalAudioEnabledRef.current && !soundOutputMuted,
+    );
+    void video
+      .play()
+      .then(() => {
+        if (video.paused) return;
+        setIsVideoPaused(false);
+        onVideoTransitionChange(false);
+      })
+      .catch((error: unknown) => {
+        if (heroPlayWasInterrupted(error)) return;
+        if (
+          activeVideo.hasPromotionalAudio &&
+          promotionalAudioEnabledRef.current &&
+          autoplayWasBlocked(error)
+        ) {
+          setSoundOutputMuted(true);
+          prepareSilentBackgroundVideo(video);
+          void video
+            .play()
+            .then(() => {
+              if (video.paused) return;
+              setIsVideoPaused(false);
+              onVideoTransitionChange(false);
+            })
+            .catch(() => {
+              setIsVideoPaused(true);
+              onVideoTransitionChange(false);
+            });
+          return;
+        }
+
+        if (video.paused && video.readyState >= 2) {
+          setIsVideoPaused(true);
+          onVideoTransitionChange(false);
+        }
+      });
   }
 
   function handleHeroVideoError() {
@@ -994,21 +1002,24 @@ function HeroVisual({
     const hearingSound = !video.muted && video.volume > 0;
     const nextEnabled = !hearingSound;
     setHalloweenAudioEnabled(nextEnabled);
-    updateSoundOutputMuted(false);
+    if (nextEnabled) setSoundOutputMuted(false);
     syncHeroPlayback(video, activeVideo, nextEnabled);
-    applyHeroPlaybackRate(video, activeVideo);
 
     if (!nextEnabled) return;
 
     userPausedRef.current = false;
     holdForReducedMotionRef.current = false;
-    void video.play().then(() => {
-      if (!video.paused) setIsVideoPaused(false);
-    }).catch(() => {
-      updateSoundOutputMuted(true);
-      prepareSilentBackgroundVideo(video);
-      void video.play().catch(() => setIsVideoPaused(true));
-    });
+    void video
+      .play()
+      .then(() => {
+        if (!video.paused) setIsVideoPaused(false);
+      })
+      .catch((error: unknown) => {
+        if (!autoplayWasBlocked(error)) return;
+        setSoundOutputMuted(true);
+        prepareSilentBackgroundVideo(video);
+        void video.play().catch(() => setIsVideoPaused(true));
+      });
   }
 
   return (
@@ -1038,13 +1049,10 @@ function HeroVisual({
         disablePictureInPicture
         preload="auto"
         aria-hidden="true"
-        onLoadedMetadata={(event) => {
-          applyHeroPlaybackRate(event.currentTarget, activeVideo);
-        }}
         onLoadedData={() => setReadyVideoSrc(activeVideo.src)}
         onPlaying={() => setReadyVideoSrc(activeVideo.src)}
         onCanPlay={(event) => {
-          applyHeroPlaybackRate(event.currentTarget, activeVideo);
+          event.currentTarget.playbackRate = activeVideo.playbackRate;
           if (prefersReducedMotion() && holdForReducedMotionRef.current) {
             event.currentTarget.pause();
             event.currentTarget.currentTime = 0;
