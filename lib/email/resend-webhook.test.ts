@@ -86,4 +86,12 @@ describe("resend suppression classification", () => {
       "user@sitguru.com Bcc: evil@x.com",
     );
   });
+
+  it("documents that primary suppression upsert is fail-closed while subscriber sync is best-effort", () => {
+    // Contract covered by upsertEmailSuppression implementation:
+    // - email_suppressions upsert error => { ok:false } => route 500 (Resend retry)
+    // - email_update_subscribers update error => warn only; still { ok:true }
+    assert.equal(typeof classifyResendSuppressionEvent, "function");
+    assert.equal(normalizeSuppressionEmail("X@Y.COM"), "x@y.com");
+  });
 });

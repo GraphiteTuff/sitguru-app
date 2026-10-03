@@ -1,6 +1,11 @@
 -- SitGuru email suppressions for hard bounces / spam complaints (Resend webhooks).
 -- Used to block future MARKETING sends only — never blocks auth/security mail.
--- NOTE: Already applied on production SitGuru (mmtjhxnzuglbyumbsjhs). Do not re-apply.
+--
+-- Production migration identity (already applied on SitGuru / mmtjhxnzuglbyumbsjhs):
+--   version: 20261002215629
+--   name: email_suppressions
+-- This filename matches that version so history does not treat it as a new migration.
+-- Do not re-apply / do not db push this file against production.
 
 create table if not exists public.email_suppressions (
   id uuid primary key default gen_random_uuid(),

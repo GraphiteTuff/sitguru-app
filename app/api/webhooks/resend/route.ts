@@ -46,11 +46,19 @@ async function logProviderEvent(params: {
   email: string;
   eventType: string;
   providerMessageId: string | null;
+  providerEventId: string | null;
   status: string;
   metadata: Record<string, unknown>;
 }) {
+  // Best-effort audit log only. Supabase JS returns { error } rather than throwing
+  // for most query failures — inspect the error explicitly.
+  //
+  // IDEMPOTENCY NOTE: email_events has no unique key on svix-id / provider_event_id
+  // for Resend webhooks, so retries may insert duplicate log rows. Suppression
+  // correctness uses email_suppressions (unique on email_normalized). Follow-up:
+  // optional unique/idempotent event-log key — do not add production migration here.
   try {
-    await supabaseAdmin.from("email_events").insert({
+    const { error } = await supabaseAdmin.from("email_events").insert({
       user_id: null,
       guru_id: null,
       email: params.email,
@@ -58,10 +66,22 @@ async function logProviderEvent(params: {
       provider_message_id: params.providerMessageId,
       stripe_session_id: null,
       status: params.status,
-      metadata: params.metadata,
+      metadata: {
+        ...params.metadata,
+        provider_event_id: params.providerEventId,
+      },
     });
+    if (error) {
+      console.warn(
+        "email_events webhook log skipped:",
+        error.message || "unknown insert error",
+      );
+    }
   } catch (error) {
-    console.warn("email_events webhook log skipped:", error);
+    console.warn(
+      "email_events webhook log skipped:",
+      error instanceof Error ? error.message : "unexpected error",
+    );
   }
 }
 
@@ -127,6 +147,7 @@ export async function POST(req: NextRequest) {
     email: emailNormalized === "unknown@invalid" ? recipient || "unknown" : emailNormalized,
     eventType: `resend.${eventType || "unknown"}`,
     providerMessageId,
+    providerEventId: verified.svixId || null,
     status: eventType.replace(/^email\./, "") || "received",
     metadata,
   });

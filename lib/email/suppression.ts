@@ -64,23 +64,28 @@ export async function upsertEmailSuppression(params: {
   );
 
   if (error) {
-    console.error("email suppression upsert failed:", error);
+    console.error("email suppression upsert failed:", error.message || "unknown upsert error");
     return { ok: false, error: error.message };
   }
 
   // Keep marketing list in sync when present.
-  try {
-    await supabaseAdmin
-      .from("email_update_subscribers")
-      .update({
-        status: "unsubscribed",
-        unsubscribed_at: now,
-        updated_at: now,
-      })
-      .eq("email_normalized", emailNormalized)
-      .eq("status", "subscribed");
-  } catch (syncError) {
-    console.warn("email_update_subscribers sync on suppress skipped:", syncError);
+  // Best-effort only — email_suppressions is authoritative for marketing blocks.
+  // Auth/security mail never consults this list.
+  const { error: subscriberSyncError } = await supabaseAdmin
+    .from("email_update_subscribers")
+    .update({
+      status: "unsubscribed",
+      unsubscribed_at: now,
+      updated_at: now,
+    })
+    .eq("email_normalized", emailNormalized)
+    .eq("status", "subscribed");
+
+  if (subscriberSyncError) {
+    console.warn(
+      "email_update_subscribers sync on suppress skipped:",
+      subscriberSyncError.message || "unknown update error",
+    );
   }
 
   return { ok: true };
