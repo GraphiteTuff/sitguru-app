@@ -34,6 +34,10 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
 import BubblePressable from '@/components/BubblePressable';
+import {
+  HOME_HERO_CLIP_SETTINGS,
+  HOME_HERO_VIDEO_LABELS,
+} from '@/components/home-hero-clips';
 import ConvertActionBar from '@/components/mobile/ConvertActionBar';
 import SitGuruFeatureChips from '@/components/mobile/SitGuruFeatureChips';
 import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
@@ -85,20 +89,31 @@ type SocialLink = {
 };
 
 function loadHeroMedia() {
-  return require('@/components/HomeHeroMedia') as typeof import('@/components/HomeHeroMedia');
+  return import('@/components/HomeHeroMedia');
 }
 
 function loadHeroVideoAssets() {
+  const defaultPoster = require('../assets/images/sitguru-homepage-hero-poster.jpg') as ImageSourcePropType;
+
   return [
-    require('../assets/videos/sitguru-homepage-hero.mp4'),
-    require('../assets/videos/sitguru-homepage-hero-2.mp4'),
-    require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4'),
+    {
+      source: require('../assets/videos/sitguru-howl-ween-homepage.mp4') as number,
+      poster: require('../assets/images/sitguru-howl-ween-homepage-poster.jpg') as ImageSourcePropType,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero.mp4') as number,
+      poster: defaultPoster,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero-2.mp4') as number,
+      poster: defaultPoster,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4') as number,
+      poster: defaultPoster,
+    },
   ] as const;
 }
-
-const heroVideoPosterAsset = require(
-  '../assets/images/sitguru-homepage-hero-poster.jpg'
-) as ImageSourcePropType;
 
 const sitGuruLogoDark =
   require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
@@ -267,8 +282,25 @@ const bootStyles = StyleSheet.create({
 });
 
 function MarketingHomeScreen() {
-  const { default: HomeHeroMedia, HOME_HERO_VIDEO_LABELS } = loadHeroMedia();
   const heroVideoAssets = loadHeroVideoAssets();
+  const heroClips = HOME_HERO_CLIP_SETTINGS.map((settings, index) => ({
+    ...settings,
+    source: heroVideoAssets[index].source,
+    poster: heroVideoAssets[index].poster,
+  }));
+  const [HomeHeroMedia, setHomeHeroMedia] = useState<
+    typeof import('@/components/HomeHeroMedia').default | null
+  >(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadHeroMedia().then((mod) => {
+      if (!cancelled) setHomeHeroMedia(() => mod.default);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -501,17 +533,25 @@ function MarketingHomeScreen() {
           ) : null}
 
           <View style={[styles.heroViewport, { minHeight: heroHeight }]}>
-            <HomeHeroMedia
-              sources={[...heroVideoAssets]}
-              poster={heroVideoPosterAsset}
-              activeIndex={activeHeroIndex}
-              onActiveIndexChange={setActiveHeroIndex}
-              onTransitionChange={setHeroTransitioning}
-              topInset={isWebPreview ? 0 : insets.top}
-              bottomInset={isWebPreview ? 0 : insets.bottom}
-            />
+            {HomeHeroMedia ? (
+              <HomeHeroMedia
+                clips={heroClips}
+                activeIndex={activeHeroIndex}
+                onActiveIndexChange={setActiveHeroIndex}
+                onTransitionChange={setHeroTransitioning}
+                topInset={isWebPreview ? 0 : insets.top}
+                bottomInset={isWebPreview ? 0 : insets.bottom}
+              />
+            ) : (
+              <Image
+                source={heroClips[0].poster}
+                resizeMode="cover"
+                style={styles.heroPosterFill}
+              />
+            )}
 
             <View
+              pointerEvents="box-none"
               style={[
                 styles.heroOverlay,
                 {
@@ -1287,6 +1327,13 @@ function createStyles(
       overflow: 'hidden',
       position: 'relative',
       width: '100%',
+    },
+    heroPosterFill: {
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
     },
     heroOverlay: {
       bottom: 0,

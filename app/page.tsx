@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
@@ -20,24 +20,65 @@ import {
   openCompanionChat,
 } from "@/lib/companions/open-companion-chat";
 import {
+  canPlayPageSound,
   prepareSilentBackgroundVideo,
   setAmbientAudioSession,
 } from "@/lib/media/ambient-audio-session";
 
-const heroVideoPaths = [
-  "/videos/sitguru-homepage-hero.mp4",
-  "/videos/sitguru-homepage-hero-2.mp4",
-  "/videos/sitguru-homepage-hero-3-ambassadors.mp4",
-] as const;
+type HeroVideo = {
+  src: string;
+  label: string;
+  poster: string;
+  playbackRate: number;
+  hasPromotionalAudio: boolean;
+  objectPositionClassName: string;
+  /** Howl-ween-only responsive crop. Desktop stays object-cover at scale 1. */
+  frameClassName?: string;
+};
 
-const heroVideoLabels = [
-  "Dog Walking",
-  "Drop-In Visits",
-  "Join the SitGuru Community",
-] as const;
+const defaultHeroObjectPositionClassName =
+  "object-[62%_center] sm:object-[58%_center] lg:object-center";
+const defaultHeroPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 
-const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
-const heroVideoPlaybackRates = [1, 1, 0.9] as const;
+const heroVideos: readonly HeroVideo[] = [
+  {
+    src: "/videos/sitguru-howl-ween-homepage.mp4",
+    label: "SitGuru Howl-ween",
+    poster: "/images/sitguru-howl-ween-homepage-poster.jpg",
+    playbackRate: 1,
+    hasPromotionalAudio: true,
+    // Desktop stays centered and full-bleed. Narrow heroes zoom out just
+    // enough to keep the burned-in Halloween title in frame.
+    objectPositionClassName: "object-center",
+    frameClassName:
+      "inset-x-0 top-[34%] h-auto w-full aspect-video -translate-y-1/2 sm:top-[38%] md:top-[44%] lg:inset-0 lg:top-0 lg:h-full lg:w-full lg:translate-y-0 lg:aspect-auto",
+  },
+  {
+    src: "/videos/sitguru-homepage-hero.mp4",
+    label: "Dog Walking",
+    poster: defaultHeroPosterPath,
+    playbackRate: 1,
+    hasPromotionalAudio: false,
+    objectPositionClassName: defaultHeroObjectPositionClassName,
+  },
+  {
+    src: "/videos/sitguru-homepage-hero-2.mp4",
+    label: "Drop-In Visits",
+    poster: defaultHeroPosterPath,
+    playbackRate: 1,
+    hasPromotionalAudio: false,
+    objectPositionClassName: defaultHeroObjectPositionClassName,
+  },
+  {
+    src: "/videos/sitguru-homepage-hero-3-ambassadors.mp4",
+    label: "Join the SitGuru Community",
+    poster: defaultHeroPosterPath,
+    playbackRate: 0.9,
+    hasPromotionalAudio: false,
+    objectPositionClassName: defaultHeroObjectPositionClassName,
+  },
+];
+
 const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 
@@ -559,6 +600,76 @@ function getMessengerInitials(name: string) {
   return `${first}${second}`.toUpperCase() || "V";
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function applyHeroPlaybackAudio(
+  video: HTMLVideoElement,
+  videoConfig: HeroVideo,
+  promotionalAudioEnabled: boolean,
+) {
+  const playSound = videoConfig.hasPromotionalAudio && promotionalAudioEnabled;
+  video.muted = !playSound;
+  video.volume = playSound ? 1 : 0;
+  return playSound;
+}
+
+function syncHeroPlayback(
+  video: HTMLVideoElement,
+  videoConfig: HeroVideo,
+  promotionalAudioEnabled: boolean,
+  options?: { honorActivation?: boolean },
+) {
+  setAmbientAudioSession();
+  video.playbackRate = videoConfig.playbackRate;
+  video.playsInline = true;
+  video.disableRemotePlayback = true;
+  video.disablePictureInPicture = true;
+
+  const allowSound =
+    promotionalAudioEnabled &&
+    (!options?.honorActivation || canPlayPageSound());
+  const playSound = applyHeroPlaybackAudio(video, videoConfig, allowSound);
+
+  if (!playSound) {
+    prepareSilentBackgroundVideo(video);
+    return false;
+  }
+
+  video.defaultMuted = false;
+  video.removeAttribute("muted");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+  video.setAttribute("x-webkit-airplay", "deny");
+  return true;
+}
+
+function HeroSoundIcon({ audible }: { audible: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 10v4h3l4 3V7L7 10H4z" fill="currentColor" stroke="none" />
+      {audible ? (
+        <>
+          <path d="M16 9.5a3.5 3.5 0 010 5" />
+          <path d="M18.5 7.5a6.5 6.5 0 010 9" />
+        </>
+      ) : (
+        <path d="M16 10l5 5M21 10l-5 5" />
+      )}
+    </svg>
+  );
+}
+
 function HeroVisual({
   onActiveVideoChange,
   onVideoTransitionChange,
@@ -568,34 +679,98 @@ function HeroVisual({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
+  const promotionalAudioEnabledRef = useRef(false);
+  const userPausedRef = useRef(false);
+  const holdForReducedMotionRef = useRef(true);
+  const failedVideoSrcsRef = useRef<Set<string>>(new Set());
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
+  const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(false);
 
-  const activeVideoPath = heroVideoPaths[activeVideoIndex];
-  const activeVideoPlaybackRate = heroVideoPlaybackRates[activeVideoIndex] ?? 1;
+  const activeVideo = heroVideos[activeVideoIndex] ?? heroVideos[0];
+  const heroAudioAudible =
+    activeVideo.hasPromotionalAudio && promotionalAudioEnabled;
+
+  function setHalloweenAudioEnabled(enabled: boolean) {
+    promotionalAudioEnabledRef.current = enabled;
+    setPromotionalAudioEnabled(enabled);
+  }
 
   useEffect(() => {
     onActiveVideoChange(activeVideoIndex);
   }, [activeVideoIndex, onActiveVideoChange]);
 
+  const rotateToNextVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      prepareSilentBackgroundVideo(video);
+    }
+
+    if (transitionTimeoutRef.current !== null) {
+      window.clearTimeout(transitionTimeoutRef.current);
+    }
+
+    setIsVideoTransitioning(true);
+    onVideoTransitionChange(true);
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      setActiveVideoIndex((currentIndex) => {
+        for (let step = 1; step <= heroVideos.length; step += 1) {
+          const nextIndex = (currentIndex + step) % heroVideos.length;
+          if (!failedVideoSrcsRef.current.has(heroVideos[nextIndex].src)) {
+            return nextIndex;
+          }
+        }
+
+        return currentIndex;
+      });
+      transitionTimeoutRef.current = null;
+    }, heroVideoTransitionMs);
+  }, [onVideoTransitionChange]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    setAmbientAudioSession();
-    prepareSilentBackgroundVideo(video);
-    video.playbackRate = activeVideoPlaybackRate;
+    const markVideoUnavailable = () => {
+      const failedSrc = activeVideo.src;
+      if (failedVideoSrcsRef.current.has(failedSrc)) return;
+      failedVideoSrcsRef.current.add(failedSrc);
+      rotateToNextVideo();
+    };
 
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      video.pause();
-      video.currentTime = 0;
-      setIsVideoPaused(true);
-      return;
+    video.addEventListener("error", markVideoUnavailable);
+    if (video.error || video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+      queueMicrotask(markVideoUnavailable);
     }
 
-    void video.play().catch(() => setIsVideoPaused(true));
-  }, [activeVideoIndex, activeVideoPlaybackRate]);
+    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current, {
+      honorActivation: true,
+    });
+
+    if (prefersReducedMotion() && holdForReducedMotionRef.current) {
+      video.pause();
+      video.currentTime = 0;
+      if (video.paused) {
+        queueMicrotask(() => setIsVideoPaused(true));
+      }
+    } else if (!userPausedRef.current) {
+      void video.play().catch(() => {
+        if (!video.muted) {
+          prepareSilentBackgroundVideo(video);
+          setHalloweenAudioEnabled(false);
+          void video.play().catch(() => setIsVideoPaused(true));
+          return;
+        }
+
+        setIsVideoPaused(true);
+      });
+    }
+
+    return () => {
+      video.removeEventListener("error", markVideoUnavailable);
+    };
+  }, [activeVideo, rotateToNextVideo]);
 
   useEffect(() => {
     return () => {
@@ -609,36 +784,49 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video) return;
 
-    setAmbientAudioSession();
-    prepareSilentBackgroundVideo(video);
-    video.playbackRate = activeVideoPlaybackRate;
+    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current, {
+      honorActivation: true,
+    });
     void video
       .play()
       .then(() => {
+        if (video.paused) return;
         setIsVideoPaused(false);
         setIsVideoTransitioning(false);
         onVideoTransitionChange(false);
       })
       .catch(() => {
+        if (!video.muted) {
+          prepareSilentBackgroundVideo(video);
+          setHalloweenAudioEnabled(false);
+          void video
+            .play()
+            .then(() => {
+              if (video.paused) return;
+              setIsVideoPaused(false);
+              setIsVideoTransitioning(false);
+              onVideoTransitionChange(false);
+            })
+            .catch(() => {
+              setIsVideoPaused(true);
+              setIsVideoTransitioning(false);
+              onVideoTransitionChange(false);
+            });
+          return;
+        }
+
         setIsVideoPaused(true);
         setIsVideoTransitioning(false);
         onVideoTransitionChange(false);
       });
   }
 
-  function rotateToNextVideo() {
-    if (transitionTimeoutRef.current !== null) {
-      window.clearTimeout(transitionTimeoutRef.current);
-    }
+  function handleHeroVideoError() {
+    const failedSrc = activeVideo.src;
+    if (failedVideoSrcsRef.current.has(failedSrc)) return;
 
-    setIsVideoTransitioning(true);
-    onVideoTransitionChange(true);
-    transitionTimeoutRef.current = window.setTimeout(() => {
-      setActiveVideoIndex(
-        (currentIndex) => (currentIndex + 1) % heroVideoPaths.length,
-      );
-      transitionTimeoutRef.current = null;
-    }, heroVideoTransitionMs);
+    failedVideoSrcsRef.current.add(failedSrc);
+    rotateToNextVideo();
   }
 
   function toggleHeroVideo() {
@@ -646,54 +834,117 @@ function HeroVisual({
     if (!video) return;
 
     if (video.paused) {
+      userPausedRef.current = false;
+      holdForReducedMotionRef.current = false;
       playActiveVideo();
       return;
     }
 
+    userPausedRef.current = true;
     video.pause();
+    setIsVideoPaused(true);
+  }
+
+  function toggleHalloweenAudio() {
+    const video = videoRef.current;
+    if (!video || !activeVideo.hasPromotionalAudio) return;
+
+    const nextEnabled = !promotionalAudioEnabledRef.current;
+    setHalloweenAudioEnabled(nextEnabled);
+    syncHeroPlayback(video, activeVideo, nextEnabled);
+
+    if (!nextEnabled || prefersReducedMotion() || !video.paused) return;
+
+    userPausedRef.current = false;
+    void video
+      .play()
+      .then(() => {
+        if (!video.paused) setIsVideoPaused(false);
+      })
+      .catch(() => {
+        prepareSilentBackgroundVideo(video);
+        setHalloweenAudioEnabled(false);
+      });
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-slate-950">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-slate-950">
+      {activeVideo.hasPromotionalAudio ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl lg:hidden"
+          style={{ backgroundImage: `url(${activeVideo.poster})` }}
+        />
+      ) : null}
       <video
-        key={activeVideoPath}
+        key={activeVideo.src}
         ref={videoRef}
-        className={`absolute inset-0 h-full w-full object-cover object-[62%_center] transition-opacity duration-500 sm:object-[58%_center] lg:object-center ${
+        className={`absolute object-cover transition-opacity duration-500 ${
+          activeVideo.frameClassName ?? "inset-0 h-full w-full"
+        } ${activeVideo.objectPositionClassName} ${
           isVideoTransitioning ? "opacity-0" : "opacity-100"
         }`}
-        poster={heroVideoPosterPath}
+        poster={activeVideo.poster}
         autoPlay
-        muted
+        muted={!heroAudioAudible}
         playsInline
         disableRemotePlayback
         disablePictureInPicture
         preload="metadata"
         aria-hidden="true"
         onCanPlay={(event) => {
-          prepareSilentBackgroundVideo(event.currentTarget);
-          event.currentTarget.playbackRate = activeVideoPlaybackRate;
+          event.currentTarget.playbackRate = activeVideo.playbackRate;
+          if (prefersReducedMotion() && holdForReducedMotionRef.current) {
+            event.currentTarget.pause();
+            event.currentTarget.currentTime = 0;
+            setIsVideoPaused(true);
+            return;
+          }
+          if (userPausedRef.current || !event.currentTarget.paused) return;
           playActiveVideo();
         }}
         onEnded={rotateToNextVideo}
+        onError={handleHeroVideoError}
         onPlay={() => setIsVideoPaused(false)}
         onPause={() => setIsVideoPaused(true)}
       >
-        <source src={activeVideoPath} type="video/mp4" />
+        <source src={activeVideo.src} type="video/mp4" />
       </video>
 
       <div className="absolute inset-0 bg-black/15" />
       <div className="absolute inset-y-0 left-0 w-[95%] bg-gradient-to-r from-black/80 via-black/50 to-transparent sm:w-[82%] lg:w-[68%]" />
       <div className="absolute inset-x-0 bottom-0 h-[32%] bg-gradient-to-t from-black/45 to-transparent" />
 
-      <button
-        type="button"
-        onClick={toggleHeroVideo}
-        className="pointer-events-auto absolute right-5 top-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto"
-        aria-label={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
-        title={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
-      >
-        <span aria-hidden="true">{isVideoPaused ? "▶" : "Ⅱ"}</span>
-      </button>
+      <div className="pointer-events-auto absolute right-5 top-5 z-30 flex items-center gap-2 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto">
+        {activeVideo.hasPromotionalAudio ? (
+          <button
+            type="button"
+            onClick={toggleHalloweenAudio}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25"
+            aria-pressed={heroAudioAudible}
+            aria-label={
+              heroAudioAudible ? "Mute Halloween music" : "Play Halloween music"
+            }
+            title={
+              heroAudioAudible ? "Mute Halloween music" : "Play Halloween music"
+            }
+          >
+            <HeroSoundIcon audible={heroAudioAudible} />
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={toggleHeroVideo}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25"
+          aria-label={
+            isVideoPaused ? "Play homepage videos" : "Pause homepage videos"
+          }
+          title={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
+        >
+          <span aria-hidden="true">{isVideoPaused ? "▶" : "Ⅱ"}</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -1983,7 +2234,7 @@ export default function HomePage() {
                 }`}
               >
                 <span key={activeHeroVideoIndex}>
-                  {heroVideoLabels[activeHeroVideoIndex]}
+                  {heroVideos[activeHeroVideoIndex]?.label}
                 </span>
               </div>
 

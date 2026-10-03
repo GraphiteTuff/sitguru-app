@@ -1,17 +1,32 @@
 import { Camera, MapPin, Navigation, LocateFixed } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   Platform,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import MapView, {
-  Marker,
-  Polyline,
-  PROVIDER_DEFAULT,
-  type Region,
-} from 'react-native-maps';
+
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+type NativeMapModule = {
+  default: ComponentType<Record<string, unknown>>;
+  Marker: ComponentType<Record<string, unknown>>;
+  Polyline: ComponentType<Record<string, unknown>>;
+  PROVIDER_DEFAULT?: string;
+};
+
+const MapsModule: NativeMapModule | null =
+  Platform.OS === 'web' ? null : require('react-native-maps');
+const MapView = MapsModule?.default;
+const Marker = MapsModule?.Marker;
+const Polyline = MapsModule?.Polyline;
+const PROVIDER_DEFAULT = MapsModule?.PROVIDER_DEFAULT;
 
 import type { LiveCoords } from '@/hooks/useLiveLocation';
 import BubblePressable from '@/components/BubblePressable';
@@ -79,7 +94,7 @@ export default function LiveRouteHeader({
   expanded = false,
   autoCenter = true,
 }: LiveRouteHeaderProps) {
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<{ animateToRegion: (region: Region, duration?: number) => void } | null>(null);
   const [followUser, setFollowUser] = useState(autoCenter);
   const showNativeMap = Platform.OS !== 'web';
 
@@ -127,7 +142,7 @@ export default function LiveRouteHeader({
         // Keep map gestures from fighting parent ScrollView / StickyActionBar.
         onStartShouldSetResponderCapture={() => true}
       >
-        {showNativeMap ? (
+        {showNativeMap && MapView && Marker && Polyline ? (
           <MapView
             ref={mapRef}
             style={styles.map}
