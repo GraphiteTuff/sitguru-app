@@ -31,7 +31,7 @@ type HeroVideo = {
   playbackRate: number;
   hasPromotionalAudio: boolean;
   objectPositionClassName: string;
-  /** Howl-ween-only responsive crop. Desktop stays object-cover at scale 1. */
+  /** Howl-ween fills a 16:9 stage so burned-in titles are not cropped or covered. */
   frameClassName?: string;
 };
 
@@ -46,10 +46,8 @@ const heroVideos: readonly HeroVideo[] = [
     poster: "/images/sitguru-howl-ween-homepage-poster.jpg",
     playbackRate: 1,
     hasPromotionalAudio: true,
-    // Keep the whole 16:9 frame in view so the burned-in title is not cropped.
     objectPositionClassName: "object-center",
-    frameClassName:
-      "left-1/2 top-[42%] h-auto w-auto max-h-[70%] max-w-full aspect-video -translate-x-1/2 -translate-y-1/2 sm:top-[40%] sm:max-h-[76%] lg:top-[46%] lg:max-h-[90%] lg:max-w-[94%]",
+    frameClassName: "inset-0 h-full w-full object-contain",
   },
   {
     src: "/videos/sitguru-homepage-hero.mp4",
@@ -685,9 +683,11 @@ function HeroSoundIcon({ audible }: { audible: boolean }) {
 function HeroVisual({
   onActiveVideoChange,
   onVideoTransitionChange,
+  onHowlweenStageHold,
 }: {
   onActiveVideoChange: (index: number) => void;
   onVideoTransitionChange: (isTransitioning: boolean) => void;
+  onHowlweenStageHold: (hold: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const promotionalAudioEnabledRef = useRef(true);
@@ -721,7 +721,8 @@ function HeroVisual({
   useEffect(() => {
     activeVideoRef.current = activeVideo;
     onActiveVideoChange(activeVideoIndex);
-  }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
+    if (activeVideo.hasPromotionalAudio) onHowlweenStageHold(true);
+  }, [activeVideo, activeVideoIndex, onActiveVideoChange, onHowlweenStageHold]);
 
   useEffect(() => {
     const unlockSound = () => setAwaitingSoundGesture(false);
@@ -770,11 +771,14 @@ function HeroVisual({
       video.pause();
     }
 
+    const leavingPromotionalStage = activeVideoRef.current.hasPromotionalAudio;
     setHandoffStill(still);
     setHandoffFrameClassName(activeVideoRef.current.frameClassName);
     setHandoffPositionClassName(activeVideoRef.current.objectPositionClassName);
     setHandoffFading(false);
-    window.requestAnimationFrame(() => setHandoffFading(true));
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setHandoffFading(true));
+    });
     if (handoffTimerRef.current !== null) {
       window.clearTimeout(handoffTimerRef.current);
     }
@@ -782,7 +786,8 @@ function HeroVisual({
       setHandoffStill(null);
       setHandoffFading(false);
       handoffTimerRef.current = null;
-    }, 760);
+      if (leavingPromotionalStage) onHowlweenStageHold(false);
+    }, 1100);
     onVideoTransitionChange(true);
     window.setTimeout(() => onVideoTransitionChange(false), 420);
 
@@ -796,7 +801,7 @@ function HeroVisual({
 
       return currentIndex;
     });
-  }, [onVideoTransitionChange]);
+  }, [onHowlweenStageHold, onVideoTransitionChange]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -931,18 +936,19 @@ function HeroVisual({
         key={activeVideo.poster}
         src={activeVideo.poster}
         alt=""
-        className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${
-          activeVideo.hasPromotionalAudio ? "scale-110 blur-2xl" : ""
-        } ${activeVideo.objectPositionClassName}`}
+        className={`pointer-events-none absolute inset-0 h-full w-full ${
+          activeVideo.hasPromotionalAudio
+            ? "object-contain"
+            : `object-cover ${activeVideo.objectPositionClassName}`
+        }`}
       />
       <video
         key={activeVideo.src}
         ref={videoRef}
-        className={`absolute object-cover transition-opacity duration-700 ease-out ${
-          activeVideo.frameClassName ?? "inset-0 h-full w-full"
-        } ${activeVideo.objectPositionClassName} ${
-          videoFrameReady ? "opacity-100" : "opacity-0"
-        }`}
+        className={`absolute transition-opacity duration-1000 ease-in-out ${
+          activeVideo.frameClassName ??
+          `inset-0 h-full w-full object-cover ${activeVideo.objectPositionClassName}`
+        } ${videoFrameReady ? "opacity-100" : "opacity-0"}`}
         poster={activeVideo.poster}
         autoPlay
         muted={!heroAudioAudible}
@@ -975,27 +981,28 @@ function HeroVisual({
         <img
           src={handoffStill}
           alt=""
-          className={`pointer-events-none absolute object-cover transition-opacity duration-700 ease-out ${
-            handoffFrameClassName ?? "inset-0 h-full w-full"
-          } ${handoffPositionClassName} ${handoffFading ? "opacity-0" : "opacity-100"}`}
+          className={`pointer-events-none absolute transition-opacity duration-1000 ease-in-out ${
+            handoffFrameClassName ??
+            `inset-0 h-full w-full object-cover ${handoffPositionClassName}`
+          } ${handoffFading ? "opacity-0" : "opacity-100"}`}
         />
       ) : null}
 
-      <div
-        className={`absolute inset-0 ${
-          activeVideo.hasPromotionalAudio ? "bg-black/5" : "bg-black/15"
-        }`}
-      />
-      <div
-        className={
-          activeVideo.hasPromotionalAudio
-            ? "absolute inset-y-0 left-0 w-[70%] bg-gradient-to-r from-black/35 via-black/10 to-transparent sm:w-[54%] lg:w-[38%]"
-            : "absolute inset-y-0 left-0 w-[95%] bg-gradient-to-r from-black/80 via-black/50 to-transparent sm:w-[82%] lg:w-[68%]"
-        }
-      />
-      <div className="absolute inset-x-0 bottom-0 h-[32%] bg-gradient-to-t from-black/45 to-transparent" />
+      {activeVideo.hasPromotionalAudio || handoffStill ? null : (
+        <>
+          <div className="absolute inset-0 bg-black/15" />
+          <div className="absolute inset-y-0 left-0 w-[95%] bg-gradient-to-r from-black/80 via-black/50 to-transparent sm:w-[82%] lg:w-[68%]" />
+          <div className="absolute inset-x-0 bottom-0 h-[32%] bg-gradient-to-t from-black/45 to-transparent" />
+        </>
+      )}
 
-      <div className="pointer-events-auto absolute right-5 top-5 z-30 flex items-center gap-2 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto">
+      <div
+        className={`pointer-events-auto absolute z-30 flex items-center gap-2 ${
+          activeVideo.hasPromotionalAudio
+            ? "bottom-4 right-4"
+            : "right-5 top-5 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto"
+        }`}
+      >
         {activeVideo.hasPromotionalAudio ? (
           <button
             type="button"
@@ -2045,6 +2052,10 @@ export default function HomePage() {
   const [source, setSource] = useState("direct");
   const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
   const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
+  const [howlweenStage, setHowlweenStage] = useState(true);
+  const holdHowlweenStage = useCallback((hold: boolean) => {
+    setHowlweenStage(hold);
+  }, []);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
   const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
@@ -2296,14 +2307,41 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <section className="relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]">
-        <HeroVisual
-          onActiveVideoChange={setActiveHeroVideoIndex}
-          onVideoTransitionChange={setIsHeroVideoTransitioning}
-        />
+      <section
+        className={
+          howlweenStage
+            ? "relative overflow-hidden bg-slate-950"
+            : "relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]"
+        }
+      >
+        <div
+          className={
+            howlweenStage
+              ? "relative mx-auto aspect-video w-full max-w-[calc(78vh*16/9)] bg-black"
+              : "absolute inset-0"
+          }
+        >
+          <HeroVisual
+            onActiveVideoChange={setActiveHeroVideoIndex}
+            onVideoTransitionChange={setIsHeroVideoTransitioning}
+            onHowlweenStageHold={holdHowlweenStage}
+          />
+        </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[920px] max-w-7xl px-4 sm:min-h-[860px] sm:px-6 md:min-h-[790px] lg:min-h-[690px] lg:items-center lg:px-8 lg:py-12">
-          <div className="flex w-full max-w-3xl flex-col self-stretch pb-8 pt-12 sm:pb-10 sm:pt-14 md:pb-12 md:pt-16 lg:block lg:self-auto lg:py-0">
+        <div
+          className={
+            howlweenStage
+              ? "relative z-10 mx-auto flex w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
+              : "relative z-10 mx-auto flex min-h-[920px] max-w-7xl px-4 sm:min-h-[860px] sm:px-6 md:min-h-[790px] lg:min-h-[690px] lg:items-center lg:px-8 lg:py-12"
+          }
+        >
+          <div
+            className={
+              howlweenStage
+                ? "flex w-full max-w-3xl flex-col"
+                : "flex w-full max-w-3xl flex-col self-stretch pb-8 pt-12 sm:pb-10 sm:pt-14 md:pb-12 md:pt-16 lg:block lg:self-auto lg:py-0"
+            }
+          >
             <div>
               <div
                 aria-live="polite"
@@ -2336,7 +2374,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="mt-auto pt-24 sm:pt-28 md:pt-20 lg:mt-8 lg:pt-0">
+            <div className={howlweenStage ? "pt-6" : "mt-auto pt-24 sm:pt-28 md:pt-20 lg:mt-8 lg:pt-0"}>
               <div className="max-w-3xl">
                 <SearchPanel
                   searchForm={searchForm}
