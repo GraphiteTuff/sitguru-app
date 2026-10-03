@@ -22,7 +22,6 @@ import {
 import {
   canPlayPageSound,
   prepareSilentBackgroundVideo,
-  setAmbientAudioSession,
 } from "@/lib/media/ambient-audio-session";
 
 type HeroVideo = {
@@ -47,11 +46,10 @@ const heroVideos: readonly HeroVideo[] = [
     poster: "/images/sitguru-howl-ween-homepage-poster.jpg",
     playbackRate: 1,
     hasPromotionalAudio: true,
-    // Desktop stays centered and full-bleed. Narrow heroes zoom out just
-    // enough to keep the burned-in Halloween title in frame.
+    // Keep the whole 16:9 frame in view so the burned-in title is not cropped.
     objectPositionClassName: "object-center",
     frameClassName:
-      "inset-x-0 top-[34%] h-auto w-full aspect-video -translate-y-1/2 sm:top-[38%] md:top-[44%] lg:inset-0 lg:top-0 lg:h-full lg:w-full lg:translate-y-0 lg:aspect-auto",
+      "left-1/2 top-[42%] h-auto w-auto max-h-[70%] max-w-full aspect-video -translate-x-1/2 -translate-y-1/2 sm:top-[40%] sm:max-h-[76%] lg:top-[46%] lg:max-h-[90%] lg:max-w-[94%]",
   },
   {
     src: "/videos/sitguru-homepage-hero.mp4",
@@ -599,6 +597,21 @@ function getMessengerInitials(name: string) {
   return `${first}${second}`.toUpperCase() || "V";
 }
 
+function setHeroAudioSession(audible: boolean) {
+  if (typeof navigator === "undefined") return;
+
+  const session = (
+    navigator as Navigator & { audioSession?: { type?: string } }
+  ).audioSession;
+  if (!session) return;
+
+  try {
+    session.type = audible ? "playback" : "ambient";
+  } catch {
+    // Safari-only. Other browsers ignore this.
+  }
+}
+
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -620,7 +633,7 @@ function syncHeroPlayback(
   promotionalAudioEnabled: boolean,
   options?: { honorActivation?: boolean },
 ) {
-  setAmbientAudioSession();
+  setHeroAudioSession(promotionalAudioEnabled && videoConfig.hasPromotionalAudio);
   video.playbackRate = videoConfig.playbackRate;
   video.playsInline = true;
   video.disableRemotePlayback = true;
@@ -681,15 +694,24 @@ function HeroVisual({
   const userPausedRef = useRef(false);
   const holdForReducedMotionRef = useRef(true);
   const failedVideoSrcsRef = useRef<Set<string>>(new Set());
+  const handoffTimerRef = useRef<number | null>(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
   const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
+  const [awaitingSoundGesture, setAwaitingSoundGesture] = useState(false);
+  const [handoffStill, setHandoffStill] = useState<string | null>(null);
+  const [handoffFrameClassName, setHandoffFrameClassName] = useState<string | undefined>();
+  const [handoffPositionClassName, setHandoffPositionClassName] = useState("");
+  const [handoffFading, setHandoffFading] = useState(false);
+  const activeVideoRef = useRef(heroVideos[0]);
 
   const activeVideo = heroVideos[activeVideoIndex] ?? heroVideos[0];
   const videoFrameReady = readyVideoSrc === activeVideo.src;
   const heroAudioAudible =
-    activeVideo.hasPromotionalAudio && promotionalAudioEnabled;
+    activeVideo.hasPromotionalAudio &&
+    promotionalAudioEnabled &&
+    !awaitingSoundGesture;
 
   function setHalloweenAudioEnabled(enabled: boolean) {
     promotionalAudioEnabledRef.current = enabled;
@@ -697,17 +719,73 @@ function HeroVisual({
   }
 
   useEffect(() => {
+    activeVideoRef.current = activeVideo;
     onActiveVideoChange(activeVideoIndex);
-  }, [activeVideoIndex, onActiveVideoChange]);
+  }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
+
+  useEffect(() => {
+    const unlockSound = () => setAwaitingSoundGesture(false);
+    window.addEventListener("pointerdown", unlockSound);
+    return () => {
+      window.removeEventListener("pointerdown", unlockSound);
+      if (handoffTimerRef.current !== null) {
+        window.clearTimeout(handoffTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (awaitingSoundGesture || !promotionalAudioEnabled) return;
+    const video = videoRef.current;
+    if (!video || !activeVideo.hasPromotionalAudio) return;
+
+    syncHeroPlayback(video, activeVideo, true);
+    void video.play().catch(() => {
+      setAwaitingSoundGesture(true);
+      prepareSilentBackgroundVideo(video);
+      void video.play().catch(() => setIsVideoPaused(true));
+    });
+  }, [activeVideo, awaitingSoundGesture, promotionalAudioEnabled]);
 
   const rotateToNextVideo = useCallback(() => {
     const video = videoRef.current;
+    let still: string | null = null;
+    if (video && video.videoWidth > 0) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d");
+        if (context) {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          still = canvas.toDataURL("image/jpeg", 0.72);
+        }
+      } catch {
+        still = null;
+      }
+    }
+
     if (video) {
       prepareSilentBackgroundVideo(video);
       video.pause();
     }
 
-    onVideoTransitionChange(false);
+    setHandoffStill(still);
+    setHandoffFrameClassName(activeVideoRef.current.frameClassName);
+    setHandoffPositionClassName(activeVideoRef.current.objectPositionClassName);
+    setHandoffFading(false);
+    window.requestAnimationFrame(() => setHandoffFading(true));
+    if (handoffTimerRef.current !== null) {
+      window.clearTimeout(handoffTimerRef.current);
+    }
+    handoffTimerRef.current = window.setTimeout(() => {
+      setHandoffStill(null);
+      setHandoffFading(false);
+      handoffTimerRef.current = null;
+    }, 760);
+    onVideoTransitionChange(true);
+    window.setTimeout(() => onVideoTransitionChange(false), 420);
+
     setActiveVideoIndex((currentIndex) => {
       for (let step = 1; step <= heroVideos.length; step += 1) {
         const nextIndex = (currentIndex + step) % heroVideos.length;
@@ -751,8 +829,8 @@ function HeroVisual({
     } else if (!userPausedRef.current) {
       void video.play().catch(() => {
         if (!video.muted) {
+          setAwaitingSoundGesture(true);
           prepareSilentBackgroundVideo(video);
-          setHalloweenAudioEnabled(false);
           void video.play().catch(() => setIsVideoPaused(true));
           return;
         }
@@ -780,8 +858,8 @@ function HeroVisual({
       })
       .catch(() => {
         if (!video.muted) {
+          setAwaitingSoundGesture(true);
           prepareSilentBackgroundVideo(video);
-          setHalloweenAudioEnabled(false);
           void video
             .play()
             .then(() => {
@@ -854,15 +932,13 @@ function HeroVisual({
         src={activeVideo.poster}
         alt=""
         className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${
-          activeVideo.hasPromotionalAudio
-            ? "scale-110 blur-2xl lg:scale-100 lg:blur-none"
-            : ""
+          activeVideo.hasPromotionalAudio ? "scale-110 blur-2xl" : ""
         } ${activeVideo.objectPositionClassName}`}
       />
       <video
         key={activeVideo.src}
         ref={videoRef}
-        className={`absolute object-cover ${
+        className={`absolute object-cover transition-opacity duration-700 ease-out ${
           activeVideo.frameClassName ?? "inset-0 h-full w-full"
         } ${activeVideo.objectPositionClassName} ${
           videoFrameReady ? "opacity-100" : "opacity-0"
@@ -895,9 +971,28 @@ function HeroVisual({
       >
         <source src={activeVideo.src} type="video/mp4" />
       </video>
+      {handoffStill ? (
+        <img
+          src={handoffStill}
+          alt=""
+          className={`pointer-events-none absolute object-cover transition-opacity duration-700 ease-out ${
+            handoffFrameClassName ?? "inset-0 h-full w-full"
+          } ${handoffPositionClassName} ${handoffFading ? "opacity-0" : "opacity-100"}`}
+        />
+      ) : null}
 
-      <div className="absolute inset-0 bg-black/15" />
-      <div className="absolute inset-y-0 left-0 w-[95%] bg-gradient-to-r from-black/80 via-black/50 to-transparent sm:w-[82%] lg:w-[68%]" />
+      <div
+        className={`absolute inset-0 ${
+          activeVideo.hasPromotionalAudio ? "bg-black/5" : "bg-black/15"
+        }`}
+      />
+      <div
+        className={
+          activeVideo.hasPromotionalAudio
+            ? "absolute inset-y-0 left-0 w-[70%] bg-gradient-to-r from-black/35 via-black/10 to-transparent sm:w-[54%] lg:w-[38%]"
+            : "absolute inset-y-0 left-0 w-[95%] bg-gradient-to-r from-black/80 via-black/50 to-transparent sm:w-[82%] lg:w-[68%]"
+        }
+      />
       <div className="absolute inset-x-0 bottom-0 h-[32%] bg-gradient-to-t from-black/45 to-transparent" />
 
       <div className="pointer-events-auto absolute right-5 top-5 z-30 flex items-center gap-2 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto">
