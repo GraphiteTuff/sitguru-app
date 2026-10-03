@@ -1006,7 +1006,6 @@ function HeroVisual({
         poster={activeVideo.poster}
         autoPlay
         muted={videoMuted}
-        defaultMuted={videoMuted}
         playsInline
         disableRemotePlayback
         disablePictureInPicture
