@@ -79,7 +79,6 @@ const heroVideos: readonly HeroVideo[] = [
   },
 ];
 
-const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 
 const heroServiceOptions = SEARCH_SERVICE_OPTIONS;
@@ -678,17 +677,17 @@ function HeroVisual({
   onVideoTransitionChange: (isTransitioning: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const transitionTimeoutRef = useRef<number | null>(null);
-  const promotionalAudioEnabledRef = useRef(false);
+  const promotionalAudioEnabledRef = useRef(true);
   const userPausedRef = useRef(false);
   const holdForReducedMotionRef = useRef(true);
   const failedVideoSrcsRef = useRef<Set<string>>(new Set());
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
-  const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
-  const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(false);
+  const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
+  const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
 
   const activeVideo = heroVideos[activeVideoIndex] ?? heroVideos[0];
+  const videoFrameReady = readyVideoSrc === activeVideo.src;
   const heroAudioAudible =
     activeVideo.hasPromotionalAudio && promotionalAudioEnabled;
 
@@ -705,32 +704,29 @@ function HeroVisual({
     const video = videoRef.current;
     if (video) {
       prepareSilentBackgroundVideo(video);
+      video.pause();
     }
 
-    if (transitionTimeoutRef.current !== null) {
-      window.clearTimeout(transitionTimeoutRef.current);
-    }
-
-    setIsVideoTransitioning(true);
-    onVideoTransitionChange(true);
-    transitionTimeoutRef.current = window.setTimeout(() => {
-      setActiveVideoIndex((currentIndex) => {
-        for (let step = 1; step <= heroVideos.length; step += 1) {
-          const nextIndex = (currentIndex + step) % heroVideos.length;
-          if (!failedVideoSrcsRef.current.has(heroVideos[nextIndex].src)) {
-            return nextIndex;
-          }
+    onVideoTransitionChange(false);
+    setActiveVideoIndex((currentIndex) => {
+      for (let step = 1; step <= heroVideos.length; step += 1) {
+        const nextIndex = (currentIndex + step) % heroVideos.length;
+        if (!failedVideoSrcsRef.current.has(heroVideos[nextIndex].src)) {
+          return nextIndex;
         }
+      }
 
-        return currentIndex;
-      });
-      transitionTimeoutRef.current = null;
-    }, heroVideoTransitionMs);
+      return currentIndex;
+    });
   }, [onVideoTransitionChange]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    if (video.readyState >= 2) {
+      setReadyVideoSrc(activeVideo.src);
+    }
 
     const markVideoUnavailable = () => {
       const failedSrc = activeVideo.src;
@@ -744,9 +740,7 @@ function HeroVisual({
       queueMicrotask(markVideoUnavailable);
     }
 
-    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current, {
-      honorActivation: true,
-    });
+    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current);
 
     if (prefersReducedMotion() && holdForReducedMotionRef.current) {
       video.pause();
@@ -772,27 +766,16 @@ function HeroVisual({
     };
   }, [activeVideo, rotateToNextVideo]);
 
-  useEffect(() => {
-    return () => {
-      if (transitionTimeoutRef.current !== null) {
-        window.clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, []);
-
   function playActiveVideo() {
     const video = videoRef.current;
     if (!video) return;
 
-    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current, {
-      honorActivation: true,
-    });
+    syncHeroPlayback(video, activeVideo, promotionalAudioEnabledRef.current);
     void video
       .play()
       .then(() => {
         if (video.paused) return;
         setIsVideoPaused(false);
-        setIsVideoTransitioning(false);
         onVideoTransitionChange(false);
       })
       .catch(() => {
@@ -804,19 +787,16 @@ function HeroVisual({
             .then(() => {
               if (video.paused) return;
               setIsVideoPaused(false);
-              setIsVideoTransitioning(false);
               onVideoTransitionChange(false);
             })
             .catch(() => {
               setIsVideoPaused(true);
-              setIsVideoTransitioning(false);
               onVideoTransitionChange(false);
             });
           return;
         }
 
         setIsVideoPaused(true);
-        setIsVideoTransitioning(false);
         onVideoTransitionChange(false);
       });
   }
@@ -869,20 +849,23 @@ function HeroVisual({
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-slate-950">
-      {activeVideo.hasPromotionalAudio ? (
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl lg:hidden"
-          style={{ backgroundImage: `url(${activeVideo.poster})` }}
-        />
-      ) : null}
+      <img
+        key={activeVideo.poster}
+        src={activeVideo.poster}
+        alt=""
+        className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${
+          activeVideo.hasPromotionalAudio
+            ? "scale-110 blur-2xl lg:scale-100 lg:blur-none"
+            : ""
+        } ${activeVideo.objectPositionClassName}`}
+      />
       <video
         key={activeVideo.src}
         ref={videoRef}
-        className={`absolute object-cover transition-opacity duration-500 ${
+        className={`absolute object-cover ${
           activeVideo.frameClassName ?? "inset-0 h-full w-full"
         } ${activeVideo.objectPositionClassName} ${
-          isVideoTransitioning ? "opacity-0" : "opacity-100"
+          videoFrameReady ? "opacity-100" : "opacity-0"
         }`}
         poster={activeVideo.poster}
         autoPlay
@@ -890,8 +873,10 @@ function HeroVisual({
         playsInline
         disableRemotePlayback
         disablePictureInPicture
-        preload="metadata"
+        preload="auto"
         aria-hidden="true"
+        onLoadedData={() => setReadyVideoSrc(activeVideo.src)}
+        onPlaying={() => setReadyVideoSrc(activeVideo.src)}
         onCanPlay={(event) => {
           event.currentTarget.playbackRate = activeVideo.playbackRate;
           if (prefersReducedMotion() && holdForReducedMotionRef.current) {

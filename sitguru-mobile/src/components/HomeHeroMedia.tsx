@@ -32,7 +32,6 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 
 export { HOME_HERO_CLIP_SETTINGS, HOME_HERO_VIDEO_LABELS };
 
-const HERO_TRANSITION_MS = 420;
 /** Share of the 16:9 frame kept visible on a tall phone before we stop zooming out. */
 const HOWLWEEN_TARGET_VISIBLE_WIDTH = 0.66;
 
@@ -257,7 +256,7 @@ function RotatingHeroVideo({
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [paused, setPaused] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
 
   const clip = clips[activeIndex] ?? clips[0];
@@ -307,32 +306,11 @@ function RotatingHeroVideo({
     }
 
     rotatingRef.current = true;
-    onTransitionChange?.(true);
     applyClipAudioSafe();
-
-    Animated.timing(opacity, {
-      toValue: 0,
-      duration: HERO_TRANSITION_MS,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished) {
-        rotatingRef.current = false;
-        onTransitionChange?.(false);
-        return;
-      }
-
-      const nextIndex = (activeIndex + 1) % clips.length;
-      onActiveIndexChange(nextIndex);
-      onTransitionChange?.(false);
-
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: HERO_TRANSITION_MS,
-        useNativeDriver: true,
-      }).start(() => {
-        rotatingRef.current = false;
-      });
-    });
+    onActiveIndexChange((activeIndex + 1) % clips.length);
+    onTransitionChange?.(false);
+    opacity.setValue(1);
+    rotatingRef.current = false;
   }
 
   function applyClipAudioSafe() {
