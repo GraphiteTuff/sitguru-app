@@ -655,6 +655,10 @@ function syncHeroPlayback(
   return true;
 }
 
+function autoplayWasBlocked(error: unknown) {
+  return error instanceof DOMException && error.name === "NotAllowedError";
+}
+
 const HOWLWEEN_BAT_PATH =
   "M50 30 L45 16 L36 12 L28 2 L24 12 L14 6 L6 0 L12 14 L2 16 L0 22 L14 22 L10 32 L22 26 L32 34 L42 42 L50 30 L58 42 L68 34 L78 26 L90 32 L86 22 L100 22 L98 16 L88 14 L94 0 L86 6 L76 12 L72 2 L64 12 L55 16 Z";
 
@@ -781,15 +785,57 @@ function HeroVisual({
     onActiveVideoChange(activeVideoIndex);
   }, [activeVideo, activeVideoIndex, onActiveVideoChange]);
 
+  function beginHeroPlayback(video: HTMLVideoElement, videoConfig: HeroVideo) {
+    const wantSound = Boolean(
+      videoConfig.hasPromotionalAudio && promotionalAudioEnabledRef.current,
+    );
+    syncHeroPlayback(video, videoConfig, wantSound);
+
+    const markPlaying = () => {
+      if (video.paused) return;
+      setIsVideoPaused(false);
+      if (wantSound) setSoundOutputMuted(false);
+      onVideoTransitionChange(false);
+    };
+
+    return video.play().then(markPlaying).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // A play() before the file is ready can reject even when sound is allowed.
+      // Leave the preference on so the canplay retry starts the music.
+      if (!wantSound || !autoplayWasBlocked(error) || video.readyState < 2) {
+        if (video.paused && video.readyState >= 2) setIsVideoPaused(true);
+        return;
+      }
+
+      setSoundOutputMuted(true);
+      prepareSilentBackgroundVideo(video);
+      return video.play().then(markPlaying).catch(() => {
+        if (video.paused) setIsVideoPaused(true);
+      });
+    });
+  }
+
   useEffect(() => {
     const unlockSound = () => {
-      if (!promotionalAudioEnabledRef.current) return;
-      if (!activeVideoRef.current.hasPromotionalAudio) return;
+      const video = videoRef.current;
+      const clip = activeVideoRef.current;
+      if (!video || !clip.hasPromotionalAudio || !promotionalAudioEnabledRef.current) return;
+      if (!video.muted && video.volume > 0 && !video.paused) return;
+
+      video.muted = false;
+      video.defaultMuted = false;
+      video.volume = 1;
+      video.removeAttribute("muted");
       setSoundOutputMuted(false);
+      if (video.paused) {
+        void video.play().catch(() => undefined);
+      }
     };
-    window.addEventListener("pointerdown", unlockSound);
+    window.addEventListener("pointerdown", unlockSound, true);
+    window.addEventListener("keydown", unlockSound, true);
     return () => {
-      window.removeEventListener("pointerdown", unlockSound);
+      window.removeEventListener("pointerdown", unlockSound, true);
+      window.removeEventListener("keydown", unlockSound, true);
       if (handoffTimerRef.current !== null) {
         window.clearTimeout(handoffTimerRef.current);
       }
@@ -869,9 +915,11 @@ function HeroVisual({
       queueMicrotask(markVideoUnavailable);
     }
 
-    const wantSound =
-      promotionalAudioEnabledRef.current && !soundOutputMuted;
-    syncHeroPlayback(video, activeVideo, wantSound);
+    syncHeroPlayback(
+      video,
+      activeVideo,
+      promotionalAudioEnabledRef.current && !soundOutputMuted,
+    );
 
     if (prefersReducedMotion() && holdForReducedMotionRef.current) {
       video.pause();
@@ -879,17 +927,8 @@ function HeroVisual({
       if (video.paused) {
         queueMicrotask(() => setIsVideoPaused(true));
       }
-    } else if (!userPausedRef.current) {
-      void video.play().catch(() => {
-        if (activeVideo.hasPromotionalAudio && promotionalAudioEnabledRef.current) {
-          setSoundOutputMuted(true);
-          prepareSilentBackgroundVideo(video);
-          void video.play().catch(() => setIsVideoPaused(true));
-          return;
-        }
-
-        setIsVideoPaused(true);
-      });
+    } else if (!userPausedRef.current && video.readyState >= 2) {
+      void beginHeroPlayback(video, activeVideo);
     }
 
     return () => {
@@ -900,40 +939,7 @@ function HeroVisual({
   function playActiveVideo() {
     const video = videoRef.current;
     if (!video) return;
-
-    syncHeroPlayback(
-      video,
-      activeVideo,
-      promotionalAudioEnabledRef.current && !soundOutputMuted,
-    );
-    void video
-      .play()
-      .then(() => {
-        if (video.paused) return;
-        setIsVideoPaused(false);
-        onVideoTransitionChange(false);
-      })
-      .catch(() => {
-        if (activeVideo.hasPromotionalAudio && promotionalAudioEnabledRef.current) {
-          setSoundOutputMuted(true);
-          prepareSilentBackgroundVideo(video);
-          void video
-            .play()
-            .then(() => {
-              if (video.paused) return;
-              setIsVideoPaused(false);
-              onVideoTransitionChange(false);
-            })
-            .catch(() => {
-              setIsVideoPaused(true);
-              onVideoTransitionChange(false);
-            });
-          return;
-        }
-
-        setIsVideoPaused(true);
-        onVideoTransitionChange(false);
-      });
+    void beginHeroPlayback(video, activeVideo);
   }
 
   function handleHeroVideoError() {
@@ -964,24 +970,23 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video || !activeVideo.hasPromotionalAudio) return;
 
-    const nextEnabled = !promotionalAudioEnabledRef.current;
+    const hearingSound = !video.muted && video.volume > 0;
+    const nextEnabled = !hearingSound;
     setHalloweenAudioEnabled(nextEnabled);
-    if (nextEnabled) setSoundOutputMuted(false);
+    setSoundOutputMuted(false);
     syncHeroPlayback(video, activeVideo, nextEnabled);
 
-    if (!nextEnabled || prefersReducedMotion() || !video.paused) return;
+    if (!nextEnabled) return;
 
     userPausedRef.current = false;
-    void video
-      .play()
-      .then(() => {
-        if (!video.paused) setIsVideoPaused(false);
-      })
-      .catch(() => {
-        setSoundOutputMuted(true);
-        prepareSilentBackgroundVideo(video);
-        void video.play().catch(() => setIsVideoPaused(true));
-      });
+    holdForReducedMotionRef.current = false;
+    void video.play().then(() => {
+      if (!video.paused) setIsVideoPaused(false);
+    }).catch(() => {
+      setSoundOutputMuted(true);
+      prepareSilentBackgroundVideo(video);
+      void video.play().catch(() => setIsVideoPaused(true));
+    });
   }
 
   return (
