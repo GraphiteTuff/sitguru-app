@@ -853,6 +853,13 @@ export default async function AccountLifecyclePage({
   const guru = guruRows[0] || null;
   const ambassador = ambassadorRows[0] || null;
   const referral = referralRows[0] || null;
+  const isGuruRoleAccount = roles.some((role) =>
+    ["guru", "sitter", "provider", "walker", "both", "customer_guru", "pet_parent_and_guru"].includes(
+      role.toLowerCase().replace(/[\s-]+/g, "_"),
+    ),
+  ) || ["guru", "sitter", "provider", "walker", "both", "customer_guru", "pet_parent_and_guru"].includes(
+    asString(profile?.role).toLowerCase().replace(/[\s-]+/g, "_"),
+  );
 
   const currentAdminId = signedInAdmin?.id || "";
   const currentAdminPermissionRows = currentAdminId
@@ -1275,37 +1282,89 @@ export default async function AccountLifecyclePage({
                   tone="green"
                 />
                 <SummaryCard
-                  icon={guru ? <CheckCircle2 size={19} /> : <Wrench size={19} />}
+                  icon={
+                    guru || isGuruRoleAccount ? (
+                      guru ? (
+                        <CheckCircle2 size={19} />
+                      ) : (
+                        <Wrench size={19} />
+                      )
+                    ) : (
+                      <CheckCircle2 size={19} />
+                    )
+                  }
                   label="Guru workspace"
-                  value={guru ? "Exists" : "Missing"}
+                  value={
+                    guru
+                      ? "Exists"
+                      : isGuruRoleAccount
+                        ? "Missing"
+                        : "Not needed"
+                  }
                   detail={
                     guru
                       ? "A canonical Guru record is available."
-                      : "This account needs a Guru workspace repair."
+                      : isGuruRoleAccount
+                        ? "This account has a Guru role but no Guru workspace — repair it."
+                        : "Not a Guru account. Pet Parents and Ambassadors do not need a Guru workspace."
                   }
-                  tone={guru ? "green" : "rose"}
+                  tone={
+                    guru
+                      ? "green"
+                      : isGuruRoleAccount
+                        ? "rose"
+                        : "slate"
+                  }
                 />
                 <SummaryCard
                   icon={<ShieldCheck size={19} />}
                   label="Visibility"
-                  value={isPublicVisible ? "Public" : "Hidden"}
-                  detail={
-                    isPublicVisible
-                      ? "The profile may appear to Pet Parents."
-                      : "The profile is currently hidden from public search."
+                  value={
+                    guru
+                      ? isPublicVisible
+                        ? "Public"
+                        : "Hidden"
+                      : "N/A"
                   }
-                  tone={isPublicVisible ? "green" : "amber"}
+                  detail={
+                    guru
+                      ? isPublicVisible
+                        ? "The Guru profile may appear to Pet Parents."
+                        : "The Guru profile is currently hidden from public search."
+                      : "Public search visibility applies to Guru profiles only."
+                  }
+                  tone={
+                    guru
+                      ? isPublicVisible
+                        ? "green"
+                        : "amber"
+                      : "slate"
+                  }
                 />
                 <SummaryCard
                   icon={<Activity size={19} />}
                   label="Bookability"
-                  value={isBookable ? "Bookable" : "Not bookable"}
-                  detail={
-                    isBookable
-                      ? "The Guru may receive booking requests."
-                      : "The Guru cannot receive booking requests yet."
+                  value={
+                    guru
+                      ? isBookable
+                        ? "Bookable"
+                        : "Not bookable"
+                      : "N/A"
                   }
-                  tone={isBookable ? "green" : "amber"}
+                  detail={
+                    guru
+                      ? isBookable
+                        ? "The Guru may receive booking requests."
+                        : "The Guru cannot receive booking requests yet."
+                      : "Bookability applies to Guru workspaces only."
+                  }
+                  tone={
+                    guru
+                      ? isBookable
+                        ? "green"
+                        : "amber"
+                      : "slate"
+                  }
                 />
                 <SummaryCard
                   icon={
