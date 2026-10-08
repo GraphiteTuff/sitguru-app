@@ -22,12 +22,20 @@ import {
 } from "lucide-react";
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import {
+  buildPetParentWelcomeMailto,
+  sendAdminPetParentWelcome,
+} from "@/lib/admin/pet-parent-welcome";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{
     id: string;
+  }>;
+  searchParams?: Promise<{
+    welcome?: string;
+    welcome_to?: string;
   }>;
 };
 
@@ -1268,9 +1276,84 @@ async function deleteIncompletePetParentAction(formData: FormData) {
   redirect("/admin/petparents?cleanup=deleted-incomplete-pet-parent");
 }
 
-export default async function AdminCustomerDetailPage({ params }: PageProps) {
+async function sendPetParentWelcomeEmailAction(formData: FormData) {
+  "use server";
+
+  const customerId = String(formData.get("customerId") || "").trim();
+
+  if (!isUuid(customerId)) {
+    redirect("/admin/customers?welcome=invalid-id");
+  }
+
+  // Recipient is resolved from the stored profile/auth email only — never from a typed To field.
+  const delivery = await sendAdminPetParentWelcome({ customerId });
+
+  revalidatePath(`/admin/customers/${customerId}`);
+
+  if (delivery.status === "sent" && delivery.to) {
+    redirect(
+      `/admin/customers/${customerId}?welcome=sent&welcome_to=${encodeURIComponent(delivery.to)}`,
+    );
+  }
+
+  if (delivery.status === "skipped") {
+    redirect(`/admin/customers/${customerId}?welcome=missing-email`);
+  }
+
+  redirect(
+    `/admin/customers/${customerId}?welcome=failed&welcome_to=${encodeURIComponent(delivery.reason || "send-failed")}`,
+  );
+}
+
+function getWelcomeBanner(welcome: string, welcomeTo: string) {
+  if (welcome === "sent") {
+    return {
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      title: "Welcome email sent",
+      body: welcomeTo
+        ? `Delivered via Resend to the stored address ${welcomeTo}. No typed recipient was used.`
+        : "Delivered via Resend to the stored Pet Parent email.",
+    };
+  }
+
+  if (welcome === "missing-email") {
+    return {
+      tone: "border-amber-200 bg-amber-50 text-amber-950",
+      title: "No stored email to send",
+      body: "This Pet Parent record has no usable profile or auth email. Add or confirm an email before sending.",
+    };
+  }
+
+  if (welcome === "failed") {
+    return {
+      tone: "border-rose-200 bg-rose-50 text-rose-950",
+      title: "Welcome email failed",
+      body: welcomeTo || "Resend could not deliver the welcome email. Check RESEND_API_KEY and try again.",
+    };
+  }
+
+  if (welcome === "invalid-id") {
+    return {
+      tone: "border-rose-200 bg-rose-50 text-rose-950",
+      title: "Invalid Pet Parent id",
+      body: "Could not send welcome email because the customer id was invalid.",
+    };
+  }
+
+  return null;
+}
+
+export default async function AdminCustomerDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const resolvedParams = await params;
+  const resolvedSearch = (await searchParams) || {};
   const lookupKey = decodeURIComponent(resolvedParams.id || "").trim();
+  const welcomeFlash = getWelcomeBanner(
+    String(resolvedSearch.welcome || "").trim(),
+    String(resolvedSearch.welcome_to || "").trim(),
+  );
 
   const [profile, authUserByLookup, registrationHealthByLookup] = await Promise.all([
     getProfileByLookupKey(lookupKey),
@@ -1345,6 +1428,12 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const customerMessageSearchHref = `/admin/messages?q=${encodeURIComponent(
     name || email || phone || relatedCustomerId || lookupKey,
   )}`;
+  const hasStoredEmail = Boolean(email && email !== "No email found");
+  const petParentWelcomeMailto = hasStoredEmail
+    ? buildPetParentWelcomeMailto({ email, fullName: name })
+    : "";
+  const canSendStoredWelcome =
+    hasStoredEmail && Boolean(relatedCustomerId && isUuid(relatedCustomerId));
   const role = getText(profile, ["role", "user_role", "account_type"], "customer");
   const normalizedRole = role.toLowerCase().replace(/[\s-]+/g, "_");
   const isGuruOnlyProfile =
@@ -1526,13 +1615,50 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
               <Link
                 href={customerDirectMessageHref}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 shadow-sm hover:bg-emerald-50"
               >
                 <MessageSquare className="h-4 w-4" />
                 Start Message
               </Link>
+
+              {canSendStoredWelcome ? (
+                <form action={sendPetParentWelcomeEmailAction}>
+                  <input type="hidden" name="customerId" value={relatedCustomerId} />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+                    title={`Sends via Resend to stored address ${email}`}
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email welcome
+                  </button>
+                </form>
+              ) : null}
+
+              {petParentWelcomeMailto ? (
+                <a
+                  href={petParentWelcomeMailto}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-4 py-3 text-sm font-black text-sky-800 shadow-sm hover:bg-sky-50"
+                  title={`Opens Outlook with To: ${email}`}
+                >
+                  <Mail className="h-4 w-4" />
+                  Draft in Outlook
+                </a>
+              ) : null}
             </div>
           </div>
+
+          {welcomeFlash ? (
+            <div className={["mt-5 rounded-3xl border p-4", welcomeFlash.tone].join(" ")}>
+              <p className="text-sm font-black">{welcomeFlash.title}</p>
+              <p className="mt-1 text-sm font-semibold leading-6">{welcomeFlash.body}</p>
+              {hasStoredEmail ? (
+                <p className="mt-2 break-all text-xs font-black uppercase tracking-[0.12em] opacity-80">
+                  Stored email: {email}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           {isDualRoleProfile ? (
             <div className="mt-5 rounded-3xl border border-sky-200 bg-sky-50 p-4">
@@ -1866,8 +1992,19 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               <ProfileInfoRow
                 icon={<Mail className="mt-0.5 h-5 w-5 text-emerald-700" />}
                 label="Email"
-                value={email}
-                detail={`${emailSource}${verifiedFields.hasConfirmedEmail ? " · Email verified" : " · Email not verified"}`}
+                value={
+                  hasStoredEmail && petParentWelcomeMailto ? (
+                    <a
+                      href={petParentWelcomeMailto}
+                      className="break-all font-black text-emerald-800 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-950"
+                    >
+                      {email}
+                    </a>
+                  ) : (
+                    email
+                  )
+                }
+                detail={`${emailSource}${verifiedFields.hasConfirmedEmail ? " · Email verified" : " · Email not verified"} · Welcome actions use this stored address only`}
               />
 
               <ProfileInfoRow
@@ -2147,7 +2284,7 @@ function ProfileInfoRow({
 }: {
   icon: ReactNode;
   label: string;
-  value: string;
+  value: ReactNode;
   detail?: string;
 }) {
   return (
@@ -2157,7 +2294,7 @@ function ProfileInfoRow({
         <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
           {label}
         </p>
-        <p className="break-words text-sm font-black">{value}</p>
+        <div className="break-words text-sm font-black">{value}</div>
         {detail ? (
           <p className="mt-1 text-xs font-bold text-slate-500">{detail}</p>
         ) : null}
