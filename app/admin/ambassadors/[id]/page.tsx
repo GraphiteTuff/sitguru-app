@@ -29,10 +29,25 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   Users,
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/utils/supabase/admin";
+import {
+  listAmbassadorMissingFields,
+  sendAmbassadorMissingInfoEmail,
+} from "@/lib/admin/ambassador-missing-info-email";
+
+const AMBASSADOR_PHOTO_BUCKET = "profile-photos";
+const AMBASSADOR_PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+const AMBASSADOR_PHOTO_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -635,6 +650,89 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
   redirect(`/admin/ambassadors/${ambassadorId}?updated=success`);
 }
 
+function sanitizePhotoFileName(fileName: string) {
+  const base = fileName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return base || "ambassador-photo.jpg";
+}
+
+function getPhotoExtension(fileName: string, mimeType: string) {
+  const fromName = fileName.includes(".")
+    ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+    : "";
+
+  if ([".jpg", ".jpeg", ".png", ".webp"].includes(fromName)) {
+    return fromName === ".jpeg" ? ".jpg" : fromName;
+  }
+
+  if (mimeType.includes("png")) return ".png";
+  if (mimeType.includes("webp")) return ".webp";
+  return ".jpg";
+}
+
+async function uploadAmbassadorPhotoAttachment({
+  ambassadorId,
+  file,
+}: {
+  ambassadorId: string;
+  file: File;
+}) {
+  if (!AMBASSADOR_PHOTO_MIME_TYPES.has(file.type)) {
+    throw new Error("Ambassador photo must be a JPG, PNG, or WEBP image.");
+  }
+
+  if (file.size <= 0 || file.size > AMBASSADOR_PHOTO_MAX_BYTES) {
+    throw new Error("Ambassador photo must be under 8MB.");
+  }
+
+  const extension = getPhotoExtension(file.name, file.type);
+  const safeName = sanitizePhotoFileName(
+    file.name.replace(/\.[^/.]+$/, "") || "ambassador-photo",
+  );
+  const storagePath = `ambassadors/${ambassadorId}/${Date.now()}-${safeName}${extension}`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(AMBASSADOR_PHOTO_BUCKET)
+    .upload(storagePath, file, {
+      contentType: file.type || "image/jpeg",
+      cacheControl: "3600",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Photo upload failed: ${uploadError.message}`);
+  }
+
+  const { data } = supabaseAdmin.storage
+    .from(AMBASSADOR_PHOTO_BUCKET)
+    .getPublicUrl(storagePath);
+
+  return {
+    ambassador_photo_url: data.publicUrl,
+    ambassador_photo_path: storagePath,
+  };
+}
+
+function buildCanonicalReferralUrls(referralCode: string) {
+  const encoded = encodeURIComponent(referralCode);
+  const petParent = `https://www.sitguru.com/r/${encoded}/pet-parent`;
+  const guru = `https://www.sitguru.com/r/${encoded}/guru`;
+  const partner = `https://www.sitguru.com/r/${encoded}/partner`;
+
+  return {
+    referral_link: petParent,
+    pet_parent_referral_url: petParent,
+    customer_referral_url: petParent,
+    guru_referral_url: guru,
+    partner_referral_url: partner,
+  };
+}
+
 async function updateAmbassadorPhoto(
   ambassadorId: string,
   formData: FormData,
@@ -653,19 +751,34 @@ async function updateAmbassadorPhoto(
 
   const photoUrl = String(formData.get("ambassador_photo_url") || "").trim();
   const photoPath = String(formData.get("ambassador_photo_path") || "").trim();
+  const photoFile = formData.get("ambassador_photo_file");
+  const autoApprove = formData.get("auto_approve_photo") === "on";
 
-  const hasPhoto = Boolean(photoUrl || photoPath);
+  let nextUrl = photoUrl || null;
+  let nextPath = photoPath || null;
+
+  if (photoFile instanceof File && photoFile.size > 0) {
+    const uploaded = await uploadAmbassadorPhotoAttachment({
+      ambassadorId,
+      file: photoFile,
+    });
+    nextUrl = uploaded.ambassador_photo_url;
+    nextPath = uploaded.ambassador_photo_path;
+  }
+
+  const hasPhoto = Boolean(nextUrl || nextPath);
+  const now = new Date().toISOString();
 
   const { error } = await supabase
     .from("ambassadors")
     .update({
-      ambassador_photo_url: photoUrl || null,
-      ambassador_photo_path: photoPath || null,
-      photo_uploaded_at: hasPhoto ? new Date().toISOString() : null,
-      photo_approved: false,
-      photo_approved_at: null,
-      photo_approved_by: null,
-      updated_at: new Date().toISOString(),
+      ambassador_photo_url: nextUrl,
+      ambassador_photo_path: nextPath,
+      photo_uploaded_at: hasPhoto ? now : null,
+      photo_approved: hasPhoto && autoApprove ? true : false,
+      photo_approved_at: hasPhoto && autoApprove ? now : null,
+      photo_approved_by: hasPhoto && autoApprove ? user.id : null,
+      updated_at: now,
     })
     .eq("id", ambassadorId);
 
@@ -677,16 +790,228 @@ async function updateAmbassadorPhoto(
     ambassador_id: ambassadorId,
     activity_type: "photo_update",
     activity_title: hasPhoto
-      ? "Ambassador photo added or updated"
+      ? photoFile instanceof File && photoFile.size > 0
+        ? "Ambassador photo uploaded from attachment"
+        : "Ambassador photo added or updated"
       : "Ambassador photo cleared",
-    activity_notes: `Photo record updated by ${user.email || "Super Admin"}.`,
+    activity_notes: `Photo record updated by ${user.email || "Super Admin"}.${
+      hasPhoto && autoApprove ? " Auto-approved for public use." : ""
+    }`,
     created_by: user.id,
   });
 
   revalidatePath("/admin/ambassadors");
   revalidatePath(`/admin/ambassadors/${ambassadorId}`);
 
-  redirect(`/admin/ambassadors/${ambassadorId}?photo=updated`);
+  redirect(
+    `/admin/ambassadors/${ambassadorId}?photo=${
+      hasPhoto && autoApprove ? "uploaded-approved" : "updated"
+    }`,
+  );
+}
+
+async function quickStartAmbassadorOnboarding(
+  ambassadorId: string,
+  formData: FormData,
+) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const { data: ambassador, error: lookupError } = await supabase
+    .from("ambassadors")
+    .select("*")
+    .eq("id", ambassadorId)
+    .maybeSingle();
+
+  if (lookupError || !ambassador) {
+    redirect("/admin/ambassadors");
+  }
+
+  const displayName =
+    asString(formData.get("display_name")) ||
+    asString(ambassador.display_name) ||
+    asString(ambassador.full_name);
+  const email =
+    asString(formData.get("email")) || asString(ambassador.email);
+  const phone =
+    asString(formData.get("phone")) || asString(ambassador.phone);
+  const city =
+    asString(formData.get("city")) || asString(ambassador.city);
+  const state =
+    asString(formData.get("state")) || asString(ambassador.state);
+  const referralCode =
+    asString(ambassador.referral_code) ||
+    asString(formData.get("referral_code"));
+  const photoFile = formData.get("ambassador_photo_file");
+  const autoApprove = formData.get("auto_approve_photo") !== "off";
+  const activateNow = formData.get("activate_referring") !== "off";
+
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    display_name: displayName || null,
+    full_name:
+      asString(ambassador.full_name) || displayName || null,
+    email: email || null,
+    phone: phone || null,
+    city: city || null,
+    state: state || null,
+    updated_at: now,
+  };
+
+  if (referralCode) {
+    Object.assign(patch, buildCanonicalReferralUrls(referralCode));
+    patch.referral_code = referralCode;
+  }
+
+  if (photoFile instanceof File && photoFile.size > 0) {
+    const uploaded = await uploadAmbassadorPhotoAttachment({
+      ambassadorId,
+      file: photoFile,
+    });
+    patch.ambassador_photo_url = uploaded.ambassador_photo_url;
+    patch.ambassador_photo_path = uploaded.ambassador_photo_path;
+    patch.photo_uploaded_at = now;
+    if (autoApprove) {
+      patch.photo_approved = true;
+      patch.photo_approved_at = now;
+      patch.photo_approved_by = user.id;
+    } else {
+      patch.photo_approved = false;
+      patch.photo_approved_at = null;
+      patch.photo_approved_by = null;
+    }
+  }
+
+  const nextAmbassador = {
+    ...ambassador,
+    ...patch,
+  } as AmbassadorRow;
+
+  const canStartReferring = Boolean(
+    (asString(nextAmbassador.full_name) ||
+      asString(nextAmbassador.display_name)) &&
+      asString(nextAmbassador.email) &&
+      asString(nextAmbassador.phone) &&
+      asString(nextAmbassador.city) &&
+      asString(nextAmbassador.state) &&
+      asString(nextAmbassador.referral_code),
+  );
+
+  if (activateNow && canStartReferring) {
+    patch.status = "active";
+    patch.referral_status = "Early Referral Approved";
+    patch.dashboard_enabled = true;
+    patch.login_enabled = true;
+    patch.activated_at = ambassador.activated_at || now;
+    patch.onboarding_status = asString(ambassador.onboarding_status) ||
+      "Onboarding In Progress";
+  }
+
+  const { error: updateError } = await supabase
+    .from("ambassadors")
+    .update(patch)
+    .eq("id", ambassadorId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (activateNow && canStartReferring && ambassador.user_id) {
+    const { error: roleError } = await supabase.from("user_roles").upsert(
+      {
+        user_id: ambassador.user_id,
+        role: "ambassador",
+        updated_at: now,
+      },
+      { onConflict: "user_id,role" },
+    );
+
+    if (roleError) {
+      console.warn(
+        "Ambassador quick-start role sync warning:",
+        roleError.message,
+      );
+    }
+
+    // Keep Pet Parent contact fields in sync when we capture phone/location.
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        phone: phone || undefined,
+        city: city || undefined,
+        state: state || undefined,
+        updated_at: now,
+      })
+      .eq("id", ambassador.user_id);
+  }
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "quick_start_onboarding",
+    activity_title: canStartReferring
+      ? "Quick-start onboarding completed — ready to refer"
+      : "Quick-start onboarding saved",
+    activity_notes: `Updated by ${user.email || "Super Admin"}. Required fields ${
+      canStartReferring ? "complete" : "still missing"
+    }.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+  revalidatePath("/admin/hr");
+
+  if (!canStartReferring) {
+    redirect(`/admin/ambassadors/${ambassadorId}?onboarding=incomplete`);
+  }
+
+  redirect(`/admin/ambassadors/${ambassadorId}?onboarding=ready`);
+}
+
+async function emailAmbassadorMissingInfoAction(
+  ambassadorId: string,
+  _formData: FormData,
+) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const delivery = await sendAmbassadorMissingInfoEmail({ ambassadorId });
+
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+
+  if (delivery.status === "sent" && delivery.to) {
+    redirect(
+      `/admin/ambassadors/${ambassadorId}?missing_info=sent&missing_to=${encodeURIComponent(delivery.to)}`,
+    );
+  }
+
+  if (delivery.status === "skipped") {
+    redirect(
+      `/admin/ambassadors/${ambassadorId}?missing_info=skipped&missing_to=${encodeURIComponent(delivery.reason || "skipped")}`,
+    );
+  }
+
+  redirect(
+    `/admin/ambassadors/${ambassadorId}?missing_info=failed&missing_to=${encodeURIComponent(delivery.reason || "send-failed")}`,
+  );
 }
 
 async function approveAmbassadorPhoto(ambassadorId: string) {
@@ -1750,6 +2075,10 @@ function AdminNotice({
   const activation = searchParams?.activation;
   const updated = searchParams?.updated;
   const photo = searchParams?.photo;
+  const missingInfo = searchParams?.missing_info;
+  const missingTo = Array.isArray(searchParams?.missing_to)
+    ? searchParams?.missing_to[0]
+    : searchParams?.missing_to;
 
   if (activation === "blocked") {
     return (
@@ -1765,6 +2094,33 @@ function AdminNotice({
             </p>
           </div>
         </div>
+      </section>
+    );
+  }
+
+  if (missingInfo === "sent") {
+    return (
+      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
+        <p className="font-black">Missing-info email sent</p>
+        <p className="mt-1 text-sm font-semibold leading-6">
+          Sent via Resend to the stored address{" "}
+          <span className="break-all font-black">{missingTo || "the Ambassador"}</span>.
+        </p>
+      </section>
+    );
+  }
+
+  if (missingInfo === "failed" || missingInfo === "skipped") {
+    return (
+      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+        <p className="font-black">
+          {missingInfo === "skipped"
+            ? "Missing-info email skipped"
+            : "Missing-info email failed"}
+        </p>
+        <p className="mt-1 break-all text-sm font-semibold leading-6">
+          {missingTo || "Check RESEND_API_KEY and the Ambassador email, then try again."}
+        </p>
       </section>
     );
   }
@@ -1921,6 +2277,7 @@ export default async function AdminAmbassadorDetailPage({
   const ambassadorRoleLabel = getAmbassadorRoleLabel(ambassadorRow);
   const hasPhoto = Boolean(ambassadorRow.ambassador_photo_url);
   const isArchived = isArchivedAmbassador(ambassadorRow);
+  const missingOnboardingFields = listAmbassadorMissingFields(ambassadorRow);
 
   return (
     <main className="min-h-screen bg-[#f5f8f3] px-4 py-6 text-[#17351f] sm:px-6 lg:px-8">
@@ -1936,6 +2293,50 @@ export default async function AdminAmbassadorDetailPage({
         </div>
 
         <AdminNotice searchParams={resolvedSearchParams} />
+
+        {!isArchived && missingOnboardingFields.length > 0 ? (
+          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-800">
+                  Missing information
+                </p>
+                <h2 className="mt-1 text-2xl font-extrabold text-amber-950">
+                  Ask {ambassadorName.split(" ")[0] || "them"} for the last details
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-amber-900">
+                  Sends a Resend email to the stored address{" "}
+                  <span className="break-all font-black">
+                    {ambassadorRow.email || "missing"}
+                  </span>
+                  . No typed recipient — this avoids address typos.
+                </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-bold text-amber-950">
+                  {missingOnboardingFields.map((field) => (
+                    <li key={field}>{field}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <form
+                action={emailAmbassadorMissingInfoAction.bind(
+                  null,
+                  ambassadorRow.id,
+                )}
+                className="shrink-0"
+              >
+                <button
+                  type="submit"
+                  disabled={!ambassadorRow.email}
+                  className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#0a4a2e] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Email missing info
+                </button>
+              </form>
+            </div>
+          </section>
+        ) : null}
 
         <section
           className={`rounded-[2rem] border bg-white p-5 shadow-sm sm:p-6 ${
