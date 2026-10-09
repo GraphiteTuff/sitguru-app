@@ -35,7 +35,7 @@
         "NSMicrophoneUsageDescription": "SitGuru uses the microphone to record voice notes for Pet Parents and Gurus.",
         "NSFaceIDUsageDescription": "Allow SitGuru to use Face ID for faster, secure access to your account.",
         "NSUserTrackingUsageDescription": "SitGuru does not track you across other companies’ apps or websites for advertising.",
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": false
       },
       "config": {
         "usesNonExemptEncryption": false
