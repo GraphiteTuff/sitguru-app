@@ -89,31 +89,11 @@ function getEnvAdminEmails() {
     .filter(Boolean);
 }
 
-export function isSuperUserRole(role: string | null | undefined) {
-  return SUPER_USER_ROLES.has(
-    String(role || "")
-      .trim()
-      .toLowerCase(),
-  );
-}
-
-export function isAdminRole(role: string | null | undefined) {
-  const normalized = String(role || "")
-    .trim()
-    .toLowerCase();
-
-  if (!normalized) return false;
-
-  return (
-    ADMIN_ROLES.includes(normalized as (typeof ADMIN_ROLES)[number]) ||
-    isSuperUserRole(normalized)
-  );
-}
-
 function normalizeRoleCandidate(value: unknown) {
   return String(value || "")
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
 }
 
 /** Map legacy / mistaken keys onto canonical admin roles. */
@@ -124,8 +104,10 @@ function canonicalizeRole(role: string, accessLevel?: string | null) {
   if (
     normalized === "super_user" ||
     normalized === "superuser" ||
+    normalized === "superadmin" ||
     level === "super_user" ||
-    level === "superuser"
+    level === "superuser" ||
+    level === "superadmin"
   ) {
     return "super_admin";
   }
@@ -135,6 +117,21 @@ function canonicalizeRole(role: string, accessLevel?: string | null) {
   }
 
   return normalized;
+}
+
+export function isSuperUserRole(role: string | null | undefined) {
+  return SUPER_USER_ROLES.has(canonicalizeRole(String(role || "")));
+}
+
+export function isAdminRole(role: string | null | undefined) {
+  const normalized = canonicalizeRole(String(role || ""));
+
+  if (!normalized) return false;
+
+  return (
+    ADMIN_ROLES.includes(normalized as (typeof ADMIN_ROLES)[number]) ||
+    isSuperUserRole(normalized)
+  );
 }
 
 function pickBestRole(candidates: string[]) {
@@ -166,19 +163,18 @@ function buildCapabilities(role: string, explicitFinance = false) {
   };
 }
 
+type AdminUserLike = {
+  id: string;
+  email?: string | null;
+};
+
 /**
- * Resolve a signed-in admin identity.
- * Never invents a default "admin" role when no profile / HQ assignment exists.
+ * Resolve admin capabilities for an already-authenticated user.
+ * Used by cookie sessions (`getAdminIdentity`) and Bearer APIs (`requireAdminUser`).
  */
-export async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
+export async function resolveAdminIdentityForUser(
+  user: AdminUserLike,
+): Promise<AdminIdentity | null> {
   const email = String(user.email || "").toLowerCase();
   const envEmails = getEnvAdminEmails();
 
@@ -193,7 +189,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     };
   }
 
-  const [hqAccess, adminUser, profile, users] = await Promise.all([
+  const [hqAccess, adminUser, profile, users, userRoles] = await Promise.all([
     supabaseAdmin
       .from("admin_user_access")
       .select("role_key,email,is_active,access_level")
@@ -215,6 +211,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
       .select("role,email,is_active,can_access_financials")
       .eq("id", user.id)
       .limit(1),
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
   ]);
 
   const hqRow = hqAccess.data?.[0] || null;
@@ -228,6 +225,9 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     normalizeRoleCandidate(adminRow?.role),
     normalizeRoleCandidate(profileRow?.role),
     normalizeRoleCandidate(usersRow?.role),
+    ...(userRoles.data || []).map((item) =>
+      normalizeRoleCandidate((item as { role?: string }).role),
+    ),
   ]);
 
   if (!role || !isAdminRole(role)) return null;
@@ -246,6 +246,25 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     role,
     ...caps,
   };
+}
+
+/**
+ * Resolve a signed-in admin identity.
+ * Never invents a default "admin" role when no profile / HQ assignment exists.
+ */
+export async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  return resolveAdminIdentityForUser({
+    id: user.id,
+    email: user.email,
+  });
 }
 
 type AdminApiOk = {

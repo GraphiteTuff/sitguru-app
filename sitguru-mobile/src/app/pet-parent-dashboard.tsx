@@ -48,7 +48,7 @@ import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
 import { AI_COMPANIONS } from '@/constants/companions';
 import { getDashboardPalette } from '@/constants/role-palettes';
@@ -63,6 +63,7 @@ import {
   canBookAgain,
   pushBookAgain,
 } from '@/lib/navigation/book-again';
+import { useSyncWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { firstNameFromPerson } from '@/lib/people/first-name';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -209,6 +210,7 @@ const REALTIME_TABLES = [
 
 export default function PetParentDashboardScreen() {
   const { user, profile, firstName } = useAuth();
+  useSyncWorkspace('pet_parent');
   const params = useLocalSearchParams<{
     welcomePet?: string;
     welcomePetId?: string;
@@ -231,7 +233,12 @@ export default function PetParentDashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
   const [now, setNow] = useState(Date.now());
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: 'pet_parent',
+  });
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
   const [needsVisitReview, setNeedsVisitReview] = useState(false);
@@ -850,11 +857,7 @@ export default function PetParentDashboardScreen() {
                 badges={{ messages: dashboardData.unreadMessages }}
               />
 
-              <SitGuruWorkspaceSwitcher
-                currentRole="pet_parent"
-                onClose={() => setWorkspaceSwitcherOpen(false)}
-                visible={workspaceSwitcherOpen}
-              />
+              {workspaceMenus}
             </View>
           }
         >
@@ -904,7 +907,7 @@ export default function PetParentDashboardScreen() {
                 <TouchTarget
                   accessibilityRole="button"
                   accessibilityLabel="Switch workspace"
-                  onPress={() => setWorkspaceSwitcherOpen(true)}
+                  {...avatarPressProps}
                   style={styles.profileButton}
                 >
                   <Avatar

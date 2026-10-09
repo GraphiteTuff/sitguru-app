@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trophy,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -85,6 +86,12 @@ export const ADDITIONAL_OVERFLOW_ITEMS: Record<
     params: item.params,
   })),
   guru: [
+    {
+      key: 'guru-profile',
+      label: 'Guru profile',
+      icon: UserRound,
+      href: '/guru-profile',
+    },
     {
       key: 'earnings',
       label: 'Earnings',

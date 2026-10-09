@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import type { SitGuruTabRole } from '@/components/SitGuruTabBar';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppRole } from '@/types/auth';
 
@@ -14,10 +15,11 @@ function roleToTabRole(role: AppRole | null, isAuthenticated: boolean): SitGuruT
 /** Resolves tab bar role + optional message badge for the signed-in user. */
 export function useMobileTabContext() {
   const { isAuthenticated, primaryRole, user } = useAuth();
+  const { activeWorkspace } = useActiveWorkspace();
 
   const tabRole = useMemo(
-    () => roleToTabRole(primaryRole, isAuthenticated),
-    [isAuthenticated, primaryRole],
+    () => roleToTabRole(activeWorkspace ?? primaryRole, isAuthenticated),
+    [activeWorkspace, isAuthenticated, primaryRole],
   );
 
   return {

@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   setAudioModeAsync,
   useAudioPlayer,
@@ -40,9 +39,9 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
-import { LAST_WORKSPACE_KEY } from '@/constants/workspaces';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { readStoredWorkspace } from '@/lib/workspaces/switch';
 import { firstNameFromPerson } from '@/lib/people/first-name';
 import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -707,9 +706,7 @@ export default function ConversationScreen() {
       }
 
       try {
-        const savedRole = normalizeRole(
-          await AsyncStorage.getItem(LAST_WORKSPACE_KEY),
-        );
+        const savedRole = await readStoredWorkspace();
 
         if (savedRole && roleIsAvailable(savedRole, roles)) {
           if (active) setActiveWorkspaceRole(savedRole);

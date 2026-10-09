@@ -43,7 +43,7 @@ import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import {
@@ -52,6 +52,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubmitBookingReview } from '@/hooks/data/useSubmitBookingReview';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -908,10 +909,22 @@ export default function ReviewsScreen() {
   const requestedGuruId =
     typeof params.guruId === 'string' ? params.guruId : '';
 
+  const { activeWorkspace } = useActiveWorkspace();
   const effectiveRole: AppRole =
+    activeWorkspace ||
     primaryRole ||
     roles[0] ||
     'pet_parent';
+
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: effectiveRole,
+    profileHref: '/account',
+    profileLabel: 'Manage account',
+  });
 
   const [booking, setBooking] = useState<BookingView | null>(null);
   const [guruName, setGuruName] = useState('Your Guru');
@@ -939,7 +952,6 @@ export default function ReviewsScreen() {
   const [responseReviewId, setResponseReviewId] = useState('');
   const [responseText, setResponseText] = useState('');
   const [savingResponse, setSavingResponse] = useState(false);
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
 
   const guruUserId =
     requestedGuruId ||
@@ -1407,7 +1419,8 @@ export default function ReviewsScreen() {
                         <BubblePressable
                           accessibilityLabel="Switch workspace"
                           accessibilityRole="button"
-                          onPress={() => setWorkspaceSwitcherOpen(true)}
+                          haptic="none"
+                          {...avatarPressProps}
                           scaleTo={0.88}
                           style={styles.profileButton}>
                           <HeaderAvatar
@@ -2057,13 +2070,7 @@ export default function ReviewsScreen() {
         </View>
       </SitGuruScreen>
 
-      <SitGuruWorkspaceSwitcher
-        currentRole={effectiveRole}
-        onClose={() => setWorkspaceSwitcherOpen(false)}
-        profileHref="/account"
-        profileLabel="Manage account"
-        visible={workspaceSwitcherOpen}
-      />
+      {workspaceMenus}
     </>
   );
 }

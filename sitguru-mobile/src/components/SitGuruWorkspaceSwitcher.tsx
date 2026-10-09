@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     router,
     type Href,
@@ -16,11 +15,11 @@ import {
     X,
 } from 'lucide-react-native';
 import {
-    useMemo,
     useState,
 } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Image,
     Modal,
     Platform,
@@ -33,39 +32,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
+import { MAX_CHROME_FONT_MULTIPLIER } from '@/lib/a11y/type-scale';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
+import { getWorkspace } from '@/constants/workspaces';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import type { AppRole } from '@/types/auth';
 
-const LAST_WORKSPACE_KEY =
-  'sitguru-last-workspace';
-
-const WORKSPACE_ORDER: AppRole[] = [
-  'pet_parent',
-  'guru',
-  'ambassador',
-  'admin',
-];
-
-const DASHBOARD_PATHS:
-  Record<AppRole, Href> = {
-    pet_parent:
-      '/pet-parent-dashboard',
-    guru:
-      '/guru-dashboard',
-    ambassador:
-      '/ambassador-dashboard',
-    admin:
-      '/admin-dashboard',
-  };
-
 type SitGuruWorkspaceSwitcherProps = {
-  currentRole: AppRole;
+  currentRole?: AppRole;
   visible: boolean;
   onClose: () => void;
   profileHref?: Href;
   profileLabel?: string;
+  /** Full account sheet vs long-press role-only shortcut. */
+  variant?: 'full' | 'quick';
 };
 
 export default function SitGuruWorkspaceSwitcher({
@@ -73,7 +55,8 @@ export default function SitGuruWorkspaceSwitcher({
   visible,
   onClose,
   profileHref = '/account',
-  profileLabel = 'Manage profile',
+  profileLabel = 'Profile & Account',
+  variant = 'full',
 }: SitGuruWorkspaceSwitcherProps) {
   const insets =
     useSafeAreaInsets();
@@ -93,9 +76,23 @@ export default function SitGuruWorkspaceSwitcher({
   const {
     user,
     profile,
-    roles,
     signOut,
   } = useAuth();
+
+  const {
+    activeWorkspace,
+    authorizedRoles,
+    joinableRoles,
+    switching,
+    switchWorkspace,
+    startRoleSetup,
+  } = useActiveWorkspace();
+
+  const selectedRole =
+    currentRole &&
+    authorizedRoles.includes(currentRole)
+      ? currentRole
+      : activeWorkspace;
 
   const [
     signingOut,
@@ -149,41 +146,20 @@ export default function SitGuruWorkspaceSwitcher({
         null,
     );
 
-  const availableRoles =
-    useMemo(() => {
-      const roleSet =
-        new Set<AppRole>([
-          ...roles,
-          currentRole,
-        ]);
-
-      return WORKSPACE_ORDER.filter(
-        (role) =>
-          roleSet.has(role),
-      );
-    }, [
-      currentRole,
-      roles,
-    ]);
-
   async function openWorkspace(
     role: AppRole,
   ) {
-    onClose();
+    if (switching) return;
 
-    try {
-      await AsyncStorage.setItem(
-        LAST_WORKSPACE_KEY,
-        role,
-      );
-    } catch {
-      // Navigation can continue even if
-      // local preference storage fails.
+    const result = await switchWorkspace(role);
+    if (result.ok) {
+      onClose();
+      return;
     }
 
-    router.replace(
-      DASHBOARD_PATHS[role],
-    );
+    if (result.error) {
+      Alert.alert('SitGuru', result.error);
+    }
   }
 
   function openDestination(
@@ -275,11 +251,14 @@ export default function SitGuruWorkspaceSwitcher({
                   }
                 >
                   <Text
+                    maxFontSizeMultiplier={
+                      MAX_CHROME_FONT_MULTIPLIER
+                    }
                     style={
                       styles.title
                     }
                   >
-                    Switch workspace
+                    {profileName}
                   </Text>
 
                   <Text
@@ -288,7 +267,9 @@ export default function SitGuruWorkspaceSwitcher({
                       styles.subtitle
                     }
                   >
-                    {profileName}
+                    {variant === 'quick'
+                      ? 'Switch workspace'
+                      : user?.email || 'SitGuru account'}
                   </Text>
                 </View>
               </View>
@@ -310,28 +291,45 @@ export default function SitGuruWorkspaceSwitcher({
               </BubblePressable>
             </View>
 
+            {variant === 'full' ? (
+              <Text style={styles.sectionLabel}>
+                Currently using SitGuru as
+              </Text>
+            ) : (
+              <Text style={styles.sectionLabel}>
+                Switch workspace
+              </Text>
+            )}
+
             <View
               style={
                 styles.workspaceList
               }
             >
-              {availableRoles.map(
+              {authorizedRoles.map(
                 (role) => {
                   const active =
                     role ===
-                    currentRole;
+                    selectedRole;
+                  const workspace =
+                    getWorkspace(role);
 
                   return (
                     <BubblePressable
                       key={role}
-                      accessibilityLabel={`Open ${workspaceLabel(
-                        role,
-                      )}`}
+                      accessibilityLabel={
+                        active
+                          ? `${workspace.label}, current workspace`
+                          : `Switch to ${workspace.label}`
+                      }
                       accessibilityRole="button"
                       accessibilityState={{
                         selected:
                           active,
+                        disabled:
+                          switching,
                       }}
+                      disabled={switching}
                       onPress={() =>
                         void openWorkspace(
                           role,
@@ -367,13 +365,14 @@ export default function SitGuruWorkspaceSwitcher({
                         }
                       >
                         <Text
+                          maxFontSizeMultiplier={
+                            MAX_CHROME_FONT_MULTIPLIER
+                          }
                           style={
                             styles.workspaceTitle
                           }
                         >
-                          {workspaceLabel(
-                            role,
-                          )}
+                          {workspace.label}
                         </Text>
 
                         <Text
@@ -383,9 +382,7 @@ export default function SitGuruWorkspaceSwitcher({
                         >
                           {active
                             ? 'Current workspace'
-                            : workspaceHelper(
-                                role,
-                              )}
+                            : workspace.switcherDescription}
                         </Text>
                       </View>
 
@@ -420,10 +417,59 @@ export default function SitGuruWorkspaceSwitcher({
               )}
             </View>
 
+            {variant === 'full' &&
+            joinableRoles.length ? (
+              <View style={styles.workspaceList}>
+                {joinableRoles.map((role) => {
+                  const workspace = getWorkspace(role);
+                  return (
+                    <BubblePressable
+                      key={`join-${role}`}
+                      accessibilityLabel={`Become a ${workspace.label}`}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        onClose();
+                        startRoleSetup(role);
+                      }}
+                      scaleTo={0.97}
+                      style={styles.workspaceRow}
+                    >
+                      <View style={styles.workspaceIcon}>
+                        <WorkspaceIcon
+                          color={palette.text}
+                          role={role}
+                        />
+                      </View>
+                      <View style={styles.workspaceCopy}>
+                        <Text
+                          maxFontSizeMultiplier={MAX_CHROME_FONT_MULTIPLIER}
+                          style={styles.workspaceTitle}
+                        >
+                          Become a {workspace.label}
+                        </Text>
+                        <Text style={styles.workspaceText}>
+                          Start SitGuru {workspace.label} setup
+                        </Text>
+                      </View>
+                      <ChevronRight
+                        color={palette.muted}
+                        size={18}
+                        strokeWidth={2.3}
+                      />
+                    </BubblePressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {variant === 'full' ? (
             <View
               style={styles.divider}
             />
+            ) : null}
 
+            {variant === 'full' ? (
+            <>
             <BubblePressable
               accessibilityRole="button"
               onPress={() =>
@@ -466,8 +512,8 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionText
                   }
                 >
-                  Update your workspace
-                  profile and availability.
+                  Signed-in SitGuru account,
+                  photos, and personal details.
                 </Text>
               </View>
 
@@ -512,7 +558,7 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionTitle
                   }
                 >
-                  Manage account
+                  Settings
                 </Text>
 
                 <Text
@@ -520,9 +566,8 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionText
                   }
                 >
-                  Security, phone,
-                  payments, roles, and
-                  account settings.
+                  Theme, notifications,
+                  security, and preferences.
                 </Text>
               </View>
 
@@ -634,9 +679,11 @@ export default function SitGuruWorkspaceSwitcher({
               >
                 {signingOut
                   ? 'Signing out…'
-                  : 'Sign out of SitGuru'}
+                  : 'Sign Out'}
               </Text>
             </BubblePressable>
+            </>
+            ) : null}
           </View>
         </View>
       </View>
@@ -730,6 +777,7 @@ function Avatar({
     >
       {showImage ? (
         <Image
+          alt=""
           onError={onImageError}
           resizeMode="cover"
           source={{
@@ -760,42 +808,6 @@ function Avatar({
       )}
     </View>
   );
-}
-
-function workspaceLabel(
-  role: AppRole,
-) {
-  if (role === 'pet_parent') {
-    return 'Pet Parent';
-  }
-
-  if (role === 'guru') {
-    return 'Pet Guru';
-  }
-
-  if (role === 'ambassador') {
-    return 'Ambassador';
-  }
-
-  return 'SitGuru Admin';
-}
-
-function workspaceHelper(
-  role: AppRole,
-) {
-  if (role === 'pet_parent') {
-    return 'Pets, care, bookings, and payments';
-  }
-
-  if (role === 'guru') {
-    return 'Requests, clients, earnings, and PawReports';
-  }
-
-  if (role === 'ambassador') {
-    return 'Referrals, rewards, outreach, and training';
-  }
-
-  return 'Operations, accounts, payouts, and platform tools';
 }
 
 function initials(
@@ -955,6 +967,14 @@ function createStyles(
       justifyContent:
         'center',
       width: 35,
+    },
+    sectionLabel: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+      letterSpacing: 0.2,
+      marginTop: 6,
+      paddingHorizontal: 8,
     },
     workspaceList: {
       gap: 3,

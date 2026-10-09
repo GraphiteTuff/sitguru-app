@@ -39,7 +39,7 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import {
@@ -48,7 +48,9 @@ import {
   useColorScheme,
   useThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
+import { persistActiveWorkspace } from '@/lib/workspaces/switch';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { AppRole } from '@/types/auth';
@@ -289,13 +291,49 @@ function actionLabel(
   }
 }
 
+function workspaceFromNotificationRow(
+  row: RecordRow,
+  category: NotificationCategory,
+  userId: string,
+  roles: AppRole[],
+  fallback: AppRole,
+): AppRole {
+  if (category === 'guru' && roles.includes('guru')) return 'guru';
+  if (category === 'ambassador' && roles.includes('ambassador')) {
+    return 'ambassador';
+  }
+
+  const guruId = firstText(row, ['guru_id', 'sitter_id', 'provider_id']);
+  if (
+    guruId &&
+    guruId === userId &&
+    roles.includes('guru') &&
+    (category === 'bookings' ||
+      category === 'pawreport' ||
+      category === 'payments')
+  ) {
+    return 'guru';
+  }
+
+  return fallback;
+}
+
 function notificationFromRow(
   row: RecordRow,
   index: number,
   table: string,
   role: AppRole,
+  userId: string,
+  roles: AppRole[],
 ): NotificationItem {
   const category = normalizeCategory(row);
+  const workspace = workspaceFromNotificationRow(
+    row,
+    category,
+    userId,
+    roles,
+    role,
+  );
 
   const dismissed =
     firstBoolean(row, ['dismissed', 'is_dismissed', 'archived']) ||
@@ -325,8 +363,8 @@ function notificationFromRow(
       ]) || new Date().toISOString(),
     unread: !read,
     dismissed,
-    actionLabel: actionLabel(category, row, role),
-    href: resolveHref(category, row, role),
+    actionLabel: actionLabel(category, row, workspace),
+    href: resolveHref(category, row, workspace),
     raw: row,
     table,
   };
@@ -400,7 +438,11 @@ function categoryIcon(
   }
 }
 
-async function loadNotifications(userId: string, role: AppRole) {
+async function loadNotifications(
+  userId: string,
+  role: AppRole,
+  roles: AppRole[],
+) {
   for (const table of NOTIFICATION_TABLES) {
     for (const field of [
       'user_id',
@@ -419,7 +461,9 @@ async function loadNotifications(userId: string, role: AppRole) {
       if (result.error) continue;
 
       return ((result.data || []) as RecordRow[])
-        .map((row, index) => notificationFromRow(row, index, table, role))
+        .map((row, index) =>
+          notificationFromRow(row, index, table, role, userId, roles),
+        )
         .filter((item) => !item.dismissed)
         .sort(
           (left, right) =>
@@ -480,12 +524,23 @@ export default function NotificationsScreen() {
     firstName,
   } = useAuth();
 
-  const activeRole: AppRole = primaryRole || roles[0] || 'pet_parent';
+  const { activeWorkspace } = useActiveWorkspace();
+  const activeRole: AppRole =
+    activeWorkspace || primaryRole || roles[0] || 'pet_parent';
+
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: activeRole,
+    profileHref: '/account',
+    profileLabel: 'Manage account',
+  });
 
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [selectedFilter, setSelectedFilter] =
     useState<NotificationCategory>('all');
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
@@ -533,7 +588,7 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const nextItems = await loadNotifications(user.id, activeRole);
+        const nextItems = await loadNotifications(user.id, activeRole, roles);
 
         setItems(nextItems);
         setMessage('');
@@ -548,7 +603,7 @@ export default function NotificationsScreen() {
         setRefreshing(false);
       }
     },
-    [activeRole, authLoading, isAuthenticated, user?.id],
+    [activeRole, authLoading, isAuthenticated, roles, user?.id],
   );
 
   useEffect(() => {
@@ -685,6 +740,20 @@ export default function NotificationsScreen() {
       void markRead(item);
     }
 
+    const target = user?.id
+      ? workspaceFromNotificationRow(
+          item.raw,
+          item.category,
+          user.id,
+          roles,
+          activeRole,
+        )
+      : null;
+
+    if (target && target !== activeRole) {
+      void persistActiveWorkspace(target);
+    }
+
     router.push(item.href as never);
   }
 
@@ -804,7 +873,8 @@ export default function NotificationsScreen() {
                       <BubblePressable
                         accessibilityLabel="Switch workspace"
                         accessibilityRole="button"
-                        onPress={() => setWorkspaceSwitcherOpen(true)}
+                        haptic="none"
+                        {...avatarPressProps}
                         scaleTo={0.88}
                         style={styles.profileButton}>
                         <HeaderAvatar
@@ -1077,13 +1147,7 @@ export default function NotificationsScreen() {
         </View>
       </SitGuruScreen>
 
-      <SitGuruWorkspaceSwitcher
-        currentRole={activeRole}
-        onClose={() => setWorkspaceSwitcherOpen(false)}
-        profileHref="/account"
-        profileLabel="Manage account"
-        visible={workspaceSwitcherOpen}
-      />
+      {workspaceMenus}
     </>
   );
 }

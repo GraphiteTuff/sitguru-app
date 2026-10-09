@@ -45,7 +45,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
 import { SitGuruColors } from '@/constants/colors';
 import { getDashboardPalette } from '@/constants/role-palettes';
 import { AppFonts } from '@/constants/fonts';
@@ -56,6 +56,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useSyncWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { formatUsd } from '@/lib/data/money';
@@ -288,6 +289,7 @@ const REALTIME_TABLES = [
 
 export default function GuruDashboardScreen() {
   const { user, profile, firstName } = useAuth();
+  useSyncWorkspace('guru');
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const { summary: earningsSummary, analytics, payoutSetup } = useGuruEarnings();
@@ -318,8 +320,13 @@ export default function GuruDashboardScreen() {
   const [now, setNow] =
     useState(Date.now());
 
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] =
-    useState(false);
+  const {
+    avatarPressProps,
+    menus: workspaceMenus,
+    openFullMenu,
+  } = useOwnAvatarWorkspaceMenus({
+    currentRole: 'guru',
+  });
 
   const profileName =
     firstString(profileRecord, [
@@ -1126,9 +1133,8 @@ export default function GuruDashboardScreen() {
                       <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Switch workspace"
-                        onPress={() =>
-                          setWorkspaceSwitcherOpen(true)
-                        }
+                        haptic="none"
+                        {...avatarPressProps}
                         scaleTo={0.88}
                         style={
                           styles.profileButton
@@ -1826,11 +1832,7 @@ export default function GuruDashboardScreen() {
 
                 <SitGuruTabBar active="home" role="guru" />
 
-                <SitGuruWorkspaceSwitcher
-                  currentRole="guru"
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
-                />
+              {workspaceMenus}
               </View>
             </View>
 

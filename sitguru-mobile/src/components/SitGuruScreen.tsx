@@ -24,6 +24,11 @@ type SitGuruScreenProps = {
    * owns insets so the page is not double-padded.
    */
   inset?: boolean;
+  /**
+   * Wrap non-scroll content in KeyboardAvoidingView.
+   * Set false when the screen owns its own keyboard handling (e.g. login).
+   */
+  keyboardAvoiding?: boolean;
 };
 
 export default function SitGuruScreen({
@@ -33,6 +38,7 @@ export default function SitGuruScreen({
   scroll = false,
   edgeToEdge = false,
   inset = true,
+  keyboardAvoiding = true,
 }: SitGuruScreenProps) {
   const { width } = useWindowDimensions();
   const theme = useTheme();
@@ -75,7 +81,7 @@ export default function SitGuruScreen({
     >
       <View style={contentStyle}>{children}</View>
     </ScrollView>
-  ) : (
+  ) : keyboardAvoiding ? (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.keyboardView}
@@ -97,6 +103,24 @@ export default function SitGuruScreen({
         <View style={contentStyle}>{children}</View>
       </View>
     </KeyboardAvoidingView>
+  ) : (
+    <View
+      style={[
+        styles.keyboardView,
+        styles.content,
+        edgeToEdge && styles.contentEdgeToEdge,
+        fillNative && styles.contentNative,
+        {
+          paddingHorizontal: horizontalPadding,
+          ...(chromePadding === 0
+            ? { paddingTop: 0, paddingBottom: 0 }
+            : null),
+        },
+        alignStyle,
+      ]}
+    >
+      <View style={contentStyle}>{children}</View>
+    </View>
   );
 
   if (!inset || edgeToEdge) {

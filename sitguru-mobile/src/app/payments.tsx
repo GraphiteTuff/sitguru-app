@@ -67,6 +67,7 @@ import {
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useSitGuruPaymentSheet } from '@/hooks/useSitGuruPaymentSheet';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -1196,7 +1197,8 @@ export default function PaymentsScreen() {
   const checkoutResult =
     typeof params.checkout === 'string' ? params.checkout : '';
 
-  const effectiveRole = primaryRole || roles[0] || null;
+  const { activeWorkspace, switchWorkspace } = useActiveWorkspace();
+  const effectiveRole = activeWorkspace || primaryRole || roles[0] || null;
   const activeRole: AppRole = effectiveRole || 'pet_parent';
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
@@ -1975,18 +1977,20 @@ export default function PaymentsScreen() {
                           })}
                         </View>
 
-                        <BubblePressable
-                          accessibilityLabel="Switch workspace"
-                          accessibilityRole="button"
-                          onPress={() => setWorkspaceSwitcherOpen(true)}
-                          scaleTo={0.88}
-                          style={styles.profileButton}>
-                          <HeaderAvatar
-                            fallback={initials(currentUserName)}
-                            imageUrl={avatarUrl}
-                            styles={styles}
-                          />
-                        </BubblePressable>
+                        {showCheckoutSticky ? null : (
+                          <BubblePressable
+                            accessibilityLabel="Switch workspace"
+                            accessibilityRole="button"
+                            onPress={() => setWorkspaceSwitcherOpen(true)}
+                            scaleTo={0.88}
+                            style={styles.profileButton}>
+                            <HeaderAvatar
+                              fallback={initials(currentUserName)}
+                              imageUrl={avatarUrl}
+                              styles={styles}
+                            />
+                          </BubblePressable>
+                        )}
                       </View>
                     </View>
 
@@ -2152,6 +2156,11 @@ export default function PaymentsScreen() {
             }
             onPress={() => {
               if (effectiveRole !== 'pet_parent') {
+                if (roles.includes('pet_parent')) {
+                  void switchWorkspace('pet_parent');
+                  return;
+                }
+
                 setWorkspaceSwitcherOpen(true);
                 return;
               }

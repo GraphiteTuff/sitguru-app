@@ -56,6 +56,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -642,9 +643,12 @@ export default function SupportScreen() {
   const [requestTable, setRequestTable] = useState<string | null>(null);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestLoadError, setRequestLoadError] = useState('');
+
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
 
-  const activeRole: AppRole = primaryRole || roles[0] || 'pet_parent';
+  const { activeWorkspace } = useActiveWorkspace();
+  const activeRole: AppRole =
+    activeWorkspace || primaryRole || roles[0] || 'pet_parent';
   const profileRecord = (profile ?? {}) as SupportRequestRow;
   const metadata = (user?.user_metadata ?? {}) as SupportRequestRow;
 

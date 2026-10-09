@@ -19,7 +19,7 @@ export const WORKSPACES: Record<AppRole, SitGuruWorkspaceDefinition> = {
     label: 'Pet Parent',
     description:
       'Manage pets, care requests, bookings, messages, payments, PawReports, and PawPerks.',
-    switcherDescription: 'Pets, care, bookings, and payments',
+    switcherDescription: 'Find and book pet care',
     dashboardPath: '/pet-parent-dashboard',
     setupPath: '/pet-parent-setup',
   },
@@ -28,7 +28,7 @@ export const WORKSPACES: Record<AppRole, SitGuruWorkspaceDefinition> = {
     label: 'Pet Guru',
     description:
       'Run your pet-care business, manage requests, clients, pricing, earnings, and PawReports.',
-    switcherDescription: 'Requests, clients, earnings, and PawReports',
+    switcherDescription: 'Provide pet care and manage bookings',
     dashboardPath: '/guru-dashboard',
     setupPath: '/guru-setup',
   },
@@ -37,7 +37,7 @@ export const WORKSPACES: Record<AppRole, SitGuruWorkspaceDefinition> = {
     label: 'Ambassador',
     description:
       'Grow the SitGuru community through referrals, local outreach, rewards, training, and partnerships.',
-    switcherDescription: 'Referrals, rewards, outreach, and training',
+    switcherDescription: 'Grow SitGuru and manage referrals',
     dashboardPath: '/ambassador-dashboard',
     setupPath: '/ambassador-setup',
   },

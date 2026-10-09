@@ -16,6 +16,7 @@ import {
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
 import { loadGuruProfileForUser } from "@/lib/gurus/load-guru-profile-for-user";
+import { firstNameFromPerson } from "@/lib/people/first-name";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ type GuruProfile = {
   full_name?: string | null;
   display_name?: string | null;
   name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   title?: string | null;
   bio?: string | null;
   city?: string | null;
@@ -210,11 +213,7 @@ function getDisplayNameFromEmail(email?: string | null) {
 }
 
 function getFirstName(name?: string | null) {
-  return (
-    String(name || "Guru")
-      .trim()
-      .split(/\s+/)[0] || "Guru"
-  );
+  return firstNameFromPerson(name, "there");
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -1955,7 +1954,15 @@ export default async function GuruDashboardPage() {
   const serviceRatesReady = enabledPricedServiceRates.length > 0;
 
   const name = getGuruName(guruProfile, user.email);
-  const welcomeName = getFirstName(name);
+  const welcomeName = firstNameFromPerson(
+    {
+      first_name: guruProfile?.first_name,
+      full_name: name,
+      display_name: guruProfile?.display_name,
+      email: guruProfile?.email || user.email,
+    },
+    "there",
+  );
   const imageUrl = getGuruImage(guruProfile);
   const location = getGuruLocation(guruProfile);
   const profileCompletion = calculateProfileCompletion(guruProfile);

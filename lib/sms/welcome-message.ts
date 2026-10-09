@@ -1,3 +1,5 @@
+import { firstNameFromPerson } from "@/lib/people/first-name";
+
 const ROLE_LABELS: Record<string, string> = {
   guru: "Guru",
   pet_parent: "Pet Parent",
@@ -38,9 +40,7 @@ export function welcomeRolePhrase(roles: string[]) {
 }
 
 export function firstNameFromDisplayName(name: string) {
-  const cleaned = String(name || "").replace(/\s+/g, " ").trim();
-  if (!cleaned) return "there";
-  return cleaned.split(" ")[0] || "there";
+  return firstNameFromPerson(name, "there");
 }
 
 export function buildWelcomeSms({

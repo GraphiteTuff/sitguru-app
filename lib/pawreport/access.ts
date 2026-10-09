@@ -6,6 +6,8 @@
  */
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { isAdminRole } from "@/lib/admin/access";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 import type { PawReportAccessRole } from "@/lib/pawreport/types";
 
 type BookingAccessRow = {
@@ -132,20 +134,18 @@ export async function resolvePawReportAccess(params: {
     params.email,
   );
 
-  // Soft admin fallback via profiles.role when present
-  let isAdmin = false;
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", params.userId)
-    .maybeSingle();
+  // Soft admin fallback — same SitGuru admin model as getAdminIdentity.
+  let isAdmin = isHardcodedSuperUserEmail(params.email);
+  if (!isAdmin) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", params.userId)
+      .maybeSingle();
 
-  if (
-    String((profile as { role?: string } | null)?.role || "")
-      .trim()
-      .toLowerCase() === "admin"
-  ) {
-    isAdmin = true;
+    if (isAdminRole((profile as { role?: string } | null)?.role)) {
+      isAdmin = true;
+    }
   }
 
   if (!isGuru && !isPetParent && !isAdmin) {
