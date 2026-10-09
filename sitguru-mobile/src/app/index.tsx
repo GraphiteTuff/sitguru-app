@@ -54,6 +54,8 @@ import {
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
+import { getWorkspaceDashboardPath } from '@/constants/workspaces';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { roleDashboardPath } from '@/types/auth';
 
 type ThemeOption = {
@@ -184,6 +186,7 @@ const services: ServiceCard[] = [
  */
 export default function HomeScreen() {
   const { isAuthenticated, loading, primaryRole, profile, user } = useAuth();
+  const { activeWorkspace, hydrated: workspaceReady } = useActiveWorkspace();
   const [expiredForUserId, setExpiredForUserId] = useState<string | null>(null);
   const [bootEscaped, setBootEscaped] = useState(false);
 
@@ -195,7 +198,10 @@ export default function HomeScreen() {
   const awaitingProfile = isAuthenticated && !profile;
   const rolesTimedOut = Boolean(userId) && expiredForUserId === userId;
   const bootBlocked =
-    !bootEscaped && (loading || (awaitingProfile && !rolesTimedOut));
+    !bootEscaped &&
+    (loading ||
+      (isAuthenticated && !workspaceReady) ||
+      (awaitingProfile && !rolesTimedOut));
 
   useEffect(() => {
     /* Session restore and profile fetch can both hang on device. Never keep
@@ -214,6 +220,10 @@ export default function HomeScreen() {
   }
 
   if (isAuthenticated) {
+    if (activeWorkspace) {
+      return <Redirect href={getWorkspaceDashboardPath(activeWorkspace)} />;
+    }
+
     if (primaryRole) {
       return <Redirect href={roleDashboardPath(primaryRole)} />;
     }

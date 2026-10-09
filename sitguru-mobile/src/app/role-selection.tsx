@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, type Href } from 'expo-router';
 import {
   Bell,
@@ -47,14 +46,9 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { persistActiveWorkspace, readStoredWorkspace } from '@/lib/workspaces/switch';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
-import {
-  normalizeRole,
-  type AppRole,
-} from '@/types/auth';
-
-const LAST_WORKSPACE_KEY =
-  'sitguru-last-workspace';
+import { type AppRole } from '@/types/auth';
 
 const DASHBOARD_PATHS: Record<AppRole, Href> = {
   pet_parent: '/pet-parent-dashboard',
@@ -149,18 +143,13 @@ export default function RoleSelectionScreen() {
 
     async function loadLastWorkspace() {
       try {
-        const storedValue =
-          await AsyncStorage.getItem(
-            LAST_WORKSPACE_KEY,
-          );
+        const storedValue = await readStoredWorkspace();
 
         if (!active) {
           return;
         }
 
-        setLastWorkspace(
-          normalizeRole(storedValue),
-        );
+        setLastWorkspace(storedValue);
       } catch {
         if (active) {
           setLastWorkspace(null);
@@ -229,14 +218,7 @@ export default function RoleSelectionScreen() {
   ) {
     setLastWorkspace(role);
 
-    try {
-      await AsyncStorage.setItem(
-        LAST_WORKSPACE_KEY,
-        role,
-      );
-    } catch {
-      // Continue with the in-memory workspace.
-    }
+    await persistActiveWorkspace(role);
   }
 
   async function openWorkspace(

@@ -63,6 +63,7 @@ import {
   canBookAgain,
   pushBookAgain,
 } from '@/lib/navigation/book-again';
+import { useSyncWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { firstNameFromPerson } from '@/lib/people/first-name';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -209,6 +210,7 @@ const REALTIME_TABLES = [
 
 export default function PetParentDashboardScreen() {
   const { user, profile, firstName } = useAuth();
+  useSyncWorkspace('pet_parent');
   const params = useLocalSearchParams<{
     welcomePet?: string;
     welcomePetId?: string;

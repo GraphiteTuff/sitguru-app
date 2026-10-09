@@ -57,6 +57,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
+import { useSyncWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
@@ -236,6 +237,7 @@ const REALTIME_TABLES = [
 export default function AmbassadorDashboardScreen() {
   const { width } = useWindowDimensions();
   const { user, profile, firstName } = useAuth();
+  useSyncWorkspace('ambassador');
   const isWebPreview = Platform.OS === 'web';
   const isTablet = Platform.OS !== 'web' && width >= 768;
   const themeMode = useThemeMode();

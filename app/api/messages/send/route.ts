@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
+import { firstNameFromPerson } from "@/lib/people/first-name";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   mobileCorsHeaders,
@@ -847,6 +848,7 @@ async function createNotification(params: {
   conversationId: string;
   preview: string;
   source: string;
+  senderName?: string;
 }) {
   try {
     if (!params.recipient.userId) return false;
@@ -857,10 +859,14 @@ async function createNotification(params: {
       params.recipient.role,
       params.source,
     );
+    const senderFirst = firstNameFromPerson(params.senderName, "");
+    const title = senderFirst
+      ? `New message from ${senderFirst}`
+      : "New SitGuru Message";
 
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: params.recipient.userId,
-      title: "New SitGuru Message",
+      title,
       body: params.preview || "You have a new SitGuru message.",
       type: "message",
       href,
@@ -877,7 +883,7 @@ async function createNotification(params: {
 
     void sendExpoPushToUser({
       userId: params.recipient.userId,
-      title: "New SitGuru Message",
+      title,
       body: params.preview || "You have a new SitGuru message.",
       href: `/conversation?id=${encodeURIComponent(params.conversationId)}`,
       channelId: "sitguru-messages",
@@ -1685,6 +1691,7 @@ export async function POST(req: NextRequest) {
       conversationId: conversation.id,
       preview,
       source: messageSource,
+      senderName,
     });
 
     if (!delivery.notificationCreated) {

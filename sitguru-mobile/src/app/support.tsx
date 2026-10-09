@@ -47,7 +47,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
-import { useOwnAvatarWorkspaceMenus } from '@/hooks/useOwnAvatarWorkspaceMenus';
+import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import {
@@ -56,6 +56,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -643,17 +644,11 @@ export default function SupportScreen() {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestLoadError, setRequestLoadError] = useState('');
 
-  const activeRole: AppRole = primaryRole || roles[0] || 'pet_parent';
+  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
 
-  const {
-    avatarPressProps,
-    menus: workspaceMenus,
-    openFullMenu,
-  } = useOwnAvatarWorkspaceMenus({
-    currentRole: activeRole,
-    profileHref: '/account',
-    profileLabel: 'Manage account',
-  });
+  const { activeWorkspace } = useActiveWorkspace();
+  const activeRole: AppRole =
+    activeWorkspace || primaryRole || roles[0] || 'pet_parent';
   const profileRecord = (profile ?? {}) as SupportRequestRow;
   const metadata = (user?.user_metadata ?? {}) as SupportRequestRow;
 
@@ -946,8 +941,7 @@ export default function SupportScreen() {
           <BubblePressable
             accessibilityLabel="Switch workspace"
             accessibilityRole="button"
-            haptic="none"
-            {...avatarPressProps}
+            onPress={() => setWorkspaceSwitcherOpen(true)}
             scaleTo={0.88}
             style={styles.profileButton}>
             <HeaderAvatar
@@ -1503,7 +1497,13 @@ export default function SupportScreen() {
       </View>
       </SitGuruScreen>
 
-      {workspaceMenus}
+      <SitGuruWorkspaceSwitcher
+        currentRole={activeRole}
+        onClose={() => setWorkspaceSwitcherOpen(false)}
+        profileHref="/account"
+        profileLabel="Manage account"
+        visible={workspaceSwitcherOpen}
+      />
     </>
   );
 }

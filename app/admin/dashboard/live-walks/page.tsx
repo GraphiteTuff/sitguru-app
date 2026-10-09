@@ -1,6 +1,7 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveAdminIdentityForUser } from "@/lib/admin/access";
 import AdminAccessDenied from "@/components/admin/live-walks/AdminAccessDenied";
 import AdminLiveWalksDashboard from "@/components/admin/live-walks/AdminLiveWalksDashboard";
 
@@ -10,40 +11,22 @@ export const metadata = {
   title: "Live Map Dashboard | SitGuru Admin",
 };
 
-async function assertAdminAccess() {
+export default async function AdminLiveWalksPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user?.id) {
-    return { ok: false as const, reason: "unauthenticated" };
+    redirect("/admin/login");
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role, account_status")
-    .eq("id", user.id)
-    .maybeSingle();
+  const identity = await resolveAdminIdentityForUser({
+    id: user.id,
+    email: user.email,
+  });
 
-  const role = String(profile?.role || "")
-    .trim()
-    .toLowerCase();
-  const status = String(profile?.account_status || "active")
-    .trim()
-    .toLowerCase();
-
-  if (role !== "admin" || (status && status !== "active")) {
-    return { ok: false as const, reason: "forbidden" };
-  }
-
-  return { ok: true as const, userId: user.id };
-}
-
-export default async function AdminLiveWalksPage() {
-  const access = await assertAdminAccess();
-
-  if (!access.ok) {
+  if (!identity?.canAccessAdmin) {
     return <AdminAccessDenied />;
   }
 

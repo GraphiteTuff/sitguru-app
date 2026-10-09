@@ -56,6 +56,7 @@ import {
 } from "@/lib/rewards/perks-broker";
 import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
+import { firstNameFromPerson } from "@/lib/people/first-name";
 import {
   petParentAvatarWritePayload,
   resolvePetParentAvatarUrl,
@@ -1303,7 +1304,16 @@ function buildCustomerProfile(
     [firstName, lastName].filter(Boolean).join(" ").trim() ||
     null;
 
-  const resolvedFirstName = firstName || fullName?.split(" ")[0] || null;
+  const resolvedFirstName =
+    firstNameFromPerson(
+      {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName,
+        email: user.email,
+      },
+      "",
+    ) || null;
 
   const streetAddress =
     readString(row?.street_address) ||

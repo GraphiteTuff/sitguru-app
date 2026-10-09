@@ -66,6 +66,11 @@ export function normalizeRoleAlias(role: string | null | undefined): CanonicalRo
   return ROLE_ALIASES[normalizedRole] ?? ROLE_ALIASES[underscoredRole] ?? null;
 }
 
+export {
+  firstNameFromPerson,
+  personalizedGreeting,
+} from "@/lib/people/first-name";
+
 export function displayNameFallback(
   displayName: string | null | undefined,
   fallback = 'SitGuru User',

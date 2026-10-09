@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
+import { firstNameFromPerson } from "@/lib/people/first-name";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   mobileCorsHeaders,
@@ -318,15 +319,21 @@ async function createGuruNotification(params: {
   guruDisplayName: string;
   subject: string;
 }) {
+  const customerFirst = firstNameFromPerson(
+    params.customerDisplayName,
+    "a Pet Parent",
+  );
+  const guruFirst = firstNameFromPerson(params.guruDisplayName, "");
+  const title = `New message from ${customerFirst}`;
+  const body = params.subject
+    ? params.subject
+    : `You have a new message request${guruFirst ? ` for ${guruFirst}` : ""}.`;
+
   const { error } = await supabaseAdmin.from("notifications").insert({
     user_id: params.guruUserId,
     type: "new_message",
-    title: `New message from ${params.customerDisplayName || "a customer"}`,
-    body: params.subject
-      ? params.subject
-      : `You have a new message request${
-          params.guruDisplayName ? ` for ${params.guruDisplayName}` : ""
-        }.`,
+    title,
+    body,
     link: buildMessageThreadHref(params.conversationId),
     is_read: false,
     created_at: new Date().toISOString(),
@@ -339,12 +346,8 @@ async function createGuruNotification(params: {
 
   void sendExpoPushToUser({
     userId: params.guruUserId,
-    title: `New message from ${params.customerDisplayName || "a customer"}`,
-    body: params.subject
-      ? params.subject
-      : `You have a new message request${
-          params.guruDisplayName ? ` for ${params.guruDisplayName}` : ""
-        }.`,
+    title,
+    body,
     href: `/conversation?id=${encodeURIComponent(params.conversationId)}`,
     channelId: "sitguru-messages",
     data: {

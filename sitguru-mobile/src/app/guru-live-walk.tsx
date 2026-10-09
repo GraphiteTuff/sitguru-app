@@ -974,7 +974,11 @@ export default function GuruLiveWalkScreen() {
                   </StickyActionBar>
                 ) : null}
 
-                <SitGuruTabBar active="careMap" role="guru" />
+                <SitGuruTabBar
+                  active="careMap"
+                  role="guru"
+                  showAccountAvatar={false}
+                />
               </View>
             </View>
 
