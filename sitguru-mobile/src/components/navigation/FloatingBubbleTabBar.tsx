@@ -1,6 +1,12 @@
 import { Ellipsis } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   Platform,
   StyleSheet,
@@ -52,6 +58,12 @@ export type FloatingBubbleTabBarProps = {
    */
   additionalOverflowItems?: ToolbarOverflowMenuItem[];
   onOverflowItemPress?: (item: ToolbarOverflowMenuItem) => void;
+  /**
+   * Instagram / TikTok / Facebook-style account control.
+   * Always rendered last so it stays in the thumb-side corner.
+   */
+  accountSlot?: ReactNode;
+  accountSelected?: boolean;
 };
 
 const MORE_TAB_KEY = '__more';
@@ -67,6 +79,8 @@ export default function FloatingBubbleTabBar({
   floating = true,
   additionalOverflowItems,
   onOverflowItemPress,
+  accountSlot,
+  accountSelected = false,
 }: FloatingBubbleTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -100,11 +114,15 @@ export default function FloatingBubbleTabBar({
 
   const rowWidthRef = useRef(0);
 
-  const slotCount = tabs.length + (showOverflowButton ? 1 : 0);
+  const slotCount =
+    tabs.length + (showOverflowButton ? 1 : 0) + (accountSlot ? 1 : 0);
   const tabActiveIndex = tabs.findIndex((tab) => tab.key === activeKey);
-  const activeIndex =
-    overflowSelected && showOverflowButton
-      ? slotCount - 1
+  const moreIndex = tabs.length;
+  const accountIndex = showOverflowButton ? tabs.length + 1 : tabs.length;
+  const activeIndex = accountSelected && accountSlot
+    ? accountIndex
+    : overflowSelected && showOverflowButton
+      ? moreIndex
       : Math.max(0, tabActiveIndex);
 
   const moveSelection = useCallback(
@@ -132,7 +150,14 @@ export default function FloatingBubbleTabBar({
 
   useEffect(() => {
     moveSelection(activeIndex, true);
-  }, [activeIndex, activeKey, moveSelection, overflowSelected, slotCount]);
+  }, [
+    accountSelected,
+    activeIndex,
+    activeKey,
+    moveSelection,
+    overflowSelected,
+    slotCount,
+  ]);
 
   const capsuleStyle = useAnimatedStyle(() => {
     const progress = compact.value;
@@ -240,7 +265,7 @@ export default function FloatingBubbleTabBar({
             {tabs.map((tab, index) => (
               <FloatingTabItem
                 key={tab.key}
-                active={!overflowSelected && tab.key === activeKey}
+                active={!overflowSelected && !accountSelected && tab.key === activeKey}
                 compact={compact}
                 mutedColor={palette.mutedColor}
                 onPress={() => {
@@ -259,7 +284,7 @@ export default function FloatingBubbleTabBar({
 
             {showOverflowButton ? (
               <FloatingTabItem
-                active={overflowSelected}
+                active={overflowSelected && !accountSelected}
                 compact={compact}
                 mutedColor={palette.mutedColor}
                 onPress={() => {
@@ -268,7 +293,7 @@ export default function FloatingBubbleTabBar({
                 }}
                 onThumbDown={() => {
                   motion?.expandNow();
-                  moveSelection(slotCount - 1, true);
+                  moveSelection(moreIndex, true);
                 }}
                 reduceMotion={reduceMotion}
                 tab={{
@@ -279,6 +304,16 @@ export default function FloatingBubbleTabBar({
                 }}
                 tintColor={palette.activeColor}
               />
+            ) : null}
+
+            {accountSlot ? (
+              <AccountSlot
+                compact={compact}
+                reduceMotion={reduceMotion}
+                selected={accountSelected}
+              >
+                {accountSlot}
+              </AccountSlot>
             ) : null}
           </View>
         </GlassChrome>
@@ -402,6 +437,57 @@ function FloatingTabItem({
       </BubblePressable>
     </Animated.View>
   );
+}
+
+function AccountSlot({
+  children,
+  compact,
+  reduceMotion,
+  selected,
+}: {
+  children: ReactNode;
+  compact: SharedValue<number>;
+  reduceMotion: boolean;
+  selected: boolean;
+}) {
+  const emphasis = useSharedValue(selected ? 1 : 0);
+
+  useEffect(() => {
+    emphasis.set(
+      reduceMotion
+        ? selected
+          ? 1
+          : 0
+        : withSpring(selected ? 1 : 0, TAB_BAR_MOTION.iconSpring),
+    );
+  }, [emphasis, reduceMotion, selected]);
+
+  const wrapStyle = useAnimatedStyle(() => {
+    const compactScale = reduceMotion
+      ? 1
+      : interpolate(compact.value, [0, 1], [1, 0.96], Extrapolation.CLAMP);
+    const focusScale = interpolate(
+      emphasis.value,
+      [0, 1],
+      [1, 1.06],
+      Extrapolation.CLAMP,
+    );
+    const opacity = interpolate(
+      emphasis.value,
+      [0, 1],
+      [0.7, 1],
+      Extrapolation.CLAMP,
+    );
+
+    return {
+      flex: 1,
+      flexBasis: 0,
+      opacity,
+      transform: [{ scale: focusScale * compactScale }],
+    };
+  });
+
+  return <Animated.View style={wrapStyle}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

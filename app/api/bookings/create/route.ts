@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
+import { firstNameFromPerson } from "@/lib/people/first-name";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   optionsWithMobileCors,
@@ -765,7 +766,7 @@ export async function POST(req: NextRequest) {
       void sendExpoPushToUser({
         userId: guruUserId,
         title: "New booking request",
-        body: `${customerName || "A Pet Parent"} requested ${serviceType} for ${resolvedPetName || "their pet"}.`,
+        body: `${firstNameFromPerson(customerName, "A Pet Parent")} requested ${serviceType} for ${resolvedPetName || "their pet"}.`,
         href: `/guru-requests?bookingId=${encodeURIComponent(bookingId)}`,
         channelId: "sitguru-bookings",
         categoryId: "booking_request",

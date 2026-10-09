@@ -51,6 +51,7 @@ import { useThemePreference } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useNotificationPreferences } from '@/hooks/data/useNotificationPreferences';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { confirmSensitiveAction } from '@/lib/security/biometrics';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -156,7 +157,8 @@ export default function AccountScreen() {
     ? authRoles
     : ['pet_parent', 'guru', 'ambassador'];
 
-  const currentRole: AppRole = primaryRole ?? 'pet_parent';
+  const { activeWorkspace } = useActiveWorkspace();
+  const currentRole: AppRole = activeWorkspace ?? primaryRole ?? 'pet_parent';
 
   const statusLabel = profileError
     ? 'Needs attention'

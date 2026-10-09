@@ -52,6 +52,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubmitBookingReview } from '@/hooks/data/useSubmitBookingReview';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -908,7 +909,9 @@ export default function ReviewsScreen() {
   const requestedGuruId =
     typeof params.guruId === 'string' ? params.guruId : '';
 
+  const { activeWorkspace } = useActiveWorkspace();
   const effectiveRole: AppRole =
+    activeWorkspace ||
     primaryRole ||
     roles[0] ||
     'pet_parent';

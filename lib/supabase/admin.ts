@@ -86,28 +86,36 @@ export async function requireAdminUser(request: Request) {
     throw new Error("Unable to verify your account.");
   }
 
-  const { data: profile, error: profileError } = await supabaseAdminClient
-    .from("profiles")
-    .select("id, role, account_status")
-    .eq("id", user.id)
-    .single();
+  // Same HQ / role model as cookie-session admin pages (getAdminIdentity).
+  // Do not require profiles.role === "admin" — Super Admin inherits Admin access.
+  const { resolveAdminIdentityForUser } = await import("@/lib/admin/access");
+  const identity = await resolveAdminIdentityForUser({
+    id: user.id,
+    email: user.email,
+  });
 
-  if (profileError || !profile) {
-    throw new Error("Unable to verify admin profile.");
-  }
-
-  if (profile.role !== "admin") {
+  if (!identity?.canAccessAdmin) {
     throw new Error("Admin access required.");
   }
 
-  if (profile.account_status && profile.account_status !== "active") {
+  const { data: profile } = await supabaseAdminClient
+    .from("profiles")
+    .select("id, role, account_status")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile?.account_status && profile.account_status !== "active") {
     throw new Error("Admin account is not active.");
   }
 
   return {
     supabaseAdmin: supabaseAdminClient,
     adminUser: user,
-    adminProfile: profile,
+    adminProfile: profile ?? {
+      id: user.id,
+      role: identity.role,
+      account_status: "active",
+    },
   };
 }
 

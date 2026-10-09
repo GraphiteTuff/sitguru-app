@@ -12,8 +12,9 @@ import {
   User,
   Wallet,
 } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
+import WorkspaceAvatarButton from '@/components/account/WorkspaceAvatarButton';
 import FloatingBubbleTabBar from '@/components/navigation/FloatingBubbleTabBar';
 import { getTabChromePalette } from '@/constants/role-palettes';
 import {
@@ -21,6 +22,7 @@ import {
   overflowItemIsActive,
 } from '@/constants/toolbar-overflow';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useActiveWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppRole } from '@/types/auth';
 
@@ -85,7 +87,6 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: MessageCircle,
       href: '/messages',
     },
-    { key: 'profile', label: 'Profile', icon: User, href: '/account' },
   ],
   guru: [
     { key: 'home', label: 'Dashboard', icon: Home, href: '/guru-dashboard' },
@@ -102,7 +103,6 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: MessageCircle,
       href: '/messages',
     },
-    { key: 'profile', label: 'Profile', icon: User, href: '/guru-profile' },
   ],
   ambassador: [
     { key: 'home', label: 'Home', icon: Home, href: '/ambassador-dashboard' },
@@ -124,9 +124,24 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: MessageCircle,
       href: '/messages',
     },
-    { key: 'profile', label: 'Profile', icon: User, href: '/account' },
   ],
 };
+
+const ACCOUNT_ROUTES = [
+  '/account',
+  '/guru-profile',
+  '/payments',
+  '/notifications',
+  '/support',
+  '/pawperks',
+];
+
+function isAccountRoute(pathname: string) {
+  const normalized = pathname.replace(/\/$/, '') || '/';
+  return ACCOUNT_ROUTES.some(
+    (route) => normalized === route || normalized.startsWith(`${route}/`),
+  );
+}
 
 function toTabRole(role: AppRole | null): SitGuruTabRole {
   if (role === 'guru') return 'guru';
@@ -155,11 +170,13 @@ function resolveActiveTab(
 
 type SitGuruTabBarProps = {
   active?: SitGuruTabKey;
-  /** Defaults to the signed-in user's primary role. Use `visitor` on marketing home. */
+  /** Defaults to the signed-in user's active workspace. Use `visitor` on marketing home. */
   role?: SitGuruTabRole;
   badges?: Partial<Record<SitGuruTabKey, number>>;
   /** App Store–style floating dock instead of edge-to-edge bar. */
   floating?: boolean;
+  /** Hide the thumb-side workspace avatar during focused flows. */
+  showAccountAvatar?: boolean;
 };
 
 function navigateOverflowHref(
@@ -183,24 +200,56 @@ export default function SitGuruTabBar({
   role,
   badges,
   floating = true,
+  showAccountAvatar = true,
 }: SitGuruTabBarProps) {
   const isDark = useThemeMode() === 'dark';
   const pathname = usePathname();
   const routeParams = useLocalSearchParams();
-  const { primaryRole } = useAuth();
+  const { isAuthenticated, primaryRole } = useAuth();
+  const { activeWorkspace } = useActiveWorkspace();
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
 
-  const resolvedRole = role ?? toTabRole(primaryRole);
+  const resolvedRole = role ?? toTabRole(activeWorkspace ?? primaryRole);
   const palette = getTabChromePalette(resolvedRole, isDark);
   const tabs = TAB_SETS[resolvedRole];
-  const activeKey = resolveActiveTab(pathname, tabs, active);
+  const activeKey = resolveActiveTab(
+    pathname,
+    tabs,
+    active === 'profile' ? undefined : active,
+  );
 
   const overflowItems = useMemo(
     () => ADDITIONAL_OVERFLOW_ITEMS[resolvedRole],
     [resolvedRole],
   );
 
+  const overflowSelected = overflowItems.some((item) =>
+    overflowItemIsActive(pathname, item, routeParams),
+  );
+
+  const showDockAvatar =
+    showAccountAvatar &&
+    isAuthenticated &&
+    resolvedRole !== 'visitor';
+
+  const accountSelected =
+    showDockAvatar &&
+    (accountSheetOpen ||
+      (!overflowSelected &&
+        (active === 'profile' || isAccountRoute(pathname))));
+
   return (
     <FloatingBubbleTabBar
+      accountSelected={accountSelected}
+      accountSlot={
+        showDockAvatar ? (
+          <WorkspaceAvatarButton
+            onSheetChange={setAccountSheetOpen}
+            selected={accountSelected}
+            variant="tab"
+          />
+        ) : null
+      }
       activeKey={activeKey}
       additionalOverflowItems={overflowItems.map((item) => ({
         key: item.key,

@@ -56,6 +56,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useSyncWorkspace } from '@/hooks/useActiveWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { formatUsd } from '@/lib/data/money';
@@ -288,6 +289,7 @@ const REALTIME_TABLES = [
 
 export default function GuruDashboardScreen() {
   const { user, profile, firstName } = useAuth();
+  useSyncWorkspace('guru');
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const { summary: earningsSummary, analytics, payoutSetup } = useGuruEarnings();
