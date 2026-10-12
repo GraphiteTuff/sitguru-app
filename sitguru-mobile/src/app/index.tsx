@@ -91,16 +91,27 @@ function loadHeroMedia() {
 }
 
 function loadHeroVideoAssets() {
+  const defaultPoster = require('../assets/images/sitguru-homepage-hero-poster.jpg') as ImageSourcePropType;
+
   return [
-    require('../assets/videos/sitguru-homepage-hero.mp4'),
-    require('../assets/videos/sitguru-homepage-hero-2.mp4'),
-    require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4'),
+    {
+      source: require('../assets/videos/sitguru-howl-ween-homepage.mp4') as number,
+      poster: require('../assets/images/sitguru-howl-ween-homepage-poster.jpg') as ImageSourcePropType,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero.mp4') as number,
+      poster: defaultPoster,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero-2.mp4') as number,
+      poster: defaultPoster,
+    },
+    {
+      source: require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4') as number,
+      poster: defaultPoster,
+    },
   ] as const;
 }
-
-const heroVideoPosterAsset = require(
-  '../assets/images/sitguru-homepage-hero-poster.jpg'
-) as ImageSourcePropType;
 
 const sitGuruLogoDark =
   require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
@@ -277,8 +288,17 @@ const bootStyles = StyleSheet.create({
 });
 
 function MarketingHomeScreen() {
-  const { default: HomeHeroMedia, HOME_HERO_VIDEO_LABELS } = loadHeroMedia();
+  const {
+    default: HomeHeroMedia,
+    HOME_HERO_VIDEO_LABELS,
+    HOME_HERO_CLIP_SETTINGS,
+  } = loadHeroMedia();
   const heroVideoAssets = loadHeroVideoAssets();
+  const heroClips = HOME_HERO_CLIP_SETTINGS.map((settings, index) => ({
+    ...settings,
+    source: heroVideoAssets[index].source,
+    poster: heroVideoAssets[index].poster,
+  }));
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -512,8 +532,7 @@ function MarketingHomeScreen() {
 
           <View style={[styles.heroViewport, { minHeight: heroHeight }]}>
             <HomeHeroMedia
-              sources={[...heroVideoAssets]}
-              poster={heroVideoPosterAsset}
+              clips={heroClips}
               activeIndex={activeHeroIndex}
               onActiveIndexChange={setActiveHeroIndex}
               onTransitionChange={setHeroTransitioning}
@@ -522,6 +541,7 @@ function MarketingHomeScreen() {
             />
 
             <View
+              pointerEvents="box-none"
               style={[
                 styles.heroOverlay,
                 {

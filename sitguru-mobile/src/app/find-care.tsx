@@ -715,8 +715,6 @@ export default function FindCareScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const palette = useMemo(() => getPalette(isDark), [isDark]);
   const styles = useMemo(() => createStyles(isDark), [isDark]);
-  const tabDockHeight =
-    ButtonMetrics.tabHeight + Math.max(insets.bottom, 8) + 8;
   const scrollRef = useRef<ScrollView | null>(null);
   const searchFieldRef = useRef<View>(null);
   const homeZipFieldRef = useRef<View>(null);
@@ -1041,12 +1039,25 @@ export default function FindCareScreen() {
     return mapPoints[0]?.guru ?? displayedGurus[0] ?? null;
   }, [displayedGurus, mapPoints, selectedGuruId]);
 
-  const mapPreviewBottom = tabDockHeight + 8;
+  /*
+   * Preview docks inside a phoneShell overlay whose bottom edge is the measured
+   * tab-bar top. Using tab-bar height again as the card's own `bottom` was what
+   * floated Angel Costner into mid-map (screenshot gap ≈ one nav height).
+   */
+  const [tabBarHeight, setTabBarHeight] = useState(
+    6 + ButtonMetrics.tabHeight + Math.max(insets.bottom, 8),
+  );
+  const mapPreviewBottom = 12;
+  const mapCompactPreviewHeight = 110;
+  const mapExpandedPreviewHeight = 260;
+  const mapUtilityGap = 10;
   const mapUtilityBottom = selectedGuru
-    ? isMapPreviewExpanded
-      ? tabDockHeight + 268
-      : tabDockHeight + 118
-    : tabDockHeight + 16;
+    ? mapPreviewBottom +
+      (isMapPreviewExpanded
+        ? mapExpandedPreviewHeight
+        : mapCompactPreviewHeight) +
+      mapUtilityGap
+    : 16;
 
   const targetMapRegion = useMemo(() => {
     return getTargetMapRegion({
@@ -2043,77 +2054,6 @@ export default function FindCareScreen() {
                       </Text>
                     </BubblePressable>
                   ) : null}
-
-                  <View
-                    style={[
-                      styles.mapUtilityStack,
-                      { bottom: mapUtilityBottom },
-                    ]}
-                  >
-                    <BubblePressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Center map on home area"
-                      onPress={() => {
-                        if (
-                          homeLocation?.latitude !== null &&
-                          homeLocation?.latitude !== undefined &&
-                          homeLocation?.longitude !== null &&
-                          homeLocation?.longitude !== undefined
-                        ) {
-                          setMapRegion({
-                            latitude: homeLocation.latitude,
-                            longitude: homeLocation.longitude,
-                            latitudeDelta: 0.48,
-                            longitudeDelta: 0.54,
-                          });
-                        }
-                      }}
-                      scaleTo={0.88}
-                      style={styles.mapUtilityButton}
-                    >
-                      <Text style={styles.mapUtilityIcon}>◎</Text>
-                    </BubblePressable>
-
-                    <BubblePressable
-                      accessibilityRole="button"
-                      accessibilityLabel="View Guru list"
-                      onPress={() => {
-                        setActiveView("list");
-                        setIsMapPreviewExpanded(false);
-                        setHighlightedGuruId(null);
-                        scrollRef.current?.scrollTo({ y: 0, animated: false });
-                      }}
-                      scaleTo={0.88}
-                      style={styles.mapUtilityButton}
-                    >
-                      <List
-                        size={18}
-                        color={palette.title}
-                        strokeWidth={2.5}
-                      />
-                    </BubblePressable>
-                  </View>
-
-                  {selectedGuru ? (
-                    <MapGuruPreviewCard
-                      dockBottom={mapPreviewBottom}
-                      expanded={isMapPreviewExpanded}
-                      favoriteGuruIds={favoriteGuruIds}
-                      feeRules={feeRules}
-                      guru={selectedGuru}
-                      distanceOrigin={distanceOrigin}
-                      isAcademyCertified={certifiedGuruUserIds.has(
-                        getGuruUserId(selectedGuru),
-                      )}
-                      onBook={handleBookingAction}
-                      onCollapse={() => setIsMapPreviewExpanded(false)}
-                      onExpand={() => setIsMapPreviewExpanded(true)}
-                      onFavorite={handleToggleFavorite}
-                      onView={handleViewProfile}
-                      palette={palette}
-                      styles={styles}
-                    />
-                  ) : null}
                 </View>
               )}
 
@@ -2123,7 +2063,98 @@ export default function FindCareScreen() {
             </ScrollView>
             </KeyboardAvoidingView>
 
-            <SitGuruTabBar active="explore" />
+            {activeView === "map" ? (
+              <View
+                pointerEvents="box-none"
+                style={[
+                  styles.mapDockOverlay,
+                  { bottom: tabBarHeight },
+                ]}
+              >
+                <View
+                  pointerEvents="box-none"
+                  style={[
+                    styles.mapUtilityStack,
+                    { bottom: mapUtilityBottom },
+                  ]}
+                >
+                  <BubblePressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Center map on home area"
+                    onPress={() => {
+                      if (
+                        homeLocation?.latitude !== null &&
+                        homeLocation?.latitude !== undefined &&
+                        homeLocation?.longitude !== null &&
+                        homeLocation?.longitude !== undefined
+                      ) {
+                        setMapRegion({
+                          latitude: homeLocation.latitude,
+                          longitude: homeLocation.longitude,
+                          latitudeDelta: 0.48,
+                          longitudeDelta: 0.54,
+                        });
+                      }
+                    }}
+                    scaleTo={0.88}
+                    style={styles.mapUtilityButton}
+                  >
+                    <Text style={styles.mapUtilityIcon}>◎</Text>
+                  </BubblePressable>
+
+                  <BubblePressable
+                    accessibilityRole="button"
+                    accessibilityLabel="View Guru list"
+                    onPress={() => {
+                      setActiveView("list");
+                      setIsMapPreviewExpanded(false);
+                      setHighlightedGuruId(null);
+                      scrollRef.current?.scrollTo({ y: 0, animated: false });
+                    }}
+                    scaleTo={0.88}
+                    style={styles.mapUtilityButton}
+                  >
+                    <List
+                      size={18}
+                      color={palette.title}
+                      strokeWidth={2.5}
+                    />
+                  </BubblePressable>
+                </View>
+
+                {selectedGuru ? (
+                  <MapGuruPreviewCard
+                    dockBottom={mapPreviewBottom}
+                    expanded={isMapPreviewExpanded}
+                    favoriteGuruIds={favoriteGuruIds}
+                    feeRules={feeRules}
+                    guru={selectedGuru}
+                    distanceOrigin={distanceOrigin}
+                    isAcademyCertified={certifiedGuruUserIds.has(
+                      getGuruUserId(selectedGuru),
+                    )}
+                    onBook={handleBookingAction}
+                    onCollapse={() => setIsMapPreviewExpanded(false)}
+                    onExpand={() => setIsMapPreviewExpanded(true)}
+                    onFavorite={handleToggleFavorite}
+                    onView={handleViewProfile}
+                    palette={palette}
+                    styles={styles}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
+            <View
+              onLayout={(event) => {
+                const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+                setTabBarHeight((current) =>
+                  current === nextHeight ? current : nextHeight,
+                );
+              }}
+            >
+              <SitGuruTabBar active="explore" />
+            </View>
 
             {openSheet ? (
               <View style={styles.sheetOverlay}>
@@ -6684,8 +6715,16 @@ function createStyles(isDark: boolean) {
     },
     mapExplorerStageNative: {
       flex: 1,
-      height: undefined,
+      // `undefined` does not clear the web `height: 566` in RN style merge.
+      height: null,
       minHeight: 360,
+    },
+    mapDockOverlay: {
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+      zIndex: 40,
     },
     listMapStage: {
       backgroundColor: palette.mapWater,
@@ -6898,7 +6937,7 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 20,
       borderWidth: 1,
-      bottom: 10,
+      bottom: 12,
       flexDirection: "row",
       left: 12,
       minHeight: 94,
