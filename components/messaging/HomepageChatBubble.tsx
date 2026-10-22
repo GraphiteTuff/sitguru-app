@@ -309,10 +309,13 @@ export default function HomepageChatBubble() {
     () => readStoredCommunityEventCompanion(),
   );
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
+  const conversationIdRef = useRef<string | null>(null);
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
 
   const ctaContext = useMemo<HomepageCtaContext>(
@@ -398,6 +401,9 @@ export default function HomepageChatBubble() {
         ? `${window.location.pathname}${window.location.search}`
         : "/");
     const storedEvent = readStoredCommunityEventCompanion();
+    const clientMessageId = `web-rogue-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
     return {
       body: {
         channel: "HOMEPAGE_LEAD",
@@ -407,6 +413,10 @@ export default function HomepageChatBubble() {
         user_role: role,
         user_type: role,
         userRole: role,
+        clientMessageId,
+        ...(conversationIdRef.current
+          ? { conversationId: conversationIdRef.current }
+          : {}),
         ...(isCommunityCompanionPath(pagePath) && storedEvent
           ? {
               community_event_slug: storedEvent.slug,
@@ -419,6 +429,109 @@ export default function HomepageChatBubble() {
       },
     };
   }
+
+  // Keep personal chat state segregated across login / logout / account switch.
+  useEffect(() => {
+    let active = true;
+    const previousUserIdRef = { current: authUserId };
+
+    async function syncAuthAndConversation() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!active) return;
+        const nextUserId = session?.user?.id || null;
+        const previousUserId = previousUserIdRef.current;
+
+        if (previousUserId && nextUserId && previousUserId !== nextUserId) {
+          try {
+            sessionStorage.removeItem(STORAGE_KEY);
+            sessionStorage.removeItem(NAME_STORAGE_KEY);
+            localStorage.removeItem(NAME_STORAGE_KEY);
+          } catch {
+            // ignore
+          }
+          setMessages([buildGreetingPlaceholder()]);
+          setClientFirstName("");
+          setConversationId(null);
+          conversationIdRef.current = null;
+        }
+
+        if (!nextUserId) {
+          if (previousUserId) {
+            try {
+              sessionStorage.removeItem(STORAGE_KEY);
+            } catch {
+              // ignore
+            }
+            setMessages([buildGreetingPlaceholder()]);
+          }
+          previousUserIdRef.current = null;
+          setAuthUserId(null);
+          setConversationId(null);
+          conversationIdRef.current = null;
+          return;
+        }
+
+        previousUserIdRef.current = nextUserId;
+        setAuthUserId(nextUserId);
+        const res = await fetch("/api/companions/conversations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session!.access_token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({ companion: "rogue", includeMessages: true }),
+        });
+        if (!active || !res.ok) return;
+        const json = (await res.json().catch(() => ({}))) as {
+          conversation?: { id?: string };
+          messages?: Array<{ id: string; role: string; content: string }>;
+        };
+        const id = json.conversation?.id || null;
+        if (id) {
+          setConversationId(id);
+          conversationIdRef.current = id;
+        }
+        const restored = (json.messages || [])
+          .filter(
+            (row) =>
+              (row.role === "user" || row.role === "assistant") &&
+              String(row.content || "").trim(),
+          )
+          .map((row) => ({
+            id: row.id,
+            role: row.role as "user" | "assistant",
+            content: row.content,
+          }));
+        if (restored.length) {
+          setMessages(restored);
+        }
+      } catch {
+        // Guests continue with local sessionStorage only.
+      }
+    }
+
+    void syncAuthAndConversation();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void syncAuthAndConversation();
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auth subscription owns refresh
+  }, []);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   useEffect(() => {
     setEventCompanion(readStoredCommunityEventCompanion());

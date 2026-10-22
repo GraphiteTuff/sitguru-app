@@ -47,6 +47,8 @@ export type CompanionRequestContext = {
   firstName: string;
   roles: AppRole[];
   accessToken: string | null;
+  conversationId?: string | null;
+  clientMessageId?: string | null;
 };
 
 export type CompanionRequest = {
@@ -74,12 +76,19 @@ export function buildCompanionRequest({
   firstName,
   roles,
   accessToken,
+  conversationId,
+  clientMessageId,
 }: CompanionRequestContext): CompanionRequest {
   const headers: Record<string, string> = {
     'X-SitGuru-Client': 'sitguru-mobile',
   };
 
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const sharedIds = {
+    ...(conversationId ? { conversationId } : {}),
+    ...(clientMessageId ? { clientMessageId } : {}),
+  };
 
   if (companion.id === 'rogue') {
     return {
@@ -92,6 +101,7 @@ export function buildCompanionRequest({
         pagePath: companion.pagePath,
         userRole: toRogueAudienceLabel(roles, Boolean(accessToken)),
         ...(firstName ? { client_first_name: firstName } : {}),
+        ...sharedIds,
       },
     };
   }
@@ -106,6 +116,55 @@ export function buildCompanionRequest({
       surface: resolveOfficerSurface(companion, roles, accessToken),
       pagePath: companion.pagePath,
       ...(accessToken ? { accessToken } : {}),
+      ...sharedIds,
     },
   };
+}
+
+/** Ensure / restore the signed-in user's server conversation for a companion. */
+export async function ensureCompanionConversation(opts: {
+  companionId: string;
+  accessToken: string;
+  includeMessages?: boolean;
+}): Promise<{
+  conversationId: string | null;
+  messages: CompanionTurn[];
+}> {
+  try {
+    const res = await fetch(companionWebUrl('/api/companions/conversations'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${opts.accessToken}`,
+        'X-SitGuru-Client': 'sitguru-mobile',
+      },
+      body: JSON.stringify({
+        companion: opts.companionId,
+        includeMessages: opts.includeMessages !== false,
+      }),
+    });
+    if (!res.ok) {
+      return { conversationId: null, messages: [] };
+    }
+    const json = (await res.json().catch(() => ({}))) as {
+      conversation?: { id?: string };
+      messages?: Array<{ role?: string; content?: string }>;
+    };
+    const messages = (json.messages || [])
+      .filter(
+        (row) =>
+          (row.role === 'user' || row.role === 'assistant') &&
+          String(row.content || '').trim(),
+      )
+      .map((row) => ({
+        role: row.role as 'user' | 'assistant',
+        content: String(row.content || '').trim(),
+      }));
+    return {
+      conversationId: json.conversation?.id || null,
+      messages,
+    };
+  } catch {
+    return { conversationId: null, messages: [] };
+  }
 }

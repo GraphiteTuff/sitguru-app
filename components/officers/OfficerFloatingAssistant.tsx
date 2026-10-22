@@ -22,6 +22,8 @@ import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
 import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
 import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
+import { useCompanionConversation } from "@/hooks/useCompanionConversation";
+import { normalizeCompanionId } from "@/lib/companions/types";
 
 export type OfficerTheme = {
   brand: string;
@@ -363,8 +365,9 @@ export default function OfficerFloatingAssistant({
       : undefined;
   const safeSurface = surface === "public" ? "public" : "dashboard";
 
-  const requestBody = {
+  const baseRequestBody = {
     officer: officerId,
+    companion: officerId,
     surface: safeSurface,
     preset: preset || undefined,
     // Only forward when present — never send null/"undefined" string tokens.
@@ -383,6 +386,7 @@ export default function OfficerFloatingAssistant({
     isLoading,
     error,
     setMessages,
+    stop,
   } = useChat({
     api: "/api/ai/officer-stream",
     initialMessages: [
@@ -392,12 +396,41 @@ export default function OfficerFloatingAssistant({
         content: greetingMarkdown,
       },
     ],
-    body: requestBody,
+    body: baseRequestBody,
   });
+
+  const companionId = normalizeCompanionId(officerId, "scout");
+  const companionConversation = useCompanionConversation({
+    companionId,
+    setMessages,
+    greetingMessages: [
+      {
+        id: `${officerId}-hello`,
+        role: "assistant",
+        content: greetingMarkdown,
+      },
+    ],
+  });
+
+  function officerRequestOptions(extra?: Record<string, unknown>) {
+    const { clientMessageId } = companionConversation.beginTurn();
+    return {
+      body: {
+        ...baseRequestBody,
+        ...companionConversation.requestExtras,
+        clientMessageId,
+        ...(extra || {}),
+      },
+    };
+  }
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!companionConversation.authUserId) stop();
+  }, [companionConversation.authUserId, stop]);
 
   useEffect(() => {
     if (!open) return;
@@ -471,12 +504,7 @@ export default function OfficerFloatingAssistant({
         role: "user",
         content: chip.prompt,
       },
-      {
-        body: {
-          ...requestBody,
-          preset: chip.id,
-        },
-      },
+      officerRequestOptions({ preset: chip.id }),
     );
     focusComposer(40);
   }
@@ -484,12 +512,10 @@ export default function OfficerFloatingAssistant({
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!input.trim() || isLoading) return;
-    handleSubmit(event, {
-      body: {
-        ...requestBody,
-        preset: preset || undefined,
-      },
-    });
+    handleSubmit(
+      event,
+      officerRequestOptions({ preset: preset || undefined }),
+    );
     focusComposer(40);
   }
 
