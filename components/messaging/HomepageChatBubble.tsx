@@ -401,6 +401,9 @@ export default function HomepageChatBubble() {
         ? `${window.location.pathname}${window.location.search}`
         : "/");
     const storedEvent = readStoredCommunityEventCompanion();
+    const clientMessageId = `web-rogue-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
     return {
       body: {
         channel: "HOMEPAGE_LEAD",
@@ -410,6 +413,7 @@ export default function HomepageChatBubble() {
         user_role: role,
         user_type: role,
         userRole: role,
+        clientMessageId,
         ...(conversationIdRef.current
           ? { conversationId: conversationIdRef.current }
           : {}),

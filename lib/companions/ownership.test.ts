@@ -19,6 +19,8 @@ function actor(partial: Partial<CompanionActor>): CompanionActor {
     isPetParent: true,
     guruId: null,
     ambassadorId: null,
+    partnerId: null,
+    partnerBusinessName: null,
     ...partial,
   };
 }

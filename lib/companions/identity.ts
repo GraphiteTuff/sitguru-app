@@ -25,6 +25,8 @@ export type CompanionActor = {
   isPetParent: boolean;
   guruId: string | null;
   ambassadorId: string | null;
+  partnerId: string | null;
+  partnerBusinessName: string | null;
 };
 
 function asString(value: unknown) {
@@ -71,17 +73,23 @@ export async function loadCompanionActor(
       .select("id,full_name,status")
       .eq("user_id", userId)
       .maybeSingle(),
+    // Canonical Partner membership: partners.owner_user_id (see partner-access.ts).
     Promise.resolve(
       supabaseAdmin
         .from("partners")
-        .select("id,business_name,status")
-        .eq("user_id", userId)
+        .select(
+          "id,owner_user_id,business_name,contact_name,status,city,state,zip_code,slug,partner_type",
+        )
+        .eq("owner_user_id", userId)
+        .in("status", ["active", "paused"])
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle(),
     )
       .then((result) =>
-        result.error ? { data: null as null } : result,
+        result.error ? { data: null as null, error: result.error } : result,
       )
-      .catch(() => ({ data: null as null })),
+      .catch(() => ({ data: null as null, error: null })),
   ]);
 
   const roles = new Set<CompanionWorkspaceRole>();
@@ -122,10 +130,14 @@ export async function loadCompanionActor(
   ) {
     roles.add("ambassador");
   }
+  const partnerRow = partner as {
+    id?: string;
+    business_name?: string;
+  } | null;
   if (
     profileRole === "partner" ||
     accountType.includes("partner") ||
-    Boolean((partner as { id?: string } | null)?.id)
+    Boolean(partnerRow?.id)
   ) {
     roles.add("partner");
   }
@@ -181,6 +193,8 @@ export async function loadCompanionActor(
     isPetParent,
     guruId: asString((guru as { id?: string } | null)?.id) || null,
     ambassadorId: asString((ambassador as { id?: string } | null)?.id) || null,
+    partnerId: asString(partnerRow?.id) || null,
+    partnerBusinessName: asString(partnerRow?.business_name) || null,
   };
 }
 
@@ -200,6 +214,8 @@ export function guestCompanionActor(): CompanionActor {
     isPetParent: false,
     guruId: null,
     ambassadorId: null,
+    partnerId: null,
+    partnerBusinessName: null,
   };
 }
 

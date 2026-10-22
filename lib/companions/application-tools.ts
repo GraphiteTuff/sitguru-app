@@ -220,6 +220,34 @@ export function buildCompanionTools(opts: {
     },
   });
 
+  const getMyPartnerInfo = tool({
+    description:
+      "Retrieve the signed-in Partner account (owner_user_id) when authorized. Never invent partner listings.",
+    parameters: z.object({}),
+    execute: async () => {
+      if (!actor.userId) return "Signed out — no Partner info.";
+      if (!actor.isPartner && !actor.isAdmin) {
+        return "No Partner membership on this account. Partnership inquiries: /contact or Partner apply flows.";
+      }
+      if (context.dataErrors.some((err) => err.startsWith("partners:"))) {
+        return [
+          "# MY PARTNER INFO",
+          "Partner lookup failed (schema/query error) — do not invent Partner data.",
+          ...context.dataErrors.filter((err) => err.startsWith("partners:")),
+        ].join("\n");
+      }
+      if (!context.partner) {
+        return "No active Partner row (partners.owner_user_id) for this account.";
+      }
+      return [
+        "# MY PARTNER INFO (self only)",
+        `Business: ${context.partner.businessName || "(unnamed)"}`,
+        `Location: ${[context.partner.city, context.partner.state].filter(Boolean).join(", ") || "(unset)"}`,
+        "Partner Events are managed in the Partner workspace — companions do not create or publish events.",
+      ].join("\n");
+    },
+  });
+
   const findCurrentEvents = tool({
     description:
       "Find current public SitGuru community events. Returns titles and routes only — no RSVP mutation.",
@@ -272,6 +300,7 @@ export function buildCompanionTools(opts: {
     getMyPets,
     getMyBookings,
     getMyReferralInfo,
+    getMyPartnerInfo,
     findCurrentEvents,
     fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
   };

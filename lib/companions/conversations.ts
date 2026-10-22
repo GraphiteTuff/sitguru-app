@@ -36,12 +36,24 @@ function isMissingTable(error: { message?: string } | null | undefined) {
   );
 }
 
+/** Soft kill-switch — disables writes without dropping stored data. */
+export function isCompanionPersistenceEnabled() {
+  const raw = String(process.env.COMPANION_PERSISTENCE_ENABLED || "true")
+    .trim()
+    .toLowerCase();
+  return raw !== "0" && raw !== "false" && raw !== "off";
+}
+
 export async function ensureCompanionConversation(opts: {
   userId: string;
   companionId: CompanionId;
   workspaceRole?: string | null;
   title?: string | null;
 }): Promise<CompanionConversationRow | null> {
+  if (!isCompanionPersistenceEnabled()) {
+    return null;
+  }
+
   const { data: existing, error: readError } = await supabaseAdmin
     .from("companion_conversations")
     .select("*")
@@ -166,6 +178,10 @@ export async function appendCompanionMessage(opts: {
   clientMessageId?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<CompanionMessageRow | null> {
+  if (!isCompanionPersistenceEnabled()) {
+    return null;
+  }
+
   const content = String(opts.content || "").trim().slice(0, 12000);
   if (!content) return null;
 

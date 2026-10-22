@@ -23,8 +23,13 @@ import {
   type DataStreamTransport,
 } from '@/lib/ai/data-stream';
 import { getSupabaseAccessToken } from '@/lib/supabase';
+import {
+  CURRENT_MOBILE_STORAGE_PREFIX,
+  discardLegacyCompanionCaches,
+  mayRestoreLocalCompanionHistory,
+} from '@/lib/ai/legacy-history';
 
-const STORAGE_PREFIX = 'sitguru:companion-chat:v2';
+const STORAGE_PREFIX = CURRENT_MOBILE_STORAGE_PREFIX;
 
 /** Keeps the stored thread small and the request payload inside model limits. */
 const MAX_PERSISTED_MESSAGES = 40;
@@ -174,10 +179,28 @@ export function useCompanionChat(
 
     async function restore() {
       try {
+        // Never upload or display unscoped v1 histories for a later account.
+        await discardLegacyCompanionCaches(
+          () => AsyncStorage.getAllKeys(),
+          (key) => AsyncStorage.removeItem(key),
+        );
+
+        // Abort any in-flight stream from a previous account/companion.
+        abortRef.current?.abort();
+        abortRef.current = null;
+
         const key = storageKey(companion.id, userId);
         const stored = await AsyncStorage.getItem(key);
         if (!active) return;
-        if (stored) setMessages(normalizeStored(JSON.parse(stored)));
+        if (
+          stored &&
+          mayRestoreLocalCompanionHistory({
+            storageKey: key,
+            signedInUserId: userId,
+          })
+        ) {
+          setMessages(normalizeStored(JSON.parse(stored)));
+        }
 
         if (userId) {
           const accessToken = await getSupabaseAccessToken().catch(() => null);

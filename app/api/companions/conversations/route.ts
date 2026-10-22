@@ -4,6 +4,7 @@
 
 import {
   ensureCompanionConversation,
+  isCompanionPersistenceEnabled,
   listOwnedConversations,
   listOwnedMessages,
 } from "@/lib/companions/conversations";
@@ -102,6 +103,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!isCompanionPersistenceEnabled()) {
+      return Response.json(
+        {
+          error:
+            "Companion conversation persistence is temporarily disabled. Chat still works; history will not be saved.",
+          persistenceEnabled: false,
+        },
+        { status: 503, headers: cors },
+      );
+    }
+
     const body = (await req.json().catch(() => ({}))) as {
       companion?: string;
       includeMessages?: boolean;
@@ -118,6 +130,7 @@ export async function POST(req: NextRequest) {
         {
           error:
             "Companion conversations are not available yet (migration pending).",
+          persistenceEnabled: false,
         },
         { status: 503, headers: cors },
       );

@@ -41,7 +41,15 @@ export type CompanionUserContext = {
     id: string;
     referralCode: string | null;
   } | null;
+  partner: {
+    id: string;
+    businessName: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
   memories: CompanionMemoryRow[];
+  /** True when a required application table query failed (not merely empty). */
+  dataErrors: string[];
   promptBlock: string;
 };
 
@@ -135,30 +143,33 @@ export async function buildCompanionUserContext(opts: {
       bookings: [],
       guruPublic: null,
       ambassador: null,
+      partner: null,
       memories: [],
+      dataErrors: [],
       promptBlock:
         "# USER CONTEXT\nSigned-out guest. No personal pets, bookings, or memories. Offer public SitGuru help and Guru search only.",
     };
   }
 
-  const [location, pets, bookings, memories] = await Promise.all([
+  const dataErrors: string[] = [];
+
+  // Every companion receives the same authorized account context. Specialty
+  // only changes tone/suggestions — not which owned records are visible.
+  const [location, pets, parentBookings, memories] = await Promise.all([
     loadProfileLocation(actor.userId),
-    actor.isPetParent || actor.isAdmin
-      ? loadOwnedPets(actor.userId)
-      : Promise.resolve([]),
-    actor.isPetParent || actor.isAdmin
-      ? loadOwnedBookings(actor.userId)
-      : Promise.resolve([]),
+    loadOwnedPets(actor.userId),
+    loadOwnedBookings(actor.userId),
     listActiveMemories({ userId: actor.userId, companionId }),
   ]);
 
   let guruPublic: CompanionUserContext["guruPublic"] = null;
-  if ((actor.isGuru || actor.isAdmin) && actor.guruId) {
-    const { data: guru } = await supabaseAdmin
+  if (actor.guruId) {
+    const { data: guru, error } = await supabaseAdmin
       .from("gurus")
       .select("id,display_name,full_name,service_city,service_state,city,state")
       .eq("id", actor.guruId)
       .maybeSingle();
+    if (error) dataErrors.push(`gurus:${error.message}`);
     if (guru) {
       const row = guru as Record<string, unknown>;
       guruPublic = {
@@ -172,12 +183,15 @@ export async function buildCompanionUserContext(opts: {
   }
 
   let ambassador: CompanionUserContext["ambassador"] = null;
-  if ((actor.isAmbassador || actor.isAdmin) && actor.userId) {
-    const { data: ledger } = await supabaseAdmin
+  {
+    const { data: ledger, error } = await supabaseAdmin
       .from("ambassador_profiles")
       .select("id,referral_code_slug,display_name")
       .eq("user_id", actor.userId)
       .maybeSingle();
+    if (error && !/does not exist|schema cache/i.test(error.message)) {
+      dataErrors.push(`ambassador_profiles:${error.message}`);
+    }
     if (ledger) {
       ambassador = {
         id: asString((ledger as { id?: string }).id),
@@ -191,9 +205,35 @@ export async function buildCompanionUserContext(opts: {
     }
   }
 
-  // Guru bookings for Scout (provider side) — only own assigned bookings.
+  let partner: CompanionUserContext["partner"] = null;
+  if (actor.partnerId) {
+    const { data: partnerRow, error } = await supabaseAdmin
+      .from("partners")
+      .select("id,business_name,city,state,status,owner_user_id")
+      .eq("id", actor.partnerId)
+      .eq("owner_user_id", actor.userId)
+      .maybeSingle();
+    if (error) {
+      // Real Partner schema uses owner_user_id — surface schema failures honestly.
+      dataErrors.push(`partners:${error.message}`);
+    } else if (partnerRow) {
+      const row = partnerRow as Record<string, unknown>;
+      partner = {
+        id: asString(row.id),
+        businessName: asString(row.business_name) || actor.partnerBusinessName,
+        city: asString(row.city) || null,
+        state: asString(row.state) || null,
+      };
+    }
+  } else if (actor.isPartner) {
+    dataErrors.push(
+      "partners:membership flagged but no partners.owner_user_id row resolved",
+    );
+  }
+
+  // Guru-side bookings (assigned provider) — union with parent bookings when both apply.
   let guruBookings: CompanionUserContext["bookings"] = [];
-  if ((actor.isGuru || actor.isAdmin) && actor.guruId) {
+  if (actor.guruId) {
     for (const field of ["guru_id", "provider_id"] as const) {
       const { data, error } = await supabaseAdmin
         .from("bookings")
@@ -201,7 +241,10 @@ export async function buildCompanionUserContext(opts: {
         .eq(field, actor.guruId)
         .order("created_at", { ascending: false })
         .limit(8);
-      if (error) continue;
+      if (error) {
+        dataErrors.push(`bookings.${field}:${error.message}`);
+        continue;
+      }
       guruBookings = ((data as Array<Record<string, unknown>>) || []).map(
         (row) => ({
           id: asString(row.id),
@@ -218,12 +261,16 @@ export async function buildCompanionUserContext(opts: {
     }
   }
 
-  const effectiveBookings =
-    actor.isGuru && !actor.isPetParent ? guruBookings : bookings;
+  const bookingById = new Map<string, CompanionUserContext["bookings"][number]>();
+  for (const row of [...parentBookings, ...guruBookings]) {
+    if (row.id) bookingById.set(row.id, row);
+  }
+  const effectiveBookings = Array.from(bookingById.values()).slice(0, 12);
 
   const lines = [
-    "# USER CONTEXT (authorized live records)",
+    "# USER CONTEXT (authorized live records — shared across all companions)",
     `Authenticated: yes`,
+    `Active companion: ${companionId}`,
     `User id: ${actor.userId}`,
     `Primary role: ${actor.primaryRole}`,
     `Roles: ${actor.roles.join(", ")}`,
@@ -231,7 +278,7 @@ export async function buildCompanionUserContext(opts: {
     `First name: ${actor.firstName || "(none)"}`,
     `Saved location: ${[location.city, location.state, location.zip].filter(Boolean).join(", ") || "(none on profile)"}`,
     "",
-    "## Pets (owner only)",
+    "## Pets (owner only — available to every companion for this account)",
     pets.length
       ? pets
           .map(
@@ -246,7 +293,7 @@ export async function buildCompanionUserContext(opts: {
       ? effectiveBookings
           .map(
             (booking) =>
-              `- ${booking.service || "care"} · ${booking.status || "unknown"}${booking.startAt ? ` · ${booking.startAt}` : ""} → /bookings/${booking.id} or mobile booking-details`,
+              `- ${booking.service || "care"} · ${booking.status || "unknown"}${booking.startAt ? ` · ${booking.startAt}` : ""} → booking-details / bookings/${booking.id}`,
           )
           .join("\n")
       : "- (none accessible)",
@@ -269,13 +316,32 @@ export async function buildCompanionUserContext(opts: {
     );
   }
 
+  if (partner) {
+    lines.push(
+      "",
+      "## Partner account (self — owner_user_id)",
+      `- Business: ${partner.businessName || "(unnamed)"}`,
+      `- Location: ${[partner.city, partner.state].filter(Boolean).join(", ") || "(unset)"}`,
+      `- Manage Partner Events in the Partner workspace — companions do not create events autonomously.`,
+    );
+  }
+
+  if (dataErrors.length) {
+    lines.push(
+      "",
+      "## DATA ACCESS NOTES (do not invent missing records)",
+      ...dataErrors.map((err) => `- Lookup issue: ${err}`),
+    );
+  }
+
   lines.push(
     "",
     memoriesPromptBlock(memories),
     "",
     "RULES:",
     "- Prefer live records above over memories when they conflict.",
-    "- Never expose another user's pets, bookings, or memories.",
+    "- Never expose another user's pets, bookings, partners, or memories.",
+    "- Companion specialty changes tone/suggestions only — not permissions.",
     "- For prices/availability/booking status, retrieve live tools/records — do not invent.",
     "- Consequential actions (book, pay, message, cancel) stay on SitGuru screens — guide with links only.",
   );
@@ -287,7 +353,9 @@ export async function buildCompanionUserContext(opts: {
     bookings: effectiveBookings,
     guruPublic,
     ambassador,
+    partner,
     memories,
+    dataErrors,
     promptBlock: lines.join("\n"),
   };
 }

@@ -18,6 +18,7 @@ import {
 } from "@/lib/companions/conversations";
 import {
   forgetMemories,
+  getMemorySettings,
   listActiveMemories,
   upsertMemory,
 } from "@/lib/companions/memories";
@@ -209,6 +210,16 @@ export async function enrichCompanionTurn(opts: {
 
   // Prefer saved location in the context block when the user asks near-me.
   let contextBlock = context.promptBlock;
+  if (actor.userId) {
+    const settings = await getMemorySettings(actor.userId);
+    if (!settings.memory_enabled) {
+      context.memories = [];
+      contextBlock = context.promptBlock.replace(
+        /# USER-SAVED MEMORIES[\s\S]*?(?=\n# |\nRULES:|$)/,
+        "# USER-SAVED MEMORIES\nMemory is disabled in account settings — do not recall or invent saved preferences.\n\n",
+      );
+    }
+  }
   if (locationHint) {
     contextBlock += `\n\n# CARE SEARCH LOCATION HINT\nUse this authorized location for Guru search this turn (source=${locationHint.source}): ${[
       locationHint.city,
