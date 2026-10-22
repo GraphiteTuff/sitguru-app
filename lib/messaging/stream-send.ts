@@ -8,8 +8,6 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
-import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
@@ -35,6 +33,11 @@ import {
   joinRecentUserTexts,
   needsCareMatchingAsk,
 } from "@/lib/chat/care-matching-intake";
+import {
+  enrichCompanionTurn,
+  persistAssistantCompanionMessage,
+  resolvePreferredFirstName,
+} from "@/lib/companions/enrich-turn";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -242,13 +245,6 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser().catch(() => ({
-      data: { user: null },
-    }));
-
-    const userId = user?.id || null;
 
     const body = (await req.json()) as {
       messages?: CoreMessage[];
@@ -267,27 +263,16 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       community_event_title?: string;
       community_event_city?: string;
       community_event_state?: string;
+      clientMessageId?: string;
+      client_message_id?: string;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const walkId = safeString(body?.walkId);
-    const conversationId = safeString(body?.conversationId);
-    const companionKey = safeString(body?.companion) || "rogue";
     const pagePath =
       safeString(body?.pagePath) ||
       safeString(body?.page_path) ||
       (walkId ? "/pawreport" : "/");
-    const insightMeta = { companion: companionKey, pagePath };
-    const clientFirstNameRaw = sanitizePreferredName(
-      body?.client_first_name,
-    ).slice(0, 40);
-    const clientFirstName = isReservedPreferredName(clientFirstNameRaw)
-      ? ""
-      : clientFirstNameRaw;
-    parsedClientFirstName = clientFirstName;
-    const userTypeLabel = normalizeRogueUserType(
-      body?.userRole || body?.user_type || body?.user_role || "Guest Pet Parent",
-    );
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
@@ -304,6 +289,45 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const lastUserText = messageContent(lastUserMessage);
     parsedLastUserText = lastUserText;
     const careThread = joinRecentUserTexts(messages, lastUserText);
+
+    // Server-derived identity (Bearer or cookie) + memory/conversation enrich.
+    const enriched = await enrichCompanionTurn({
+      req,
+      body: body as Record<string, unknown>,
+      lastUserText,
+      companionFallback: "rogue",
+    });
+    const companionKey = enriched.companionId;
+    const insightMeta = { companion: companionKey, pagePath };
+    const userId = enriched.actor.userId;
+    const conversationId = enriched.conversation?.id || null;
+
+    const clientFirstNameRaw = sanitizePreferredName(
+      resolvePreferredFirstName(enriched.actor, body?.client_first_name),
+    ).slice(0, 40);
+    const clientFirstName = isReservedPreferredName(clientFirstNameRaw)
+      ? ""
+      : clientFirstNameRaw;
+    parsedClientFirstName = clientFirstName;
+    // Prefer verified role; fall back to client label for guests only.
+    const userTypeLabel = normalizeRogueUserType(
+      enriched.actor.userId
+        ? enriched.audienceLabel
+        : body?.userRole ||
+            body?.user_type ||
+            body?.user_role ||
+            "Guest Pet Parent",
+    );
+
+    if (enriched.directReply) {
+      void persistAssistantCompanionMessage({
+        conversation: enriched.conversation,
+        actor: enriched.actor,
+        companionId: enriched.companionId,
+        text: enriched.directReply,
+      });
+      return simulationDataStreamResponse(enriched.directReply);
+    }
 
     const simulationPayload = async () =>
       simulationDataStreamResponse(
@@ -329,11 +353,19 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       insightMeta,
     );
 
-    if (conversationId && userId && lastUserText) {
+    // Legacy CRM/walk messaging table — only when the client explicitly passed
+    // a non-companion conversation id (companion threads use companion_messages).
+    const legacyConversationId = safeString(body?.conversationId);
+    if (
+      legacyConversationId &&
+      userId &&
+      lastUserText &&
+      legacyConversationId !== conversationId
+    ) {
       void supabase
         .from("messages")
         .insert({
-          conversation_id: conversationId,
+          conversation_id: legacyConversationId,
           sender_id: userId,
           content: lastUserText,
           body: lastUserText,
@@ -367,9 +399,19 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         }
       : undefined;
 
+    const replyAndPersist = (text: string) => {
+      void persistAssistantCompanionMessage({
+        conversation: enriched.conversation,
+        actor: enriched.actor,
+        companionId: enriched.companionId,
+        text,
+      });
+      return simulationDataStreamResponse(text);
+    };
+
     const matchingAsk = buildCareMatchingAsk(careThread, clientFirstName);
     if (matchingAsk) {
-      return simulationDataStreamResponse(matchingAsk);
+      return replyAndPersist(matchingAsk);
     }
 
     if (isCommunityCompanionPath(pagePath) && lastUserText) {
@@ -388,7 +430,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
             communityEventSlug: communityEventSlug || null,
           },
         });
-        return simulationDataStreamResponse(faqHit.answer);
+        return replyAndPersist(faqHit.answer);
       }
     }
 
@@ -396,17 +438,23 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
       matchRoguePublicSoftIntent(lastUserText);
     if (exactParentFaq?.answer) {
-      return simulationDataStreamResponse(exactParentFaq.answer);
+      return replyAndPersist(exactParentFaq.answer);
     }
 
-    const systemPrompt = buildRogueSystemPrompt({
-      clientFirstName,
-      userRole: userTypeLabel,
-      lastUserText: careThread,
-      walkId: walkId || undefined,
-      pagePath,
-      communityEvent,
-    });
+    const systemPrompt = [
+      buildRogueSystemPrompt({
+        clientFirstName,
+        userRole: userTypeLabel,
+        lastUserText: careThread,
+        walkId: walkId || undefined,
+        pagePath,
+        communityEvent,
+      }),
+      "",
+      enriched.knowledgeBlock,
+      "",
+      enriched.contextBlock,
+    ].join("\n");
 
     let result;
     try {
@@ -414,10 +462,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         model: anthropic(getSitGuruAiModel()),
         messages,
         system: systemPrompt,
-        tools: {
-          lookupGurus: lookupGurusTool,
-          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
-        },
+        tools: enriched.tools,
         maxSteps: 3 as const,
       };
 
@@ -467,9 +512,24 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
               insightMeta,
             );
 
-            if (conversationId && userId && assistantText) {
+            await persistAssistantCompanionMessage({
+              conversation: enriched.conversation,
+              actor: enriched.actor,
+              companionId: enriched.companionId,
+              text: assistantText,
+            });
+
+            // Legacy messaging table only when an explicit CRM conversationId
+            // was provided by a walk/messaging surface (not companion threads).
+            const legacyConversationId = safeString(body?.conversationId);
+            if (
+              legacyConversationId &&
+              userId &&
+              assistantText &&
+              legacyConversationId !== conversationId
+            ) {
               const { error } = await supabase.from("messages").insert({
-                conversation_id: conversationId,
+                conversation_id: legacyConversationId,
                 sender_id: userId,
                 content: assistantText,
                 body: assistantText,
@@ -521,9 +581,21 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
             if (!assistantText) return;
 
-            if (conversationId && userId) {
+            await persistAssistantCompanionMessage({
+              conversation: enriched.conversation,
+              actor: enriched.actor,
+              companionId: enriched.companionId,
+              text: assistantText,
+            });
+
+            const legacyConversationId = safeString(body?.conversationId);
+            if (
+              legacyConversationId &&
+              userId &&
+              legacyConversationId !== conversationId
+            ) {
               const { error } = await supabase.from("messages").insert({
-                conversation_id: conversationId,
+                conversation_id: legacyConversationId,
                 sender_id: userId,
                 content: assistantText,
                 body: assistantText,

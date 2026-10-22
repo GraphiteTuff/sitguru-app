@@ -13,6 +13,7 @@ import type { AiCompanionProfile } from '@/constants/companions';
 import { useAuth } from '@/hooks/useAuth';
 import {
   buildCompanionRequest,
+  ensureCompanionConversation,
   type CompanionTurn,
 } from '@/lib/ai/companion-api';
 import {
@@ -23,7 +24,7 @@ import {
 } from '@/lib/ai/data-stream';
 import { getSupabaseAccessToken } from '@/lib/supabase';
 
-const STORAGE_PREFIX = 'sitguru:companion-chat:v1';
+const STORAGE_PREFIX = 'sitguru:companion-chat:v2';
 
 /** Keeps the stored thread small and the request payload inside model limits. */
 const MAX_PERSISTED_MESSAGES = 40;
@@ -52,8 +53,9 @@ export type UseCompanionChatResult = {
   stop: () => void;
 };
 
-function storageKey(companionId: string) {
-  return `${STORAGE_PREFIX}:${companionId}`;
+function storageKey(companionId: string, userId: string | null) {
+  // Always scope by auth user so account switches cannot leak transcripts.
+  return `${STORAGE_PREFIX}:${userId || 'guest'}:${companionId}`;
 }
 
 function createId(role: 'user' | 'assistant') {
@@ -119,13 +121,21 @@ export function useCompanionChat(
   const [error, setError] = useState<string | null>(null);
   const [transport, setTransport] = useState<DataStreamTransport | null>(null);
 
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
   const messagesRef = useRef<CompanionChatMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const conversationIdRef = useRef<string | null>(null);
+  const userId = user?.id || null;
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   const firstName = useMemo(() => {
     const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -153,18 +163,48 @@ export function useCompanionChat(
     };
   }, []);
 
-  // Restore the saved thread whenever the visitor switches companion.
+  // Restore device cache + server conversation when companion or account changes.
   useEffect(() => {
     let active = true;
     setHydrated(false);
     setMessages([]);
+    setConversationId(null);
+    conversationIdRef.current = null;
     setError(null);
 
     async function restore() {
       try {
-        const stored = await AsyncStorage.getItem(storageKey(companion.id));
+        const key = storageKey(companion.id, userId);
+        const stored = await AsyncStorage.getItem(key);
         if (!active) return;
         if (stored) setMessages(normalizeStored(JSON.parse(stored)));
+
+        if (userId) {
+          const accessToken = await getSupabaseAccessToken().catch(() => null);
+          if (accessToken) {
+            const server = await ensureCompanionConversation({
+              companionId: companion.id,
+              accessToken,
+              includeMessages: true,
+            });
+            if (!active) return;
+            if (server.conversationId) {
+              setConversationId(server.conversationId);
+              conversationIdRef.current = server.conversationId;
+            }
+            if (server.messages.length) {
+              setMessages(
+                server.messages.map((turn, index) => ({
+                  id: `server-${companion.id}-${index}-${turn.role}`,
+                  role: turn.role,
+                  content: turn.content,
+                  createdAt: new Date().toISOString(),
+                  state: 'complete' as const,
+                })),
+              );
+            }
+          }
+        }
       } catch {
         // A corrupt or unavailable thread simply starts the chat fresh.
       } finally {
@@ -177,7 +217,7 @@ export function useCompanionChat(
     return () => {
       active = false;
     };
-  }, [companion.id]);
+  }, [companion.id, userId]);
 
   // Persist after each settled turn so returning to the screen restores it.
   useEffect(() => {
@@ -186,22 +226,20 @@ export function useCompanionChat(
     const persistable = messages
       .filter((message) => message.content.trim())
       .slice(-MAX_PERSISTED_MESSAGES);
+    const key = storageKey(companion.id, userId);
 
     void (async () => {
       try {
         if (!persistable.length) {
-          await AsyncStorage.removeItem(storageKey(companion.id));
+          await AsyncStorage.removeItem(key);
           return;
         }
-        await AsyncStorage.setItem(
-          storageKey(companion.id),
-          JSON.stringify(persistable),
-        );
+        await AsyncStorage.setItem(key, JSON.stringify(persistable));
       } catch {
         // Losing the cache is acceptable; the live transcript still works.
       }
     })();
-  }, [companion.id, hydrated, messages, streaming]);
+  }, [companion.id, hydrated, messages, streaming, userId]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -213,10 +251,10 @@ export function useCompanionChat(
     setMessages([]);
     setError(null);
     setStreaming(false);
-    void AsyncStorage.removeItem(storageKey(companion.id)).catch(() => {
+    void AsyncStorage.removeItem(storageKey(companion.id, userId)).catch(() => {
       // Nothing to recover from — state is already cleared.
     });
-  }, [companion.id, stop]);
+  }, [companion.id, stop, userId]);
 
   const sendMessage = useCallback(
     (text: string) => {
@@ -273,6 +311,8 @@ export function useCompanionChat(
             firstName,
             roles,
             accessToken,
+            conversationId: conversationIdRef.current,
+            clientMessageId: userMessage.id,
           });
 
           const result = await streamCompanionResponse({
@@ -337,7 +377,7 @@ export function useCompanionChat(
         }
       })();
     },
-    [companion, firstName, roles, streaming],
+    [companion, firstName, roles, streaming, conversationId],
   );
 
   return {
