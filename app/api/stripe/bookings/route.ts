@@ -9,6 +9,7 @@ import {
   resolveRegionalConfig,
   toStripeAmountCents,
 } from "@/lib/i18n/regional-config";
+import { paypalCheckoutChargeAllowed } from "@/lib/payments/paypal-readiness";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -235,8 +236,7 @@ function resolveCheckoutPaymentSelection(
       .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
       .join(" ");
 
-  const paypalMarketplaceEnabled =
-    process.env.PAYPAL_MARKETPLACE_ENABLED?.trim().toLowerCase() === "true";
+  const paypalMarketplaceEnabled = paypalCheckoutChargeAllowed();
 
   if (uiOption === "paypal") {
     return {

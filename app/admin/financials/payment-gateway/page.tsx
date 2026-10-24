@@ -9,6 +9,7 @@ import {
   type PaymentGatewayId,
   type PaymentGatewayRange,
 } from "@/lib/admin/financials/payment-gateways";
+import { describePaypalMerchantReadiness } from "@/lib/payments/paypal-readiness";
 
 type GatewaySummary = {
   id: PaymentGatewayId;
@@ -743,10 +744,11 @@ export default function AdminPaymentGatewayPage() {
             {showPaypalMerchants ? (
               <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="text-xl font-black text-slate-950">
-                  PayPal merchant readiness
+                  PayPal &amp; Venmo Readiness
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Guru PayPal connections that unlock PayPal / Venmo checkout.
+                  See which Gurus are ready to accept PayPal and Venmo payments.
+                  Test accounts cannot take live customer payments.
                 </p>
 
                 {data.merchants.length === 0 ? (
@@ -759,9 +761,18 @@ export default function AdminPaymentGatewayPage() {
                   </div>
                 ) : (
                   <div className="mt-4 space-y-3">
-                    {data.merchants.slice(0, 8).map((merchant) => (
+                    {data.merchants.map((merchant) => {
+                      const readiness = describePaypalMerchantReadiness(merchant);
+                      const toneClass =
+                        readiness.tone === "ready"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : readiness.tone === "disconnected"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-amber-200 bg-amber-50 text-amber-800";
+
+                      return (
                       <div
-                        key={merchant.id}
+                        key={`${merchant.gateway}-${merchant.id}`}
                         className="rounded-[1.25rem] border border-slate-100 bg-slate-50 p-4"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -770,28 +781,32 @@ export default function AdminPaymentGatewayPage() {
                               {merchant.merchantEmail}
                             </p>
                             <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
-                              {merchant.environment} · {merchant.id}
+                              Environment: {readiness.environmentLabel}
                             </p>
                           </div>
                           <span
-                            className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                              merchant.status === "connected" ||
-                              merchant.paymentsReceivable
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                : "border-amber-200 bg-amber-50 text-amber-800"
-                            }`}
+                            className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${toneClass}`}
                           >
-                            {merchant.status}
+                            {readiness.label}
                           </span>
                         </div>
-                        <p className="mt-2 text-xs font-semibold text-slate-500">
-                          Synced {formatDateTime(merchant.lastSyncedAt)}
-                          {merchant.paymentsReceivable
-                            ? " · payments receivable"
-                            : ""}
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                          {readiness.sentence}
                         </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Synced {formatDateTime(merchant.lastSyncedAt)}
+                        </p>
+                        <details className="mt-2 text-xs font-semibold text-slate-500">
+                          <summary className="cursor-pointer font-black uppercase tracking-[0.12em] text-slate-400">
+                            View technical details
+                          </summary>
+                          <p className="mt-2 break-all">
+                            {merchant.environment} · {merchant.id} · {merchant.status}
+                          </p>
+                        </details>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>
