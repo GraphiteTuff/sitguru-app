@@ -18,7 +18,8 @@ import {
 } from "@/lib/internship/queries";
 import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
 import { findDuplicateAssignment } from "@/lib/internship/assignment";
-import { staffPersonById } from "@/lib/internship/staff";
+import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
+import { loadInternshipStaffGate } from "@/lib/internship/staff";
 import { CAPSTONE_WEEK_PLAN } from "@/lib/internship/final-project";
 import {
   INTERN_GROWTH_KPIS,
@@ -368,18 +369,22 @@ export async function saveIntern(formData: FormData) {
 
   const managerId = String(payload.manager_user_id || "");
   const supervisorId = String(payload.supervisor_user_id || "");
-  if (managerId) {
-    const manager = await staffPersonById(managerId);
-    if (!manager) {
-      bounce("/admin/internship/interns", "error", "Choose an eligible SitGuru manager. Customer accounts cannot supervise interns.");
-    }
-  }
-  if (supervisorId) {
-    const supervisor = await staffPersonById(supervisorId);
-    if (!supervisor) {
-      bounce("/admin/internship/interns", "error", "Choose an eligible formal supervisor.");
-    }
-  }
+  const manager = managerId ? await loadInternshipStaffGate(managerId) : null;
+  const supervisor = supervisorId ? await loadInternshipStaffGate(supervisorId) : null;
+  const managerDecision = assignmentStaffChangeAllowed({
+    currentId: null,
+    nextId: managerId,
+    selectable: Boolean(manager && canSelectInternshipManager(manager)),
+    roleLabel: "manager",
+  });
+  if (!managerDecision.ok) bounce("/admin/internship/interns", "error", managerDecision.error);
+  const supervisorDecision = assignmentStaffChangeAllowed({
+    currentId: null,
+    nextId: supervisorId,
+    selectable: Boolean(supervisor && canSelectInternshipSupervisor(supervisor)),
+    roleLabel: "supervisor",
+  });
+  if (!supervisorDecision.ok) bounce("/admin/internship/interns", "error", supervisorDecision.error);
 
   const { data: existingRows } = await supabaseAdmin
     .from("internship_interns")
@@ -419,8 +424,6 @@ export async function saveIntern(formData: FormData) {
   const internId = String((data as { id?: string } | null)?.id || "");
   if (internId) {
     const actor = await getAdminIdentity();
-    const manager = managerId ? await staffPersonById(managerId) : null;
-    const supervisor = supervisorId ? await staffPersonById(supervisorId) : null;
     await supabaseAdmin.from("internship_assignment_events").insert({
       intern_id: internId,
       new_manager_user_id: managerId || null,

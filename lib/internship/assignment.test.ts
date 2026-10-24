@@ -97,13 +97,10 @@ describe("dynamic manager assignment", () => {
     );
   });
 
-  it("rejects customer accounts and accepts an intern manager role", () => {
+  it("does not treat a staff role alone as permission to manage interns", () => {
     assert.equal(isEligibleInternshipManagerRole("pet_parent"), false);
     assert.equal(isEligibleInternshipManagerRole("customer"), false);
     assert.equal(isEligibleInternshipManagerRole("guru"), false);
-    assert.equal(isEligibleInternshipManagerRole("intern_manager"), true);
-    assert.equal(isEligibleInternshipManagerRole("social_community_manager"), true);
-    assert.equal(isEligibleInternshipManagerRole("founder"), true);
   });
 
   it("blocks a second open assignment for the same account and term", () => {

@@ -1,18 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isEligibleInternshipManagerRole } from "@/lib/internship/assignment";
 import {
-  isEligibleInternshipManagerRole,
-  staffRoleLabel,
-} from "@/lib/internship/assignment";
+  canSelectInternshipManager,
+  canSelectInternshipSupervisor,
+  type InternshipStaffIdentity,
+} from "@/lib/internship/staff-eligibility";
 import type { InternshipIntern } from "@/lib/internship/types";
 
-export type InternshipStaffPerson = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  title: string;
-  active: boolean;
-};
+export type InternshipStaffPerson = InternshipStaffIdentity;
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -21,94 +16,99 @@ function text(value: unknown) {
 function nameFrom(row: Record<string, unknown>) {
   const full = text(row.full_name) || text(row.name);
   if (full) return full;
-  const combined = `${text(row.first_name)} ${text(row.last_name)}`.trim();
-  if (combined) return combined;
-  const email = text(row.email);
-  return email ? email.split("@")[0] : "SitGuru staff";
+  return `${text(row.first_name)} ${text(row.last_name)}`.trim();
 }
 
-export async function listEligibleInternshipStaff(): Promise<InternshipStaffPerson[]> {
-  const [access, admins, profiles] = await Promise.all([
-    supabaseAdmin
-      .from("admin_user_access")
-      .select("user_id,email,role_key,is_active")
-      .eq("is_active", true)
-      .limit(200),
-    supabaseAdmin
-      .from("admin_users")
-      .select("user_id,email,role,is_active")
-      .eq("is_active", true)
-      .limit(200),
-    supabaseAdmin
-      .from("profiles")
-      .select("id,email,full_name,first_name,last_name,role,is_active")
-      .limit(400),
-  ]);
-
-  const people = new Map<string, InternshipStaffPerson>();
-  const consider = (
-    id: string,
-    email: string,
-    role: string,
-    active: boolean,
-    row: Record<string, unknown>,
-  ) => {
-    if (!id || !isEligibleInternshipManagerRole(role) || active === false) return;
-    const current = people.get(id);
-    const next: InternshipStaffPerson = {
-      id,
-      name: nameFrom({ ...row, email }),
-      email: email.toLowerCase(),
-      role,
-      title: staffRoleLabel(role),
-      active: true,
-    };
-    if (!current || next.name.length > current.name.length) people.set(id, next);
+function asIdentity(row: Record<string, unknown>, eligibility?: Record<string, unknown> | null): InternshipStaffIdentity {
+  const active = row.is_active !== false && row.deleted_at == null && row.disabled_at == null;
+  return {
+    id: text(row.id) || text(row.user_id),
+    name: nameFrom(row),
+    email: text(row.email).toLowerCase(),
+    role: text(row.role) || text(row.role_key),
+    jobTitle: text(eligibility?.job_title),
+    active,
+    isTest: row.is_test === true || row.is_test_account === true,
+    canManageInterns: eligibility?.can_manage_interns === true,
+    canSuperviseInterns: eligibility?.can_supervise_interns === true,
   };
+}
 
+async function eligibilityByUser(ids: string[]) {
+  if (!ids.length) return new Map<string, Record<string, unknown>>();
+  const { data, error } = await supabaseAdmin
+    .from("internship_staff_eligibility")
+    .select("user_id,can_manage_interns,can_supervise_interns,job_title")
+    .in("user_id", ids);
+  if (error) return new Map<string, Record<string, unknown>>();
+  return new Map((data || []).map((row) => [text(row.user_id), row as Record<string, unknown>]));
+}
+
+async function profileRows(ids: string[]) {
+  if (!ids.length) return [] as Record<string, unknown>[];
+  const rich = await supabaseAdmin
+    .from("profiles")
+    .select("id,email,full_name,first_name,last_name,role,is_active,is_test")
+    .in("id", ids);
+  if (!rich.error) return (rich.data || []) as Record<string, unknown>[];
+  const basic = await supabaseAdmin
+    .from("profiles")
+    .select("id,email,full_name,first_name,last_name,role,is_active")
+    .in("id", ids);
+  return (basic.data || []) as Record<string, unknown>[];
+}
+
+export async function listInternshipStaffDirectory(): Promise<InternshipStaffPerson[]> {
+  const [access, admins, flagged] = await Promise.all([
+    supabaseAdmin.from("admin_user_access").select("user_id,email,role_key,is_active").eq("is_active", true).limit(200),
+    supabaseAdmin.from("admin_users").select("user_id,email,role,is_active").eq("is_active", true).limit(200),
+    supabaseAdmin.from("internship_staff_eligibility").select("user_id,can_manage_interns,can_supervise_interns,job_title").limit(200),
+  ]);
+  const ids = new Set<string>();
   for (const row of access.data || []) {
-    consider(text(row.user_id), text(row.email), text(row.role_key), row.is_active !== false, row);
+    if (isEligibleInternshipManagerRole(text(row.role_key))) ids.add(text(row.user_id));
   }
   for (const row of admins.data || []) {
-    consider(text(row.user_id), text(row.email), text(row.role), row.is_active !== false, row);
+    if (isEligibleInternshipManagerRole(text(row.role))) ids.add(text(row.user_id));
   }
-  for (const row of profiles.data || []) {
-    consider(text(row.id), text(row.email), text(row.role), row.is_active !== false, row);
+  for (const row of flagged.data || []) ids.add(text(row.user_id));
+  const profiles = await profileRows([...ids].filter(Boolean));
+  const flags = new Map((flagged.data || []).map((row) => [text(row.user_id), row as Record<string, unknown>]));
+  const people = new Map<string, InternshipStaffPerson>();
+  for (const row of profiles) {
+    const id = text(row.id);
+    if (!id) continue;
+    people.set(id, asIdentity(row, flags.get(id)));
   }
-
-  const missingNames = [...people.values()].filter((person) => person.name === person.email.split("@")[0]);
-  if (missingNames.length) {
-    const { data } = await supabaseAdmin
-      .from("profiles")
-      .select("id,email,full_name,first_name,last_name")
-      .in("id", missingNames.map((person) => person.id));
-    for (const row of data || []) {
-      const person = people.get(text(row.id));
-      if (!person) continue;
-      const name = nameFrom(row);
-      if (name) person.name = name;
-    }
+  for (const row of access.data || []) {
+    const id = text(row.user_id);
+    if (!id || people.has(id)) continue;
+    people.set(id, asIdentity({ ...row, id, role: row.role_key }, flags.get(id)));
   }
-
-  return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...people.values()].sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
 }
 
-export async function staffPersonById(userId: string | null | undefined) {
+export async function listSelectableInternshipStaff(kind: "manager" | "supervisor") {
+  const directory = await listInternshipStaffDirectory();
+  return directory.filter((person) =>
+    kind === "manager" ? canSelectInternshipManager(person) : canSelectInternshipSupervisor(person),
+  );
+}
+
+export async function loadInternshipStaffGate(userId: string | null | undefined) {
   if (!userId) return null;
-  const people = await listEligibleInternshipStaff();
-  return people.find((person) => person.id === userId) || null;
+  const profiles = await profileRows([userId]);
+  const flags = await eligibilityByUser([userId]);
+  const row = profiles[0];
+  if (!row) return null;
+  return asIdentity(row, flags.get(userId));
 }
 
 export async function attachInternshipStaff(intern: InternshipIntern) {
   const ids = [intern.managerUserId, intern.supervisorUserId].filter(Boolean) as string[];
-  if (!ids.length && !intern.departmentId) return intern;
-  const { data } = ids.length
-    ? await supabaseAdmin
-        .from("profiles")
-        .select("id,full_name,first_name,last_name,email,role,is_active")
-        .in("id", ids)
-    : { data: [] };
-  const byId = new Map((data || []).map((row) => [text(row.id), row]));
+  const profiles = await profileRows(ids);
+  const flags = await eligibilityByUser(ids);
+  const byId = new Map(profiles.map((row) => [text(row.id), asIdentity(row, flags.get(text(row.id)))]));
   const manager = intern.managerUserId ? byId.get(intern.managerUserId) : null;
   const supervisor = intern.supervisorUserId ? byId.get(intern.supervisorUserId) : null;
   let departmentName = intern.departmentName || "";
@@ -122,10 +122,10 @@ export async function attachInternshipStaff(intern: InternshipIntern) {
   }
   return {
     ...intern,
-    managerName: manager ? nameFrom(manager) : intern.managerName || "",
-    managerTitle: manager ? staffRoleLabel(text(manager.role)) : intern.managerTitle || "",
-    supervisorName: supervisor ? nameFrom(supervisor) : intern.supervisorName || "",
-    supervisorTitle: supervisor ? staffRoleLabel(text(supervisor.role)) : intern.supervisorTitle || "",
+    managerName: manager?.name || intern.managerName || "",
+    managerTitle: manager?.jobTitle || intern.managerTitle || "",
+    supervisorName: supervisor?.name || intern.supervisorName || "",
+    supervisorTitle: supervisor?.jobTitle || intern.supervisorTitle || "",
     departmentName,
   };
 }

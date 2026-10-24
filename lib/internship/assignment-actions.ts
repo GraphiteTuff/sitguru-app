@@ -5,9 +5,10 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignmentChangeSummary } from "@/lib/internship/assignment";
+import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { findInternById } from "@/lib/internship/queries";
-import { staffPersonById } from "@/lib/internship/staff";
+import { loadInternshipStaffGate } from "@/lib/internship/staff";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -31,13 +32,25 @@ export async function saveInternshipAssignment(formData: FormData) {
 
   const managerId = text(formData, "managerUserId");
   const supervisorId = text(formData, "supervisorUserId");
-  const manager = managerId ? await staffPersonById(managerId) : null;
-  const supervisor = supervisorId ? await staffPersonById(supervisorId) : null;
-  if (managerId && !manager) bounce("That manager account is not eligible.");
-  if (supervisorId && !supervisor) bounce("That supervisor account is not eligible.");
+  const manager = managerId ? await loadInternshipStaffGate(managerId) : null;
+  const supervisor = supervisorId ? await loadInternshipStaffGate(supervisorId) : null;
+  const managerDecision = assignmentStaffChangeAllowed({
+    currentId: intern.managerUserId,
+    nextId: managerId,
+    selectable: Boolean(manager && canSelectInternshipManager(manager)),
+    roleLabel: "manager",
+  });
+  if (!managerDecision.ok) bounce(managerDecision.error);
+  const supervisorDecision = assignmentStaffChangeAllowed({
+    currentId: intern.supervisorUserId,
+    nextId: supervisorId,
+    selectable: Boolean(supervisor && canSelectInternshipSupervisor(supervisor)),
+    roleLabel: "supervisor",
+  });
+  if (!supervisorDecision.ok) bounce(supervisorDecision.error);
 
-  const previousManager = intern.managerUserId ? await staffPersonById(intern.managerUserId) : null;
-  const previousSupervisor = intern.supervisorUserId ? await staffPersonById(intern.supervisorUserId) : null;
+  const previousManager = intern.managerUserId ? await loadInternshipStaffGate(intern.managerUserId) : null;
+  const previousSupervisor = intern.supervisorUserId ? await loadInternshipStaffGate(intern.supervisorUserId) : null;
   const nextStatus = text(formData, "internshipStatus") || intern.status;
   const nextApproval = text(formData, "universityApproval") || intern.universityVerificationStatus || "pending";
   const payload = {
@@ -111,6 +124,52 @@ export async function saveInternshipAssignment(formData: FormData) {
   revalidatePath("/intern/manage");
   revalidatePath("/intern");
   bounce("Assignment saved. Approved hours were left as they were.", "ok");
+}
+
+export async function saveInternshipStaffEligibility(formData: FormData) {
+  const actor = await getAdminIdentity();
+  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
+  if (!actor || !canEditRequirements(kind)) {
+    redirect("/admin/login?next=/admin/internship/staff");
+  }
+  const userId = text(formData, "userId");
+  const person = await loadInternshipStaffGate(userId);
+  if (!person) {
+    redirect("/admin/internship/staff?error=" + encodeURIComponent("That staff account was not found."));
+  }
+  const nextManage = formData.get("canManageInterns") === "on";
+  const nextSupervise = formData.get("canSuperviseInterns") === "on";
+  const jobTitle = text(formData, "jobTitle");
+  const { data: existing } = await supabaseAdmin
+    .from("internship_staff_eligibility")
+    .select("can_manage_interns,can_supervise_interns,job_title")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const { error } = await supabaseAdmin.from("internship_staff_eligibility").upsert(
+    {
+      user_id: userId,
+      can_manage_interns: nextManage,
+      can_supervise_interns: nextSupervise,
+      job_title: jobTitle,
+      updated_by: actor.id,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) {
+    redirect("/admin/internship/staff?error=" + encodeURIComponent("Eligibility could not be saved."));
+  }
+  await supabaseAdmin.from("internship_staff_eligibility_audits").insert({
+    user_id: userId,
+    old_can_manage: existing?.can_manage_interns === true,
+    new_can_manage: nextManage,
+    old_can_supervise: existing?.can_supervise_interns === true,
+    new_can_supervise: nextSupervise,
+    changed_by: actor.id,
+  });
+  revalidatePath("/admin/internship/staff");
+  revalidatePath("/admin/internship/interns");
+  redirect("/admin/internship/staff?ok=" + encodeURIComponent(`Eligibility saved for ${person.name || person.email}.`));
 }
 
 export async function dismissStaffNotice(formData: FormData) {

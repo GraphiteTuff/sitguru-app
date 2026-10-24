@@ -81,6 +81,12 @@ export default async function InternshipProgramDashboardPage() {
             Review interns
           </Link>
           <Link
+            href="/admin/internship/staff"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-white/30 px-4 text-sm font-black !text-white"
+          >
+            Staff eligibility
+          </Link>
+          <Link
             href="/admin/internship/playbook"
             className="inline-flex min-h-11 items-center rounded-2xl border border-white/30 px-4 text-sm font-black !text-white"
           >

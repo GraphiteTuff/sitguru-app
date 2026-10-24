@@ -13,7 +13,8 @@ import {
   listPathTypes,
   listUniversities,
 } from "@/lib/internship/queries";
-import { listEligibleInternshipStaff, listInternshipDepartments } from "@/lib/internship/staff";
+import { listInternshipDepartments, listSelectableInternshipStaff } from "@/lib/internship/staff";
+import InternshipStaffPicker from "@/components/internship/InternshipStaffPicker";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipRequirementChecker from "@/components/internship/InternshipRequirementChecker";
@@ -29,11 +30,12 @@ export default async function InternshipInternsPage({
   if (!actor?.canAccessAdmin) redirect("/admin/login");
 
   const cohort = await getActiveCohort();
-  const [interns, universities, pathTypes, staff, departments] = await Promise.all([
+  const [interns, universities, pathTypes, managers, supervisors, departments] = await Promise.all([
     listInterns(cohort?.id),
     listUniversities(),
     listPathTypes(),
-    listEligibleInternshipStaff(),
+    listSelectableInternshipStaff("manager"),
+    listSelectableInternshipStaff("supervisor"),
     listInternshipDepartments(),
   ]);
   const ids = interns.map((intern) => intern.id);
@@ -42,7 +44,7 @@ export default async function InternshipInternsPage({
     : { data: [] };
   const universityName = new Map(universities.map((row) => [row.id, row.displayName || row.name]));
   const departmentName = new Map(departments.map((row) => [row.id, row.name]));
-  const staffName = new Map(staff.map((row) => [row.id, row.name]));
+  const staffName = new Map([...managers, ...supervisors].map((row) => [row.id, row.name]));
   const cards: AdminInternCard[] = interns.map((intern) => {
     const summary = summarizeInternshipHours({
       requiredHours: intern.requiredHours,
@@ -101,14 +103,19 @@ export default async function InternshipInternsPage({
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 overflow-x-hidden px-3 pb-8 sm:px-0">
-      <h1 className="text-3xl font-black text-slate-950">Intern team</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-3xl font-black text-slate-950">Intern team</h1>
+        <Link href="/admin/internship/staff" className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900">
+          Staff eligibility
+        </Link>
+      </div>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
         Create an internship, assign a manager and formal supervisor, and it shows on that manager’s desk. Pending university approval does not start Week 1.
       </p>
       {ok ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{ok}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
 
-      <AdminInternTeam interns={cards} staff={staff} departments={departments} />
+      <AdminInternTeam interns={cards} managers={managers} supervisors={supervisors} departments={departments} />
 
       <section className="grid gap-4 xl:grid-cols-12">
         <div className="space-y-2 xl:col-span-5">
@@ -153,18 +160,18 @@ export default async function InternshipInternsPage({
               <option key={department.id} value={department.id}>{department.name}</option>
             ))}
           </select>
-          <select name="managerUserId" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold">
-            <option value="">Assigned manager</option>
-            {staff.map((person) => (
-              <option key={person.id} value={person.id}>{person.name} · {person.title}</option>
-            ))}
-          </select>
-          <select name="supervisorUserId" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold">
-            <option value="">Formal supervisor</option>
-            {staff.map((person) => (
-              <option key={person.id} value={person.id}>{person.name} · {person.title}</option>
-            ))}
-          </select>
+          <InternshipStaffPicker
+            name="managerUserId"
+            label="Assigned manager"
+            people={managers}
+            emptyMessage="No eligible internship managers are configured. Configure a staff member's internship eligibility in Admin."
+          />
+          <InternshipStaffPicker
+            name="supervisorUserId"
+            label="Formal supervisor"
+            people={supervisors}
+            emptyMessage="No eligible internship supervisors are configured."
+          />
           <select name="pathType" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold">
             {pathTypes.map((path) => (
               <option key={path.slug} value={path.slug}>{path.name}</option>

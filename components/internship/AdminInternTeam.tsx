@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { saveInternshipAssignment } from "@/lib/internship/assignment-actions";
 import { lifecycleLabel, universityApprovalLabel } from "@/lib/internship/assignment";
+import InternshipStaffPicker, { type StaffChoice } from "@/components/internship/InternshipStaffPicker";
 
 export type AdminInternCard = {
   id: string;
@@ -46,11 +47,13 @@ const FILTERS = [
 
 export default function AdminInternTeam({
   interns,
-  staff,
+  managers,
+  supervisors,
   departments,
 }: {
   interns: AdminInternCard[];
-  staff: { id: string; name: string; title: string }[];
+  managers: StaffChoice[];
+  supervisors: StaffChoice[];
   departments: { id: string; name: string }[];
 }) {
   const [query, setQuery] = useState("");
@@ -116,9 +119,11 @@ export default function AdminInternTeam({
           Manager
           <select value={managerId} onChange={(event) => setManagerId(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base">
             <option value="">All managers</option>
-            {staff.map((person) => (
-              <option key={person.id} value={person.id}>{person.name}</option>
-            ))}
+            {interns
+              .filter((intern, index, list) => intern.managerUserId && list.findIndex((row) => row.managerUserId === intern.managerUserId) === index)
+              .map((intern) => (
+                <option key={intern.managerUserId} value={intern.managerUserId}>{intern.managerName || intern.managerUserId}</option>
+              ))}
           </select>
         </label>
         <label className="block text-sm font-semibold text-slate-700">
@@ -198,22 +203,22 @@ export default function AdminInternTeam({
                     ))}
                   </select>
                 </label>
-                <label className="text-sm font-semibold">Manager
-                  <select name="managerUserId" defaultValue={intern.managerUserId} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
-                    <option value="">Unassigned</option>
-                    {staff.map((person) => (
-                      <option key={person.id} value={person.id}>{person.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-sm font-semibold">Formal supervisor
-                  <select name="supervisorUserId" defaultValue={intern.supervisorUserId} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
-                    <option value="">Unassigned</option>
-                    {staff.map((person) => (
-                      <option key={person.id} value={person.id}>{person.name}</option>
-                    ))}
-                  </select>
-                </label>
+                <InternshipStaffPicker
+                  name="managerUserId"
+                  label="Assigned manager"
+                  people={managers}
+                  defaultId={intern.managerUserId}
+                  preserved={intern.managerUserId ? { id: intern.managerUserId, name: intern.managerName || "Current manager", email: "Existing assignment", jobTitle: "Keep current assignment" } : null}
+                  emptyMessage="No eligible internship managers are configured. Configure a staff member's internship eligibility in Admin."
+                />
+                <InternshipStaffPicker
+                  name="supervisorUserId"
+                  label="Formal supervisor"
+                  people={supervisors}
+                  defaultId={intern.supervisorUserId}
+                  preserved={intern.supervisorUserId ? { id: intern.supervisorUserId, name: intern.supervisorName || "Current supervisor", email: "Existing assignment", jobTitle: "Keep current assignment" } : null}
+                  emptyMessage="No eligible internship supervisors are configured."
+                />
                 <label className="text-sm font-semibold">Internship status
                   <select name="internshipStatus" defaultValue={intern.internshipStatus} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
                     {["candidate", "pending_university_approval", "approved", "onboarding", "active", "completed", "archived"].map((item) => (
