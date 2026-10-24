@@ -122,7 +122,7 @@ export async function saveTimeEntry(formData: FormData) {
   });
   if (error) bounce("/intern?tab=home", "error", "Hours could not be saved yet.");
   refresh("/intern");
-  bounce("/intern?tab=home", "ok", submit ? "Hours submitted to Ava." : "Hours saved as a draft.");
+  bounce("/intern?tab=home", "ok", submit ? "Hours submitted to your manager." : "Hours saved as a draft.");
 }
 
 export async function reviewTimeEntry(formData: FormData) {
@@ -178,9 +178,9 @@ export async function askAva(formData: FormData) {
   const intern = await assertCanTouchIntern(internId, actor);
   if (!intern) bounce("/intern", "error", "You can only ask about your own internship.");
   const question = text(formData, "question");
-  if (question.length < 4) bounce("/intern", "error", "Write the question you want Ava to see.");
+  if (question.length < 4) bounce("/intern", "error", "Write the question you want your manager to see.");
   const askedByRole = actor.kind === "intern" ? "intern" : actor.kind;
-  if (askedByRole === "none") bounce("/intern", "error", "Sign in to ask Ava.");
+  if (askedByRole === "none") bounce("/intern", "error", "Sign in to ask your manager.");
   const { error } = await supabaseAdmin.from("internship_questions").insert({
     intern_id: internId,
     target_type: text(formData, "targetType"),
@@ -193,12 +193,12 @@ export async function askAva(formData: FormData) {
   });
   if (error) bounce(text(formData, "returnTo") || "/intern", "error", "Question could not be sent.");
   refresh("/intern");
-  bounce(text(formData, "returnTo") || "/intern", "ok", askedByRole === "intern" ? "Ava has your question." : "Question sent to the intern.");
+  bounce(text(formData, "returnTo") || "/intern", "ok", askedByRole === "intern" ? "Your manager has your question." : "Question sent to the intern.");
 }
 
 export async function answerInternQuestion(formData: FormData) {
   const actor = await actorContext();
-  if (!canReviewRoutineWork(actor.kind)) bounce("/intern/manage", "error", "Only Ava or Jason can answer.");
+  if (!canReviewRoutineWork(actor.kind)) bounce("/intern/manage", "error", "Only the assigned manager or formal supervisor can answer.");
   const internId = text(formData, "internId");
   const intern = await assertCanTouchIntern(internId, actor);
   if (!intern) bounce("/intern/manage?tab=questions", "error", "That intern is not on your team.");

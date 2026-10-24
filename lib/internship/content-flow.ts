@@ -28,10 +28,10 @@ export function contentStatusActions(input: { status: string; actor: ContentActo
   const push = (next: string, label: string) => actions.push({ status: next, label });
 
   if (status === "Draft" && actor !== "supervisor") {
-    push("Submitted to Ava", "Submit to Ava");
+    push("Submitted to Ava", "Submit to your manager");
   }
   if (status === "Changes Requested" && (actor === "intern" || actor === "manager")) {
-    push("Submitted to Ava", "Resubmit to Ava");
+    push("Submitted to Ava", "Resubmit to your manager");
   }
   if (status === "Submitted to Ava" && (actor === "manager" || actor === "supervisor")) {
     push("Approved", "Approve");

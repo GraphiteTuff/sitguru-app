@@ -28,6 +28,7 @@ import type {
   InternshipWorkspaceData,
 } from "@/lib/internship/types";
 import { attachInternAvatar, attachInternAvatars } from "@/lib/internship/avatar";
+import { attachInternshipStaff } from "@/lib/internship/staff";
 
 function rows(data: unknown) {
   return (Array.isArray(data) ? data : []) as Record<string, unknown>[];
@@ -378,7 +379,16 @@ export async function findInternByAccount(input: {
       .select("*")
       .eq("user_id", input.userId)
       .eq("portal_enabled", true)
-      .in("status", ["accepted", "active"])
+      .in("status", [
+      "accepted",
+      "active",
+      "approved",
+      "onboarding",
+      "pending_university_approval",
+      "candidate",
+      "applicant",
+      "completed",
+    ])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -397,7 +407,16 @@ export async function findInternByAccount(input: {
     .select("*")
     .ilike("email", email)
     .eq("portal_enabled", true)
-    .in("status", ["accepted", "active"])
+    .in("status", [
+      "accepted",
+      "active",
+      "approved",
+      "onboarding",
+      "pending_university_approval",
+      "candidate",
+      "applicant",
+      "completed",
+    ])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -550,8 +569,10 @@ export async function getInternWorkspace(
     ),
   ]);
 
+  const namedIntern = await attachInternshipStaff(intern);
+
   return {
-    intern,
+    intern: namedIntern,
     university,
     campus: campus.data
       ? mapCampus(campus.data as Record<string, unknown>)

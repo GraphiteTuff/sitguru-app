@@ -13,7 +13,7 @@ export const WEEK_ZERO_ITEMS = [
   { key: "planner", label: "Review Planner expectations" },
   { key: "canva", label: "Review Canva and content workflow" },
   { key: "test", label: "Complete test assignment" },
-  { key: "meet_ava", label: "Meet with Ava" },
+  { key: "meet_manager", label: "Meet your manager" },
   { key: "schedule", label: "Confirm internship schedule" },
   { key: "ready", label: "Ready to begin" },
 ] as const;
@@ -26,6 +26,7 @@ export function isWeekZeroReady(input: {
 }) {
   if (input.approvedAt) return true;
   const done = new Set(input.completedKeys || []);
+  if (done.has("meet_ava")) done.add("meet_manager");
   return WEEK_ZERO_ITEMS.every((item) => done.has(item.key));
 }
 

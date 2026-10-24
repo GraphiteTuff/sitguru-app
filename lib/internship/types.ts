@@ -173,6 +173,13 @@ export type InternshipIntern = {
   universityNotes?: string;
   academicYear?: string;
   weekZeroApprovedAt?: string | null;
+  departmentId?: string | null;
+  departmentName?: string;
+  internshipTitle?: string;
+  managerName?: string;
+  managerTitle?: string;
+  supervisorName?: string;
+  supervisorTitle?: string;
 };
 
 export type InternshipTask = {

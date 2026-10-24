@@ -38,7 +38,7 @@ export async function loadManagerDashboard(input: {
   const interns = everyone.filter(
     (intern) =>
       !intern.isTest &&
-      ["accepted", "active"].includes(intern.status) &&
+      ["accepted", "active", "approved", "onboarding", "pending_university_approval", "candidate", "applicant", "completed"].includes(intern.status) &&
       canReadPrivateInternRecord({
         actor: input.actorKind,
         actorUserId: input.actorUserId,
@@ -46,6 +46,23 @@ export async function loadManagerDashboard(input: {
         managerUserId: intern.managerUserId,
       }),
   );
+  const noticeRows = await safeRows(
+    "notices",
+    supabaseAdmin
+      .from("internship_staff_notices")
+      .select("id,intern_id,title,body,created_at")
+      .eq("recipient_user_id", input.actorUserId)
+      .is("read_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12),
+  );
+  const notices = noticeRows.map((row) => ({
+    id: String(row.id || ""),
+    internId: String(row.intern_id || ""),
+    title: String(row.title || "New team member"),
+    body: String(row.body || ""),
+    createdAt: String(row.created_at || ""),
+  }));
   const ids = interns.map((intern) => intern.id);
   if (!ids.length) {
     return {
@@ -53,6 +70,7 @@ export async function loadManagerDashboard(input: {
       reviews: [] as ManagerReviewItem[],
       questions: [] as ManagerQuestion[],
       interns,
+      notices,
     };
   }
 
@@ -115,6 +133,7 @@ export async function loadManagerDashboard(input: {
       internName: names.get(question.internId) || "Intern",
     })),
     interns,
+    notices,
   };
 }
 

@@ -25,7 +25,7 @@ export default async function InternManagerPage({
         <section className="rounded-[1.6rem] border border-rose-100 bg-white p-5">
           <h1 className="text-2xl font-black text-slate-950">Manager access required</h1>
           <p className="mt-2 text-sm font-semibold text-slate-600">
-            This desk is for Ava and Jason. Intern records stay private.
+            This desk is for assigned intern managers and the formal supervisor. Intern records stay private.
           </p>
           <Link href="/intern" className="mt-4 inline-flex min-h-11 items-center rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">
             Intern portal
@@ -47,6 +47,7 @@ export default async function InternManagerPage({
         reviews={data.reviews}
         questions={data.questions}
         interns={data.interns}
+        notices={data.notices}
         canEdit={canEditRequirements(kind)}
         canCeo={canGiveCeoReview(kind)}
         notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}

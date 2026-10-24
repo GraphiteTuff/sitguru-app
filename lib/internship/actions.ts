@@ -17,6 +17,8 @@ import {
   matchRequirementForProgram,
 } from "@/lib/internship/queries";
 import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
+import { findDuplicateAssignment } from "@/lib/internship/assignment";
+import { staffPersonById } from "@/lib/internship/staff";
 import { CAPSTONE_WEEK_PLAN } from "@/lib/internship/final-project";
 import {
   INTERN_GROWTH_KPIS,
@@ -348,21 +350,103 @@ export async function saveIntern(formData: FormData) {
     semester: internFields.semester,
     academic_start_date: internFields.academicStartDate,
     academic_end_date: internFields.academicEndDate,
-    status: text(formData, "status") || "accepted",
+    status: text(formData, "status") || "pending_university_approval",
     portal_enabled: true,
     academic_snapshot: snapshot,
     notes: text(formData, "notes"),
+    internship_title: text(formData, "internshipTitle") || "Social Media & Community Growth Intern",
+    department_id: text(formData, "departmentId") || null,
+    manager_user_id: text(formData, "managerUserId") || null,
+    supervisor_user_id: text(formData, "supervisorUserId") || null,
+    planned_weekly_hours: optionalNumber(formData, "plannedWeeklyHours"),
+    internship_weeks: optionalNumber(formData, "internshipWeeks"),
+    academic_year: text(formData, "academicYear"),
+    university_verification_status: text(formData, "universityApproval") || "pending",
+    requirement_status: text(formData, "requiredHours") ? text(formData, "requirementStatus") || "pending" : "pending",
     updated_at: new Date().toISOString(),
+  };
+
+  const managerId = String(payload.manager_user_id || "");
+  const supervisorId = String(payload.supervisor_user_id || "");
+  if (managerId) {
+    const manager = await staffPersonById(managerId);
+    if (!manager) {
+      bounce("/admin/internship/interns", "error", "Choose an eligible SitGuru manager. Customer accounts cannot supervise interns.");
+    }
+  }
+  if (supervisorId) {
+    const supervisor = await staffPersonById(supervisorId);
+    if (!supervisor) {
+      bounce("/admin/internship/interns", "error", "Choose an eligible formal supervisor.");
+    }
+  }
+
+  const { data: existingRows } = await supabaseAdmin
+    .from("internship_interns")
+    .select("id,email,user_id,cohort_id,status")
+    .eq("cohort_id", cohortId);
+  const duplicate = findDuplicateAssignment(
+    (existingRows || []).map((row) => ({
+      id: String(row.id),
+      email: String(row.email || ""),
+      userId: row.user_id ? String(row.user_id) : null,
+      cohortId: String(row.cohort_id || ""),
+      status: String(row.status || ""),
+    })),
+    { email, cohortId },
+  );
+  if (duplicate) {
+    bounce("/admin/internship/interns", "error", "This student already has an open internship for that term.");
+  }
+
+  const { data: linkedProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
+  const insertPayload = {
+    ...payload,
+    ...(linkedProfile?.id ? { user_id: linkedProfile.id } : {}),
   };
 
   const { data, error } = await supabaseAdmin
     .from("internship_interns")
-    .insert(payload)
+    .insert(insertPayload)
     .select("id")
     .maybeSingle();
   if (error) bounce("/admin/internship/interns", "error", error.message);
   const internId = String((data as { id?: string } | null)?.id || "");
   if (internId) {
+    const actor = await getAdminIdentity();
+    const manager = managerId ? await staffPersonById(managerId) : null;
+    const supervisor = supervisorId ? await staffPersonById(supervisorId) : null;
+    await supabaseAdmin.from("internship_assignment_events").insert({
+      intern_id: internId,
+      new_manager_user_id: managerId || null,
+      new_supervisor_user_id: supervisorId || null,
+      new_department_id: payload.department_id,
+      changed_by: actor?.id || null,
+      reason: "Internship assignment created",
+      summary: `Created internship. Manager ${manager?.name || "unassigned"}. Supervisor ${supervisor?.name || "unassigned"}.`,
+    });
+    await supabaseAdmin.from("internship_requirement_audits").insert({
+      intern_id: internId,
+      actor_id: actor?.id || null,
+      field_name: "created",
+      previous_value: "",
+      next_value: String(payload.status),
+      reason: "Internship assignment created",
+    });
+    if (managerId) {
+      await supabaseAdmin.from("internship_staff_notices").insert({
+        recipient_user_id: managerId,
+        intern_id: internId,
+        kind: "new_team_member",
+        title: "New team member",
+        body: `${fullName} is on your intern team. Status: ${String(payload.status).replaceAll("_", " ")}.`,
+      });
+    }
     await supabaseAdmin.from("internship_access_grants").insert(
       [
         ["intern_dashboard", true, "Internship Growth Dashboard"],

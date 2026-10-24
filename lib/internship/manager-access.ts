@@ -1,5 +1,9 @@
 const SUPERVISOR_ROLES = new Set(["founder", "owner", "super_admin", "admin"]);
-const MANAGER_ROLES = new Set(["social_community_manager", "marketing_admin"]);
+const MANAGER_ROLES = new Set([
+  "social_community_manager",
+  "marketing_admin",
+  "intern_manager",
+]);
 
 export type InternshipActorKind = "supervisor" | "manager" | "intern" | "none";
 
@@ -33,8 +37,7 @@ export function canReadPrivateInternRecord(input: {
   if (!input.targetInternId) return false;
   if (input.actor === "supervisor") return true;
   if (input.actor === "manager") {
-    if (!input.managerUserId) return true;
-    return input.managerUserId === input.actorUserId;
+    return Boolean(input.managerUserId) && input.managerUserId === input.actorUserId;
   }
   if (input.actor === "intern") return input.actorInternId === input.targetInternId;
   return false;

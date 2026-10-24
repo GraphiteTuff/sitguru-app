@@ -96,6 +96,7 @@ export function buildInternManagerCard(input: {
     })),
     exceptions: input.exceptions,
     weekZeroReady: ready,
+    internshipStatus: input.intern.status,
   });
   const academicWeek = internshipWeekNumber(input.intern.academicStartDate, today);
   const deliverable = currentSemesterDeliverable(input.intern.academicStartDate, today);
@@ -220,7 +221,7 @@ export function buildManagerReviewQueue(input: {
       submittedAt: review.submittedAt || review.weekOf,
       hours: review.hoursLogged != null ? String(review.hoursLogged) : "",
       reportSection: review.finalSection || "",
-      statusLabel: review.reviewStatus === "submitted_to_jason" ? "Needs CEO Review" : "Needs Ava Review",
+      statusLabel: review.reviewStatus === "submitted_to_jason" ? "Needs CEO Review" : "Needs manager review",
       stage: review.reviewStatus,
       evidence: "",
       ceo: review.reviewStatus === "submitted_to_jason",
@@ -239,7 +240,7 @@ export function buildManagerReviewQueue(input: {
       submittedAt: log.submittedAt || log.workedOn,
       hours: String(log.hours),
       reportSection: "",
-      statusLabel: "Needs Ava Review",
+      statusLabel: "Needs manager review",
       stage: "submitted_to_ava",
       evidence: log.evidenceUrl,
       ceo: false,

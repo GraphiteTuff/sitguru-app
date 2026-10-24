@@ -22,18 +22,18 @@ export type ReviewAction =
 
 const LABELS: Record<string, string> = {
   draft: "Draft",
-  submitted_to_ava: "Needs Ava Review",
+  submitted_to_ava: "Needs manager review",
   changes_requested: "Changes Requested",
-  ava_approved: "Ava Approved",
-  ceo_review_required: "Ava Approved — CEO Review Required",
+  ava_approved: "Manager approved",
+  ceo_review_required: "Manager approved — CEO review required",
   submitted_to_jason: "Needs CEO Review",
   ceo_approved: "CEO Approved",
   approved_complete: "Approved / Complete",
   todo: "Draft",
   in_progress: "Draft",
-  submitted: "Needs Ava Review",
+  submitted: "Needs manager review",
   revision_requested: "Changes Requested",
-  approved: "Ava Approved",
+  approved: "Manager approved",
   not_accepted: "Not accepted",
   blocked: "Blocked",
 };
@@ -84,13 +84,13 @@ export function nextReviewStage(input: {
       return { ok: false, error: "Only the intern can submit this." };
     }
     if (stage !== "draft" && stage !== "changes_requested") {
-      return { ok: false, error: "This is already with Ava." };
+      return { ok: false, error: "This is already with your manager." };
     }
     return { ok: true, stage: "submitted_to_ava" };
   }
 
   if (action === "request_changes") {
-    if (actor === "intern") return { ok: false, error: "Ava reviews this, not the intern." };
+    if (actor === "intern") return { ok: false, error: "Your manager reviews this." };
     if (stage !== "submitted_to_ava" && stage !== "submitted_to_jason" && stage !== "ava_approved") {
       return { ok: false, error: "Nothing is waiting for changes." };
     }
@@ -103,19 +103,19 @@ export function nextReviewStage(input: {
   if (action === "approve") {
     if (actor === "intern") return { ok: false, error: "You can’t approve your own work." };
     if (actor === "manager" && stage !== "submitted_to_ava") {
-      return { ok: false, error: "Routine approval is for work submitted to Ava." };
+      return { ok: false, error: "Routine approval is for work submitted to your manager." };
     }
     if (stage === "submitted_to_jason" || stage === "ceo_review_required") {
       return { ok: false, error: "Escalated work needs CEO review." };
     }
     if (stage !== "submitted_to_ava" && actor !== "supervisor") {
-      return { ok: false, error: "This work is not waiting on Ava." };
+      return { ok: false, error: "This work is not waiting on your manager." };
     }
     return { ok: true, stage: "ava_approved" };
   }
 
   if (action === "escalate") {
-    if (actor === "intern") return { ok: false, error: "Ask Ava to escalate this." };
+    if (actor === "intern") return { ok: false, error: "Ask your manager to escalate this." };
     if (stage !== "submitted_to_ava" && stage !== "ava_approved") {
       return { ok: false, error: "This can’t be escalated from its current step." };
     }

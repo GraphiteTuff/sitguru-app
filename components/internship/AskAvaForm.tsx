@@ -8,8 +8,8 @@ export default function AskAvaForm({
   targetId = "",
   targetTitle = "",
   returnTo = "/intern",
-  label = "Ask Ava",
-  placeholder = "What do you need Ava to answer?",
+  label = "Ask your manager",
+  placeholder = "What do you need your manager to answer?",
 }: {
   internId: string;
   targetType?: string;
@@ -44,7 +44,7 @@ export default function AskAvaForm({
         type="submit"
         className="inline-flex min-h-11 items-center rounded-2xl bg-sky-700 px-4 text-sm font-black !text-white"
       >
-        Ask Ava
+        {label}
       </button>
     </form>
   );

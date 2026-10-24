@@ -258,6 +258,7 @@ export default function InternStudentDashboard({
     })),
     exceptions: data.scheduleExceptions,
     weekZeroReady,
+    internshipStatus: data.intern.status,
   });
   const focusWeek = hourSummary.weekNumber;
   const workload = groupWorkload(data.tasks, focusWeek);
@@ -487,7 +488,7 @@ export default function InternStudentDashboard({
               </div>
               <div className="flex items-center gap-2">
                 <Share2 className="h-4 w-4 text-rose-700" />
-                {waitingOnAva} waiting on Ava
+                {waitingOnAva} waiting on your manager
                 {returnedWork.length ? ` · ${returnedWork.length} returned to you` : ""}
               </div>
             </div>
@@ -693,6 +694,22 @@ export default function InternStudentDashboard({
             </Link>
           </section>
 
+          <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">Your SitGuru team</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-[#FAF6EE] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Manager</p>
+                <p className="mt-1 font-black text-slate-950">{data.intern.managerName || "Not assigned yet"}</p>
+                <p className="text-sm font-semibold text-slate-600">{data.intern.managerTitle || "Day-to-day internship manager"}</p>
+              </div>
+              <div className="rounded-2xl bg-[#FAF6EE] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Formal supervisor</p>
+                <p className="mt-1 font-black text-slate-950">{data.intern.supervisorName || "Not assigned yet"}</p>
+                <p className="text-sm font-semibold text-slate-600">{data.intern.supervisorTitle || "University and formal review"}</p>
+              </div>
+            </div>
+          </section>
+
           <InternWeekZeroCard
             internId={data.intern.id}
             completedKeys={data.startChecks || []}
@@ -711,7 +728,7 @@ export default function InternStudentDashboard({
           {(data.questions || []).filter((question) => question.status === "open" || question.answer).slice(0, 3).map((question) => (
             <article key={question.id} className="rounded-[1.4rem] border border-sky-100 bg-white p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-800">
-                {question.askedByRole === "manager" ? "Ava asked" : "Question for Ava"} · {question.status === "answered" ? "Answered" : "Open"}
+                {question.askedByRole === "manager" ? "Your manager asked" : "Question for your manager"} · {question.status === "answered" ? "Answered" : "Open"}
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-800">{question.question}</p>
               {question.answer ? <p className="mt-2 text-sm font-semibold text-emerald-900">{question.answer}</p> : null}
@@ -833,7 +850,7 @@ export default function InternStudentDashboard({
               </label>
               <label className="block">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Blockers or questions for Ava
+                  Blockers or questions for your manager
                 </span>
                 <textarea name="blockers" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
               </label>
@@ -852,14 +869,14 @@ export default function InternStudentDashboard({
               </label>
               <button className={`${internPrimaryBtnClass} w-full`}>
                 <CheckCircle2 size={16} />
-                Send weekly check-in to Ava
+                Send weekly check-in to your manager
               </button>
             </form>
               <AskAvaForm
                 internId={data.intern.id}
                 targetType="weekly"
                 targetTitle={`Week ${focusWeek || 0} check-in`}
-                returnTo="/intern?tab=home"
+                label="Ask your manager"
               />
             </>
           ) : process.weeklyThisWeek ? (

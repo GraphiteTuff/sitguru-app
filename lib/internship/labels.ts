@@ -90,13 +90,18 @@ export function fundingStatusLabel(status: string) {
 
 export function internStatusLabel(status: string) {
   const map: Record<string, string> = {
-    applicant: "Applicant",
-    accepted: "Accepted",
+    applicant: "Candidate",
+    candidate: "Candidate",
+    pending_university_approval: "Pending university approval",
+    accepted: "Approved",
+    approved: "Approved",
+    onboarding: "Onboarding",
     active: "Active",
     completed: "Completed",
-    withdrawn: "Withdrawn",
+    withdrawn: "Archived",
+    archived: "Archived",
   };
-  return map[status] || status;
+  return map[status] || status.replaceAll("_", " ");
 }
 
 export function academicLevelLabel(level: string) {
@@ -116,13 +121,13 @@ export function taskStatusLabel(status: string, reviewStage?: string | null) {
   const stage = reviewStage || status;
   if (stage === "submitted_to_jason" || stage === "ceo_review_required") return "Needs CEO Review";
   if (stage === "ceo_approved" || stage === "approved_complete") return "Approved / Complete";
-  if (stage === "submitted_to_ava") return "Needs Ava Review";
+  if (stage === "submitted_to_ava") return "Needs manager review";
   if (stage === "changes_requested" || stage === "revision_requested") return "Changes Requested";
-  if (stage === "ava_approved" || stage === "approved") return "Ava Approved";
+  if (stage === "ava_approved" || stage === "approved") return "Manager approved";
   const map: Record<string, string> = {
     todo: "To do",
     in_progress: "In progress",
-    submitted: "Needs Ava Review",
+    submitted: "Needs manager review",
     not_accepted: "Not accepted",
     blocked: "Blocked",
     draft: "Draft",

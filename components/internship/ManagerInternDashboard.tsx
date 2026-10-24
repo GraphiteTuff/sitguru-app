@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { dismissStaffNotice } from "@/lib/internship/assignment-actions";
 import {
   answerInternQuestion,
   approveWeekZero,
@@ -124,7 +125,7 @@ function ReviewCard({
             </button>
             {!item.ceo ? (
               <button name="reviewAction" value="escalate" className="min-h-12 rounded-2xl border border-slate-200 px-3 text-sm font-black text-slate-800">
-                Escalate to Jason
+                Escalate to supervisor
               </button>
             ) : null}
           </div>
@@ -152,12 +153,14 @@ export default function ManagerInternDashboard({
   interns,
   canEdit,
   canCeo,
+  notices = [],
   notice,
 }: {
   cards: ManagerInternCard[];
   reviews: ManagerReviewItem[];
   questions: ManagerQuestion[];
   interns: InternshipIntern[];
+  notices?: { id: string; internId: string; title: string; body: string; createdAt: string }[];
   canEdit: boolean;
   canCeo: boolean;
   notice?: { kind: "ok" | "error"; message: string } | null;
@@ -172,12 +175,22 @@ export default function ManagerInternDashboard({
           {notice.message}
         </p>
       ) : null}
+      {notices.map((item) => (
+        <section key={item.id} className="rounded-[1.6rem] border border-sky-200 bg-sky-50 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-800">{item.title}</p>
+          <p className="mt-2 text-sm font-semibold text-slate-800">{item.body}</p>
+          <form action={dismissStaffNotice} className="mt-3">
+            <input type="hidden" name="id" value={item.id} />
+            <button className="min-h-11 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">Got it</button>
+          </form>
+        </section>
+      ))}
       <header className="rounded-[1.8rem] bg-[#FAF6EE] p-1">
         <div className="public-dark-section rounded-[1.6rem] px-4 py-5 sm:px-6" data-brand-green style={{ background: "#0D5C3A" }}>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-white/80">Intern team</p>
-          <h1 className="mt-1 text-3xl font-black !text-white">Intern team</h1>
+          <h1 className="mt-1 text-3xl font-black !text-white">My intern team</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold !text-white/90">
-            Hours, pace, and work waiting on you. Routine drafts stay here. Jason sees what you escalate.
+            You see the interns assigned to you. Routine work stays here. Your supervisor sees what you escalate.
           </p>
         </div>
       </header>
@@ -208,12 +221,12 @@ export default function ManagerInternDashboard({
 
       {tab === "reviews" ? (
         <section className="space-y-3">
-          <h2 className="text-xl font-black text-slate-950">Needs Ava review</h2>
+          <h2 className="text-xl font-black text-slate-950">Needs manager review</h2>
           {reviews.filter((item) => !item.ceo).map((item) => (
             <ReviewCard key={`${item.targetType}-${item.id}`} item={item} canCeo={canCeo} />
           ))}
           {!reviews.some((item) => !item.ceo) ? (
-            <p className="rounded-[1.4rem] bg-white p-4 text-sm font-semibold text-slate-600">Nothing is waiting on Ava.</p>
+            <p className="rounded-[1.4rem] bg-white p-4 text-sm font-semibold text-slate-600">Nothing is waiting on you.</p>
           ) : null}
           <h2 className="pt-2 text-xl font-black text-slate-950">Needs CEO review</h2>
           {reviews.filter((item) => item.ceo).map((item) => (

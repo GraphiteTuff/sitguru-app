@@ -8,7 +8,12 @@ function startOfDay(value: Date) {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }
 
-export function internshipWeekNumber(startDate?: string | null, today = new Date()) {
+export function internshipWeekNumber(
+  startDate?: string | null,
+  today = new Date(),
+  status?: string | null,
+) {
+  if (status && String(status).toLowerCase() !== "active") return 0;
   if (!startDate) return 1;
   const start = startOfDay(new Date(`${startDate}T12:00:00`));
   if (Number.isNaN(start.getTime())) return 1;
@@ -44,7 +49,15 @@ export function currentSemesterDeliverable(startDate?: string | null, today = ne
 export function buildInternshipProcess(data: InternshipWorkspaceData, today = new Date()) {
   const startDate =
     data.intern.academicStartDate || data.cohort?.startsOn || null;
-  const deliverable = currentSemesterDeliverable(startDate, today);
+  const weekNumber = internshipWeekNumber(startDate, today, data.intern.status);
+  const deliverable = weekNumber <= 0
+    ? {
+        id: "start_here",
+        timing: "Week 0",
+        title: "Start here",
+        demonstrates: "Week 1 begins after the internship is active, Start Here is done, and the start date arrives.",
+      }
+    : currentSemesterDeliverable(startDate, today);
   const pendingApprovals =
     data.tasks.filter((row) => row.status === "submitted").length +
     data.content.filter((row) => row.status === "submitted").length;
@@ -59,7 +72,7 @@ export function buildInternshipProcess(data: InternshipWorkspaceData, today = ne
   );
 
   return {
-    weekNumber: internshipWeekNumber(startDate, today),
+    weekNumber,
     deliverable,
     pendingApprovals,
     unverifiedMetrics,

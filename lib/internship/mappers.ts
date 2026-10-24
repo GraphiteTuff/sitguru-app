@@ -206,6 +206,12 @@ export function mapIntern(row: Record<string, unknown>): InternshipIntern {
     universityNotes: text(row.university_notes),
     academicYear: text(row.academic_year),
     weekZeroApprovedAt: text(row.week_zero_approved_at) || null,
+    departmentId: text(row.department_id) || null,
+    internshipTitle: text(row.internship_title),
+    managerName: text(row.manager_name),
+    managerTitle: text(row.manager_title),
+    supervisorName: text(row.supervisor_name),
+    supervisorTitle: text(row.supervisor_title),
   };
 }
 

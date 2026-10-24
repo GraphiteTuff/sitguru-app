@@ -98,7 +98,7 @@ export async function GrowthWorkplaceHome({
     { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
     { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} />, trend: stats.trends.conversion },
     { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share", tone: "emerald" as const, icon: <Sparkles size={18} />, trend: stats.trends.campaigns },
-    { label: "Needs review", value: String(stats.pendingReview), helper: "Needs Ava review", tone: "rose" as const, icon: <ClipboardCheck size={18} />, trend: stats.trends.pendingReview },
+    { label: "Needs review", value: String(stats.pendingReview), helper: "Needs manager review", tone: "rose" as const, icon: <ClipboardCheck size={18} />, trend: stats.trends.pendingReview },
   ];
 
   const actions = [

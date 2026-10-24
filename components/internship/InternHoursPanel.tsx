@@ -5,9 +5,9 @@ import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import type { InternshipTask, InternshipTimeLog } from "@/lib/internship/types";
 
 function statusText(status: string) {
-  if (status === "ava_approved") return "Ava approved";
+  if (status === "ava_approved") return "Manager approved";
   if (status === "supervisor_verified") return "Jason verified";
-  if (status === "submitted") return "Needs Ava review";
+  if (status === "submitted") return "Needs manager review";
   if (status === "changes_requested") return "Changes requested";
   return "Draft";
 }

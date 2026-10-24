@@ -139,9 +139,10 @@ export function summarizeInternshipHours(input: {
   entries?: HourLogEntry[];
   exceptions?: ScheduleException[];
   weekZeroReady?: boolean;
+  internshipStatus?: string | null;
 }): HourSummary {
   const today = input.today || new Date();
-  const academicWeek = internshipWeekNumber(input.startDate, today);
+  const academicWeek = internshipWeekNumber(input.startDate, today, input.internshipStatus);
   const weekNumber = input.weekZeroReady === false ? 0 : academicWeek;
   const weeks = input.internshipWeeks && input.internshipWeeks > 0
     ? input.internshipWeeks
