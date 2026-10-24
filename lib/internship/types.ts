@@ -160,6 +160,19 @@ export type InternshipIntern = {
   isTest?: boolean;
   baselineLockedAt?: string | null;
   baselineLockReason?: string;
+  plannedWeeklyHours?: number | null;
+  internshipWeeks?: number | null;
+  requirementStatus?: string;
+  universityVerificationStatus?: string;
+  hoursVerifiedBy?: string | null;
+  hoursVerificationDate?: string | null;
+  managerUserId?: string | null;
+  supervisorUserId?: string | null;
+  dayToDayManagerName?: string;
+  siteSupervisorName?: string;
+  universityNotes?: string;
+  academicYear?: string;
+  weekZeroApprovedAt?: string | null;
 };
 
 export type InternshipTask = {
@@ -186,6 +199,7 @@ export type InternshipTask = {
   internReportedValue?: string;
   verifiedValue?: string;
   briefPayload?: Record<string, unknown>;
+  reviewStage?: string;
 };
 
 export type InternshipContentItem = {
@@ -205,6 +219,7 @@ export type InternshipContentItem = {
   kpiTier: string;
   outputVsTarget: number | null;
   finalSection?: string;
+  reviewStage?: string;
 };
 
 export type InternshipWorkComment = {
@@ -334,6 +349,59 @@ export type InternshipWeeklyReview = {
   contributionApproved?: boolean;
   internReportedKpi?: string;
   verifiedKpi?: string;
+  whatWorked?: string;
+  learning?: string;
+  blockers?: string;
+  reviewStatus?: string;
+  submittedAt?: string | null;
+};
+
+export type InternshipTimeLog = {
+  id: string;
+  internId: string;
+  workedOn: string;
+  hours: number;
+  activity: string;
+  workItemType: string;
+  workItemId: string;
+  weekNumber: number | null;
+  notes: string;
+  evidenceUrl: string;
+  status: string;
+  submittedAt: string | null;
+  managerReviewedAt: string | null;
+};
+
+export type InternshipQuestion = {
+  id: string;
+  internId: string;
+  targetType: string;
+  targetId: string;
+  targetTitle: string;
+  question: string;
+  urgency: string;
+  status: string;
+  answer: string;
+  askedByRole: string;
+  askedAt: string;
+  answeredAt: string | null;
+};
+
+export type InternshipReviewEvent = {
+  id: string;
+  internId: string;
+  targetType: string;
+  targetId: string;
+  reviewerRole: string;
+  reviewStage: string;
+  comment: string;
+  createdAt: string;
+};
+
+export type InternshipScheduleException = {
+  weekNumber: number;
+  plannedHours: number;
+  reason: string;
 };
 
 export type FrozenAcademicProfile = {
@@ -443,4 +511,9 @@ export type InternshipWorkspaceData = {
   comments: InternshipWorkComment[];
   attachments: InternshipWorkAttachment[];
   onboarding: InternshipOnboarding | null;
+  timeLogs?: InternshipTimeLog[];
+  questions?: InternshipQuestion[];
+  startChecks?: string[];
+  reviewEvents?: InternshipReviewEvent[];
+  scheduleExceptions?: InternshipScheduleException[];
 };

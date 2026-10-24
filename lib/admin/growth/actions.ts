@@ -13,6 +13,7 @@ import {
   resolveDestination,
   uniqueCampaignSlug,
 } from "@/lib/admin/growth/data";
+import { allowedContentTransition, type ContentActor } from "@/lib/internship/content-flow";
 
 function field(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -163,18 +164,47 @@ export async function updateGrowthContentStatus(formData: FormData) {
     return { ok: false, error: "Invalid content." };
   }
 
-  if (status === "Ready" && !access.actor.isSuperUser) {
-    return { ok: false, error: "Only Super Admins can approve." };
+  const actorRole: ContentActor = access.actor.kind === "intern"
+    ? "intern"
+    : access.actor.isSuperUser
+      ? "supervisor"
+      : "manager";
+
+  const { data: current, error: readError } = await supabaseAdmin
+    .from("admin_marketing_content_calendar")
+    .select("status")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError || !current) return { ok: false, error: "That post could not be found." };
+
+  if (!allowedContentTransition({ from: String(current.status || "Draft"), to: status, actor: actorRole })) {
+    return { ok: false, error: "That step isn’t available for this post." };
   }
 
-  const { error } = await supabaseAdmin
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    status,
+    ceo_review: status === "Needs CEO Review" ? "Needs CEO Review" : status,
+    updated_at: now,
+  };
+  if (status === "Approved" || status === "Needs CEO Review") {
+    patch.approved_by_email = access.actor.email;
+    patch.approved_at = now;
+  }
+
+  let { error } = await supabaseAdmin
     .from("admin_marketing_content_calendar")
-    .update({
-      status,
-      ceo_review: status === "Ready" ? "Approved" : status,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", id);
+
+  if (error && /approved_by_email|approved_at/i.test(error.message)) {
+    delete patch.approved_by_email;
+    delete patch.approved_at;
+    ({ error } = await supabaseAdmin
+      .from("admin_marketing_content_calendar")
+      .update(patch)
+      .eq("id", id));
+  }
 
   if (error) return { ok: false, error: error.message };
 

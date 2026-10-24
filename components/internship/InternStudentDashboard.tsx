@@ -18,6 +18,7 @@ import {
   Megaphone,
   Palette,
   Share2,
+  MoreHorizontal,
 } from "lucide-react";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternKpiBoard from "@/components/internship/InternKpiBoard";
@@ -55,8 +56,13 @@ import {
 import { buildInternshipProcess } from "@/lib/internship/process";
 import {
   internCalendarEvents,
-  internHourPacing,
 } from "@/lib/internship/student-dashboard";
+import { summarizeInternshipHours } from "@/lib/internship/hours";
+import { groupWorkload } from "@/lib/internship/workload";
+import { isWeekZeroReady } from "@/lib/internship/week-zero";
+import InternHoursPanel from "@/components/internship/InternHoursPanel";
+import InternWeekZeroCard from "@/components/internship/InternWeekZeroCard";
+import AskAvaForm from "@/components/internship/AskAvaForm";
 import {
   internPortalFirstName,
   internPortalHeroClass,
@@ -196,6 +202,7 @@ export default function InternStudentDashboard({
   );
   const [calendarMonth, setCalendarMonth] = useState(() => startDate || new Date());
   const [selectedDate, setSelectedDate] = useState(startDate ? toDateKey(startDate) : todayKey);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     function openInternPage() {
@@ -232,15 +239,32 @@ export default function InternStudentDashboard({
 
   const selectedEvents = eventsByDate.get(selectedDate) || [];
   const upcoming = calendarEvents.filter((event) => event.date >= todayKey).slice(0, 4);
-  const openWork = data.tasks.filter(
-    (task) => !["approved", "not_accepted"].includes(task.status),
-  );
   const verifiedMetrics = data.metrics.filter((metric) => metric.isVerified);
-  const pacing = internHourPacing({
-    requiredHours: data.intern.requiredHours,
-    startDate: data.intern.academicStartDate || data.cohort?.startsOn || null,
-    endDate: data.intern.academicEndDate || data.cohort?.endsOn || null,
+  const weekZeroReady = isWeekZeroReady({
+    completedKeys: data.startChecks || [],
+    approvedAt: data.intern.weekZeroApprovedAt,
   });
+  const hourSummary = summarizeInternshipHours({
+    requiredHours: data.intern.requiredHours,
+    requirementStatus: data.intern.requirementStatus,
+    plannedWeeklyHours: data.intern.plannedWeeklyHours,
+    internshipWeeks: data.intern.internshipWeeks,
+    startDate: data.intern.academicStartDate || data.cohort?.startsOn || null,
+    entries: (data.timeLogs || []).map((row) => ({
+      workedOn: row.workedOn,
+      hours: row.hours,
+      status: row.status,
+      weekNumber: row.weekNumber,
+    })),
+    exceptions: data.scheduleExceptions,
+    weekZeroReady,
+  });
+  const focusWeek = hourSummary.weekNumber;
+  const workload = groupWorkload(data.tasks, focusWeek);
+  const returnedWork = data.tasks.filter((task) => task.status === "revision_requested" || task.reviewStage === "changes_requested");
+  const waitingOnAva = data.tasks.filter((task) => task.status === "submitted" || task.reviewStage === "submitted_to_ava").length
+    + data.content.filter((item) => item.status === "submitted" || item.reviewStage === "submitted_to_ava").length
+    + (data.weeklyReviews || []).filter((row) => row.reviewStatus === "submitted_to_ava").length;
   const weekOf = (() => {
     const start = new Date();
     start.setDate(start.getDate() - start.getDay());
@@ -398,7 +422,7 @@ export default function InternStudentDashboard({
                   Welcome, {firstName}.
                 </h1>
                 <p className="mt-1 text-sm font-semibold text-slate-700">
-                  Week {process.weekNumber} · {process.deliverable.title}
+                  {hourSummary.weekLabel} · {focusWeek <= 0 ? "Start here" : process.deliverable.title}
                 </p>
               </div>
             </div>
@@ -439,13 +463,18 @@ export default function InternStudentDashboard({
           </div>
           <div className="rounded-[1.6rem] border border-white/80 bg-white/95 p-5 shadow-xl">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              Today’s focus
+              This week’s focus
             </p>
             <h2 className="mt-2 text-xl font-black text-slate-950">
-              {process.deliverable.title}
+              {hourSummary.weekLabel}
             </h2>
+            <p className="mt-1 text-sm font-black text-slate-800">
+              {focusWeek <= 0 ? "Start here" : process.deliverable.title}
+            </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-              {process.deliverable.demonstrates}
+              {focusWeek <= 0
+                ? "Finish Start Here before Week 1 counts."
+                : process.deliverable.demonstrates}
             </p>
             <div className="mt-4 grid gap-2 text-sm font-bold text-slate-700">
               <div className="flex items-center gap-2">
@@ -454,13 +483,22 @@ export default function InternStudentDashboard({
               </div>
               <div className="flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-violet-700" />
-                {openWork.length} tasks still open
+                This week {workload.counts.current} · Upcoming {workload.counts.upcoming} · Later {workload.counts.later}
               </div>
               <div className="flex items-center gap-2">
                 <Share2 className="h-4 w-4 text-rose-700" />
-                {data.content.length} social posts logged
+                {waitingOnAva} waiting on Ava
+                {returnedWork.length ? ` · ${returnedWork.length} returned to you` : ""}
               </div>
             </div>
+            <p className="mt-3 text-sm font-black text-slate-950">Pace: {hourSummary.paceLabel}</p>
+            <button
+              type="button"
+              onClick={() => openTab("work")}
+              className={`${internPrimaryBtnClass} mt-4 w-full`}
+            >
+              Start this week
+            </button>
             <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
               Your report is {growthReport.percent}% done ·{" "}
               {growthReport.outcomes.length} checked results ·{" "}
@@ -531,9 +569,9 @@ export default function InternStudentDashboard({
               aria-label="Open your work"
             >
               <ThemeStatCard
-                label="Open work"
-                value={openWork.length}
-                helper="Tasks to do"
+                label="This week"
+                value={workload.counts.current}
+                helper={`${workload.counts.upcoming} upcoming · ${workload.counts.later} later`}
                 tone="violet"
                 icon={<ClipboardList size={18} />}
                 className="h-full"
@@ -655,20 +693,30 @@ export default function InternStudentDashboard({
             </Link>
           </section>
 
-          {pacing ? (
-            <section className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                Hour pace
+          <InternWeekZeroCard
+            internId={data.intern.id}
+            completedKeys={data.startChecks || []}
+            ready={weekZeroReady}
+            preview={preview}
+          />
+
+          <InternHoursPanel
+            internId={data.intern.id}
+            summary={hourSummary}
+            logs={data.timeLogs || []}
+            tasks={data.tasks}
+            preview={preview}
+          />
+
+          {(data.questions || []).filter((question) => question.status === "open" || question.answer).slice(0, 3).map((question) => (
+            <article key={question.id} className="rounded-[1.4rem] border border-sky-100 bg-white p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-800">
+                {question.askedByRole === "manager" ? "Ava asked" : "Question for Ava"} · {question.status === "answered" ? "Answered" : "Open"}
               </p>
-              <p className="mt-1 text-lg font-black text-slate-950">
-                {pacing.requiredHours} hours · {pacing.requiredWeeklyPace}/week
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                You have {pacing.weeksRemaining} weeks left. Hit this weekly number so
-                you finish your hours on time.
-              </p>
-            </section>
-          ) : null}
+              <p className="mt-1 text-sm font-semibold text-slate-800">{question.question}</p>
+              {question.answer ? <p className="mt-2 text-sm font-semibold text-emerald-900">{question.answer}</p> : null}
+            </article>
+          ))}
 
           <section className="rounded-[1.4rem] border border-sky-200 bg-white p-4">
             <div className="flex items-center justify-between gap-2">
@@ -719,7 +767,9 @@ export default function InternStudentDashboard({
           </section>
 
           {!process.weeklyThisWeek && !preview ? (
+            <>
             <form
+              id="checkin"
               action={saveWeeklyReview}
               className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
             >
@@ -771,19 +821,47 @@ export default function InternStudentDashboard({
               ))}
               <label className="block">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Your number (SitGuru will check it)
+                  What worked?
+                </span>
+                <textarea name="whatWorked" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  What did you learn?
+                </span>
+                <textarea name="learning" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Blockers or questions for Ava
+                </span>
+                <textarea name="blockers" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
+              </label>
+              <p className="text-sm font-semibold text-slate-600">
+                Hours logged this week: {hourSummary.loggedThisWeek}. Log them above before you send this check-in.
+              </p>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Main number (SitGuru will check it)
                 </span>
                 <input
                   name="internReportedKpi"
                   placeholder="Example: 27 Pet Parent signups"
-                  className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+                  className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold text-slate-950"
                 />
               </label>
               <button className={`${internPrimaryBtnClass} w-full`}>
                 <CheckCircle2 size={16} />
-                Send this week to SitGuru
+                Send weekly check-in to Ava
               </button>
             </form>
+              <AskAvaForm
+                internId={data.intern.id}
+                targetType="weekly"
+                targetTitle={`Week ${focusWeek || 0} check-in`}
+                returnTo="/intern?tab=home"
+              />
+            </>
           ) : process.weeklyThisWeek ? (
             <div className="space-y-3">
               <p className="flex min-h-12 items-center gap-2 rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-900">
@@ -818,6 +896,12 @@ export default function InternStudentDashboard({
                   year: "numeric",
                 })}
               </h2>
+              <a
+                href="https://teams.microsoft.com"
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800"
+              >
+                Weekly Growth Meeting · Open in Microsoft Teams
+              </a>
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -961,29 +1045,45 @@ export default function InternStudentDashboard({
 
           {showTasks ? (
             data.tasks.length ? (
-              data.tasks.map((task) => (
-                <InternshipAssignmentReview
-                  key={task.id}
-                  internId={data.intern.id}
-                  mode="intern"
-                  itemType="task"
-                  id={task.id}
-                  title={task.title}
-                  status={task.status}
-                  workUrl={task.workUrl}
-                  studentNotes={task.studentNotes}
-                  supervisorNotes={task.supervisorNotes}
-                  employerLetter={task.employerLetter}
-                  kpiTier={task.kpiTier}
-                  comments={data.comments || []}
-                  attachments={data.attachments || []}
-                  preview={preview}
-                  intern={data.intern}
-                  task={task}
-                  metrics={data.metrics || []}
-                  smartGoals={data.smartGoals || []}
-                  experiments={data.experiments || []}
-                />
+              ([
+                ["Current week", workload.current, true],
+                ["Next 2 weeks", workload.upcoming, false],
+                ["Later this semester", workload.later, false],
+              ] as const).map(([label, items, open]) => (
+                <details key={label} open={open} className="rounded-[1.4rem] border border-violet-100 bg-white p-3">
+                  <summary className="cursor-pointer list-none min-h-11 text-sm font-black text-slate-950">
+                    {label} · {items.length}
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    {items.length ? items.map((task) => (
+                      <InternshipAssignmentReview
+                        key={task.id}
+                        internId={data.intern.id}
+                        mode="intern"
+                        itemType="task"
+                        id={task.id}
+                        title={task.title}
+                        status={task.status}
+                        reviewStage={task.reviewStage}
+                        workUrl={task.workUrl}
+                        studentNotes={task.studentNotes}
+                        supervisorNotes={task.supervisorNotes}
+                        employerLetter={task.employerLetter}
+                        kpiTier={task.kpiTier}
+                        comments={data.comments || []}
+                        attachments={data.attachments || []}
+                        preview={preview}
+                        intern={data.intern}
+                        task={task}
+                        metrics={data.metrics || []}
+                        smartGoals={data.smartGoals || []}
+                        experiments={data.experiments || []}
+                      />
+                    )) : (
+                      <p className="text-sm font-semibold text-slate-500">Nothing in this group.</p>
+                    )}
+                  </div>
+                </details>
               ))
             ) : workFilter === "tasks" ? (
               <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
@@ -1244,20 +1344,42 @@ export default function InternStudentDashboard({
       />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
+        {moreOpen ? (
+          <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl bg-emerald-50 p-2">
+            <button type="button" onClick={() => { setMoreOpen(false); openTab("calendar"); }} className="min-h-12 rounded-2xl bg-white text-sm font-black text-slate-900">Calendar</button>
+            <Link href={INTERN_GROWTH_WORKPLACE.href} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900">Growth Workplace</Link>
+            <Link href={INTERNSHIP_HELP_PATH} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900">Help</Link>
+            <button type="button" onClick={() => { setMoreOpen(false); setProfileOpen(true); }} className="min-h-12 rounded-2xl bg-white text-sm font-black text-slate-900">Profile</button>
+          </div>
+        ) : null}
         <div className="grid grid-cols-5 gap-1">
-          {TABS.map((item) => (
+          {([
+            ["home", "Home", Home],
+            ["work", "Work", ClipboardList],
+            ["project", "Report", BookOpen],
+            ["metrics", "Metrics", BarChart3],
+          ] as const).map(([id, label, Icon]) => (
             <button
-              key={item.id}
+              key={id}
               type="button"
-              onClick={() => openTab(item.id)}
+              onClick={() => { setMoreOpen(false); openTab(id); }}
               className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${internPressClass} ${
-                tab === item.id ? item.chip : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-900"
+                tab === id && !moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
               }`}
             >
-              <item.icon size={18} />
-              {item.label}
+              <Icon size={18} />
+              {label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"}`}
+            aria-expanded={moreOpen}
+          >
+            <MoreHorizontal size={18} />
+            More
+          </button>
         </div>
       </nav>
     </div>

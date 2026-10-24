@@ -916,6 +916,17 @@ export async function saveWeeklyReview(formData: FormData) {
     contribution_added: contributionAdded,
     hours_logged: optionalNumber(formData, "hoursLogged"),
     intern_reported_kpi: text(formData, "internReportedKpi"),
+    what_worked: text(formData, "whatWorked"),
+    learning: text(formData, "learning"),
+    blockers: text(formData, "blockers"),
+    ...(mode === "intern"
+      ? {
+          review_status: "submitted_to_ava",
+          submitted_at: new Date().toISOString(),
+          contribution_approved: false,
+          work_approved: false,
+        }
+      : {}),
   };
 
   const supervisorFields =
@@ -932,10 +943,31 @@ export async function saveWeeklyReview(formData: FormData) {
 
   const { data: existing } = await supabaseAdmin
     .from("internship_weekly_reviews")
-    .select("id")
+    .select("id, contribution_added, contribution_approved, final_section")
     .eq("intern_id", internId)
     .eq("week_of", weekOf)
     .maybeSingle();
+
+  if (existing?.id && existing.contribution_approved && mode === "intern") {
+    const { data: prior } = await supabaseAdmin
+      .from("internship_report_revisions")
+      .select("version")
+      .eq("source_type", "weekly")
+      .eq("source_id", existing.id)
+      .order("version", { ascending: false })
+      .limit(1);
+    await supabaseAdmin.from("internship_report_revisions").insert({
+      intern_id: internId,
+      source_type: "weekly",
+      source_id: existing.id,
+      section_id: existing.final_section || finalSection,
+      body: existing.contribution_added || "",
+      status: "ava_approved",
+      version: Number(prior?.[0]?.version || 0) + 1,
+      reason: "Intern revised an approved check-in",
+      approved: true,
+    });
+  }
 
   const payload = { ...internFields, ...supervisorFields };
   const { error } = existing?.id

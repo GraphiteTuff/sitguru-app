@@ -33,6 +33,18 @@ function rows(data: unknown) {
   return (Array.isArray(data) ? data : []) as Record<string, unknown>[];
 }
 
+async function safeRows(
+  label: string,
+  query: PromiseLike<{ data: unknown; error: { message: string } | null }>,
+) {
+  const { data, error } = await query;
+  if (error) {
+    console.error(`[internship] ${label}`, error.message);
+    return [] as Record<string, unknown>[];
+  }
+  return rows(data);
+}
+
 export async function getActiveCohort() {
   const { data, error } = await supabaseAdmin
     .from("internship_cohorts")
@@ -416,6 +428,11 @@ export async function getInternWorkspace(
     commentRows,
     attachmentRows,
     onboardingRow,
+    timeLogs,
+    questions,
+    startChecks,
+    reviewEvents,
+    scheduleExceptions,
   ] = await Promise.all([
     getUniversity(intern.universityId),
     intern.campusId
@@ -495,6 +512,42 @@ export async function getInternWorkspace(
       .select("*")
       .eq("intern_id", internId)
       .maybeSingle(),
+    safeRows(
+      "time logs",
+      supabaseAdmin
+        .from("internship_time_logs")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("worked_on", { ascending: false }),
+    ),
+    safeRows(
+      "questions",
+      supabaseAdmin
+        .from("internship_questions")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("asked_at", { ascending: false }),
+    ),
+    safeRows(
+      "start checks",
+      supabaseAdmin.from("internship_start_checks").select("item_key").eq("intern_id", internId),
+    ),
+    safeRows(
+      "review events",
+      supabaseAdmin
+        .from("internship_review_events")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false })
+        .limit(40),
+    ),
+    safeRows(
+      "schedule exceptions",
+      supabaseAdmin
+        .from("internship_schedule_exceptions")
+        .select("week_number,planned_hours,reason")
+        .eq("intern_id", internId),
+    ),
   ]);
 
   return {
@@ -567,6 +620,51 @@ export async function getInternWorkspace(
     onboarding: onboardingRow.data
       ? mapOnboarding(onboardingRow.data as Record<string, unknown>)
       : null,
+    timeLogs: timeLogs.map((row) => ({
+      id: String(row.id || ""),
+      internId: String(row.intern_id || internId),
+      workedOn: String(row.worked_on || "").slice(0, 10),
+      hours: Number(row.hours) || 0,
+      activity: String(row.activity || ""),
+      workItemType: String(row.work_item_type || ""),
+      workItemId: String(row.work_item_id || ""),
+      weekNumber: row.week_number == null ? null : Number(row.week_number),
+      notes: String(row.notes || ""),
+      evidenceUrl: String(row.evidence_url || ""),
+      status: String(row.status || "draft"),
+      submittedAt: row.submitted_at ? String(row.submitted_at) : null,
+      managerReviewedAt: row.manager_reviewed_at ? String(row.manager_reviewed_at) : null,
+    })),
+    questions: questions.map((row) => ({
+      id: String(row.id || ""),
+      internId: String(row.intern_id || internId),
+      targetType: String(row.target_type || ""),
+      targetId: String(row.target_id || ""),
+      targetTitle: String(row.target_title || ""),
+      question: String(row.question || ""),
+      urgency: String(row.urgency || "normal"),
+      status: String(row.status || "open"),
+      answer: String(row.answer || ""),
+      askedByRole: String(row.asked_by_role || "intern"),
+      askedAt: String(row.asked_at || ""),
+      answeredAt: row.answered_at ? String(row.answered_at) : null,
+    })),
+    startChecks: startChecks.map((row) => String(row.item_key || "")).filter(Boolean),
+    reviewEvents: reviewEvents.map((row) => ({
+      id: String(row.id || ""),
+      internId: String(row.intern_id || internId),
+      targetType: String(row.target_type || ""),
+      targetId: String(row.target_id || ""),
+      reviewerRole: String(row.reviewer_role || ""),
+      reviewStage: String(row.review_stage || ""),
+      comment: String(row.comment || ""),
+      createdAt: String(row.created_at || ""),
+    })),
+    scheduleExceptions: scheduleExceptions.map((row) => ({
+      weekNumber: Number(row.week_number) || 0,
+      plannedHours: Number(row.planned_hours) || 0,
+      reason: String(row.reason || ""),
+    })),
   };
 }
 

@@ -54,7 +54,13 @@ export const GROWTH_CREATE_KINDS = [
 
 export const GROWTH_CONTENT_STATUSES = [
   "Draft",
+  "Submitted to Ava",
+  "Changes Requested",
+  "Approved",
   "Needs CEO Review",
+  "Ready to Publish",
+  "Published",
+  "Results Available",
   "Ready",
   "Posted",
 ] as const;

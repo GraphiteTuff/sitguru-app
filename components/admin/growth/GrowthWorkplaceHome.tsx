@@ -98,7 +98,7 @@ export async function GrowthWorkplaceHome({
     { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
     { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} />, trend: stats.trends.conversion },
     { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share", tone: "emerald" as const, icon: <Sparkles size={18} />, trend: stats.trends.campaigns },
-    { label: "Needs review", value: String(stats.pendingReview), helper: intern ? "Waiting on Jason" : "Waiting on Jason", tone: "rose" as const, icon: <ClipboardCheck size={18} />, trend: stats.trends.pendingReview },
+    { label: "Needs review", value: String(stats.pendingReview), helper: "Needs Ava review", tone: "rose" as const, icon: <ClipboardCheck size={18} />, trend: stats.trends.pendingReview },
   ];
 
   const actions = [
@@ -107,7 +107,7 @@ export async function GrowthWorkplaceHome({
     { href: growthHref(base, "/events"), label: "Promote an event", detail: "Pack meetups and community", icon: CalendarDays },
     { href: growthHref(base, "/campaigns"), label: "Campaigns", detail: "Copy tracking links", icon: Megaphone },
     { href: growthHref(base, "/content"), label: "Content calendar", detail: "This week’s posts", icon: Sparkles },
-    { href: growthHref(base, "/analytics"), label: "Friday report", detail: "Signups, not followers", icon: BarChart3 },
+    { href: growthHref(base, "/analytics"), label: intern ? "Weekly check-in" : "Week note", detail: intern ? "Same check-in as the portal" : "Team note, not a second intern report", icon: BarChart3 },
   ];
 
   const todayContent = content.filter((item) => item.plannedDate?.slice(0, 10) === today);
@@ -128,7 +128,7 @@ export async function GrowthWorkplaceHome({
       title="Turn SitGuru stories into Pet Parents."
       detail={
         intern
-          ? "On-the-project training for the SitGuru Market Growth Project. Drafts wait for Jason. No Admin HQ, passwords, or Pet Parent PII."
+          ? "Drafts go to Ava first. No Admin HQ, passwords, or Pet Parent private records."
           : "This is the workbench. Create, post, and watch signups — not follower counts."
       }
       action={
@@ -139,7 +139,14 @@ export async function GrowthWorkplaceHome({
           >
             Intern dashboard
           </Link>
-        ) : undefined
+        ) : (
+          <Link
+            href="/intern/manage"
+            className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-emerald-900"
+          >
+            Intern team
+          </Link>
+        )
       }
     >
       {!intern && parents && parents.new24h > 0 ? (

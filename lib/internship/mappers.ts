@@ -193,6 +193,19 @@ export function mapIntern(row: Record<string, unknown>): InternshipIntern {
     isTest: bool(row.is_test),
     baselineLockedAt: text(row.baseline_locked_at) || null,
     baselineLockReason: text(row.baseline_lock_reason),
+    plannedWeeklyHours: num(row.planned_weekly_hours),
+    internshipWeeks: num(row.internship_weeks),
+    requirementStatus: text(row.requirement_status),
+    universityVerificationStatus: text(row.university_verification_status) || "pending",
+    hoursVerifiedBy: text(row.hours_verified_by) || null,
+    hoursVerificationDate: text(row.hours_verification_date) || null,
+    managerUserId: text(row.manager_user_id) || null,
+    supervisorUserId: text(row.supervisor_user_id) || null,
+    dayToDayManagerName: text(row.day_to_day_manager_name),
+    siteSupervisorName: text(row.site_supervisor_name),
+    universityNotes: text(row.university_notes),
+    academicYear: text(row.academic_year),
+    weekZeroApprovedAt: text(row.week_zero_approved_at) || null,
   };
 }
 
@@ -224,6 +237,7 @@ export function mapTask(row: Record<string, unknown>): InternshipTask {
       row.brief_payload && typeof row.brief_payload === "object"
         ? (row.brief_payload as Record<string, unknown>)
         : {},
+    reviewStage: text(row.review_stage),
   };
 }
 
@@ -245,6 +259,7 @@ export function mapContent(row: Record<string, unknown>): InternshipContentItem 
     kpiTier: text(row.kpi_tier),
     outputVsTarget: num(row.output_vs_target),
     finalSection: text(row.final_section),
+    reviewStage: text(row.review_stage),
   };
 }
 
@@ -323,6 +338,11 @@ export function mapWeeklyReview(row: Record<string, unknown>): InternshipWeeklyR
     contributionApproved: bool(row.contribution_approved),
     internReportedKpi: text(row.intern_reported_kpi),
     verifiedKpi: text(row.verified_kpi),
+    whatWorked: text(row.what_worked),
+    learning: text(row.learning),
+    blockers: text(row.blockers),
+    reviewStatus: text(row.review_status),
+    submittedAt: text(row.submitted_at) || null,
   };
 }
 

@@ -232,4 +232,4 @@ export const DOCUMENT_KINDS = [
 ] as const;
 
 export const ATTRIBUTION_RULE =
-  "No growth result is counted as attributable unless SitGuru can reasonably verify it through platform analytics, campaign tracking, referral codes, CRM records, or another approved source.";
+  "Every campaign post intended to drive a measurable action should use an approved tracking mechanism when technically appropriate — for example a Pet Parent signup, Guru signup, referral, event, partner visit, or campaign page. No growth result is counted as attributable unless SitGuru can reasonably verify it through platform analytics, campaign tracking, referral codes, CRM records, or another approved source.";

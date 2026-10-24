@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isLivePetParentProfile } from "@/lib/admin/customers/pet-parents";
-import { isPubliclyVisibleGuruProfile } from "@/lib/gurus/public-visibility";
+import { selectPromotableGurus } from "@/lib/admin/growth/promote-gurus";
 import {
   campaignTrackingUrl,
   channelLabel,
@@ -72,6 +72,7 @@ export type GrowthPromoteItem = {
   href: string;
   imageUrl: string;
   market: string;
+  badges?: string[];
 };
 
 export type GrowthMediaItem = {
@@ -160,48 +161,21 @@ export async function listGrowthContent(): Promise<GrowthContent[]> {
 }
 
 export async function listPromotableGurus(): Promise<GrowthPromoteItem[]> {
+  const rich =
+    "id,user_id,slug,full_name,display_name,name,headline,title,city,state,service_city,service_state,services,specialty,image_url,profile_photo_url,photo_url,avatar_url,is_verified,is_public,is_public_visible,is_active,is_archived,is_test_account,application_status,status,public_status,is_bookable,is_accepting_bookings,accepting_bookings,updated_at";
+  const basic =
+    "id,slug,full_name,display_name,name,headline,title,city,state,service_city,service_state,services,specialty,image_url,profile_photo_url,photo_url,avatar_url,is_verified,is_public,is_public_visible,is_active,is_archived,is_test_account,application_status,status,public_status";
   const rows = await safeRows<AnyRow>(
-    supabaseAdmin
-      .from("gurus")
-      .select(
-        "id,slug,full_name,display_name,name,headline,title,city,state,service_city,service_state,services,specialty,image_url,profile_photo_url,photo_url,avatar_url,is_verified,is_public,is_public_visible,is_active,is_archived,is_test_account,application_status,status,public_status",
-      )
-      .order("created_at", { ascending: false })
-      .limit(80),
+    supabaseAdmin.from("gurus").select(rich).order("created_at", { ascending: false }).limit(120),
     "growth_gurus",
   );
-
-  return rows
-    .filter((row) => {
-      if (row.is_archived === true || row.is_test_account === true) return false;
-      return isPubliclyVisibleGuruProfile(row);
-    })
-    .map((row) => {
-      const name =
-        text(row.display_name) ||
-        text(row.full_name) ||
-        text(row.name) ||
-        "Guru";
-      const city = text(row.service_city) || text(row.city);
-      const state = text(row.service_state) || text(row.state);
-      const slug = text(row.slug);
-      return {
-        id: text(row.id),
-        name,
-        detail:
-          text(row.headline) ||
-          text(row.title) ||
-          text(row.specialty) ||
-          "Public Guru profile",
-        href: slug ? `/guru/${slug}` : "/signup?role=pet_parent",
-        imageUrl:
-          text(row.profile_photo_url) ||
-          text(row.image_url) ||
-          text(row.photo_url) ||
-          text(row.avatar_url),
-        market: [city, state].filter(Boolean).join(", "),
-      };
-    });
+  const source = rows.length
+    ? rows
+    : await safeRows<AnyRow>(
+        supabaseAdmin.from("gurus").select(basic).order("created_at", { ascending: false }).limit(120),
+        "growth_gurus_basic",
+      );
+  return selectPromotableGurus(source);
 }
 
 export async function listPromotableEvents(): Promise<GrowthPromoteItem[]> {
@@ -387,7 +361,9 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
     conversionRate == null ? "—" : `${conversionRate.toFixed(1)}%`;
 
   const activeCampaigns = campaigns.filter((item) => item.status === "active");
-  const pending = content.filter((item) => item.status === "Needs CEO Review");
+  const pending = content.filter((item) =>
+    ["Submitted to Ava", "Needs CEO Review"].includes(item.status),
+  );
   const campaignsThisWeek = activeCampaigns.filter((item) =>
     inWindow(item.createdAt || "", thisWeekStart, nowIso),
   ).length;

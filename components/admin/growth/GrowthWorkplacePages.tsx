@@ -15,6 +15,7 @@ import {
   updateGrowthContentStatusAction,
   saveGrowthMediaAction,
 } from "@/lib/admin/growth/actions";
+import { contentStatusActions, contentStatusLabel } from "@/lib/internship/content-flow";
 import {
   GROWTH_CAMPAIGN_STATUSES,
   GROWTH_CREATE_KINDS,
@@ -109,7 +110,7 @@ export async function GrowthContentScreen({
     <GrowthPageFrame
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Content"
-      detail="Draft → submit → Jason approves → you publish. Account passwords stay with SitGuru."
+      detail="Draft, then submit to Ava. She approves routine posts or asks for changes. Jason only sees what Ava escalates. Passwords stay with SitGuru."
       action={<GrowthPrimaryLink href={growthHref(base, "/create")}>New post</GrowthPrimaryLink>}
     >
       <div className="space-y-3">
@@ -117,7 +118,7 @@ export async function GrowthContentScreen({
           <GrowthCard key={item.id}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-black text-slate-950">{item.title}</h2>
-              <StatusPill value={item.status} />
+              <StatusPill value={contentStatusLabel(item.status)} />
             </div>
             <p className="mt-1 text-sm font-semibold text-slate-600">
               {item.platform} · {item.audience}
@@ -128,35 +129,31 @@ export async function GrowthContentScreen({
                 {item.caption}
               </p>
             ) : null}
-            <form action={updateGrowthContentStatusAction} className="mt-4 flex flex-wrap gap-2">
+            <form action={updateGrowthContentStatusAction} className="mt-4 grid gap-2 sm:grid-cols-2">
               <input type="hidden" name="id" value={item.id} />
-              {item.status === "Draft" ? (
+              {contentStatusActions({
+                status: item.status,
+                actor: workplace.actor.kind === "intern"
+                  ? "intern"
+                  : workplace.actor.isSuperUser
+                    ? "supervisor"
+                    : "manager",
+              }).map((action) => (
                 <button
+                  key={action.status}
                   name="status"
-                  value="Needs CEO Review"
-                  className="min-h-11 rounded-2xl bg-amber-100 px-4 text-sm font-black text-amber-900"
+                  value={action.status}
+                  className="min-h-12 rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-950"
                 >
-                  Submit for review
+                  {action.label}
                 </button>
-              ) : null}
-              {workplace.canApprove && item.status !== "Ready" ? (
-                <button
-                  name="status"
-                  value="Ready"
-                  className="min-h-11 rounded-2xl px-4 text-sm font-black text-white"
-                  style={{ background: "#0D5C3A" }}
-                >
-                  Approve
-                </button>
-              ) : null}
-              <button
-                name="status"
-                value="Posted"
-                className="min-h-11 rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"
-              >
-                Mark posted
-              </button>
+              ))}
             </form>
+            {item.status === "Approved" || item.status === "Ready" || item.status === "Ready to Publish" ? (
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Approved posts can be marked ready, then published. Results stay a separate step.
+              </p>
+            ) : null}
           </GrowthCard>
         ))}
         {items.length === 0 ? (
@@ -183,7 +180,7 @@ export async function GrowthCampaignsScreen({
     <GrowthPageFrame
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Campaigns"
-      detail="Every real post gets a tracking link. Never send people to a bare SitGuru homepage."
+      detail="Every campaign post meant to drive a signup, referral, event, or partner visit should use an approved tracking link when it fits. Don’t count a result SitGuru can’t verify."
       action={<GrowthPrimaryLink href={growthHref(base, "/create")}>New campaign</GrowthPrimaryLink>}
     >
       <div className="space-y-3">
@@ -502,50 +499,67 @@ export async function GrowthAnalyticsScreen({
       </GrowthCard>
 
       <GrowthCard>
-        <h2 className="text-lg font-black text-slate-950">Friday report</h2>
+        <h2 className="text-lg font-black text-slate-950">Weekly check-in</h2>
+        {workplace.kind === "intern" ? (
+          <>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              One check-in covers this week. It is the same form as your intern portal, including what you learned and the report section you advanced.
+            </p>
+            <Link
+              href="/intern?tab=home#checkin"
+              className="mt-4 inline-flex min-h-12 items-center rounded-2xl px-4 text-sm font-black text-white"
+              style={{ background: "#0D5C3A" }}
+            >
+              Open weekly check-in
+            </Link>
+          </>
+        ) : (
+          <>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          One page. Posts, what worked, what did not, and three bullets for next week.
+          Ava and Jason can still note the marketing week here. Interns use the portal check-in instead of a second report.
         </p>
         <form action={submitFridayReportAction} className="mt-4 space-y-3">
           <input
             name="weekLabel"
             defaultValue="This week"
-            className="min-h-12 w-full rounded-2xl border border-emerald-100 px-4 text-sm font-semibold"
+            className="min-h-12 w-full rounded-2xl border border-emerald-100 px-4 text-base font-semibold"
           />
           <textarea
             name="posts"
             required
             rows={3}
             placeholder="Posts / Reels / Stories this week"
-            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-sm font-semibold"
+            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-base font-semibold"
           />
           <textarea
             name="best"
             rows={2}
             placeholder="Best campaign"
-            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-sm font-semibold"
+            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-base font-semibold"
           />
           <textarea
             name="worst"
             rows={2}
             placeholder="Worst campaign / blocker"
-            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-sm font-semibold"
+            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-base font-semibold"
           />
           <textarea
             name="next"
             required
             rows={3}
             placeholder="Next week — 3 bullets"
-            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-sm font-semibold"
+            className="w-full rounded-2xl border border-emerald-100 px-4 py-3 text-base font-semibold"
           />
           <button
             type="submit"
             className="min-h-12 w-full rounded-2xl text-sm font-black text-white sm:w-auto sm:px-6"
             style={{ background: "#0D5C3A" }}
           >
-            Send Friday report
+            Save team note
           </button>
         </form>
+          </>
+        )}
       </GrowthCard>
     </GrowthPageFrame>
   );

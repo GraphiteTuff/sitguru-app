@@ -35,6 +35,15 @@ export default function PromoteList({
                 {item.market}
               </p>
             ) : null}
+            {item.badges?.length ? (
+              <ul className="mt-2 flex flex-wrap gap-1">
+                {item.badges.map((badge) => (
+                  <li key={badge} className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-900">
+                    {badge}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href={createHref}

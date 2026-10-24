@@ -14,7 +14,7 @@ export function internshipWeekNumber(startDate?: string | null, today = new Date
   if (Number.isNaN(start.getTime())) return 1;
   const now = startOfDay(today);
   const diff = Math.floor((now.getTime() - start.getTime()) / 86400000);
-  if (diff < 0) return 1;
+  if (diff < 0) return 0;
   return Math.min(16, Math.floor(diff / 7) + 1);
 }
 
@@ -23,7 +23,16 @@ export function currentCapstoneWeek(startDate?: string | null, today = new Date(
 }
 
 export function currentSemesterDeliverable(startDate?: string | null, today = new Date()) {
-  const week = currentCapstoneWeek(startDate, today);
+  const weekNumber = internshipWeekNumber(startDate, today);
+  if (weekNumber <= 0) {
+    return {
+      id: "start_here",
+      timing: "Week 0",
+      title: "Start here",
+      demonstrates: "Finish Start Here. Week 1 begins after that, on your internship start date.",
+    };
+  }
+  const week = capstoneWeekForNumber(weekNumber);
   return {
     id: week.section,
     timing: `Week ${week.week}`,

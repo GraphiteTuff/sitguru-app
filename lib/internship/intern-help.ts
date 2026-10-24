@@ -1155,7 +1155,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         caption: "Guessing does not count.",
       },
     ],
-    note: "No growth result is counted as attributable unless SitGuru can reasonably verify it through platform analytics, campaign tracking, referral codes, CRM records, or another approved source.",
+    note: "Every campaign post intended to drive a measurable action should use an approved tracking mechanism when technically appropriate. No growth result is counted as attributable unless SitGuru can reasonably verify it through platform analytics, campaign tracking, referral codes, CRM records, or another approved source.",
   }),
   article("toolkit-brand", {
     title: "Use the brand kit",

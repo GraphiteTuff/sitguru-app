@@ -63,6 +63,7 @@ export default function InternshipAssignmentReview({
   metrics = [],
   smartGoals = [],
   experiments = [],
+  reviewStage,
 }: {
   internId: string;
   mode: "intern" | "supervisor";
@@ -85,11 +86,12 @@ export default function InternshipAssignmentReview({
   metrics?: InternshipMetric[];
   smartGoals?: InternshipSmartGoal[];
   experiments?: InternshipExperiment[];
+  reviewStage?: string;
 }) {
   const supervisor = mode === "supervisor";
-  const closed = status === "approved" || status === "not_accepted";
-  const awaiting = status === "submitted";
-  const needsRevision = status === "revision_requested";
+  const closed = status === "approved" || status === "not_accepted" || status === "ava_approved" || status === "ceo_approved";
+  const awaiting = status === "submitted" || status === "submitted_to_ava" || status === "submitted_to_jason";
+  const needsRevision = status === "revision_requested" || status === "changes_requested";
   const itemComments = comments.filter((row) => row.itemId === id);
   const baselineBrief =
     itemType === "task" &&
@@ -103,7 +105,7 @@ export default function InternshipAssignmentReview({
         <div className="min-w-0">
           <h3 className="break-words font-black text-slate-950">{title}</h3>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            {taskStatusLabel(status)}
+            {taskStatusLabel(status, reviewStage || task?.reviewStage)}
             {kpiTier ? ` · ${TIER_LABELS[kpiTier] || kpiTier}` : ""}
           </p>
         </div>
