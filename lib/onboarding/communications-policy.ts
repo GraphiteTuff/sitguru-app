@@ -1,7 +1,7 @@
 export const COMMUNICATIONS_POLICY = [
-  "SitGuru Messaging is the business channel for authorized work with the founder, the Growth Team, interns, Pet Parents, Gurus, Ambassadors, and partners.",
-  "Messages may be retained. Authorized SitGuru administrators may review them for safety, security, professional conduct, compliance, trust and safety, investigations, and operational needs.",
-  "Do not use SitGuru systems for personal conversations you expect to remain private. Do not send passwords, payment credentials, tax or bank information, or unnecessary customer information.",
-  "Microsoft Teams is for meetings, video, and screen sharing. Planner tracks tasks and deadlines. SharePoint holds official documents. Outlook is for formal email. SitGuru Timekeeper, when enabled, is the record of hours worked.",
-  "The Growth Manager assigns intern messaging permissions, reviews early outreach, and escalates serious concerns. Community messages stay inside approved authority. Do not make legal, financial, refund, partnership, or policy commitments from chat.",
+  "SitGuru Messaging is the day-to-day channel for the founder, the Growth Manager, assigned interns, and authorized community conversations.",
+  "A message to a community member is visible to that person. An internal note is for the SitGuru team only and is never delivered outside the team.",
+  "Interns message the community only at the permission their manager sets. Early work can require review. Later work can be independent within guardrails.",
+  "Authorized administrators may retain and review company messages for safety, security, conduct, compliance, and investigations. Do not use SitGuru for personal conversations you expect to stay private.",
+  "Do not put passwords, payment data, tax or bank information, or unnecessary customer information in a message. Official files belong in SharePoint. Tasks belong in Planner. Meetings belong in Teams.",
 ];

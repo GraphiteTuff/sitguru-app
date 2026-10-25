@@ -60,6 +60,15 @@ export default async function InternManagerPage({
     <main className="mx-auto w-full max-w-[1100px] overflow-x-hidden px-3 py-4 sm:px-5">
       <section className="mb-4 grid gap-3">
         <h2 className="text-lg font-black text-slate-950">Intern time and onboarding</h2>
+        <article className="rounded-2xl border border-emerald-100 bg-[#FAF6EE] p-4">
+          <h3 className="font-black text-slate-950">Creative freedom</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">Most meaningful intern work should be Explore or Guided. Planner holds the assignment. You coach the thinking.</p>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+            <li className="rounded-2xl bg-white p-3"><p className="font-black text-slate-950">Explore</p><p className="mt-1 text-sm font-semibold text-slate-600">Give the problem and the guardrails. The intern proposes the approach.</p></li>
+            <li className="rounded-2xl bg-white p-3"><p className="font-black text-slate-950">Guided</p><p className="mt-1 text-sm font-semibold text-slate-600">Give the objective and audience. The intern owns the creative execution.</p></li>
+            <li className="rounded-2xl bg-white p-3"><p className="font-black text-slate-950">Directed</p><p className="mt-1 text-sm font-semibold text-slate-600">Use only when compliance, a deadline, or an approved output must be followed exactly.</p></li>
+          </ul>
+        </article>
         {readiness.map((intern) => (
           <article key={intern.id} className="rounded-2xl border border-emerald-100 bg-white p-4">
             <p className="font-black text-slate-950">{intern.name}</p>

@@ -14,6 +14,7 @@ const ALLOWED = new Set([
   "independent-contractor-agreement-v1.pdf",
   "intern-leadership-guide-v1.pdf",
   "approved-systems-policy-v1.pdf",
+  "messaging-communications-policy-v1.pdf",
   "onboarding-policy-acknowledgment-v1.pdf",
 ]);
 

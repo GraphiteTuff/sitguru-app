@@ -174,7 +174,7 @@ join (values
   ('intern-leadership-guide', 'private/onboarding/intern-leadership-guide-v1.pdf'),
   ('approved-systems-policy', 'private/onboarding/approved-systems-policy-v1.pdf'),
   ('onboarding-policy-acknowledgment', 'private/onboarding/onboarding-policy-acknowledgment-v1.pdf'),
-  ('messaging-communications-policy', ''),
+  ('messaging-communications-policy', 'private/onboarding/messaging-communications-policy-v1.pdf'),
   ('timekeeper-orientation', '')
 ) as v(slug, storage_ref) on v.slug = d.slug
 where not exists (

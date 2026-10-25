@@ -23,6 +23,7 @@ import {
   documentationGrowthContent,
   documentationGrowthHomeStats,
 } from "@/lib/internship/documentation-fixture";
+import { GrowthOperatingGuide } from "@/components/admin/growth/GrowthOperatingGuide";
 import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
 import {
   growthHref,
@@ -177,6 +178,7 @@ export async function GrowthWorkplaceHome({
           ))}
         </section>
       ) : null}
+      {!intern ? <GrowthOperatingGuide /> : null}
       {!intern && parents && parents.new24h > 0 ? (
         workplace.actor.isSuperUser ? (
           <Link
