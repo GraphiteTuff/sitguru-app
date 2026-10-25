@@ -135,8 +135,8 @@ export async function GrowthWorkplaceHome({
       title="Turn SitGuru stories into Pet Parents."
       detail={
         intern
-          ? "Drafts go to Ava first. No Admin HQ, passwords, or Pet Parent private records."
-          : "This is the workbench. Create, post, and watch signups — not follower counts."
+          ? "Drafts go to your manager first. No Admin HQ, passwords, or Pet Parent private records."
+          : "This is home. Messages, the intern team, time, and onboarding are one tap away."
       }
       action={
         intern ? (
@@ -156,6 +156,27 @@ export async function GrowthWorkplaceHome({
         )
       }
     >
+      {!intern ? (
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            ["/admin/growth/messages", "Messages"],
+            ["/intern/manage", "Intern team"],
+            ["/admin/growth/time", "My time"],
+            ["/admin/growth/onboarding", "Onboarding"],
+            ...(workplace.actor.isSuperUser
+              ? [
+                  ["/admin/internship/time", "Approve hours"],
+                  ["/admin/hr/onboarding", "People"],
+                  ["/admin/messages/moderation", "Reports"],
+                ]
+              : []),
+          ].map(([href, label]) => (
+            <Link key={href} href={href} className="flex min-h-16 items-center justify-center rounded-2xl border border-emerald-100 bg-white px-3 text-center text-sm font-black text-emerald-950">
+              {label}
+            </Link>
+          ))}
+        </section>
+      ) : null}
       {!intern && parents && parents.new24h > 0 ? (
         workplace.actor.isSuperUser ? (
           <Link

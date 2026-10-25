@@ -99,10 +99,13 @@ export async function grantGrowthHireAccess(input: {
   if (!found.userId && input.invite) {
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${getPublicSiteUrl()}/admin/growth`,
-      data: {
-        full_name: input.name || GROWTH_HIRE_TITLE,
-        sitguru_role: GROWTH_HIRE_ROLE,
-      },
+        data: {
+          full_name: input.name || GROWTH_HIRE_TITLE,
+          role: GROWTH_HIRE_ROLE,
+          signup_role: GROWTH_HIRE_ROLE,
+          account_type: GROWTH_HIRE_ROLE,
+          sitguru_role: GROWTH_HIRE_ROLE,
+        },
     });
 
     if (error && !error.message.toLowerCase().includes("already")) {
@@ -172,7 +175,13 @@ export async function grantGrowthHireAccess(input: {
       if (profile?.id) {
         await supabaseAdmin
           .from("profiles")
-          .update({ full_name: displayName, role: GROWTH_HIRE_ROLE, is_active: true })
+          .update({
+            full_name: displayName,
+            role: GROWTH_HIRE_ROLE,
+            signup_role: GROWTH_HIRE_ROLE,
+            account_type: GROWTH_HIRE_ROLE,
+            is_active: true,
+          })
           .eq("id", found.userId);
       } else {
         await supabaseAdmin.from("profiles").insert({
@@ -180,6 +189,8 @@ export async function grantGrowthHireAccess(input: {
           email,
           full_name: displayName,
           role: GROWTH_HIRE_ROLE,
+          signup_role: GROWTH_HIRE_ROLE,
+          account_type: GROWTH_HIRE_ROLE,
           is_active: true,
         });
       }

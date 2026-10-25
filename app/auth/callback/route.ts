@@ -164,7 +164,16 @@ function getIntentRedirectPath(intent: AccountIntent) {
   return fallbackRoutes.customerProfile;
 }
 
+function isGrowthManagerRole(value: unknown) {
+  const role = normalizeRole(value);
+  return role === "social_community_manager" || role === "social_growth_manager";
+}
+
 function getRoleRedirectPath(role: unknown, accountType?: unknown) {
+  if (isGrowthManagerRole(role) || isGrowthManagerRole(accountType)) {
+    return "/admin/growth";
+  }
+
   if (isAdminRole(role) || isAdminRole(accountType)) {
     return fallbackRoutes.admin;
   }

@@ -110,27 +110,28 @@ const adminRoutes = {
 
 const growthNavSections = [
   {
-    title: "Growth Portal",
+    title: "Growth",
     items: [
       { label: "Home", href: adminRoutes.growth, icon: Home },
-      { label: "Create", href: adminRoutes.growthCreate, icon: Plus },
+      { label: "Messages", href: "/admin/growth/messages", icon: MessageCircle },
+      { label: "Intern team", href: "/intern/manage", icon: Users },
+      { label: "Time", href: "/admin/growth/time", icon: ClipboardCheck },
+      { label: "Onboarding", href: "/admin/growth/onboarding", icon: GraduationCap },
       { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
       { label: "Content", href: adminRoutes.growthContent, icon: FolderOpen },
-      { label: "Gurus", href: adminRoutes.growthGurus, icon: PawPrint },
       { label: "Events", href: adminRoutes.growthEvents, icon: CalendarDays },
       { label: "Partners", href: adminRoutes.growthPartners, icon: HandCoins },
-      { label: "Media", href: adminRoutes.growthMedia, icon: Images },
-      { label: "Analytics", href: adminRoutes.growthAnalytics, icon: BarChart3 },
+      { label: "Create", href: adminRoutes.growthCreate, icon: Plus },
     ],
   },
 ];
 
 const growthHeaderLinks = [
   { label: "Home", href: adminRoutes.growth },
-  { label: "Create", href: adminRoutes.growthCreate },
-  { label: "Campaigns", href: adminRoutes.growthCampaigns },
-  { label: "Content", href: adminRoutes.growthContent },
-  { label: "Analytics", href: adminRoutes.growthAnalytics },
+  { label: "Messages", href: "/admin/growth/messages" },
+  { label: "Intern team", href: "/intern/manage" },
+  { label: "Time", href: "/admin/growth/time" },
+  { label: "Onboarding", href: "/admin/growth/onboarding" },
 ];
 
 const navSections = [

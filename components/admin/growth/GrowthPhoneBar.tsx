@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   BarChart3,
+  CalendarDays,
   FolderOpen,
+  Handshake,
   Home,
   Images,
   Megaphone,
+  MessageCircle,
   Plus,
   Users,
-  CalendarDays,
-  Handshake,
+  ClipboardCheck,
 } from "lucide-react";
 
 const suffixes = {
@@ -44,19 +46,43 @@ export default function GrowthPhoneBar({
   basePath?: string;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const primary = [
-    { suffix: suffixes.home, label: "Home", icon: Home },
-    { suffix: suffixes.campaigns, label: "Campaigns", icon: Megaphone },
-    { suffix: suffixes.media, label: "Media", icon: Images },
-  ];
-  const moreLinks = [
-    { suffix: suffixes.create, label: "Create", icon: Plus },
-    { suffix: suffixes.content, label: "Content", icon: FolderOpen },
-    { suffix: suffixes.gurus, label: "Gurus", icon: Users },
-    { suffix: suffixes.events, label: "Events", icon: CalendarDays },
-    { suffix: suffixes.partners, label: "Partners", icon: Handshake },
-    { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3 },
-  ];
+  const staffHome = basePath === "/admin/growth";
+  const primary = staffHome
+    ? [
+        { suffix: suffixes.home, label: "Home", icon: Home, href: "" },
+        { suffix: "/messages", label: "Messages", icon: MessageCircle, href: "" },
+        { suffix: "", label: "Interns", icon: Users, href: "/intern/manage" },
+      ]
+    : [
+        { suffix: suffixes.home, label: "Home", icon: Home, href: "" },
+        { suffix: suffixes.campaigns, label: "Campaigns", icon: Megaphone, href: "" },
+        { suffix: suffixes.media, label: "Media", icon: Images, href: "" },
+      ];
+  const moreLinks = staffHome
+    ? [
+        { suffix: "/time", label: "Time", icon: ClipboardCheck, href: "" },
+        { suffix: "/onboarding", label: "Onboarding", icon: ClipboardCheck, href: "" },
+        { suffix: suffixes.create, label: "Create", icon: Plus, href: "" },
+        { suffix: suffixes.content, label: "Content", icon: FolderOpen, href: "" },
+        { suffix: suffixes.events, label: "Events", icon: CalendarDays, href: "" },
+        { suffix: suffixes.partners, label: "Partners", icon: Handshake, href: "" },
+      ]
+    : [
+        { suffix: suffixes.create, label: "Create", icon: Plus, href: "" },
+        { suffix: suffixes.content, label: "Content", icon: FolderOpen, href: "" },
+        { suffix: suffixes.gurus, label: "Gurus", icon: Users, href: "" },
+        { suffix: suffixes.events, label: "Events", icon: CalendarDays, href: "" },
+        { suffix: suffixes.partners, label: "Partners", icon: Handshake, href: "" },
+        { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3, href: "" },
+      ];
+  function targetOf(item: { suffix: string; href?: string }) {
+    return item.href || href(basePath, item.suffix);
+  }
+  function activeOf(item: { suffix: string; href?: string }) {
+    const target = targetOf(item);
+    if (item.href) return pathname === target || pathname.startsWith(`${target}/`);
+    return isActive(pathname, basePath, item.suffix);
+  }
 
   return (
     <div className="lg:hidden">
@@ -67,8 +93,8 @@ export default function GrowthPhoneBar({
             <div className="grid grid-cols-2 gap-2">
               {moreLinks.map((item) => {
                 const Icon = item.icon;
-                const target = href(basePath, item.suffix);
-                const active = isActive(pathname, basePath, item.suffix);
+                const target = targetOf(item);
+                const active = activeOf(item);
                 return (
                   <Link
                     key={target}
@@ -94,8 +120,8 @@ export default function GrowthPhoneBar({
         <div className="mx-auto flex max-w-lg items-end justify-between gap-1">
           {primary.slice(0, 2).map((item) => {
             const Icon = item.icon;
-            const target = href(basePath, item.suffix);
-            const active = isActive(pathname, basePath, item.suffix);
+            const target = targetOf(item);
+            const active = activeOf(item);
             return (
               <Link
                 key={target}
@@ -121,8 +147,8 @@ export default function GrowthPhoneBar({
 
           {primary.slice(2).map((item) => {
             const Icon = item.icon;
-            const target = href(basePath, item.suffix);
-            const active = isActive(pathname, basePath, item.suffix);
+            const target = targetOf(item);
+            const active = activeOf(item);
             return (
               <Link
                 key={target}
