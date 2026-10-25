@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/*": ["./public/videos/**/*", "./sitguru-mobile/**/*"],
   },
+  outputFileTracingIncludes: {
+    "/api/onboarding/file": ["./private/onboarding/**/*"],
+  },
 
   turbopack: {
     root: process.cwd(),

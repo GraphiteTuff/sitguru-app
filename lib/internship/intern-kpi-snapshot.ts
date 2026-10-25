@@ -4,6 +4,7 @@ import {
   emptyInternSocialCounts,
   internCampaignMatchesClick,
   internSocialPlatformFromText,
+  isPublicSocialReferralClick,
   type InternSafeKpiSnapshot,
 } from "@/lib/internship/intern-kpis";
 import type { InternshipCampaign } from "@/lib/internship/types";
@@ -35,7 +36,7 @@ async function safeReferralClicks() {
   try {
     const { data, error } = await supabaseAdmin
       .from("referral_clicks")
-      .select("utm_source, utm_medium, utm_campaign, landing_page");
+      .select("utm_source, utm_medium, utm_campaign, landing_page, referrer");
     if (error) return [];
     return data || [];
   } catch {
@@ -75,13 +76,16 @@ export async function loadInternSafeKpiSnapshot(input?: {
   const campaigns = input?.campaigns || [];
 
   for (const row of clicks as Array<Record<string, unknown>>) {
+    const landing = String(row.landing_page || "");
+    if (!isPublicSocialReferralClick({ referrer: String(row.referrer || ""), landingPage: landing })) {
+      continue;
+    }
     const platform = internSocialPlatformFromText(
-      String(row.utm_source || row.landing_page || ""),
+      String(row.utm_source || landing || ""),
     );
     if (!platform) continue;
     const medium = String(row.utm_medium || "").toLowerCase();
-    const landing = String(row.landing_page || "").toLowerCase();
-    const isQr = medium === "qr" || landing.includes("via=qr");
+    const isQr = medium === "qr" || landing.toLowerCase().includes("via=qr");
     if (isQr) social[platform].scans += 1;
     else social[platform].visits += 1;
     if (

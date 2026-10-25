@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
-import { resolveDashboardRoleFromPath } from "@/lib/dashboard/role-switch";
+import {
+  resolveDashboardRoleFromPath,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import {
   ChevronDown,
@@ -178,7 +181,13 @@ function getAdminAccountFromEmail(email?: string | null): AdminAccount {
   };
 }
 
-const FOUNDER_ROLES = ["parent", "guru", "ambassador", "admin"] as const;
+const FOUNDER_ROLES: DashboardSwitchRole[] = [
+  "parent",
+  "guru",
+  "ambassador",
+  "intern",
+  "admin",
+];
 
 export default function AdminAccountMenu() {
   const router = useRouter();
@@ -191,9 +200,13 @@ export default function AdminAccountMenu() {
   );
   const [growthOnly, setGrowthOnly] = useState(false);
 
+  const visibleRoleLabel = growthOnly
+    ? "Social & Growth Manager"
+    : account.roleLabel;
+
   const topButtonRoleLabel = useMemo(() => {
-    return account.roleLabel.replace("SitGuru ", "");
-  }, [account.roleLabel]);
+    return visibleRoleLabel.replace("SitGuru ", "");
+  }, [visibleRoleLabel]);
 
   useEffect(() => {
     let mounted = true;
@@ -246,7 +259,7 @@ export default function AdminAccountMenu() {
         if (data.workspace === "growth") {
           setAccount((current) => ({
             ...current,
-            roleLabel: "Social & Community",
+            roleLabel: "Social & Growth Manager",
           }));
         }
       })
@@ -306,11 +319,11 @@ export default function AdminAccountMenu() {
     router.refresh();
   }
 
-  const adminSwitchRoles = isSitGuruSuperUser(account.email)
+  const adminSwitchRoles: DashboardSwitchRole[] = isSitGuruSuperUser(account.email)
     ? FOUNDER_ROLES
     : growthOnly
-      ? ([] as const)
-      : (["parent", "admin"] as const);
+      ? ["growth"]
+      : ["parent", "admin"];
 
   return (
     <div ref={menuRef} className="relative shrink-0">
@@ -376,7 +389,7 @@ export default function AdminAccountMenu() {
                 </p>
 
                 <p className="mt-1 text-base font-black text-green-800">
-                  {account.roleLabel}
+                  {visibleRoleLabel}
                 </p>
               </div>
             </div>

@@ -31,7 +31,14 @@ import {
 } from "@/lib/pet-parent-avatar";
 import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 
-type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "intern" | "admin";
+type HeaderMode =
+  | "public"
+  | "customer"
+  | "guru"
+  | "ambassador"
+  | "intern"
+  | "growth"
+  | "admin";
 
 type HeaderUser = {
   id?: string | null;
@@ -230,6 +237,13 @@ function isBothRole(value?: string | null) {
 
 function normalizeStoredRole(value?: string | null) {
   const role = normalizeRole(value);
+  if (
+    role === "growth" ||
+    role === "social_community_manager" ||
+    role === "social_growth_manager"
+  ) {
+    return "growth";
+  }
   if (isAdminRole(role)) return "admin";
   if (isAmbassadorRole(role)) return "ambassador";
   if (isBothRole(role)) return "both";
@@ -249,6 +263,7 @@ function getHeaderMode({
 }): HeaderMode {
   const path = pathname || "";
   if (!isLoggedIn) return "public";
+  if (path.startsWith("/admin/growth")) return "growth";
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/intern")) return "intern";
   if (path.startsWith("/ambassador")) return "ambassador";
@@ -272,6 +287,7 @@ function getHeaderMode({
     return "customer";
   }
   if (storedRole === "admin") return "admin";
+  if (storedRole === "growth") return "growth";
   if (storedRole === "ambassador") return "ambassador";
   if (storedRole === "guru") return "guru";
   return "customer";
@@ -424,6 +440,7 @@ function headerModeToSwitchRole(
   if (headerMode === "guru") return "guru";
   if (headerMode === "ambassador") return "ambassador";
   if (headerMode === "intern") return "intern";
+  if (headerMode === "growth") return "growth";
   if (headerMode === "admin") return "admin";
   return null;
 }
@@ -563,13 +580,16 @@ export default function Header({ user = null }: HeaderProps) {
 
         const accessFlags = accessFlagsFromAuthorizedRoles(authorizedRoles);
         const hasAdminAccess = Boolean(accessFlags.admin);
+        const hasGrowthAccess = Boolean(accessFlags.growth);
         const hasGuruAccess = Boolean(accessFlags.guru);
         const hasAmbassadorAccess = Boolean(accessFlags.ambassador);
         const hasCustomerAccess = Boolean(accessFlags.parent);
 
         const rawRole = hasAdminAccess
           ? "admin"
-          : hasGuruAccess && hasCustomerAccess
+          : hasGrowthAccess
+            ? "growth"
+            : hasGuruAccess && hasCustomerAccess
             ? "both"
             : hasAmbassadorAccess && !hasGuruAccess && !hasCustomerAccess
               ? "ambassador"
@@ -655,6 +675,7 @@ export default function Header({ user = null }: HeaderProps) {
   const isGuru = headerMode === "guru";
   const isAmbassador = headerMode === "ambassador";
   const isIntern = headerMode === "intern";
+  const isGrowth = headerMode === "growth";
   const isAdmin = headerMode === "admin";
 
   const authorizedRoles = activeUser?.authorizedRoles || [];
@@ -678,6 +699,8 @@ export default function Header({ user = null }: HeaderProps) {
 
   const displayRole = isGuru
     ? "SitGuru Guru"
+    : isGrowth
+      ? "Social & Growth Manager"
     : isAdmin
       ? "SitGuru Admin"
       : isAmbassador

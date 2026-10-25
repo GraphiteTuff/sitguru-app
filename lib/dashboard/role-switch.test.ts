@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolveAuthorizedRolesFromProfile } from "./role-switch";
+import {
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  resolveDashboardRoleFromPath,
+} from "./role-switch";
 
 describe("founder personal marketplace roles", () => {
   it("gives jasongraff1978@gmail.com Pet Parent, Guru, Ambassador, and Intern — not Admin", () => {
@@ -10,23 +14,33 @@ describe("founder personal marketplace roles", () => {
     assert.deepEqual(roles, ["parent", "guru", "ambassador", "intern"]);
   });
 
-  it("keeps jason@sitguru.com as HQ with Admin included and Intern only when assigned", () => {
+  it("lets the HQ login switch to Intern, Pet Parent, Guru, Ambassador, and Admin", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "jason@sitguru.com",
     });
-    assert.deepEqual(roles, ["parent", "guru", "ambassador", "admin"]);
-
-    const assigned = resolveAuthorizedRolesFromProfile({
-      email: "jason@sitguru.com",
-      hasInternRecord: true,
-    });
-    assert.deepEqual(assigned, [
+    assert.deepEqual(roles, [
       "parent",
       "guru",
       "ambassador",
       "intern",
       "admin",
     ]);
+  });
+
+  it("gives the Social & Growth Manager that workspace and not full Admin", () => {
+    const roles = resolveAuthorizedRolesFromProfile({
+      email: "growth.manager@sitguru.com",
+      roleRows: ["social_community_manager"],
+    });
+    assert.deepEqual(roles, ["growth"]);
+    const switches = getAvailableDashboardSwitches({
+      currentRole: "parent",
+      authorizedRoles: roles,
+    });
+    assert.equal(switches[0]?.shortLabel, "Social & Growth Manager");
+    assert.equal(switches[0]?.path, "/admin/growth");
+    assert.equal(resolveDashboardRoleFromPath("/admin/growth"), "growth");
+    assert.equal(resolveDashboardRoleFromPath("/admin/hr"), "admin");
   });
 
   it("adds Intern for assigned marketplace accounts without Admin", () => {

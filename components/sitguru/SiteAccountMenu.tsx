@@ -149,6 +149,8 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
         ? "SitGuru Ambassador"
         : currentRole === "intern"
           ? "SitGuru Intern"
+          : currentRole === "growth"
+            ? "Social & Growth Manager"
           : currentRole === "parent"
             ? "SitGuru Pet Parent"
             : currentRole === "admin"
@@ -161,6 +163,8 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
         ? "/ambassador/dashboard"
         : currentRole === "intern"
           ? "/intern"
+          : currentRole === "growth"
+            ? "/admin/growth"
           : currentRole === "admin"
             ? "/admin"
             : "/customer/dashboard";

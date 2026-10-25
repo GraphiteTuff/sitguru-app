@@ -108,6 +108,12 @@ export async function GrowthWorkplaceHome({
     { href: growthHref(base, "/campaigns"), label: "Campaigns", detail: "Copy tracking links", icon: Megaphone },
     { href: growthHref(base, "/content"), label: "Content calendar", detail: "This week’s posts", icon: Sparkles },
     { href: growthHref(base, "/analytics"), label: intern ? "Weekly check-in" : "Week note", detail: intern ? "Same check-in as the portal" : "Team note, not a second intern report", icon: BarChart3 },
+    ...(intern
+      ? []
+      : [
+          { href: growthHref(base, "/onboarding"), label: "Your onboarding", detail: "Agreement, reviews, and acknowledgment", icon: ClipboardCheck },
+          { href: growthHref(base, "/messages"), label: "Messages", detail: "Growth team and community inbox", icon: Megaphone },
+        ]),
   ];
 
   const todayContent = content.filter((item) => item.plannedDate?.slice(0, 10) === today);

@@ -96,6 +96,34 @@ export type InternKpiCard = {
   attributed: number;
 };
 
+export function socialReferralCodeFromLanding(landingPage: string | null | undefined) {
+  const match = String(landingPage || "").match(/\/r\/social\/([^/?#]+)/i);
+  if (!match?.[1]) return "";
+  try {
+    return decodeURIComponent(match[1]).trim().toLowerCase();
+  } catch {
+    return match[1].trim().toLowerCase();
+  }
+}
+
+/** Company social totals count public arrivals, not someone opening the link from SitGuru. */
+export function isPublicSocialReferralClick(row: {
+  referrer?: string | null;
+  landingPage?: string | null;
+}) {
+  const referrer = String(row.referrer || "").trim().toLowerCase();
+  if (
+    referrer.includes("sitguru.com") ||
+    referrer.includes("localhost") ||
+    referrer.includes("127.0.0.1")
+  ) {
+    return false;
+  }
+  const code = socialReferralCodeFromLanding(row.landingPage);
+  if (code.includes("test")) return false;
+  return true;
+}
+
 export function internSocialPlatformFromText(value: string | null | undefined) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return null;
@@ -191,7 +219,7 @@ export function buildInternKpiBoard(input: {
         : kpi.group === "social"
           ? attributed
             ? `${attributed.toLocaleString()} from your tracking links`
-            : "SitGuru visits and QR scans"
+            : "Public visits and QR scans"
           : input.snapshot.marketLabel;
 
     return {

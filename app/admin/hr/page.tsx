@@ -477,6 +477,68 @@ export default async function AdminHrPage() {
 
       <AdminWorkplaceActions actions={actions} />
 
+      <section className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <GrowthCard className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+            Contractor seat
+          </p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">
+            Social Media & Community Growth Manager
+          </h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+            This login opens the Growth Workspace and the assigned intern desk.
+            It does not open HR, financials, bookings, Pet Parents, the user
+            directory, or settings.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {[
+              ["/admin/hr/growth-hire", "Create or update this login"],
+              ["/admin/growth", "Open the Growth Workspace"],
+              ["/admin/growth/onboarding", "Onboarding checklist"],
+              ["/admin/growth/messages", "Growth messages"],
+              ["/intern/manage", "Open the assigned intern desk"],
+            ].map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex min-h-11 items-center rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-black text-slate-900 hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </GrowthCard>
+        <GrowthCard className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+            No Admin login
+          </p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">Interns</h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+            Interns work in the Intern Portal. You manage records, assignment,
+            and formal approval here. Their manager only sees interns assigned
+            to them.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {[
+              ["/admin/internship/interns", "Intern records and invites"],
+              ["/admin/internship/staff", "Who can manage or supervise"],
+              ["/admin/hr/onboarding", "People and onboarding"],
+              ["/admin/messages/moderation", "Message reports"],
+              ["/admin/internship", "Internship program"],
+              ["/intern", "Intern Portal"],
+            ].map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex min-h-11 items-center rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-black text-slate-900 hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </GrowthCard>
+      </section>
+
       {internshipMilestones.length ? (
         <GrowthCard className="min-w-0">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

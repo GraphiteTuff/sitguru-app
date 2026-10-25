@@ -9,7 +9,6 @@ export const GROWTH_ALLOWED_ADMIN_PREFIXES = [
   "/admin/referrals",
   "/admin/market-growth",
   "/admin/partners",
-  "/admin/internship",
 ] as const;
 
 function normalizeRole(role: string | null | undefined) {

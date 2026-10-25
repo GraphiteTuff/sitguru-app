@@ -11,6 +11,7 @@ export type DashboardSwitchRole =
   | "guru"
   | "ambassador"
   | "intern"
+  | "growth"
   | "admin";
 
 export type DashboardSwitchTarget = {
@@ -51,6 +52,13 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
     helper: "Internship portal, weekly tasks, and growth work",
   },
   {
+    id: "growth",
+    label: "Switch to Social & Growth Manager",
+    shortLabel: "Social & Growth Manager",
+    path: "/admin/growth",
+    helper: "Campaigns, community, content, and assigned intern leadership",
+  },
+  {
     id: "admin",
     label: "Admin Dashboard",
     shortLabel: "Admin",
@@ -64,6 +72,7 @@ export type DashboardAccessFlags = {
   guru?: boolean;
   ambassador?: boolean;
   intern?: boolean;
+  growth?: boolean;
   admin?: boolean;
 };
 
@@ -72,6 +81,7 @@ const ROLE_ORDER: DashboardSwitchRole[] = [
   "guru",
   "ambassador",
   "intern",
+  "growth",
   "admin",
 ];
 
@@ -79,6 +89,7 @@ const SUPER_USER_SWITCH_ROLES: DashboardSwitchRole[] = [
   "parent",
   "guru",
   "ambassador",
+  "intern",
   "admin",
 ];
 
@@ -118,6 +129,14 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
 
   if (raw === "intern" || raw === "internship" || raw === "internship_intern") {
     return ["intern"];
+  }
+
+  if (
+    raw === "social_community_manager" ||
+    raw === "social_growth_manager" ||
+    raw === "growth_manager"
+  ) {
+    return ["growth"];
   }
 
   if (
@@ -204,6 +223,7 @@ export function accessFlagsFromAuthorizedRoles(
     guru: roles.includes("guru"),
     ambassador: roles.includes("ambassador"),
     intern: roles.includes("intern"),
+    growth: roles.includes("growth"),
     admin: roles.includes("admin"),
   };
 }
@@ -217,6 +237,7 @@ export function authorizedRolesFromAccessFlags(
   if (access.guru) roles.push("guru");
   if (access.ambassador) roles.push("ambassador");
   if (access.intern) roles.push("intern");
+  if (access.growth) roles.push("growth");
   if (access.admin) roles.push("admin");
   return roles;
 }
@@ -242,9 +263,7 @@ export function resolveAuthorizedRolesFromProfile(input: {
     (typeof metadata.email === "string" ? metadata.email : null);
 
   if (isSitGuruSuperUser(email)) {
-    const roles = [...SUPER_USER_SWITCH_ROLES];
-    if (input.hasInternRecord) roles.splice(3, 0, "intern");
-    return uniqueOrderedRoles(roles);
+    return uniqueOrderedRoles([...SUPER_USER_SWITCH_ROLES]);
   }
 
   if (isFounderPersonalMarketplaceEmail(email)) {
@@ -332,6 +351,7 @@ export function resolveDashboardRoleFromPath(
   pathname: string | null | undefined,
 ): DashboardSwitchRole | null {
   const path = String(pathname || "");
+  if (path.startsWith("/admin/growth")) return "growth";
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/intern")) return "intern";
   if (path.startsWith("/ambassador")) return "ambassador";
