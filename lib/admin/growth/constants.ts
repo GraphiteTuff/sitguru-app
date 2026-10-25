@@ -33,6 +33,12 @@ export const GROWTH_CREATE_KINDS = [
     destination: "/signup?role=pet_parent",
   },
   {
+    value: "ambassador",
+    label: "Ambassador",
+    detail: "Recruit or spotlight Ambassadors and referral growth.",
+    destination: "/programs/ambassadors",
+  },
+  {
     value: "pet_parent",
     label: "Pet Parent",
     detail: "Straight signup CTA for Pet Parents.",

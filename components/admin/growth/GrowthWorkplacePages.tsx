@@ -309,8 +309,11 @@ export async function GrowthPromoteScreen({
         }
       : kind === "event"
         ? {
-            title: "Events",
-            detail: "Promote local pet events. Send people to the event page with a tracking link.",
+            title: "Community & Events",
+            detail:
+              workplace.kind === "intern"
+                ? "Promote local pet events with tracking links. Managers record day-of leads from Admin."
+                : "Promote events from a phone or tablet. Record Pet Parent, Guru, and Ambassador leads on event day without desktop tables.",
             empty: "No published events yet. Add one in Community Events, then come back here.",
           }
         : {
@@ -324,12 +327,20 @@ export async function GrowthPromoteScreen({
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title={copy.title}
       detail={copy.detail}
+      action={
+        kind === "event" && workplace.kind !== "intern" ? (
+          <GrowthPrimaryLink href="/admin/sales-marketing/lead-entry">
+            Record event results
+          </GrowthPrimaryLink>
+        ) : undefined
+      }
     >
       <PromoteList
         items={items}
         kind={kind}
         empty={copy.empty}
         basePath={workplace.basePath}
+        showEventDayActions={kind === "event" && workplace.kind !== "intern"}
       />
     </GrowthPageFrame>
   );
@@ -446,25 +457,26 @@ export async function GrowthAnalyticsScreen({
   ]);
 
   const kpis = [
-    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} />, trend: stats.trends.petParents },
-    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} />, trend: stats.trends.gurus },
-    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} />, trend: stats.trends.referrals },
+    { label: "Pet Parents", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} />, trend: stats.trends.petParents },
+    { label: "Gurus", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} />, trend: stats.trends.gurus },
+    { label: "Ambassadors", value: String(stats.ambassadors), helper: "New this week", tone: "violet" as const, icon: <Users size={18} />, trend: stats.trends.ambassadors },
+    { label: "Referrals", value: String(stats.referrals), helper: "Links used", tone: "amber" as const, icon: <MousePointerClick size={18} />, trend: stats.trends.referrals },
     { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} />, trend: stats.trends.visits },
-    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
+    { label: "Registrations", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
     { label: "Conversion", value: String(stats.conversion), helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} />, trend: stats.trends.conversion },
   ];
 
   return (
     <GrowthPageFrame
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
-      title="Analytics"
+      title="Growth Intelligence"
       detail={
         workplace.kind === "intern"
           ? "Activity is not a result. Report signups and attributed visits separately from followers. Jason verifies KPI claims."
           : "County density still lives on the Market Growth map. This page is the Friday scoreboard: signups, not followers."
       }
     >
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
         {kpis.map((tile) => (
           <AdminThemeCard
             key={tile.label}
@@ -474,6 +486,7 @@ export async function GrowthAnalyticsScreen({
             tone={tile.tone}
             icon={tile.icon}
             trend={tile.trend}
+            className="min-w-0 break-words [&_p.text-3xl]:text-2xl sm:[&_p.text-3xl]:text-3xl"
           />
         ))}
       </section>

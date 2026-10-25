@@ -46,16 +46,16 @@ export default function GrowthPhoneBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const primary = [
     { suffix: suffixes.home, label: "Home", icon: Home },
+    { suffix: suffixes.events, label: "Events", icon: CalendarDays },
     { suffix: suffixes.campaigns, label: "Campaigns", icon: Megaphone },
-    { suffix: suffixes.media, label: "Media", icon: Images },
   ];
   const moreLinks = [
     { suffix: suffixes.create, label: "Create", icon: Plus },
     { suffix: suffixes.content, label: "Content", icon: FolderOpen },
     { suffix: suffixes.gurus, label: "Gurus", icon: Users },
-    { suffix: suffixes.events, label: "Events", icon: CalendarDays },
+    { suffix: suffixes.media, label: "Media", icon: Images },
     { suffix: suffixes.partners, label: "Partners", icon: Handshake },
-    { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3 },
+    { suffix: suffixes.analytics, label: "Insights", icon: BarChart3 },
   ];
 
   return (

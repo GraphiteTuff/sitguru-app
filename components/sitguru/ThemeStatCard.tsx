@@ -95,11 +95,11 @@ export function ThemeStatCard({
 
   return (
     <div
-      className={`rounded-[1.5rem] border p-4 shadow-sm ${theme.card} ${className}`}
+      className={`min-w-0 overflow-hidden rounded-[1.5rem] border p-3 shadow-sm sm:p-4 ${theme.card} ${className}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <p
-          className={`text-[10px] font-black uppercase tracking-[0.14em] ${theme.label}`}
+          className={`min-w-0 break-words text-[10px] font-black uppercase tracking-[0.14em] ${theme.label}`}
         >
           {label}
         </p>
@@ -111,12 +111,14 @@ export function ThemeStatCard({
           </span>
         ) : null}
       </div>
-      <div className="mt-2 flex items-end justify-between gap-2">
-        <p className="text-3xl font-black leading-none text-slate-950">{value}</p>
+      <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
+        <p className="min-w-0 break-words text-2xl font-black leading-none text-slate-950 sm:text-3xl">
+          {value}
+        </p>
         {trend ? <TrendBadge trend={trend} title={trendTitle} /> : null}
       </div>
       {helper ? (
-        <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+        <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-600">
           {helper}
         </p>
       ) : null}
