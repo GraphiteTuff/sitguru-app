@@ -4,7 +4,9 @@ import {
   assignmentStaffChangeAllowed,
   canSelectInternshipManager,
   canSelectInternshipSupervisor,
+  hiredManagerEligibility,
   internshipStaffOptionLabel,
+  INTERNSHIP_MANAGER_JOB_TITLE,
   type InternshipStaffIdentity,
 } from "./staff-eligibility";
 
@@ -89,6 +91,14 @@ describe("internship staff selectors", () => {
     assert.equal(canSelectInternshipSupervisor(supervisorOnly), true);
     assert.equal(canSelectInternshipManager(supervisorOnly), false);
     assert.match(internshipStaffOptionLabel(supervisorOnly), /Jason Graff — Founder & CEO — jason@sitguru.com/);
+  });
+
+  it("prepares a growth-manager hire for the internship manager list", () => {
+    const eligible = hiredManagerEligibility("Ava Venezia");
+    assert.equal(eligible.canManageInterns, true);
+    assert.equal(eligible.canSuperviseInterns, false);
+    assert.equal(eligible.jobTitle, INTERNSHIP_MANAGER_JOB_TITLE);
+    assert.equal(hiredManagerEligibility("Ava").canManageInterns, false);
   });
 
   it("rejects a posted ineligible id and keeps an existing assignment", () => {

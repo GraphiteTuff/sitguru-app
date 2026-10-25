@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { saveInternshipStaffEligibility } from "@/lib/internship/assignment-actions";
+import { inviteInternshipManager, saveInternshipStaffEligibility } from "@/lib/internship/assignment-actions";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { internshipStaffIdentityOk } from "@/lib/internship/staff-eligibility";
 import { listInternshipStaffDirectory } from "@/lib/internship/staff";
@@ -35,10 +35,28 @@ export default async function InternshipStaffEligibilityPage({
         </Link>
       </div>
       <p className="text-sm font-semibold text-slate-600">
-        Admin access does not make someone an internship manager or formal supervisor. Mark the real person, add their job title, and they appear in the assignment lists.
+        Add a manager login here. Use their real first and last name and work email. They are marked eligible to manage interns and show up under Assigned manager. Create each intern, including future interns, from the intern team page.
       </p>
       {ok ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{ok}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
+      <form action={inviteInternshipManager} className="grid gap-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:grid-cols-2">
+        <h2 className="text-lg font-black text-slate-950 sm:col-span-2">Add manager login</h2>
+        <label className="block text-sm font-semibold text-slate-800">
+          Full name
+          <input name="name" required placeholder="First and last name" className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base" />
+        </label>
+        <label className="block text-sm font-semibold text-slate-800">
+          Work email
+          <input name="email" type="email" required placeholder="name@sitguru.com" className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base" />
+        </label>
+        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800 sm:col-span-2">
+          <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+          Email a Social Media & Community Growth Manager login
+        </label>
+        <button className="min-h-12 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white sm:col-span-2">
+          Create manager login
+        </button>
+      </form>
       {!people.length ? (
         <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
           No staff accounts are available to configure yet.

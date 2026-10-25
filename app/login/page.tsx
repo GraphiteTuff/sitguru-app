@@ -213,7 +213,7 @@ function getAudienceDescription(audience: LoginAudience) {
   }
 
   if (audience === "intern") {
-    return "Use your SitGuru intern account to open tasks, campaigns, metrics, and supervisor review.";
+    return "Use the SitGuru login assigned to you. It opens your own internship: this week, your hours, and your manager.";
   }
 
   if (audience === "guru") {
@@ -414,20 +414,29 @@ function LoginPageContent() {
           </div>
 
           <h1 className="mt-5 text-4xl font-black leading-[1.03] tracking-[-0.055em] text-slate-950 xl:text-5xl">
-            One login for every dashboard.
+            {requestedAudience === "intern"
+              ? "Your internship lives here."
+              : "One login for every dashboard."}
           </h1>
 
           <p className="mt-4 text-base font-semibold leading-7 text-slate-700">
-            Log in once and move between Pet Parent, Guru, and Ambassador tools
-            without hunting for separate pages.
+            {requestedAudience === "intern"
+              ? "Sign in with the email SitGuru assigned. You will land in the intern portal for this week’s work, hours, and check-in."
+              : "Log in once and move between Pet Parent, Guru, and Ambassador tools without hunting for separate pages."}
           </p>
 
           <div className="mt-6 grid gap-3">
-            {[
-              ["Pet Parent", "Book care and manage pets."],
-              ["Guru", "Manage services, bookings, and messages."],
-              ["Ambassador", "Track referrals, training, and outreach."],
-            ].map(([title, description]) => (
+            {(requestedAudience === "intern"
+              ? [
+                  ["Intern", "Week, hours, check-in, and Growth Workplace."],
+                  ["Same login later", "Another intern uses this same page with their own assignment."],
+                ]
+              : [
+                  ["Pet Parent", "Book care and manage pets."],
+                  ["Guru", "Manage services, bookings, and messages."],
+                  ["Ambassador", "Track referrals, training, and outreach."],
+                ]
+            ).map(([title, description]) => (
               <div
                 key={title}
                 className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3"

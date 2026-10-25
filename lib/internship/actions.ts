@@ -17,6 +17,7 @@ import {
   matchRequirementForProgram,
 } from "@/lib/internship/queries";
 import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
+import { getPublicSiteUrl } from "@/lib/admin/growth/constants";
 import { findDuplicateAssignment } from "@/lib/internship/assignment";
 import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
 import { loadInternshipStaffGate } from "@/lib/internship/staff";
@@ -499,12 +500,31 @@ export async function saveIntern(formData: FormData) {
     ]);
   }
   refreshInternship();
+  let inviteNote = "";
+  if (formData.get("invite") === "on" && internId) {
+    const site = getPublicSiteUrl();
+    const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${site}/login?role=intern&next=/intern`,
+      data: { full_name: fullName, sitguru_role: "intern" },
+    });
+    const already = inviteError?.message.toLowerCase().includes("already") || inviteError?.message.toLowerCase().includes("registered");
+    const userId = invited?.user?.id || (already ? (await supabaseAdmin.from("profiles").select("id").ilike("email", email).limit(1).maybeSingle()).data?.id : "") || "";
+    if (userId) {
+      await supabaseAdmin.from("internship_interns").update({ user_id: userId }).eq("id", internId).is("user_id", null);
+      await supabaseAdmin.from("profiles").update({ full_name: fullName }).eq("id", userId);
+    }
+    inviteNote = inviteError && !already
+      ? ` Login invite was not sent: ${inviteError.message}`
+      : already
+        ? " Their existing SitGuru login is linked."
+        : " A login invite was emailed.";
+  }
   bounce(
     `/admin/internship/interns/${internId}`,
     "ok",
-    requirement
+    `${requirement
       ? "Intern added. Academic requirements were frozen and SMART tools were staged."
-      : "Intern added. University requirements have not yet been verified — do not invent hours or courses.",
+      : "Intern added. University requirements have not yet been verified — do not invent hours or courses."}${inviteNote}`,
   );
 }
 

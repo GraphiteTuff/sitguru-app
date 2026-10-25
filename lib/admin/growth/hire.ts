@@ -1,10 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AdminIdentity } from "@/lib/admin/access";
 import { getPublicSiteUrl } from "@/lib/admin/growth/constants";
+import { hiredManagerEligibility } from "@/lib/internship/staff-eligibility";
 
 export const GROWTH_HIRE_ROLE = "social_community_manager";
 export const GROWTH_HIRE_DEPARTMENT = "sales_marketing";
-export const GROWTH_HIRE_TITLE = "Social & Community Manager";
+export const GROWTH_HIRE_TITLE = "Social Media & Community Growth Manager";
 
 export type GrowthHireRecord = {
   id: string;
@@ -160,6 +161,45 @@ export async function grantGrowthHireAccess(input: {
       },
       { onConflict: "user_id,role" },
     );
+    const eligibility = hiredManagerEligibility(input.name || found.name);
+    if (eligibility.canManageInterns) {
+      const displayName = (input.name || found.name).trim();
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("id", found.userId)
+        .maybeSingle();
+      if (profile?.id) {
+        await supabaseAdmin
+          .from("profiles")
+          .update({ full_name: displayName, role: GROWTH_HIRE_ROLE, is_active: true })
+          .eq("id", found.userId);
+      } else {
+        await supabaseAdmin.from("profiles").insert({
+          id: found.userId,
+          email,
+          full_name: displayName,
+          role: GROWTH_HIRE_ROLE,
+          is_active: true,
+        });
+      }
+      const { data: currentEligibility } = await supabaseAdmin
+        .from("internship_staff_eligibility")
+        .select("can_supervise_interns")
+        .eq("user_id", found.userId)
+        .maybeSingle();
+      await supabaseAdmin.from("internship_staff_eligibility").upsert(
+        {
+          user_id: found.userId,
+          can_manage_interns: true,
+          can_supervise_interns: currentEligibility?.can_supervise_interns === true,
+          job_title: eligibility.jobTitle,
+          updated_by: input.actor.id,
+          updated_at: now,
+        },
+        { onConflict: "user_id" },
+      );
+    }
   }
 
   try {

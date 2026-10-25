@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { grantGrowthHireAccess } from "@/lib/admin/growth/hire";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignmentChangeSummary } from "@/lib/internship/assignment";
 import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
@@ -124,6 +125,39 @@ export async function saveInternshipAssignment(formData: FormData) {
   revalidatePath("/intern/manage");
   revalidatePath("/intern");
   bounce("Assignment saved. Approved hours were left as they were.", "ok");
+}
+
+export async function inviteInternshipManager(formData: FormData) {
+  const actor = await getAdminIdentity();
+  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
+  const returnTo = text(formData, "returnTo") === "interns"
+    ? "/admin/internship/interns"
+    : "/admin/internship/staff";
+  if (!actor || !canEditRequirements(kind)) {
+    redirect(`/admin/login?next=${encodeURIComponent(returnTo)}`);
+  }
+  const name = text(formData, "name");
+  const email = text(formData, "email").toLowerCase();
+  if (name.trim().split(/\s+/).filter((part) => part.length > 1).length < 2) {
+    redirect(`${returnTo}?error=` + encodeURIComponent("Enter the manager's first and last name."));
+  }
+  const result = await grantGrowthHireAccess({
+    actor,
+    email,
+    name,
+    notes: text(formData, "notes") || "Internship manager. Social Media & Community Growth.",
+    invite: formData.get("invite") === "on",
+  });
+  revalidatePath("/admin/internship/staff");
+  revalidatePath("/admin/internship/interns");
+  revalidatePath("/admin/hr/growth-hire");
+  if (!result.ok) {
+    redirect(`${returnTo}?error=` + encodeURIComponent(result.error));
+  }
+  const message = result.invited
+    ? `${name} was invited. After they open the email, they can sign in as Social Media & Community Growth Manager and appear in Assigned manager.`
+    : `${name} can sign in as Social Media & Community Growth Manager and appears in Assigned manager.`;
+  redirect(`${returnTo}?ok=` + encodeURIComponent(message));
 }
 
 export async function saveInternshipStaffEligibility(formData: FormData) {

@@ -1,3 +1,14 @@
+export const INTERNSHIP_MANAGER_JOB_TITLE =
+  "Social Media & Community Growth Manager";
+
+export function hiredManagerEligibility(name: string) {
+  const parts = name.trim().split(/\s+/).filter((part) => part.length > 1);
+  return {
+    canManageInterns: parts.length >= 2,
+    canSuperviseInterns: false,
+    jobTitle: INTERNSHIP_MANAGER_JOB_TITLE,
+  };
+}
 const GENERIC_NAMES = new Set([
   "admin",
   "admin user",

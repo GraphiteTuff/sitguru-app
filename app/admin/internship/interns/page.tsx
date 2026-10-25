@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { saveIntern } from "@/lib/internship/actions";
+import { inviteInternshipManager } from "@/lib/internship/assignment-actions";
 import AdminInternTeam, { type AdminInternCard } from "@/components/internship/AdminInternTeam";
 import { internPortalPreviewPath, ACADEMIC_LEVELS } from "@/lib/internship/constants";
 import { focusedInternshipWeek, lifecycleLabel } from "@/lib/internship/assignment";
@@ -110,7 +111,7 @@ export default async function InternshipInternsPage({
         </Link>
       </div>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
-        Create an internship, assign a manager and formal supervisor, and it shows on that manager’s desk. Pending university approval does not start Week 1.
+        Use this page for every intern. Add the manager once, then add Ryan or anyone else. Pending university approval does not start Week 1. Leave hours blank until the school confirms them.
       </p>
       {ok ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{ok}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
@@ -136,10 +137,27 @@ export default async function InternshipInternsPage({
           ))}
         </div>
 
-        <form action={saveIntern} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm xl:col-span-7">
+        <div className="space-y-4 xl:col-span-7">
+        <form action={inviteInternshipManager} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
+          <h2 className="font-black text-slate-950">Add manager login</h2>
+          <input type="hidden" name="returnTo" value="interns" />
+          <p className="text-sm font-semibold text-slate-600">
+            This creates a Social Media & Community Growth Manager login and adds that person to Assigned manager. Use it for the current manager, then again for a future manager.
+          </p>
+          <input name="name" required placeholder="Manager first and last name" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
+          <input name="email" type="email" required placeholder="Manager work email" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
+          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800">
+            <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+            Email the manager login
+          </label>
+          <button className="min-h-12 w-full rounded-2xl border border-emerald-200 text-sm font-black text-emerald-950">
+            Add manager
+          </button>
+        </form>
+        <form action={saveIntern} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
           <h2 className="font-black text-slate-950">Create internship</h2>
           <p className="text-sm font-semibold text-slate-600">
-            The student can be added before their SitGuru login exists. When they sign in with this email, the record links itself.
+            Add each intern here. Leave university hours blank until the school confirms them. Check the invite box to email their intern login. The same form works for every future intern.
           </p>
           {!cohort ? <p className="text-sm font-semibold text-rose-700">Create a cohort before assigning interns.</p> : <input type="hidden" name="cohortId" value={cohort.id} />}
           <input name="fullName" required placeholder="Intern name" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
@@ -164,7 +182,7 @@ export default async function InternshipInternsPage({
             name="managerUserId"
             label="Assigned manager"
             people={managers}
-            emptyMessage="No eligible internship managers are configured. Configure a staff member's internship eligibility in Admin."
+            emptyMessage="No manager login yet. Add the manager's name and work email in Add manager login on this page."
           />
           <InternshipStaffPicker
             name="supervisorUserId"
@@ -202,10 +220,15 @@ export default async function InternshipInternsPage({
             <option value="active">Active</option>
           </select>
           <textarea name="notes" rows={2} placeholder="University notes" className="w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold" />
+          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800">
+            <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+            Email this intern a SitGuru login
+          </label>
           <button disabled={!cohort} className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white disabled:opacity-50">
             Create internship assignment
           </button>
         </form>
+        </div>
       </section>
     </main>
   );
