@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
+import { findInternByAccount, findInternById } from "@/lib/internship/queries";
+import { canPreviewInternPortal, internshipActorKind } from "@/lib/internship/manager-access";
 import { internshipWeekNumber } from "@/lib/internship/process";
 import { loadCategories, loadInternTime, loadOwnEntries } from "@/lib/timekeeper/data";
 import { saveManualTime, startWorkTimer, stopWorkTimer, submitInternWeek } from "@/lib/timekeeper/actions";
@@ -20,9 +23,40 @@ export default async function InternTimePage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/intern/login?next=/intern/time");
-  const intern = await findInternByAccount({ userId: user.id, email: user.email });
-  if (!intern) redirect("/intern");
   const params = searchParams ? await searchParams : {};
+  const admin = await getAdminIdentity();
+  const ownIntern = await findInternByAccount({ userId: user.id, email: user.email });
+  const kind = internshipActorKind({
+    role: admin?.role,
+    isSuperUser: admin?.isSuperUser,
+    isIntern: Boolean(ownIntern),
+  });
+  const viewId = first(params.view);
+  let intern = ownIntern;
+  let preview = false;
+  if (viewId) {
+    const target = await findInternById(viewId);
+    if (
+      target &&
+      target.id !== ownIntern?.id &&
+      canPreviewInternPortal({
+        actor: kind,
+        canAccessAdmin: admin?.canAccessAdmin,
+        growthOnly: Boolean(admin && isGrowthOnlyRole(admin.role) && !admin.isSuperUser),
+        actorUserId: user.id,
+        actorInternId: ownIntern?.id,
+        targetInternId: target.id,
+        managerUserId: target.managerUserId,
+      })
+    ) {
+      intern = target;
+      preview = true;
+    }
+  }
+  if (!intern) {
+    if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
+    redirect("/intern");
+  }
   const notice = first(params.ok) || first(params.error);
   const error = Boolean(first(params.error));
   const week = internshipWeekNumber(intern.academicStartDate, new Date(), intern.status);
@@ -32,7 +66,7 @@ export default async function InternTimePage({
   const [categories, record, running] = await Promise.all([
     loadCategories("intern"),
     loadInternTime({ internId: intern.id, requiredHours: required, weeks, weeklyTarget: target, currentWeek: week }),
-    loadOwnEntries(user.id),
+    loadOwnEntries(intern.userId || user.id),
   ]);
   const timer = running.find((entry) => entry.timerActive);
 
@@ -45,6 +79,11 @@ export default async function InternTimePage({
           {required > 0 ? `${record?.credit ?? 0} / ${required} approved` : "University hour requirement pending confirmation"}
         </p>
       </section>
+      {preview ? (
+        <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
+          Read-only time for {intern.preferredName || intern.fullName}. Their timer and weekly submit stay on their login.
+        </p>
+      ) : null}
       {notice ? <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}>{notice}</p> : null}
       {record ? (
         <section className="grid grid-cols-2 gap-2 text-sm">
@@ -63,6 +102,7 @@ export default async function InternTimePage({
       ) : null}
       {record?.overage.exceeds ? <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">{record.overage.message}</p> : null}
       <p className="text-sm font-semibold text-slate-600">The {target}-hour week is a planning pace, not a cap. SitGuru does not award academic credit.</p>
+      {preview ? null : (
       <section className="rounded-[1.4rem] bg-white p-4 shadow-sm">
         <h2 className="font-black text-slate-950">{timer ? "Timer running" : "Start work"}</h2>
         <form action={timer ? stopWorkTimer : startWorkTimer} className="mt-3 grid gap-2">
@@ -75,6 +115,8 @@ export default async function InternTimePage({
           <button className="min-h-12 rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">{timer ? "Stop work" : "Start work"}</button>
         </form>
       </section>
+      )}
+      {preview ? null : (
       <section className="rounded-[1.4rem] bg-white p-4 shadow-sm">
         <h2 className="font-black text-slate-950">Add time by hand</h2>
         <form action={saveManualTime} className="mt-3 grid gap-2">
@@ -86,11 +128,14 @@ export default async function InternTimePage({
           <button className="min-h-12 rounded-2xl border border-emerald-200 text-sm font-black text-emerald-900">Save draft</button>
         </form>
       </section>
+      )}
+      {preview ? null : (
       <form action={submitInternWeek}>
         <input type="hidden" name="weekNumber" value={week} />
         <textarea name="reflection" rows={2} placeholder="Weekly reflection" className="w-full rounded-xl border border-emerald-100 px-3 py-2" />
         <button className="mt-2 min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">Submit this week</button>
       </form>
+      )}
       <div className="grid gap-2">
         {(record?.entries || running).slice(0, 8).map((entry) => (
           <article key={entry.id} className="rounded-2xl bg-white p-3 shadow-sm">
@@ -100,7 +145,7 @@ export default async function InternTimePage({
           </article>
         ))}
       </div>
-      <Link href="/intern" className="text-sm font-black text-emerald-800">Back to the intern portal</Link>
+      <Link href={preview ? `/intern?view=${intern.id}` : "/intern"} className="text-sm font-black text-emerald-800">Back to the intern portal</Link>
     </main>
   );
 }

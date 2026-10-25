@@ -1,4 +1,6 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { internshipActorKind } from "@/lib/internship/manager-access";
 import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
 import StaffChat from "@/components/messaging/StaffChat";
 import { loadStaffInbox } from "@/lib/messaging/staff-data";
@@ -15,7 +17,10 @@ export default async function GrowthMessagesPage({
   const params = searchParams ? await searchParams : {};
   const notice = Array.isArray(params.ok) ? params.ok[0] : params.ok || "";
   const error = Array.isArray(params.error) ? params.error[0] : params.error || "";
-  const inbox = await loadStaffInbox(access.actor.id, access.actor.isSuperUser);
+  const admin = await getAdminIdentity();
+  const kind = internshipActorKind({ role: admin?.role, isSuperUser: admin?.isSuperUser });
+  const seeAll = kind === "supervisor" || Boolean(admin?.isSuperUser);
+  const inbox = await loadStaffInbox(access.actor.id, seeAll);
 
   return (
     <GrowthPageFrame

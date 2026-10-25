@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ManagerInternDashboard from "@/components/internship/ManagerInternDashboard";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { canEditRequirements, canGiveCeoReview, internshipActorKind } from "@/lib/internship/manager-access";
+import { canEditRequirements, canGiveCeoReview, internshipActorKind, isPortalUserId } from "@/lib/internship/manager-access";
 import { loadManagerDashboard } from "@/lib/internship/manager-data";
 import { internReadiness } from "@/lib/onboarding/data";
 import { saveMessagingPermission } from "@/lib/messaging/staff-actions";
@@ -40,7 +40,17 @@ export default async function InternManagerPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const data = await loadManagerDashboard({ actorUserId: actor.id, actorKind: kind });
+  const requestedManager = kind === "supervisor" ? first(params.manager) : "";
+  const managerFilter = isPortalUserId(requestedManager) ? requestedManager : "";
+  const managerProfile = managerFilter
+    ? await supabaseAdmin.from("profiles").select("full_name,email").eq("id", managerFilter).maybeSingle()
+    : { data: null };
+  const managerName = String(managerProfile.data?.full_name || managerProfile.data?.email || "this manager");
+  const data = await loadManagerDashboard({
+    actorUserId: actor.id,
+    actorKind: kind,
+    managerUserId: managerFilter || null,
+  });
   const ok = first(params.ok);
   const error = first(params.error);
   const readiness = await Promise.all(
@@ -58,6 +68,16 @@ export default async function InternManagerPage({
 
   return (
     <main className="mx-auto w-full max-w-[1100px] overflow-x-hidden px-3 py-4 sm:px-5">
+      {managerFilter ? (
+        <p className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
+          {managerName}&apos;s intern desk.{" "}
+          <Link href="/intern/manage" className="font-black text-emerald-900">Show every intern</Link>
+        </p>
+      ) : kind === "supervisor" ? (
+        <p className="mb-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-950">
+          Every intern desk is open. Pick one manager from the intern team page to see only their interns.
+        </p>
+      ) : null}
       <section className="mb-4 grid gap-3">
         <h2 className="text-lg font-black text-slate-950">Intern time and onboarding</h2>
         <article className="rounded-2xl border border-emerald-100 bg-[#FAF6EE] p-4">
@@ -75,6 +95,10 @@ export default async function InternManagerPage({
             <p className="mt-1 text-sm font-semibold text-slate-600">
               {intern.onboarding ? `Onboarding ${intern.onboarding.percent}% · status only, no personnel files` : "Onboarding package not assigned"}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href={`/intern?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">Open portal</Link>
+              <Link href={`/intern/time?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Open time</Link>
+            </div>
             {intern.onboarding?.items.map((item) => (
               <p key={item.title} className="text-xs font-semibold text-slate-500">{item.title}: {item.status}</p>
             ))}

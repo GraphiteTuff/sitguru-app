@@ -17,6 +17,7 @@ import {
 } from "@/lib/internship/labels";
 import { getActiveCohort, getCohortDashboard, listCohortMilestones } from "@/lib/internship/queries";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
+import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,8 @@ export default async function InternshipProgramDashboardPage() {
           </Link>
         </div>
       </section>
+
+      <AdminPortalDirectory />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[

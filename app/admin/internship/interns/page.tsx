@@ -19,6 +19,7 @@ import InternshipStaffPicker from "@/components/internship/InternshipStaffPicker
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipRequirementChecker from "@/components/internship/InternshipRequirementChecker";
+import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,8 @@ export default async function InternshipInternsPage({
       </p>
       {ok ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{ok}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
+
+      <AdminPortalDirectory />
 
       <AdminInternTeam interns={cards} managers={managers} supervisors={supervisors} departments={departments} />
 

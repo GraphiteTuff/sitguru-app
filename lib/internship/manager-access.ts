@@ -43,6 +43,90 @@ export function canReadPrivateInternRecord(input: {
   return false;
 }
 
+const PORTAL_USER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const MANAGER_DESK_STATUSES = new Set([
+  "accepted",
+  "active",
+  "approved",
+  "onboarding",
+  "pending_university_approval",
+  "candidate",
+  "applicant",
+  "completed",
+]);
+
+export function isPortalUserId(value: string | null | undefined) {
+  return PORTAL_USER_ID.test(String(value || "").trim());
+}
+
+/** Founder and other Admin HQ roles can open every portal. A growth-only login cannot. */
+export function canBrowseAllPortals(input: {
+  actor: InternshipActorKind;
+  canAccessAdmin?: boolean;
+  growthOnly?: boolean;
+}) {
+  if (input.growthOnly) return false;
+  if (input.actor === "manager" || input.actor === "intern") return false;
+  return input.actor === "supervisor" || Boolean(input.canAccessAdmin);
+}
+
+export function canPreviewInternPortal(input: {
+  actor: InternshipActorKind;
+  canAccessAdmin?: boolean;
+  growthOnly?: boolean;
+  actorUserId?: string | null;
+  actorInternId?: string | null;
+  targetInternId: string;
+  managerUserId?: string | null;
+}) {
+  if (!input.targetInternId) return false;
+  if (canBrowseAllPortals(input)) return true;
+  return canReadPrivateInternRecord(input);
+}
+
+export function staffPreviewUserId(input: {
+  actor: InternshipActorKind;
+  canAccessAdmin?: boolean;
+  growthOnly?: boolean;
+  actorUserId: string;
+  requestedUserId?: string | null;
+}) {
+  const requested = String(input.requestedUserId || "").trim();
+  if (!canBrowseAllPortals(input) || !isPortalUserId(requested)) return input.actorUserId;
+  return requested;
+}
+
+export function internOnThisManagerDesk(input: {
+  actorKind: Extract<InternshipActorKind, "manager" | "supervisor">;
+  actorUserId: string;
+  managerFilter?: string | null;
+  intern: {
+    id: string;
+    isTest?: boolean;
+    status: string;
+    managerUserId?: string | null;
+  };
+}) {
+  if (input.intern.isTest) return false;
+  if (!MANAGER_DESK_STATUSES.has(input.intern.status)) return false;
+  if (
+    !canReadPrivateInternRecord({
+      actor: input.actorKind,
+      actorUserId: input.actorUserId,
+      targetInternId: input.intern.id,
+      managerUserId: input.intern.managerUserId,
+    })
+  ) {
+    return false;
+  }
+  if (input.actorKind === "supervisor" && input.managerFilter) {
+    return input.intern.managerUserId === input.managerFilter;
+  }
+  return true;
+}
+
 export function canReviewRoutineWork(actor: InternshipActorKind) {
   return actor === "manager" || actor === "supervisor";
 }

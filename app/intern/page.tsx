@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
+import { canPreviewInternPortal, internshipActorKind } from "@/lib/internship/manager-access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import InternStudentDashboard from "@/components/internship/InternStudentDashboard";
 import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
@@ -84,9 +86,35 @@ export default async function InternPortalPage({
     userId: user.id,
     email: user.email,
   });
-
-  const preview = Boolean(viewId && admin?.canAccessAdmin);
-  const intern = preview ? await findInternById(viewId) : ownIntern;
+  const kind = internshipActorKind({
+    role: admin?.role,
+    isSuperUser: admin?.isSuperUser,
+    isIntern: Boolean(ownIntern),
+  });
+  const portalAccess = {
+    actor: kind,
+    canAccessAdmin: admin?.canAccessAdmin,
+    growthOnly: Boolean(admin && isGrowthOnlyRole(admin.role) && !admin.isSuperUser),
+    actorUserId: user.id,
+    actorInternId: ownIntern?.id,
+  };
+  let intern = ownIntern;
+  let preview = false;
+  if (viewId) {
+    const target = await findInternById(viewId);
+    if (
+      target &&
+      target.id !== ownIntern?.id &&
+      canPreviewInternPortal({
+        ...portalAccess,
+        targetInternId: target.id,
+        managerUserId: target.managerUserId,
+      })
+    ) {
+      intern = target;
+      preview = true;
+    }
+  }
 
   if (!intern) {
     if (admin?.canAccessAdmin) redirect(`${INTERNSHIP_ADMIN_PATH}/portal`);

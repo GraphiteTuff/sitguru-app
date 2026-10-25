@@ -6,7 +6,7 @@ import {
   type ManagerQuestion,
   type ManagerReviewItem,
 } from "@/lib/internship/manager-dashboard";
-import { canReadPrivateInternRecord, type InternshipActorKind } from "@/lib/internship/manager-access";
+import { internOnThisManagerDesk, type InternshipActorKind } from "@/lib/internship/manager-access";
 import { listInterns } from "@/lib/internship/queries";
 import type {
   InternshipContentItem,
@@ -33,18 +33,16 @@ async function safeRows(label: string, query: PromiseLike<{ data: unknown; error
 export async function loadManagerDashboard(input: {
   actorUserId: string;
   actorKind: Extract<InternshipActorKind, "manager" | "supervisor">;
+  managerUserId?: string | null;
 }) {
   const everyone = await listInterns();
-  const interns = everyone.filter(
-    (intern) =>
-      !intern.isTest &&
-      ["accepted", "active", "approved", "onboarding", "pending_university_approval", "candidate", "applicant", "completed"].includes(intern.status) &&
-      canReadPrivateInternRecord({
-        actor: input.actorKind,
-        actorUserId: input.actorUserId,
-        targetInternId: intern.id,
-        managerUserId: intern.managerUserId,
-      }),
+  const interns = everyone.filter((intern) =>
+    internOnThisManagerDesk({
+      actorKind: input.actorKind,
+      actorUserId: input.actorUserId,
+      managerFilter: input.managerUserId,
+      intern,
+    }),
   );
   const noticeRows = await safeRows(
     "notices",

@@ -184,6 +184,10 @@ export default function AdminInternTeam({
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href={`/admin/internship/interns/${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">View intern</Link>
               <Link href={`/intern?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Intern portal</Link>
+              <Link href={`/intern/time?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Time</Link>
+              {intern.managerUserId ? (
+                <Link href={`/intern/manage?manager=${intern.managerUserId}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Manager desk</Link>
+              ) : null}
             </div>
             <details className="mt-3">
               <summary className="min-h-11 cursor-pointer text-sm font-black text-emerald-900">Update assignment</summary>

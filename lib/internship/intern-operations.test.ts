@@ -7,9 +7,13 @@ import {
   validateInternshipHours,
 } from "./hours";
 import {
+  canBrowseAllPortals,
   canGiveCeoReview,
+  canPreviewInternPortal,
   canReadPrivateInternRecord,
+  internOnThisManagerDesk,
   internshipActorKind,
+  staffPreviewUserId,
 } from "./manager-access";
 import {
   draftReportContributions,
@@ -89,6 +93,120 @@ describe("internship authorization", () => {
     assert.equal(internshipActorKind({ role: "support_admin", isSuperUser: true }), "supervisor");
     assert.equal(canGiveCeoReview("supervisor"), true);
     assert.equal(canGiveCeoReview("manager"), false);
+  });
+
+  it("lets admin open every portal and keeps a growth login on assigned interns", () => {
+    assert.equal(
+      canBrowseAllPortals({ actor: "supervisor", canAccessAdmin: true }),
+      true,
+    );
+    assert.equal(
+      canBrowseAllPortals({
+        actor: "none",
+        canAccessAdmin: true,
+        growthOnly: false,
+      }),
+      true,
+    );
+    assert.equal(
+      canBrowseAllPortals({
+        actor: "manager",
+        canAccessAdmin: true,
+        growthOnly: true,
+      }),
+      false,
+    );
+    assert.equal(
+      canPreviewInternPortal({
+        actor: "supervisor",
+        targetInternId: "intern-a",
+        managerUserId: "manager-b",
+      }),
+      true,
+    );
+    assert.equal(
+      canPreviewInternPortal({
+        actor: "manager",
+        canAccessAdmin: true,
+        growthOnly: true,
+        actorUserId: "manager-a",
+        targetInternId: "intern-a",
+        managerUserId: "manager-a",
+      }),
+      true,
+    );
+    assert.equal(
+      canPreviewInternPortal({
+        actor: "manager",
+        canAccessAdmin: true,
+        growthOnly: true,
+        actorUserId: "manager-a",
+        targetInternId: "intern-b",
+        managerUserId: "manager-b",
+      }),
+      false,
+    );
+    assert.equal(
+      staffPreviewUserId({
+        actor: "supervisor",
+        actorUserId: "founder",
+        requestedUserId: "11111111-1111-4111-8111-111111111111",
+      }),
+      "11111111-1111-4111-8111-111111111111",
+    );
+    assert.equal(
+      staffPreviewUserId({
+        actor: "manager",
+        growthOnly: true,
+        canAccessAdmin: true,
+        actorUserId: "manager-a",
+        requestedUserId: "11111111-1111-4111-8111-111111111111",
+      }),
+      "manager-a",
+    );
+  });
+
+  it("filters a supervisor desk to one manager without hiding the full desk", () => {
+    const intern = {
+      id: "intern-a",
+      status: "active",
+      managerUserId: "manager-a",
+    };
+    assert.equal(
+      internOnThisManagerDesk({
+        actorKind: "supervisor",
+        actorUserId: "founder",
+        intern,
+      }),
+      true,
+    );
+    assert.equal(
+      internOnThisManagerDesk({
+        actorKind: "supervisor",
+        actorUserId: "founder",
+        managerFilter: "manager-a",
+        intern,
+      }),
+      true,
+    );
+    assert.equal(
+      internOnThisManagerDesk({
+        actorKind: "supervisor",
+        actorUserId: "founder",
+        managerFilter: "manager-b",
+        intern,
+      }),
+      false,
+    );
+    assert.equal(
+      internOnThisManagerDesk({
+        actorKind: "manager",
+        actorUserId: "manager-b",
+        managerFilter: "manager-a",
+        intern,
+      }),
+      false,
+    );
   });
 });
 

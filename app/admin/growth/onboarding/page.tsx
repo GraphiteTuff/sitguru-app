@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { GrowthHireLinks } from "@/components/admin/AdminPortalDirectory";
 import { GrowthPageFrame, GrowthCard } from "@/components/admin/growth/GrowthPageFrame";
 import {
   confirmOnboardingReview,
@@ -9,6 +12,8 @@ import {
 } from "@/lib/onboarding/actions";
 import { COMMUNICATIONS_POLICY } from "@/lib/onboarding/communications-policy";
 import { loadOnboardingForUser } from "@/lib/onboarding/data";
+import { internshipActorKind, staffPreviewUserId } from "@/lib/internship/manager-access";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +31,35 @@ export default async function GrowthOnboardingPage({
   const params = searchParams ? await searchParams : {};
   const notice = first(params.ok) || first(params.error);
   const error = Boolean(first(params.error));
-  const workspace = await loadOnboardingForUser(access.actor.id);
+  const admin = await getAdminIdentity();
+  const kind = internshipActorKind({ role: admin?.role, isSuperUser: admin?.isSuperUser });
+  const subjectId = staffPreviewUserId({
+    actor: kind,
+    canAccessAdmin: admin?.canAccessAdmin,
+    growthOnly: Boolean(admin && isGrowthOnlyRole(admin.role) && !admin.isSuperUser),
+    actorUserId: access.actor.id,
+    requestedUserId: first(params.user),
+  });
+  const viewingOther = subjectId !== access.actor.id;
+  const subject = viewingOther
+    ? await supabaseAdmin.from("profiles").select("full_name,email").eq("id", subjectId).maybeSingle()
+    : { data: null };
+  const subjectName = String(subject.data?.full_name || subject.data?.email || "this person");
+  const workspace = await loadOnboardingForUser(subjectId);
 
   return (
     <GrowthPageFrame
-      kicker="Your onboarding"
-      title="Welcome to SitGuru"
-      detail="Complete the items below. SitGuru tracks the checklist. Legally significant signatures happen with an approved signature provider, and the executed copies stay in the restricted personnel folder."
+      kicker={viewingOther ? "Admin view" : "Your onboarding"}
+      title={viewingOther ? subjectName : "Welcome to SitGuru"}
+      detail={viewingOther
+        ? "This is their onboarding status. Reviews and signatures stay on their login. Open a file here without marking it reviewed."
+        : "Complete the items below. SitGuru tracks the checklist. Legally significant signatures happen with an approved signature provider, and the executed copies stay in the restricted personnel folder."}
     >
+      <GrowthHireLinks
+        selfHref="/admin/growth/onboarding"
+        hrefFor={(userId) => `/admin/growth/onboarding?user=${encodeURIComponent(userId)}`}
+        currentUserId={subjectId}
+      />
       {notice ? (
         <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}>
           {notice}
@@ -84,7 +110,16 @@ export default async function GrowthOnboardingPage({
                   </div>
                 ) : null}
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {item.kind === "review" && item.fileHref ? (
+                  {viewingOther && kind === "supervisor" && item.fileHref ? (
+                      <a href={item.fileHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">
+                        Open document
+                      </a>
+                  ) : viewingOther ? (
+                      <p className="text-sm font-semibold text-slate-600">
+                        Status only. This person completes their own review and signature.
+                      </p>
+                  ) : null}
+                  {!viewingOther && item.kind === "review" && item.fileHref ? (
                     <form action={openOnboardingDocument}>
                       <input type="hidden" name="itemId" value={item.id} />
                       <button className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
@@ -92,7 +127,7 @@ export default async function GrowthOnboardingPage({
                       </button>
                     </form>
                   ) : null}
-                  {item.kind === "review" && !item.fileHref && item.status !== "reviewed" ? (
+                  {!viewingOther && item.kind === "review" && !item.fileHref && item.status !== "reviewed" ? (
                     <form action={startOnboardingReview}>
                       <input type="hidden" name="itemId" value={item.id} />
                       <button className="min-h-12 w-full rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">
@@ -100,7 +135,7 @@ export default async function GrowthOnboardingPage({
                       </button>
                     </form>
                   ) : null}
-                  {item.kind === "review" && item.status !== "reviewed" ? (
+                  {!viewingOther && item.kind === "review" && item.status !== "reviewed" ? (
                     <form action={confirmOnboardingReview}>
                       <input type="hidden" name="itemId" value={item.id} />
                       <button className="min-h-12 w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-950">
@@ -108,7 +143,7 @@ export default async function GrowthOnboardingPage({
                       </button>
                     </form>
                   ) : null}
-                  {item.kind !== "review" && item.signingUrl && !item.locked ? (
+                  {!viewingOther && item.kind !== "review" && item.signingUrl && !item.locked ? (
                     <form action={followOnboardingSignature}>
                       <input type="hidden" name="itemId" value={item.id} />
                       <button className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">

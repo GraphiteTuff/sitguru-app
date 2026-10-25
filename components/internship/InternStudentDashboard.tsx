@@ -719,8 +719,8 @@ export default function InternStudentDashboard({
 
           <section className="grid grid-cols-2 gap-2">
             {[
-              ["/intern/time", "Time"],
-              ["/intern", "Weekly check-in"],
+              [preview ? `/intern/time?view=${data.intern.id}` : "/intern/time", "Time"],
+              [preview ? `/intern?view=${data.intern.id}&tab=work` : "/intern?tab=work", "Weekly check-in"],
             ].map(([href, label]) => (
               <Link key={label} href={href} className="flex min-h-14 items-center justify-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white">
                 {label}

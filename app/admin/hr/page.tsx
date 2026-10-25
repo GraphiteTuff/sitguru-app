@@ -37,6 +37,7 @@ import { countCareerJobs } from "@/lib/careers/jobs";
 import { getActiveCohort, listCohortMilestones } from "@/lib/internship/queries";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
 
 export const dynamic = "force-dynamic";
 
@@ -538,6 +539,8 @@ export default async function AdminHrPage() {
           </div>
         </GrowthCard>
       </section>
+
+      <AdminPortalDirectory />
 
       {internshipMilestones.length ? (
         <GrowthCard className="min-w-0">
