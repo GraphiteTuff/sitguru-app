@@ -112,6 +112,7 @@ export async function GrowthWorkplaceHome({
       ? []
       : [
           { href: growthHref(base, "/onboarding"), label: "Your onboarding", detail: "Agreement, reviews, and acknowledgment", icon: ClipboardCheck },
+          { href: growthHref(base, "/time"), label: "My time", detail: "Contractor hours for approval", icon: ClipboardCheck },
           { href: growthHref(base, "/messages"), label: "Messages", detail: "Growth team and community inbox", icon: Megaphone },
         ]),
   ];

@@ -395,3 +395,67 @@ export async function verifyExternalCompletion(formData: FormData) {
   refreshPaths();
   bounce("/admin/hr/onboarding", "ok", "External completion verified. The executed copy stays in the restricted personnel folder.");
 }
+
+export async function supersedeOnboardingDocument(formData: FormData) {
+  const who = await actor();
+  if (!who.founder) bounce("/admin/hr/onboarding", "error", "Only the founder can replace a document.");
+  const documentId = text(formData, "documentId");
+  const versionLabel = text(formData, "versionLabel");
+  const reack = text(formData, "reacknowledge") === "yes";
+  if (!documentId || !versionLabel) bounce("/admin/hr/onboarding", "error", "Choose the document and the new version.");
+  const { data: current } = await supabaseAdmin
+    .from("onboarding_document_versions")
+    .select("id")
+    .eq("document_id", documentId)
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data: created, error } = await supabaseAdmin.from("onboarding_document_versions").insert({
+    document_id: documentId,
+    version_label: versionLabel,
+    change_summary: text(formData, "summary"),
+    reacknowledgment_required: reack,
+    supersedes_version_id: current?.id || null,
+    status: "published",
+    storage_ref: text(formData, "storageRef"),
+  }).select("id").single();
+  if (error || !created) bounce("/admin/hr/onboarding", "error", "That version could not be saved. Use a new version name.");
+  if (current?.id) {
+    await supabaseAdmin.from("onboarding_document_versions").update({ status: "superseded" }).eq("id", current.id);
+  }
+  if (reack) {
+    const { data: openItems } = await supabaseAdmin.from("onboarding_items").select("id,instance_id,kind,requirement,sort_order").eq("document_id", documentId).neq("status", "superseded");
+    for (const item of openItems || []) {
+      await supabaseAdmin.from("onboarding_items").update({ status: "superseded", updated_at: new Date().toISOString() }).eq("id", item.id);
+      await supabaseAdmin.from("onboarding_items").insert({
+        instance_id: item.instance_id,
+        document_id: documentId,
+        version_id: created.id,
+        kind: item.kind,
+        requirement: item.requirement,
+        sort_order: item.sort_order,
+        status: "assigned",
+      });
+      await audit({ instanceId: String(item.instance_id), itemId: String(item.id), actorId: who.userId, actorRole: "founder", action: "reacknowledgment_required", previous: "published", next: versionLabel, versionId: created.id, note: text(formData, "summary") });
+    }
+  }
+  refreshPaths();
+  bounce("/admin/hr/onboarding", "ok", reack ? "New version published. People need to review it again. Earlier acknowledgments stay in history." : "New version published. A new acknowledgment is not required.");
+}
+
+export async function remindOnboarding(formData: FormData) {
+  const who = await actor();
+  if (!who.founder && !who.growth) bounce("/admin/hr/onboarding", "error", "Only the founder or assigned manager can send a reminder.");
+  const instanceId = text(formData, "instanceId");
+  const { data: last } = await supabaseAdmin.from("onboarding_audit_events").select("created_at").eq("instance_id", instanceId).eq("action", "reminder_sent").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const { data: setting } = await supabaseAdmin.from("onboarding_settings").select("value").eq("key", "reminder_interval_days").maybeSingle();
+  const days = Number(setting?.value || 7);
+  if (last?.created_at) {
+    const elapsed = Date.now() - new Date(String(last.created_at)).getTime();
+    if (elapsed < days * 86400000) bounce("/admin/hr/onboarding", "error", `A reminder was already sent in the last ${days} days.`);
+  }
+  await audit({ instanceId, actorId: who.userId, actorRole: who.founder ? "founder" : "growth", action: "reminder_sent", note: text(formData, "note") || "Onboarding reminder" });
+  refreshPaths();
+  bounce("/admin/hr/onboarding", "ok", "Reminder recorded.");
+}

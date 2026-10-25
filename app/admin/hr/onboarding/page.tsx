@@ -12,6 +12,8 @@ import {
 } from "@/lib/onboarding/actions";
 import { loadOnboardingAudit, loadOnboardingPeople } from "@/lib/onboarding/data";
 import { EXAMPLE_SIGNATURE_PROVIDERS } from "@/lib/onboarding/domain";
+import { remindOnboarding, supersedeOnboardingDocument } from "@/lib/onboarding/actions";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,11 @@ export default async function PeopleOnboardingPage({
   const params = searchParams ? await searchParams : {};
   const notice = first(params.ok) || first(params.error);
   const error = Boolean(first(params.error));
-  const [people, hires] = await Promise.all([loadOnboardingPeople(), listGrowthHires()]);
+  const [people, hires, documents] = await Promise.all([
+    loadOnboardingPeople(),
+    listGrowthHires(),
+    supabaseAdmin.from("onboarding_documents").select("id,title").eq("active", true).order("title"),
+  ]);
   const focus = first(params.person);
   const selected = people.find((person) => person.userId === focus) || people[0];
   const audit = selected ? await loadOnboardingAudit(selected.workspace.instanceId) : [];
@@ -132,6 +138,29 @@ export default async function PeopleOnboardingPage({
             </div>
           ) : null}
         </div>
+        <GrowthCard>
+          <h2 className="text-lg font-black text-slate-950">Replace a document</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-600">Earlier acknowledgments stay on record. Choose a new review only when the change is material.</p>
+          <form action={supersedeOnboardingDocument} className="mt-3 grid gap-2">
+            <select name="documentId" className="min-h-12 rounded-xl border border-emerald-100 px-3 text-sm font-semibold">
+              {(documents.data || []).map((document) => (
+                <option key={String(document.id)} value={String(document.id)}>{String(document.title)}</option>
+              ))}
+            </select>
+            <input name="versionLabel" placeholder="v1.1" required className="min-h-12 rounded-xl border border-emerald-100 px-3" />
+            <input name="summary" placeholder="What changed" className="min-h-12 rounded-xl border border-emerald-100 px-3" />
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <input type="checkbox" name="reacknowledge" value="yes" /> Require a new review
+            </label>
+            <button className="min-h-12 rounded-2xl border border-emerald-200 text-sm font-black text-emerald-900">Publish version</button>
+          </form>
+          {selected ? (
+            <form action={remindOnboarding} className="mt-3">
+              <input type="hidden" name="instanceId" value={selected.workspace.instanceId} />
+              <button className="min-h-12 w-full rounded-2xl bg-amber-100 text-sm font-black text-amber-950">Send onboarding reminder</button>
+            </form>
+          ) : null}
+        </GrowthCard>
         <Link href="/admin/hr" className="text-sm font-black text-emerald-800">Back to HR</Link>
       </GrowthPageFrame>
     </main>

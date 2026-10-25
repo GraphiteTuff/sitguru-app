@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft, Paperclip, Send } from "lucide-react";
-import { postStaffMessage } from "@/lib/messaging/staff-actions";
+import { postStaffMessage, reportMessage } from "@/lib/messaging/staff-actions";
 
 type Attachment = { url: string; mimeType: string; name: string };
 type Message = {
@@ -179,6 +179,19 @@ export default function StaffChat({
           <p className="text-[11px] font-semibold text-amber-900">
             This saves an internal team note. It is recorded in Admin and is not sent to a Pet Parent, Guru, or Ambassador.
           </p>
+          {selected ? (
+            <form action={reportMessage} className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input type="hidden" name="conversationId" value={selected.id} />
+              <input type="hidden" name="returnTo" value="/admin/growth/messages" />
+              <select name="reason" className="min-h-11 rounded-xl border border-rose-100 px-3 text-sm font-semibold">
+                <option>Harassment</option>
+                <option>Safety Concern</option>
+                <option>Confidential Information</option>
+                <option>Other</option>
+              </select>
+              <button className="min-h-11 rounded-2xl border border-rose-200 px-3 text-sm font-black text-rose-800">Report</button>
+            </form>
+          ) : null}
         </form>
       </section>
     </div>

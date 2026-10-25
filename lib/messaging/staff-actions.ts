@@ -116,3 +116,51 @@ export async function resolveMessageReport(formData: FormData) {
   revalidatePath("/admin/messages/moderation");
   bounce("/admin/messages/moderation", "ok", "Report updated. The original message was not rewritten.");
 }
+
+export async function assignConversation(formData: FormData) {
+  const who = await actor();
+  if (who.role === "none") bounce("/admin/growth/messages", "error", "You cannot assign this conversation.");
+  const conversationId = field(formData, "conversationId");
+  const assignee = field(formData, "assigneeId");
+  await supabaseAdmin.from("conversations").update({
+    assigned_user_id: assignee || null,
+    assigned_by: who.userId,
+    assigned_at: new Date().toISOString(),
+    workflow_status: assignee ? "assigned" : "unassigned",
+  }).eq("id", conversationId);
+  revalidatePath("/admin/growth/messages");
+  bounce("/admin/growth/messages", "ok", assignee ? "Conversation assigned." : "Conversation is unassigned.");
+}
+
+export async function saveMessagingPermission(formData: FormData) {
+  const who = await actor();
+  if (who.role === "none") bounce("/intern/manage", "error", "You cannot change messaging permissions.");
+  const userId = field(formData, "userId");
+  const level = field(formData, "level") || "none";
+  const review = field(formData, "review") || "all";
+  await supabaseAdmin.from("messaging_permissions").upsert({
+    user_id: userId,
+    permission_level: level,
+    review_level: review,
+    audiences: field(formData, "audiences"),
+    updated_by: who.userId,
+    updated_at: new Date().toISOString(),
+  });
+  revalidatePath("/intern/manage");
+  bounce("/intern/manage", "ok", "Messaging permission saved.");
+}
+
+export async function reportMessage(formData: FormData) {
+  const who = await actor();
+  if (!who.userId) bounce(field(formData, "returnTo") || "/admin/messages", "error", "Sign in to report a message.");
+  const route = who.role === "none" ? "founder" : "moderation_queue";
+  await supabaseAdmin.from("message_reports").insert({
+    message_id: field(formData, "messageId") || null,
+    conversation_id: field(formData, "conversationId") || null,
+    reporter_id: who.userId,
+    reason: field(formData, "reason") || "Other",
+    status: "open",
+    route_to: field(formData, "targetIsManager") === "yes" ? "founder" : route,
+  });
+  bounce(field(formData, "returnTo") || "/admin/growth/messages", "ok", "Report sent to the founder review queue.");
+}

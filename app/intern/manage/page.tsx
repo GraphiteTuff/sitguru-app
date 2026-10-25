@@ -4,6 +4,10 @@ import ManagerInternDashboard from "@/components/internship/ManagerInternDashboa
 import { getAdminIdentity } from "@/lib/admin/access";
 import { canEditRequirements, canGiveCeoReview, internshipActorKind } from "@/lib/internship/manager-access";
 import { loadManagerDashboard } from "@/lib/internship/manager-data";
+import { internReadiness } from "@/lib/onboarding/data";
+import { saveMessagingPermission } from "@/lib/messaging/staff-actions";
+import { reviewInternWeek } from "@/lib/timekeeper/actions";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +43,62 @@ export default async function InternManagerPage({
   const data = await loadManagerDashboard({ actorUserId: actor.id, actorKind: kind });
   const ok = first(params.ok);
   const error = first(params.error);
+  const readiness = await Promise.all(
+    data.interns.map(async (intern) => ({
+      id: intern.id,
+      name: intern.fullName,
+      userId: intern.userId,
+      onboarding: intern.userId ? await internReadiness(intern.userId) : null,
+    })),
+  );
+  const internIds = data.interns.map((intern) => intern.id);
+  const waiting = internIds.length
+    ? await supabaseAdmin.from("timekeeper_weeks").select("intern_id,week_number,status").eq("status", "submitted").in("intern_id", internIds)
+    : { data: [] };
 
   return (
     <main className="mx-auto w-full max-w-[1100px] overflow-x-hidden px-3 py-4 sm:px-5">
+      <section className="mb-4 grid gap-3">
+        <h2 className="text-lg font-black text-slate-950">Intern time and onboarding</h2>
+        {readiness.map((intern) => (
+          <article key={intern.id} className="rounded-2xl border border-emerald-100 bg-white p-4">
+            <p className="font-black text-slate-950">{intern.name}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              {intern.onboarding ? `Onboarding ${intern.onboarding.percent}% · status only, no personnel files` : "Onboarding package not assigned"}
+            </p>
+            {intern.onboarding?.items.map((item) => (
+              <p key={item.title} className="text-xs font-semibold text-slate-500">{item.title}: {item.status}</p>
+            ))}
+            {intern.userId ? (
+              <form action={saveMessagingPermission} className="mt-3 grid gap-2 sm:grid-cols-3">
+                <input type="hidden" name="userId" value={intern.userId} />
+                <select name="level" className="min-h-11 rounded-xl border border-emerald-100 px-2 text-sm font-semibold">
+                  <option value="none">No community messaging</option>
+                  <option value="view">View only</option>
+                  <option value="reply_assigned">Reply to assigned</option>
+                  <option value="initiate_approved">Start approved chats</option>
+                  <option value="full">Full authorized messaging</option>
+                </select>
+                <select name="review" className="min-h-11 rounded-xl border border-emerald-100 px-2 text-sm font-semibold">
+                  <option value="all">All messages need review</option>
+                  <option value="selected">Selected messages need review</option>
+                  <option value="independent">Independent within guardrails</option>
+                </select>
+                <button className="min-h-11 rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">Save messaging</button>
+              </form>
+            ) : null}
+          </article>
+        ))}
+        {(waiting.data || []).map((week) => (
+          <form key={`${week.intern_id}-${week.week_number}`} action={reviewInternWeek} className="grid gap-2 rounded-2xl bg-emerald-50 p-3 sm:grid-cols-[1fr_auto_auto]">
+            <input type="hidden" name="internId" value={String(week.intern_id)} />
+            <input type="hidden" name="weekNumber" value={String(week.week_number)} />
+            <p className="text-sm font-black text-slate-950">Week {String(week.week_number)} is ready for review</p>
+            <button name="action" value="recommend" className="min-h-11 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white">Recommend approval</button>
+            <button name="action" value="return" className="min-h-11 rounded-2xl border border-amber-300 bg-white px-3 text-sm font-black text-amber-950">Return</button>
+          </form>
+        ))}
+      </section>
       <ManagerInternDashboard
         cards={data.cards}
         reviews={data.reviews}
