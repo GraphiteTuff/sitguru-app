@@ -9,6 +9,7 @@ import {
   Handshake,
   Home,
   Images,
+  Lightbulb,
   Megaphone,
   Plus,
   Users,
@@ -17,15 +18,16 @@ import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import { INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 
 const links = [
-  { href: INTERNSHIP_GROWTH_PATH, label: "Home", icon: Home },
-  { href: `${INTERNSHIP_GROWTH_PATH}/create`, label: "Create", icon: Plus },
-  { href: `${INTERNSHIP_GROWTH_PATH}/campaigns`, label: "Campaigns", icon: Megaphone },
-  { href: `${INTERNSHIP_GROWTH_PATH}/content`, label: "Content", icon: FolderOpen },
-  { href: `${INTERNSHIP_GROWTH_PATH}/gurus`, label: "Gurus", icon: Users },
+  { href: INTERNSHIP_GROWTH_PATH, label: "Overview", icon: Home },
   { href: `${INTERNSHIP_GROWTH_PATH}/events`, label: "Events", icon: CalendarDays },
+  { href: `${INTERNSHIP_GROWTH_PATH}/campaigns`, label: "Campaigns", icon: Megaphone },
+  { href: `${INTERNSHIP_GROWTH_PATH}/intelligence`, label: "Intelligence", icon: Lightbulb },
+  { href: `${INTERNSHIP_GROWTH_PATH}/analytics`, label: "Results", icon: BarChart3 },
+  { href: `${INTERNSHIP_GROWTH_PATH}/create`, label: "Tracking", icon: Plus },
+  { href: `${INTERNSHIP_GROWTH_PATH}/content`, label: "Inventory", icon: FolderOpen },
+  { href: `${INTERNSHIP_GROWTH_PATH}/gurus`, label: "Gurus", icon: Users },
   { href: `${INTERNSHIP_GROWTH_PATH}/partners`, label: "Partners", icon: Handshake },
   { href: `${INTERNSHIP_GROWTH_PATH}/media`, label: "Media", icon: Images },
-  { href: `${INTERNSHIP_GROWTH_PATH}/analytics`, label: "Analytics", icon: BarChart3 },
 ];
 
 function isActive(pathname: string, href: string) {

@@ -3,23 +3,25 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  Lightbulb,
   Megaphone,
-  Plus,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import { growthHref, type GrowthWorkplaceAccess } from "@/lib/admin/growth/workplace";
+import { getGrowthResourceLinks } from "@/lib/admin/growth/operating-model";
 
 type QuickAction = {
   href: string;
   label: string;
   icon: LucideIcon;
   primary?: boolean;
+  external?: boolean;
 };
 
 /**
- * Compact, touch-friendly Quick Actions for phones/tablets.
- * Only exposes actions the current Growth workplace role can use.
+ * Outcome-focused Quick Actions for phones/tablets.
+ * Does not expose Planner-style personal task creation.
  */
 export default function GrowthQuickActions({
   workplace,
@@ -28,12 +30,13 @@ export default function GrowthQuickActions({
 }) {
   const base = workplace.basePath;
   const intern = workplace.kind === "intern";
+  const planner = getGrowthResourceLinks({ intern }).find((item) => item.id === "planner");
 
   const actions: QuickAction[] = [
     {
-      href: growthHref(base, "/create?type=event"),
-      label: "Add Event post",
-      icon: Plus,
+      href: `${growthHref(base, "/events")}#record-results`,
+      label: "Record Event Results",
+      icon: ClipboardList,
       primary: true,
     },
     {
@@ -42,27 +45,38 @@ export default function GrowthQuickActions({
       icon: CalendarDays,
     },
     {
-      href: "/admin/sales-marketing/lead-entry",
-      label: "Record Event Results",
-      icon: ClipboardList,
-    },
-    {
-      href: growthHref(base, "/create"),
-      label: "Add Growth Campaign",
+      href: growthHref(base, "/campaigns"),
+      label: "Campaign outcomes",
       icon: Megaphone,
     },
     {
-      href: growthHref(base, "/analytics"),
+      href: growthHref(base, "/intelligence"),
       label: "Record Growth Insight",
+      icon: Lightbulb,
+    },
+    {
+      href: growthHref(base, "/analytics"),
+      label: "Analytics / Results",
       icon: BarChart3,
     },
     {
       href: intern ? "/intern" : "/intern/manage",
-      label: intern ? "Intern portal" : "View Team",
+      label: intern ? "Intern Portal" : "Manager Desk",
       icon: Users,
     },
-  ].filter((action) => {
-    // Interns stay inside the Growth + intern portal surface — no Admin lead CRM.
+  ];
+
+  if (planner) {
+    actions.push({
+      href: planner.href,
+      label: "Open Planner",
+      icon: ClipboardList,
+      external: true,
+    });
+  }
+
+  const visible = actions.filter((action) => {
+    if (intern && action.href.includes("#record-results")) return false;
     if (intern && action.href.startsWith("/admin/sales-marketing")) return false;
     return true;
   });
@@ -75,22 +89,45 @@ export default function GrowthQuickActions({
       <p className="px-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
         Quick actions
       </p>
+      <p className="mt-1 px-1 text-xs font-semibold text-slate-500">
+        Outcomes in SitGuru. Assignments in Planner.
+      </p>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {actions.map((action) => {
+        {visible.map((action) => {
           const Icon = action.icon;
+          const className = action.primary
+            ? "flex min-h-14 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-black !text-white shadow-sm"
+            : "flex min-h-14 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm font-black text-emerald-950";
+          const body = (
+            <>
+              <Icon size={18} className="shrink-0" aria-hidden="true" />
+              <span className="min-w-0 leading-tight break-words">
+                {action.label}
+              </span>
+            </>
+          );
+          if (action.external) {
+            return (
+              <a
+                key={`${action.href}-${action.label}`}
+                href={action.href}
+                target="_blank"
+                rel="noreferrer"
+                className={className}
+                style={action.primary ? { background: "#0D5C3A" } : undefined}
+              >
+                {body}
+              </a>
+            );
+          }
           return (
             <Link
               key={`${action.href}-${action.label}`}
               href={action.href}
-              className={
-                action.primary
-                  ? "flex min-h-14 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-black !text-white shadow-sm"
-                  : "flex min-h-14 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm font-black text-emerald-950"
-              }
+              className={className}
               style={action.primary ? { background: "#0D5C3A" } : undefined}
             >
-              <Icon size={18} className="shrink-0" aria-hidden="true" />
-              <span className="min-w-0 leading-tight break-words">{action.label}</span>
+              {body}
             </Link>
           );
         })}

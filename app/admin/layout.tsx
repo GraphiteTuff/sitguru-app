@@ -40,6 +40,7 @@ import {
   WalletCards,
   Images,
   FolderOpen,
+  Lightbulb,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
@@ -67,6 +68,7 @@ const adminRoutes = {
   growthPartners: "/admin/growth/partners",
   growthMedia: "/admin/growth/media",
   growthAnalytics: "/admin/growth/analytics",
+  growthIntelligence: "/admin/growth/intelligence",
   trustSafety: "/admin/background-checks",
   hr: "/admin/hr",
   internship: "/admin/internship",
@@ -110,26 +112,27 @@ const adminRoutes = {
 
 const growthNavSections = [
   {
-    title: "Growth Portal",
+    title: "Growth Workspace",
     items: [
-      { label: "Home", href: adminRoutes.growth, icon: Home },
-      { label: "Create", href: adminRoutes.growthCreate, icon: Plus },
-      { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
-      { label: "Content", href: adminRoutes.growthContent, icon: FolderOpen },
-      { label: "Gurus", href: adminRoutes.growthGurus, icon: PawPrint },
+      { label: "Overview", href: adminRoutes.growth, icon: Home },
       { label: "Events", href: adminRoutes.growthEvents, icon: CalendarDays },
+      { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
+      { label: "Intelligence", href: adminRoutes.growthIntelligence, icon: Lightbulb },
+      { label: "Analytics", href: adminRoutes.growthAnalytics, icon: BarChart3 },
+      { label: "Tracking links", href: adminRoutes.growthCreate, icon: Plus },
+      { label: "Content inventory", href: adminRoutes.growthContent, icon: FolderOpen },
+      { label: "Gurus", href: adminRoutes.growthGurus, icon: PawPrint },
       { label: "Partners", href: adminRoutes.growthPartners, icon: HandCoins },
       { label: "Media", href: adminRoutes.growthMedia, icon: Images },
-      { label: "Analytics", href: adminRoutes.growthAnalytics, icon: BarChart3 },
     ],
   },
 ];
 
 const growthHeaderLinks = [
-  { label: "Home", href: adminRoutes.growth },
-  { label: "Create", href: adminRoutes.growthCreate },
+  { label: "Overview", href: adminRoutes.growth },
+  { label: "Events", href: adminRoutes.growthEvents },
   { label: "Campaigns", href: adminRoutes.growthCampaigns },
-  { label: "Content", href: adminRoutes.growthContent },
+  { label: "Intelligence", href: adminRoutes.growthIntelligence },
   { label: "Analytics", href: adminRoutes.growthAnalytics },
 ];
 

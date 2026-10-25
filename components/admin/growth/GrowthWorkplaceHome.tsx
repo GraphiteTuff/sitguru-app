@@ -3,12 +3,12 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
-  ClipboardCheck,
+  ClipboardList,
   Handshake,
+  Lightbulb,
   Megaphone,
   MousePointerClick,
   PawPrint,
-  Plus,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -17,12 +17,17 @@ import { getPetParentSummary } from "@/lib/admin/customers/pet-parents";
 import {
   getGrowthHomeStats,
   listGrowthCampaigns,
-  listGrowthContent,
   listUpcomingGrowthEvents,
 } from "@/lib/admin/growth/data";
 import {
+  listGrowthEventResults,
+  listGrowthInitiatives,
+  listGrowthIntelligence,
+} from "@/lib/admin/growth/outcomes";
+import { listGrowthTeamSummary } from "@/lib/admin/growth/team-summary";
+import { getGrowthResourceLinks } from "@/lib/admin/growth/operating-model";
+import {
   documentationGrowthCampaigns,
-  documentationGrowthContent,
   documentationGrowthHomeStats,
 } from "@/lib/internship/documentation-fixture";
 import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
@@ -37,29 +42,17 @@ import {
 import GrowthCollapsibleSection from "@/components/admin/growth/GrowthCollapsibleSection";
 import GrowthEmptyState from "@/components/admin/growth/GrowthEmptyState";
 import GrowthQuickActions from "@/components/admin/growth/GrowthQuickActions";
-import GrowthWeekBoard from "@/components/admin/growth/GrowthWeekBoard";
-
-function startOfWeek(date = new Date()) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() - next.getDay());
-  return next;
-}
-
-function ymd(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
+import GrowthResourcesPanel from "@/components/admin/growth/GrowthResourcesPanel";
+import GrowthTeamPanel from "@/components/admin/growth/GrowthTeamPanel";
 
 function formatEventWhen(iso: string | null) {
   if (!iso) return "Date TBD";
-  const date = new Date(iso);
+  const date = new Date(iso.includes("T") ? iso : `${iso}T12:00:00`);
   if (Number.isNaN(date.getTime())) return "Date TBD";
   return date.toLocaleString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
   });
 }
 
@@ -72,45 +65,41 @@ export async function GrowthWorkplaceHome({
   const base = workplace.basePath;
   const documentation = internDocumentationModeEnabled();
 
-  const [stats, campaigns, content, parents, upcomingEvents] = documentation
+  const [
+    stats,
+    campaigns,
+    parents,
+    upcomingEvents,
+    eventResults,
+    intelligence,
+    initiatives,
+    team,
+  ] = documentation
     ? [
         documentationGrowthHomeStats(),
         documentationGrowthCampaigns(),
-        documentationGrowthContent(),
         null,
+        [],
+        [],
+        [],
+        [],
         [],
       ]
     : await Promise.all([
         getGrowthHomeStats(),
         listGrowthCampaigns(),
-        listGrowthContent(),
         intern ? Promise.resolve(null) : getPetParentSummary(),
         listUpcomingGrowthEvents(6),
+        listGrowthEventResults(6),
+        listGrowthIntelligence(6),
+        listGrowthInitiatives(6),
+        intern
+          ? Promise.resolve([])
+          : listGrowthTeamSummary({
+              actorUserId: workplace.actor.id,
+              isSuperUser: workplace.actor.isSuperUser,
+            }),
       ]);
-
-  const weekStart = startOfWeek();
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + index);
-    return ymd(date);
-  });
-  const today = ymd(new Date());
-
-  const calendarItems = new Map<
-    string,
-    { title: string; href: string; kind: string }[]
-  >();
-  for (const item of content) {
-    const day = item.plannedDate?.slice(0, 10);
-    if (!day) continue;
-    const list = calendarItems.get(day) || [];
-    list.push({
-      title: item.title,
-      href: growthHref(base, "/content"),
-      kind: item.platform,
-    });
-    calendarItems.set(day, list);
-  }
 
   const primaryKpis = [
     {
@@ -173,80 +162,75 @@ export async function GrowthWorkplaceHome({
       trend: stats.trends.conversion,
     },
     {
-      label: "Needs review",
-      value: String(stats.pendingReview),
-      helper: "Awaiting Ava / Jason",
-      tone: "rose" as const,
-      icon: <ClipboardCheck size={18} />,
-      trend: stats.trends.pendingReview,
+      label: "Live campaigns",
+      value: String(stats.campaigns),
+      helper: "Outcome tracking",
+      tone: "emerald" as const,
+      icon: <Sparkles size={18} />,
+      trend: stats.trends.campaigns,
     },
   ];
 
   const desktopActions = [
     {
-      href: growthHref(base, "/create"),
-      label: "Create a post",
-      detail: "Caption, tracking link, publish",
-      icon: Plus,
+      href: growthHref(base, "/events"),
+      label: "Community & Events",
+      detail: "Upcoming activations + event-day results",
+      icon: CalendarDays,
       primary: true,
     },
     {
-      href: growthHref(base, "/gurus"),
-      label: "Promote a Guru",
-      detail: "Put a sitter in front of Pet Parents",
-      icon: Users,
-    },
-    {
-      href: growthHref(base, "/events"),
-      label: "Community & Events",
-      detail: "Promote meetups and record day-of results",
-      icon: CalendarDays,
-    },
-    {
       href: growthHref(base, "/campaigns"),
-      label: "Campaigns",
-      detail: "Copy tracking links",
+      label: "Campaign outcomes",
+      detail: "Target vs result — production stays in Planner",
       icon: Megaphone,
     },
     {
-      href: growthHref(base, "/analytics"),
+      href: growthHref(base, "/intelligence"),
       label: "Growth Intelligence",
-      detail: intern ? "Weekly check-in + scoreboard" : "Friday scoreboard",
+      detail: "Surveys, polls, tests, recommendations",
+      icon: Lightbulb,
+    },
+    {
+      href: growthHref(base, "/analytics"),
+      label: "Analytics / Results",
+      detail: "Business performance and trends",
       icon: BarChart3,
     },
     {
       href: intern ? "/intern" : "/intern/manage",
-      label: intern ? "Intern portal" : "Team",
-      detail: intern ? "Hours, tasks, check-in" : "Interns & upcoming reviews",
-      icon: Sparkles,
+      label: intern ? "Intern Portal" : "Manager Desk",
+      detail: intern
+        ? "Hours & university record"
+        : "Formal intern oversight",
+      icon: Users,
+    },
+    {
+      href: growthHref(base, "/create"),
+      label: "Tracking link",
+      detail: "Campaign destination for measurable signups",
+      icon: ClipboardList,
     },
   ];
 
-  const todayContent = content.filter(
-    (item) => item.plannedDate?.slice(0, 10) === today,
-  );
-  const dueSoon = content.filter((item) => {
-    const day = item.plannedDate?.slice(0, 10);
-    return day && day >= today && day <= days[6];
-  });
-
   const linkClass =
     "inline-flex min-h-11 items-center rounded-2xl px-3 text-sm font-black text-emerald-800";
+  const resourceLinks = getGrowthResourceLinks({ intern });
 
   return (
     <GrowthPageFrame
       kicker={
         intern
-          ? "Intern portal · Growth workplace"
+          ? "Intern portal · Growth measurement"
           : workplace.actor.isSuperUser
-            ? "Super Admin · Growth Workplace"
-            : "Social & Community Workplace"
+            ? "Super Admin · Growth Workspace"
+            : "Social & Community Growth Workspace"
       }
-      title="Turn SitGuru stories into Pet Parents."
+      title="Measure SitGuru growth. Decide what to do next."
       detail={
         intern
-          ? "Drafts go to Ava first. No Admin HQ, passwords, or Pet Parent private records."
-          : "This is the workbench. Create, post, and watch signups — not follower counts."
+          ? "Outcomes and learning live here. Planner owns assignments. Intern Portal owns hours and university requirements."
+          : "Teams communicates. Planner manages work. This workspace records results — not a second task board."
       }
       action={
         intern ? (
@@ -254,18 +238,25 @@ export async function GrowthWorkplaceHome({
             href="/intern"
             className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-emerald-900"
           >
-            Intern dashboard
+            Intern Portal
           </Link>
         ) : (
           <Link
             href="/intern/manage"
             className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-emerald-900"
           >
-            Intern team
+            Manager Desk
           </Link>
         )
       }
     >
+      <div className="rounded-[1.4rem] border border-emerald-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+        <span className="font-black text-emerald-900">Operating model:</span>{" "}
+        Founder direction → Growth strategy → Teams discussion → Planner
+        execution → Growth Workspace measures results → learning → next
+        experiment. Routine work does not wait on Founder approval.
+      </div>
+
       {!intern && parents && parents.new24h > 0 ? (
         workplace.actor.isSuperUser ? (
           <Link
@@ -297,24 +288,16 @@ export async function GrowthWorkplaceHome({
         )
       ) : null}
 
-      {/*
-        Mobile module order (CSS order):
-        1 Overview KPIs → 2 Quick Actions → 3 Community & Events → 4 Campaigns
-        → 5 Ambassador Growth → 6 Growth Intelligence → 7 Team → 8 Recent Activity
-        Desktop uses multi-column grid without relying on that order.
-      */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
-        {/* 1. Growth Overview — primary KPIs */}
-        <section className="order-1 min-w-0 space-y-3 lg:col-span-12 lg:order-none">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                Growth overview
-              </p>
-              <h2 className="text-lg font-black text-slate-950 sm:text-xl">
-                This week at a glance
-              </h2>
-            </div>
+        {/* Overview */}
+        <section className="order-1 min-w-0 space-y-3 lg:col-span-12">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+              Overview
+            </p>
+            <h2 className="text-lg font-black text-slate-950 sm:text-xl">
+              Business growth this week
+            </h2>
           </div>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             {primaryKpis.map((tile) => (
@@ -326,21 +309,19 @@ export async function GrowthWorkplaceHome({
                 tone={tile.tone}
                 icon={tile.icon}
                 trend={tile.trend}
-                className="min-w-0 break-words [&_p.text-3xl]:text-2xl sm:[&_p.text-3xl]:text-3xl"
+                className="min-w-0 break-words"
               />
             ))}
           </div>
         </section>
 
-        {/* 2. Mobile Quick Actions */}
         <div className="order-2 min-w-0 lg:hidden">
           <GrowthQuickActions workplace={workplace} />
         </div>
 
-        {/* Growth trend / registrations */}
-        <section className="order-3 min-w-0 space-y-3 lg:col-span-12 lg:order-none">
+        <section className="order-3 min-w-0 space-y-3 lg:col-span-12">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-            Growth trend / registrations
+            Analytics / Results
           </p>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             {trendKpis.map((tile) => (
@@ -352,19 +333,18 @@ export async function GrowthWorkplaceHome({
                 tone={tile.tone}
                 icon={tile.icon}
                 trend={tile.trend}
-                className="min-w-0 break-words [&_p.text-3xl]:text-2xl sm:[&_p.text-3xl]:text-3xl"
+                className="min-w-0 break-words"
               />
             ))}
           </div>
         </section>
 
-        {/* Desktop action strip (hidden on mobile — Quick Actions covers it) */}
-        <section className="order-10 hidden min-w-0 gap-3 lg:order-none lg:col-span-12 lg:grid lg:grid-cols-2 xl:grid-cols-3">
+        <section className="order-10 hidden min-w-0 gap-3 lg:col-span-12 lg:grid lg:grid-cols-2 xl:grid-cols-3">
           {desktopActions.map((action) => {
             const Icon = action.icon;
             return (
               <Link
-                key={action.href}
+                key={`${action.href}-${action.label}`}
                 href={action.href}
                 className={
                   action.primary
@@ -403,20 +383,66 @@ export async function GrowthWorkplaceHome({
           })}
         </section>
 
-        {/* 3. Community & Events */}
-        <div className="order-4 min-w-0 lg:col-span-6 lg:order-none">
+        {/* Current Initiatives — high-level only */}
+        <div className="order-4 min-w-0 lg:col-span-12">
           <GrowthCollapsibleSection
-            eyebrow="Main workspace"
-            title="Community & Events"
+            eyebrow="Current initiatives"
+            title="High-level growth initiatives"
+            defaultOpen={false}
+          >
+            <div className="space-y-3 pt-4">
+              <p className="text-sm font-semibold text-slate-600">
+                Initiatives describe business themes (for example November Pet
+                Parent Acquisition). Production tasks, owners, and review stages
+                belong in Microsoft Planner — not here.
+              </p>
+              {initiatives.map((item) => (
+                <article
+                  key={item.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="min-w-0 break-words font-black text-slate-950">
+                      {item.name}
+                    </p>
+                    <StatusPill value={item.status} />
+                  </div>
+                  {item.purpose ? (
+                    <p className="mt-1 break-words text-sm font-semibold text-slate-600">
+                      {item.purpose}
+                    </p>
+                  ) : null}
+                  {item.market ? (
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                      {item.market}
+                    </p>
+                  ) : null}
+                </article>
+              ))}
+              {initiatives.length === 0 ? (
+                <GrowthEmptyState
+                  title="No initiatives recorded yet"
+                  detail="Add a high-level initiative when a strategy becomes an active growth theme. Executable work still goes to Planner."
+                />
+              ) : null}
+            </div>
+          </GrowthCollapsibleSection>
+        </div>
+
+        {/* Community & Events */}
+        <div className="order-5 min-w-0 lg:col-span-6">
+          <GrowthCollapsibleSection
+            eyebrow="Community & Events"
+            title="Event activation & results"
             defaultOpen
             action={
               <Link href={growthHref(base, "/events")} className={linkClass}>
-                All →
+                Open →
               </Link>
             }
           >
             <div className="space-y-3 pt-4">
-              {upcomingEvents.slice(0, 4).map((event) => (
+              {upcomingEvents.slice(0, 3).map((event) => (
                 <article
                   key={event.id}
                   className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
@@ -425,23 +451,17 @@ export async function GrowthWorkplaceHome({
                     {event.name}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {formatEventWhen(event.startAt)}
+                    Upcoming · {formatEventWhen(event.startAt)}
                     {event.market ? ` · ${event.market}` : ""}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Link
-                      href={`${growthHref(base, "/create")}?type=event&title=${encodeURIComponent(event.name)}&market=${encodeURIComponent(event.market)}&href=${encodeURIComponent(event.href)}`}
-                      className="inline-flex min-h-11 items-center rounded-2xl px-3 text-sm font-black !text-white"
-                      style={{ background: "#0D5C3A" }}
-                    >
-                      Promote
-                    </Link>
                     {!intern ? (
                       <Link
-                        href="/admin/sales-marketing/lead-entry"
-                        className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-black text-emerald-900"
+                        href={`${growthHref(base, "/events")}#record-results`}
+                        className="inline-flex min-h-11 items-center rounded-2xl px-3 text-sm font-black !text-white"
+                        style={{ background: "#0D5C3A" }}
                       >
-                        Record leads
+                        Record results
                       </Link>
                     ) : null}
                     <Link
@@ -453,18 +473,45 @@ export async function GrowthWorkplaceHome({
                   </div>
                 </article>
               ))}
-              {upcomingEvents.length === 0 ? (
+              {eventResults.slice(0, 3).map((result) => (
+                <article
+                  key={result.id}
+                  className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3"
+                >
+                  <p className="break-words font-black text-slate-950">
+                    {result.eventName}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-600">
+                    Results · {formatEventWhen(result.eventDate)} ·{" "}
+                    {result.totalLeads} leads · {result.totalRegistrations} regs
+                    · {result.conversionRate}
+                  </p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                    Leads {result.leadsMetricSource} · Regs{" "}
+                    {result.registrationsMetricSource} · QR{" "}
+                    {result.qrScansMetricSource}
+                  </p>
+                  {result.lessonsLearned ? (
+                    <p className="mt-2 break-words text-sm font-semibold text-slate-700">
+                      {result.lessonsLearned}
+                    </p>
+                  ) : null}
+                </article>
+              ))}
+              {upcomingEvents.length === 0 && eventResults.length === 0 ? (
                 <GrowthEmptyState
-                  title="No upcoming events yet"
-                  detail="Promote published community events or create an event post from Quick Actions."
+                  title="No event outcomes yet"
+                  detail="Planner covers tent prep. SitGuru records leads, QR scans, registrations, and lessons learned."
                   action={
-                    <Link
-                      href={growthHref(base, "/events")}
-                      className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
-                      style={{ background: "#0D5C3A" }}
-                    >
-                      Browse events
-                    </Link>
+                    !intern ? (
+                      <Link
+                        href={`${growthHref(base, "/events")}#record-results`}
+                        className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
+                        style={{ background: "#0D5C3A" }}
+                      >
+                        Record event results
+                      </Link>
+                    ) : undefined
                   }
                 />
               ) : null}
@@ -472,19 +519,23 @@ export async function GrowthWorkplaceHome({
           </GrowthCollapsibleSection>
         </div>
 
-        {/* 4. Campaigns */}
-        <div className="order-5 min-w-0 lg:col-span-6 lg:order-none">
+        {/* Campaigns */}
+        <div className="order-6 min-w-0 lg:col-span-6">
           <GrowthCollapsibleSection
-            eyebrow="Main workspace"
-            title="Campaigns"
+            eyebrow="Campaigns"
+            title="Campaign performance"
             defaultOpen
             action={
               <Link href={growthHref(base, "/campaigns")} className={linkClass}>
-                All →
+                Open →
               </Link>
             }
           >
             <div className="space-y-3 pt-4">
+              <p className="text-sm font-semibold text-slate-600">
+                Track destinations, status, and acquisition impact. Creative
+                review and production checklists stay in Planner.
+              </p>
               {campaigns.slice(0, 4).map((campaign) => (
                 <Link
                   key={campaign.id}
@@ -505,28 +556,19 @@ export async function GrowthWorkplaceHome({
               ))}
               {campaigns.length === 0 ? (
                 <GrowthEmptyState
-                  title="No campaigns yet"
-                  detail="Create one and copy the tracking link before you post."
-                  action={
-                    <Link
-                      href={growthHref(base, "/create")}
-                      className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
-                      style={{ background: "#0D5C3A" }}
-                    >
-                      Add campaign
-                    </Link>
-                  }
+                  title="No campaign outcomes yet"
+                  detail="Create a tracking link when a campaign needs measurable signups."
                 />
               ) : null}
             </div>
           </GrowthCollapsibleSection>
         </div>
 
-        {/* 5. Ambassador Growth */}
-        <div className="order-6 min-w-0 lg:col-span-6 lg:order-none">
+        {/* Ambassador Growth */}
+        <div className="order-7 min-w-0 lg:col-span-6">
           <GrowthCollapsibleSection
-            eyebrow="Secondary workspace"
-            title="Ambassador Growth"
+            eyebrow="Ambassador Growth"
+            title="Ambassador outcomes"
             defaultOpen={false}
           >
             <div className="space-y-3 pt-4">
@@ -538,229 +580,142 @@ export async function GrowthWorkplaceHome({
                   {stats.ambassadors}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Promote Ambassador stories and track referral link use from
-                  this workplace.
+                  Hybrid model: in-person / person-to-person and remote /
+                  digital. Program planning stays in Teams + Planner.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={growthHref(base, "/create?type=ambassador")}
-                  className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
-                  style={{ background: "#0D5C3A" }}
-                >
-                  Ambassador post
-                </Link>
-                {!intern ? (
-                  <Link
-                    href="/admin/ambassadors"
-                    className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900"
-                  >
-                    Ambassador CRM
-                  </Link>
-                ) : null}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                    Referral clicks
+                  </p>
+                  <p className="mt-1 text-xl font-black text-slate-950">
+                    {stats.referrals}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                    Attributed regs
+                  </p>
+                  <p className="mt-1 text-xl font-black text-slate-950">
+                    {stats.signups}
+                  </p>
+                </div>
               </div>
             </div>
           </GrowthCollapsibleSection>
         </div>
 
-        {/* 6. Growth Intelligence */}
-        <div className="order-7 min-w-0 lg:col-span-6 lg:order-none">
+        {/* Growth Intelligence */}
+        <div className="order-8 min-w-0 lg:col-span-6">
           <GrowthCollapsibleSection
-            eyebrow="Secondary workspace"
-            title="Growth Intelligence"
+            eyebrow="Growth Intelligence"
+            title="Tests, surveys & learning"
             defaultOpen={false}
             action={
-              <Link href={growthHref(base, "/analytics")} className={linkClass}>
+              <Link
+                href={growthHref(base, "/intelligence")}
+                className={linkClass}
+              >
                 Open →
               </Link>
             }
           >
-            <div className="grid grid-cols-2 gap-2 pt-4 sm:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                  Visits
-                </p>
-                <p className="mt-1 break-all text-xl font-black text-slate-950">
-                  {stats.visits}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                  Signups
-                </p>
-                <p className="mt-1 break-all text-xl font-black text-slate-950">
-                  {stats.signups}
-                </p>
-              </div>
-              <div className="col-span-2 rounded-2xl bg-slate-50 p-3 sm:col-span-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                  Conversion
-                </p>
-                <p className="mt-1 break-all text-xl font-black text-slate-950">
-                  {stats.conversion}
-                </p>
-              </div>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-slate-600">
-              Compact scoreboard for phones. Open Analytics for the full Friday
-              note and campaign list.
-            </p>
-          </GrowthCollapsibleSection>
-        </div>
-
-        {/* 7. Team */}
-        <div className="order-8 min-w-0 lg:col-span-6 lg:order-none">
-          <GrowthCollapsibleSection
-            eyebrow="Bottom workspace"
-            title="Team"
-            defaultOpen={false}
-          >
             <div className="space-y-3 pt-4">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-sm font-black text-emerald-950">
-                  {stats.pendingReview > 0
-                    ? `${stats.pendingReview} posts waiting for review`
-                    : "No posts waiting for review"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-emerald-900/80">
-                  {intern
-                    ? "Submit drafts to Ava from Content. Keep passwords with SitGuru."
-                    : "Review intern drafts, hours, and weekly check-ins from the intern team desk."}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={growthHref(base, "/content")}
-                  className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900"
-                >
-                  Content queue
-                </Link>
-                <Link
-                  href={intern ? "/intern" : "/intern/manage"}
-                  className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
-                  style={{ background: "#0D5C3A" }}
-                >
-                  {intern ? "Intern portal" : "View team"}
-                </Link>
-              </div>
-            </div>
-          </GrowthCollapsibleSection>
-        </div>
-
-        {/* 8. Upcoming Work / Recent Activity */}
-        <div className="order-9 min-w-0 lg:col-span-6 lg:order-none">
-          <GrowthCollapsibleSection
-            eyebrow="Bottom workspace"
-            title="Upcoming Work"
-            defaultOpen={false}
-          >
-            <div className="space-y-3 pt-4">
-              {todayContent.map((item) => (
-                <div
-                  key={item.id}
+              <p className="text-sm font-semibold text-slate-600">
+                Test → Learn → Recommend → Act → Measure. Discussion of findings
+                can continue in the Teams Analytics and Results channel.
+              </p>
+              {intelligence.map((entry) => (
+                <article
+                  key={entry.id}
                   className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
                 >
                   <p className="break-words font-black text-slate-950">
-                    {item.title}
+                    {entry.title}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    Today · {item.platform} · {item.status}
+                    {entry.studyType}
+                    {entry.responseCount
+                      ? ` · ${entry.responseCount} responses`
+                      : ""}
                   </p>
-                </div>
+                  {entry.keyFinding ? (
+                    <p className="mt-2 break-words text-sm font-semibold text-slate-700">
+                      {entry.keyFinding}
+                    </p>
+                  ) : null}
+                  {entry.recommendation ? (
+                    <p className="mt-1 break-words text-sm font-semibold text-emerald-900">
+                      Recommend: {entry.recommendation}
+                    </p>
+                  ) : null}
+                </article>
               ))}
-              {upcomingEvents.slice(0, 3).map((event) => (
-                <div
-                  key={`up-${event.id}`}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
-                >
-                  <p className="break-words font-black text-slate-950">
-                    {event.name}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    Event · {formatEventWhen(event.startAt)}
-                  </p>
-                </div>
-              ))}
-              {todayContent.length === 0 && upcomingEvents.length === 0 ? (
+              {intelligence.length === 0 ? (
                 <GrowthEmptyState
-                  title="Nothing due today"
-                  detail="Promote a Guru or draft tomorrow’s caption from Create."
+                  title="No market learning recorded yet"
+                  detail="Draft surveys in Planner. Capture findings and recommendations here."
+                  action={
+                    <Link
+                      href={growthHref(base, "/intelligence")}
+                      className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
+                      style={{ background: "#0D5C3A" }}
+                    >
+                      Record insight
+                    </Link>
+                  }
                 />
               ) : null}
             </div>
           </GrowthCollapsibleSection>
         </div>
 
-        {/* Content calendar — full width */}
-        <div className="order-11 min-w-0 lg:col-span-12 lg:order-none">
+        {/* Team */}
+        <div className="order-9 min-w-0 lg:col-span-6">
           <GrowthCollapsibleSection
-            eyebrow="This week"
-            title="Content calendar"
-            defaultOpen
-            forceOpen
-            action={
-              <Link href={growthHref(base, "/content")} className={linkClass}>
-                Open →
-              </Link>
-            }
+            eyebrow="Team"
+            title="Assigned interns"
+            defaultOpen={false}
           >
-            <div className="pt-4">
-              <GrowthWeekBoard
-                days={days}
-                today={today}
-                calendarItems={calendarItems}
-              />
-              {dueSoon.length === 0 ? (
-                <p className="mt-4 text-sm font-semibold text-slate-500">
-                  Nothing scheduled this week. Create a post and pick a day.
-                </p>
-              ) : null}
-            </div>
+            <GrowthTeamPanel members={team} intern={intern} />
           </GrowthCollapsibleSection>
         </div>
 
-        {/* Recent activity — today + review queue */}
-        <div className="order-12 min-w-0 lg:col-span-12 lg:order-none">
+        {/* Resources */}
+        <div className="order-11 min-w-0 lg:col-span-6">
           <GrowthCollapsibleSection
-            eyebrow="Recent activity"
-            title="Today’s board"
+            eyebrow="Resources"
+            title="External work systems"
             defaultOpen={false}
           >
-            <div className="grid gap-3 pt-4 md:grid-cols-2">
-              <div className="space-y-3">
-                {todayContent.map((item) => (
-                  <div
-                    key={`act-${item.id}`}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
-                  >
-                    <p className="break-words font-black text-slate-950">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {item.platform} · {item.status}
-                    </p>
-                  </div>
-                ))}
-                {todayContent.length === 0 ? (
-                  <p className="text-sm font-semibold text-slate-500">
-                    No posts due today.
-                  </p>
-                ) : null}
-              </div>
-              <div>
-                {stats.pendingReview > 0 ? (
-                  <Link
-                    href={growthHref(base, "/content")}
-                    className="block min-h-14 rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900"
-                  >
-                    {stats.pendingReview} posts waiting for review
-                  </Link>
-                ) : (
-                  <p className="text-sm font-semibold text-slate-500">
-                    Review queue is clear.
-                  </p>
-                )}
-              </div>
+            <GrowthResourcesPanel intern={intern} links={resourceLinks} />
+          </GrowthCollapsibleSection>
+        </div>
+
+        {/* Results & Learning bridge */}
+        <div className="order-12 min-w-0 lg:col-span-12">
+          <GrowthCollapsibleSection
+            eyebrow="Results & Learning"
+            title="Bridge from Planner execution"
+            defaultOpen={false}
+            forceOpen
+          >
+            <div className="space-y-3 pt-4 text-sm font-semibold leading-6 text-slate-600">
+              <p>
+                Planner’s{" "}
+                <span className="font-black text-slate-950">
+                  Results & Learning
+                </span>{" "}
+                bucket closes production work. SitGuru stores the business
+                outcome: leads, registrations, conversion, follow-ups, lessons,
+                and recommended next action.
+              </p>
+              <p>
+                Founder approval remains reserved for substantial spend, paid
+                ads, contracts, legal/policy, compensation, and high-risk brand
+                decisions — not routine organic growth execution.
+              </p>
             </div>
           </GrowthCollapsibleSection>
         </div>

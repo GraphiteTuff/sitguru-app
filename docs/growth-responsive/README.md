@@ -2,6 +2,8 @@
 
 Responsive redesign of the SitGuru Growth Workspace (`/admin/growth`, `/intern/growth`) so the same shared components, data, permissions, and APIs work from phone through desktop.
 
+**Operating model:** see [`OPERATING-MODEL.md`](./OPERATING-MODEL.md) — Teams communicates, Planner manages work, Growth Workspace measures outcomes.
+
 ## Breakpoints (Tailwind defaults)
 
 | Range | Layout behavior |

@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   BarChart3,
+  CalendarDays,
+  ClipboardList,
   FolderOpen,
   Home,
-  Images,
+  Lightbulb,
   Megaphone,
   Plus,
   Users,
-  CalendarDays,
   Handshake,
+  Images,
 } from "lucide-react";
 
 const suffixes = {
@@ -24,6 +26,7 @@ const suffixes = {
   events: "/events",
   partners: "/partners",
   analytics: "/analytics",
+  intelligence: "/intelligence",
 } as const;
 
 function href(basePath: string, suffix: string) {
@@ -50,12 +53,14 @@ export default function GrowthPhoneBar({
     { suffix: suffixes.campaigns, label: "Campaigns", icon: Megaphone },
   ];
   const moreLinks = [
-    { suffix: suffixes.create, label: "Create", icon: Plus },
-    { suffix: suffixes.content, label: "Content", icon: FolderOpen },
+    { suffix: suffixes.intelligence, label: "Insights", icon: Lightbulb },
+    { suffix: suffixes.analytics, label: "Results", icon: BarChart3 },
+    { suffix: `${suffixes.events}#record-results`, label: "Record results", icon: ClipboardList },
+    { suffix: suffixes.create, label: "Tracking link", icon: Plus },
+    { suffix: suffixes.content, label: "Inventory", icon: FolderOpen },
     { suffix: suffixes.gurus, label: "Gurus", icon: Users },
     { suffix: suffixes.media, label: "Media", icon: Images },
     { suffix: suffixes.partners, label: "Partners", icon: Handshake },
-    { suffix: suffixes.analytics, label: "Insights", icon: BarChart3 },
   ];
 
   return (
@@ -67,17 +72,21 @@ export default function GrowthPhoneBar({
             <div className="grid grid-cols-2 gap-2">
               {moreLinks.map((item) => {
                 const Icon = item.icon;
-                const target = href(basePath, item.suffix);
-                const active = isActive(pathname, basePath, item.suffix);
+                const fullHref = href(basePath, item.suffix);
+                const active = isActive(
+                  pathname,
+                  basePath,
+                  item.suffix.split("#")[0],
+                );
                 return (
                   <Link
-                    key={target}
-                    href={target}
+                    key={fullHref}
+                    href={fullHref}
                     onClick={() => setMoreOpen(false)}
                     className={
                       active
-                    ? "flex min-h-14 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
-                    : "flex min-h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
+                        ? "flex min-h-14 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
+                        : "flex min-h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
                     }
                   >
                     <Icon size={16} />
@@ -111,12 +120,12 @@ export default function GrowthPhoneBar({
           })}
 
           <Link
-            href={href(basePath, suffixes.create)}
-            aria-label="Create"
+            href={href(basePath, `${suffixes.events}#record-results`)}
+            aria-label="Record event results"
             className="mb-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
             style={{ background: "#0D5C3A" }}
           >
-            <Plus size={30} />
+            <ClipboardList size={28} />
           </Link>
 
           {primary.slice(2).map((item) => {

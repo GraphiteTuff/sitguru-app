@@ -76,16 +76,16 @@ export default function PromoteList({
             {showEventDayActions && kind === "event" ? (
               <div className="mt-3 grid grid-cols-1 gap-2 border-t border-emerald-50 pt-3 sm:grid-cols-2">
                 <Link
-                  href="/admin/sales-marketing/lead-entry"
+                  href="#record-results"
                   className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-center text-sm font-black text-emerald-950"
                 >
-                  Record leads
+                  Record results
                 </Link>
                 <Link
                   href="/admin/sales-marketing/lead-entry"
                   className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-3 text-center text-sm font-black text-emerald-950"
                 >
-                  Event results / notes
+                  CRM lead entry
                 </Link>
               </div>
             ) : null}

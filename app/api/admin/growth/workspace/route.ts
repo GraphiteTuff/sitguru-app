@@ -3,16 +3,26 @@ import { canUseGrowthPortal } from "@/lib/admin/growth/access";
 import {
   getGrowthHomeStats,
   listGrowthCampaigns,
-  listGrowthContent,
   listUpcomingGrowthEvents,
 } from "@/lib/admin/growth/data";
+import {
+  listGrowthEventResults,
+  listGrowthInitiatives,
+  listGrowthIntelligence,
+} from "@/lib/admin/growth/outcomes";
+import { listGrowthTeamSummary } from "@/lib/admin/growth/team-summary";
+import {
+  getGrowthResourceLinks,
+  GROWTH_OPERATING_LOOP,
+  GROWTH_RESPONSIBILITY_MAP,
+} from "@/lib/admin/growth/operating-model";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { currentAssignedIntern } from "@/lib/admin/growth/workplace";
 
 /**
- * Device-agnostic Growth Workspace snapshot.
- * Shared by the responsive web/PWA UI and future SitGuru Mobile clients.
- * Authorization mirrors requireGrowthWorkplace — not tied to React layout.
+ * Device-agnostic Growth Workspace snapshot (measurement layer).
+ * Does not sync Microsoft Graph / Planner / Teams.
+ * Shared by responsive web/PWA and future SitGuru Mobile.
  */
 export async function GET() {
   const intern = await currentAssignedIntern();
@@ -22,29 +32,57 @@ export async function GET() {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
-  const [stats, campaigns, content, upcomingEvents] = await Promise.all([
+  const actorKind = intern ? "intern" : "admin";
+  const [
+    stats,
+    campaigns,
+    upcomingEvents,
+    eventResults,
+    intelligence,
+    initiatives,
+    team,
+  ] = await Promise.all([
     getGrowthHomeStats(),
     listGrowthCampaigns(),
-    listGrowthContent(),
     listUpcomingGrowthEvents(8),
+    listGrowthEventResults(12),
+    listGrowthIntelligence(12),
+    listGrowthInitiatives(8),
+    actorKind === "admin" && admin
+      ? listGrowthTeamSummary({
+          actorUserId: admin.id,
+          isSuperUser: admin.isSuperUser,
+        })
+      : Promise.resolve([]),
   ]);
 
-  const actorKind = intern ? "intern" : "admin";
   const permissions = {
-    canRecordEventLeads: actorKind === "admin",
+    canRecordEventResults: actorKind === "admin",
+    canRecordIntelligence: true,
     canManageTeam: actorKind === "admin",
     canApproveContent: Boolean(admin?.isSuperUser),
-    canCreateCampaigns: true,
-    canPromoteEvents: true,
+    canCreateTrackingLinks: true,
+    // Explicit non-capabilities — owned elsewhere
+    ownsPlannerTasks: false,
+    ownsTeamsChat: false,
+    ownsInternAcademicRecord: false,
   };
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
+    operatingModel: {
+      summary:
+        "Teams = communicate. Planner = manage work. Growth Workspace = measure growth.",
+      loop: GROWTH_OPERATING_LOOP,
+      responsibilities: GROWTH_RESPONSIBILITY_MAP,
+      microsoftGraphSync: "future_enhancement_only",
+    },
     actor: {
       kind: actorKind,
       isSuperUser: Boolean(admin?.isSuperUser),
     },
     permissions,
+    resources: getGrowthResourceLinks({ intern: actorKind === "intern" }),
     kpis: {
       petParents: stats.petParents,
       gurus: stats.gurus,
@@ -57,6 +95,13 @@ export async function GET() {
       pendingReview: stats.pendingReview,
     },
     trends: stats.trends,
+    initiatives: initiatives.map((item) => ({
+      id: item.id,
+      name: item.name,
+      purpose: item.purpose,
+      status: item.status,
+      market: item.market,
+    })),
     campaigns: campaigns.slice(0, 12).map((campaign) => ({
       id: campaign.id,
       name: campaign.name,
@@ -65,13 +110,6 @@ export async function GET() {
       market: campaign.market,
       trackingUrl: campaign.trackingUrl,
     })),
-    content: content.slice(0, 20).map((item) => ({
-      id: item.id,
-      title: item.title,
-      platform: item.platform,
-      status: item.status,
-      plannedDate: item.plannedDate,
-    })),
     upcomingEvents: upcomingEvents.map((event) => ({
       id: event.id,
       name: event.name,
@@ -79,6 +117,37 @@ export async function GET() {
       href: event.href,
       market: event.market,
       startAt: event.startAt,
+    })),
+    eventResults: eventResults.map((result) => ({
+      id: result.id,
+      eventName: result.eventName,
+      eventDate: result.eventDate,
+      totalLeads: result.totalLeads,
+      totalRegistrations: result.totalRegistrations,
+      conversionRate: result.conversionRate,
+      lessonsLearned: result.lessonsLearned,
+      recommendedNextAction: result.recommendedNextAction,
+      leadsMetricSource: result.leadsMetricSource,
+      registrationsMetricSource: result.registrationsMetricSource,
+      qrScansMetricSource: result.qrScansMetricSource,
+    })),
+    intelligence: intelligence.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      studyType: entry.studyType,
+      responseCount: entry.responseCount,
+      keyFinding: entry.keyFinding,
+      recommendation: entry.recommendation,
+      actionTaken: entry.actionTaken,
+    })),
+    team: team.map((member) => ({
+      id: member.id,
+      name: member.name,
+      statusLabel: member.statusLabel,
+      school: member.school,
+      hoursSubmitted: member.hoursSubmitted,
+      hoursApproved: member.hoursApproved,
+      managerDeskHref: member.managerDeskHref,
     })),
   });
 }
