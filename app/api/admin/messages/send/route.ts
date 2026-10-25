@@ -360,10 +360,13 @@ export async function POST(req: NextRequest) {
     const conversationId = safeString(payload?.conversationId);
     const body = safeString(payload?.body);
     const requestedTopic = safeString(payload?.topic);
+    const media = Array.isArray(payload?.media)
+      ? payload.media.filter((item: { url?: string }) => String(item?.url || "").startsWith("https://"))
+      : [];
 
-    if (!conversationId || !body) {
+    if (!conversationId || (!body && !media.length)) {
       return NextResponse.json(
-        { error: "Missing required message fields." },
+        { error: "Write a message or attach a file." },
         { status: 400 }
       );
     }
@@ -417,6 +420,16 @@ export async function POST(req: NextRequest) {
 
     const nowIso = new Date().toISOString();
 
+    const { data: senderProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("first_name, full_name")
+      .eq("id", senderId)
+      .maybeSingle();
+    const senderFirst =
+      String(senderProfile?.first_name || senderProfile?.full_name || "")
+        .trim()
+        .split(/\s+/)[0] || "SitGuru";
+
     const { data: insertedMessage, error: insertError } =
       await insertMessageWithColumnFallback({
         conversation_id: conversationId,
@@ -424,10 +437,13 @@ export async function POST(req: NextRequest) {
         recipient_id: recipientId || null,
         sender_role: "admin",
         recipient_role: recipientRole || "user",
-        content: body,
-        body,
+        sender_name_snapshot: senderFirst,
+        content: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
+        body: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
         topic,
-        message_type: "text",
+        message_type: media.length ? "file" : "text",
+        media_urls: media.map((item: { url: string }) => item.url),
+        media_mime_types: media.map((item: { mimeType?: string }) => item.mimeType || "application/octet-stream"),
         is_deleted: false,
         is_read: false,
         created_at: nowIso,
@@ -467,7 +483,7 @@ export async function POST(req: NextRequest) {
         subject: safeString(safeConversation.subject) || topic,
         status: safeString(safeConversation.status) || "open",
         last_message_at: nowIso,
-        last_message_preview: body.slice(0, 180),
+        last_message_preview: (body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment")).slice(0, 180),
         updated_at: nowIso,
       },
     });

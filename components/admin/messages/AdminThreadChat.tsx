@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Paperclip, Send } from "lucide-react";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
 import { useVisualViewportInset } from "@/lib/hooks/use-visual-viewport-inset";
 import type { AdminChatMessage, AdminSelectedThread } from "./types";
@@ -61,6 +61,9 @@ export default function AdminThreadChat({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [media, setMedia] = useState<{ url: string; mimeType: string; name: string }[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [optimistic, setOptimistic] = useState<AdminChatMessage[]>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -111,7 +114,7 @@ export default function AdminThreadChat({
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = draft.trim();
-    if (body.length < 2 || pending) return;
+    if ((body.length < 1 && media.length === 0) || pending) return;
 
     setPending(true);
     setError("");
@@ -124,12 +127,15 @@ export default function AdminThreadChat({
         body,
         createdAt: new Date().toISOString(),
         isAdmin: true,
-        senderName: "SitGuru Admin",
+        senderName: "You",
         senderAvatar: "/images/sitguru-message-avatar.jpg",
         senderRole: "admin",
+        attachments: media,
       },
     ]);
-    setDraft("");
+      setDraft("");
+      setMedia([]);
+      setFileName("");
 
     try {
       const response = await fetch("/api/admin/messages/send", {
@@ -140,6 +146,7 @@ export default function AdminThreadChat({
           conversationId: thread.id,
           body,
           topic: thread.topic || "direct_message",
+          media,
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
@@ -150,6 +157,8 @@ export default function AdminThreadChat({
       if (!response.ok || !payload?.ok) {
         setOptimistic((current) => current.filter((item) => item.id !== optimisticId));
         setDraft(body);
+        setMedia(media);
+        setFileName(media[0]?.name || "");
         setError(payload?.error || "Message could not be sent.");
         return;
       }
@@ -158,6 +167,8 @@ export default function AdminThreadChat({
     } catch {
       setOptimistic((current) => current.filter((item) => item.id !== optimisticId));
       setDraft(body);
+      setMedia(media);
+      setFileName(media[0]?.name || "");
       setError("Message could not be sent.");
     } finally {
       setPending(false);
@@ -236,6 +247,17 @@ export default function AdminThreadChat({
                   <p className="whitespace-pre-wrap text-[15px] font-semibold leading-6">
                     {message.body}
                   </p>
+                  {message.attachments?.map((file) => (
+                    <a
+                      key={file.url}
+                      href={file.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`mt-2 block truncate text-xs font-black underline ${message.isAdmin ? "text-white" : "text-emerald-800"}`}
+                    >
+                      {file.name || "Open attachment"}
+                    </a>
+                  ))}
                   <p
                     className={`mt-1 text-[10px] font-bold ${
                       message.isAdmin ? "text-white/70" : "text-slate-400"
@@ -257,7 +279,56 @@ export default function AdminThreadChat({
         {error ? (
           <p className="mb-2 text-xs font-bold text-rose-700">{error}</p>
         ) : null}
+        {fileName ? (
+          <p className="mb-2 truncate text-xs font-bold text-emerald-800">Attached {fileName}</p>
+        ) : null}
         <div className="flex items-end gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.txt,.csv"
+            className="hidden"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setPending(true);
+              setError("");
+              const form = new FormData();
+              form.set("file", file);
+              form.set("conversationId", thread.id);
+              try {
+                const response = await fetch("/api/messaging/upload", {
+                  method: "POST",
+                  body: form,
+                  credentials: "same-origin",
+                });
+                const payload = (await response.json()) as {
+                  ok?: boolean;
+                  error?: string;
+                  media?: { url: string; mimeType: string; name: string };
+                };
+                if (!response.ok || !payload.media?.url) {
+                  setError(payload.error || "That file could not be attached.");
+                  return;
+                }
+                setMedia((current) => [...current, payload.media!]);
+                setFileName(payload.media.name || file.name);
+              } catch {
+                setError("That file could not be attached.");
+              } finally {
+                setPending(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d7e4da] bg-white text-emerald-900"
+            aria-label="Attach a file"
+          >
+            <Paperclip size={18} />
+          </button>
           <textarea
             ref={inputRef}
             value={draft}
@@ -276,7 +347,7 @@ export default function AdminThreadChat({
           />
           <button
             type="submit"
-            disabled={pending || draft.trim().length < 2}
+            disabled={pending || (draft.trim().length < 1 && media.length === 0)}
             className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
             aria-label="Send message"
           >

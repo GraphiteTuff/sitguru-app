@@ -151,7 +151,7 @@ async function hydrateInstance(instance: Record<string, unknown>, includeSensiti
       .eq("instance_id", instanceId)
       .order("sort_order", { ascending: true }),
     supabaseAdmin.from("onboarding_templates").select("name").eq("id", text(instance.template_id)).maybeSingle(),
-    settings().catch(() => ({})),
+    settings().catch(() => ({}) as Record<string, string>),
   ]);
   if (error) return null;
   const versionIds = rows(items).map((row) => text(row.version_id)).filter(Boolean);

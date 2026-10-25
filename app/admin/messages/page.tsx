@@ -117,6 +117,8 @@ type MessageRow = {
   read_at?: string | null;
   is_read?: boolean | null;
   is_deleted?: boolean | null;
+  media_urls?: string[] | null;
+  media_mime_types?: string[] | null;
   created_at?: string | null;
   edited_at?: string | null;
 };
@@ -508,6 +510,13 @@ function getProfileRole(profile?: ProfileRow | null) {
   return normalizeRole(
     profile.role || profile.user_role || profile.account_type || profile.type,
   );
+}
+
+function personFirstName(profile?: ProfileRow | null, snapshot?: string | null) {
+  const first = asString(profile?.first_name);
+  if (first) return first;
+  const source = asString(snapshot) || (profile ? getProfileName(profile) : "");
+  return source.split(/\s+/).filter(Boolean)[0] || "SitGuru";
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -3897,15 +3906,17 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           const senderProfile = message.sender_id
             ? profileMap.get(message.sender_id) || null
             : null;
-          const senderName = isAdminSender
-            ? "SitGuru Admin"
-            : asString(message.sender_name_snapshot) ||
-              (senderProfile ? getProfileName(senderProfile) : "") ||
-              selectedCard.contactName;
+          const senderName = personFirstName(
+            isAdminSender ? profileMap.get(user.id) || senderProfile : senderProfile,
+            isAdminSender ? null : message.sender_name_snapshot,
+          );
           const senderAvatar = isAdminSender
-            ? defaultAdminAvatar
+            ? (profileMap.get(user.id) ? getProfileAvatar(profileMap.get(user.id)) : "") ||
+              defaultAdminAvatar
             : (senderProfile ? getProfileAvatar(senderProfile) : "") ||
               getThreadAvatar(selectedCard);
+          const mediaUrls = Array.isArray(message.media_urls) ? message.media_urls : [];
+          const mediaTypes = Array.isArray(message.media_mime_types) ? message.media_mime_types : [];
 
           return {
             id: message.id,
@@ -3915,6 +3926,11 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             senderName,
             senderAvatar,
             senderRole: senderRole || "user",
+            attachments: mediaUrls.map((url, index) => ({
+              url: String(url),
+              mimeType: String(mediaTypes[index] || ""),
+              name: "Attachment",
+            })),
           };
         }),
       }

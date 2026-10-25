@@ -24,6 +24,7 @@ export type AdminChatMessage = {
   senderName: string;
   senderAvatar: string;
   senderRole: string;
+  attachments?: { url: string; name: string; mimeType: string }[];
 };
 
 export type AdminSelectedThread = {

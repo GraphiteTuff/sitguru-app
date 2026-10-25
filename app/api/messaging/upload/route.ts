@@ -21,6 +21,9 @@ const ALLOWED = new Set([
   "video/mp4",
   "video/quicktime",
   "video/webm",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
 ]);
 
 export async function POST(req: NextRequest) {
@@ -62,7 +65,7 @@ export async function POST(req: NextRequest) {
     const mime = file.type || "application/octet-stream";
     if (!ALLOWED.has(mime)) {
       return NextResponse.json(
-        { ok: false, error: "Only image/video uploads are supported." },
+        { ok: false, error: "Use an image, video, PDF, or text file under 25MB." },
         { status: 400 },
       );
     }

@@ -35,9 +35,28 @@ export async function postStaffMessage(formData: FormData) {
   if (who.role === "none" || !who.userId) bounce("/admin/growth/messages", "error", "Sign in with a growth or founder login.");
   const body = field(formData, "body");
   const visibility = field(formData, "visibility") === "internal_note" ? "internal_note" : "participant";
-  if (body.length < 1) bounce("/admin/growth/messages", "error", "Write a message first.");
+  let media: { url: string; mimeType?: string; name?: string }[] = [];
+  try {
+    const parsed = JSON.parse(field(formData, "media") || "[]");
+    if (Array.isArray(parsed)) {
+      media = parsed.filter((item) => String(item?.url || "").startsWith("https://"));
+    }
+  } catch {
+    media = [];
+  }
+  if (body.length < 1 && !media.length) bounce("/admin/growth/messages", "error", "Write a message or attach a file.");
   const sensitive = scanSensitive(body);
   if (sensitive.flag) bounce("/admin/growth/messages", "error", sensitive.message);
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("first_name, full_name, avatar_url")
+    .eq("id", who.userId)
+    .maybeSingle();
+  const firstName =
+    String(profile?.first_name || profile?.full_name || "")
+      .trim()
+      .split(/\s+/)[0] || "SitGuru";
+  const preview = (body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment")).slice(0, 140);
 
   let conversationId = field(formData, "conversationId");
   if (!conversationId) {
@@ -48,7 +67,7 @@ export async function postStaffMessage(formData: FormData) {
         conversation_type: "internal_direct",
         workflow_status: "open",
         started_by_user_id: who.userId,
-        last_message_preview: body.slice(0, 140),
+        last_message_preview: preview,
         last_message_at: new Date().toISOString(),
         retention_class: "standard_internal",
       })
@@ -67,11 +86,12 @@ export async function postStaffMessage(formData: FormData) {
     conversation_id: conversationId,
     sender_id: who.userId,
     recipient_id: who.userId,
-    content: body,
-    body,
+    content: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
+    body: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
     visibility,
-    recipient_id: visibility === "internal_note" ? null : undefined,
-    sender_name_snapshot: who.role === "growth" ? "Social Media & Community Growth Manager" : "SitGuru",
+    media_urls: media.map((item) => item.url),
+    media_mime_types: media.map((item) => item.mimeType || "application/octet-stream"),
+    sender_name_snapshot: firstName,
     status: "unread",
     created_at: new Date().toISOString(),
   });
