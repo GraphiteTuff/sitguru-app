@@ -75,7 +75,11 @@ export const REALTIME_CHANNELS = {
   presence: 'sitguru-message-presence',
   guruLiveSearch: 'sitguru-guru-live-search',
   guruLiveProfile: (slug: string) => `sitguru-guru-live-profile-${slug}`,
+  /** Authorized workspace sync bus — mirrors web sitguru_live_signals. */
+  liveSignals: (userId: string) => `sitguru-live-signals:${userId}`,
 } as const;
+
+export const LIVE_SIGNAL_TABLE = 'sitguru_live_signals' as const;
 
 export const API_PATHS = {
   createBooking: '/api/bookings/create',

@@ -26,6 +26,18 @@ import {
 } from "@/lib/internship/review-flow";
 import { findInternByAccount, findInternById } from "@/lib/internship/queries";
 import { createClient } from "@/lib/supabase/server";
+import {
+  publishInternCheckinEvent,
+  publishInternHoursEvent,
+  publishInternQuestionEvent,
+  SITGURU_DOMAIN_EVENTS,
+} from "@/lib/realtime/publish-internship";
+import {
+  publishLiveSignals,
+  stableEventId,
+} from "@/lib/realtime/publish-live-signal";
+import { pathsForInternWorkspace } from "@/lib/realtime/query-keys";
+import { recipientsForInternWorkspace } from "@/lib/realtime/recipients";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -107,20 +119,34 @@ export async function saveTimeEntry(formData: FormData) {
 
   const submit = text(formData, "submit") === "yes";
   const now = new Date().toISOString();
-  const { error } = await supabaseAdmin.from("internship_time_logs").insert({
-    intern_id: internId,
-    worked_on: workedOn,
-    hours: hours.hours,
-    activity,
-    work_item_type: text(formData, "workItemType"),
-    work_item_id: text(formData, "workItemId"),
-    week_number: weekNumberForEntry(intern.academicStartDate, workedOn),
-    notes: text(formData, "notes"),
-    evidence_url: text(formData, "evidenceUrl"),
-    status: submit ? "submitted" : "draft",
-    submitted_at: submit ? now : null,
-  });
+  const { data: inserted, error } = await supabaseAdmin
+    .from("internship_time_logs")
+    .insert({
+      intern_id: internId,
+      worked_on: workedOn,
+      hours: hours.hours,
+      activity,
+      work_item_type: text(formData, "workItemType"),
+      work_item_id: text(formData, "workItemId"),
+      week_number: weekNumberForEntry(intern.academicStartDate, workedOn),
+      notes: text(formData, "notes"),
+      evidence_url: text(formData, "evidenceUrl"),
+      status: submit ? "submitted" : "draft",
+      submitted_at: submit ? now : null,
+    })
+    .select("id")
+    .maybeSingle();
   if (error) bounce("/intern?tab=home", "error", "Hours could not be saved yet.");
+  const logId = String(inserted?.id || stableEventId([internId, workedOn, activity, now]));
+  await publishInternHoursEvent({
+    intern,
+    eventType: submit
+      ? SITGURU_DOMAIN_EVENTS.INTERN_HOURS_SUBMITTED
+      : SITGURU_DOMAIN_EVENTS.TIME_ENTRY_CREATED,
+    resourceId: logId,
+    actor: { userId: actor.userId, label: actor.email },
+    submitted: submit,
+  });
   refresh("/intern");
   bounce("/intern?tab=home", "ok", submit ? "Hours submitted to your manager." : "Hours saved as a draft.");
 }
@@ -168,6 +194,17 @@ export async function reviewTimeEntry(formData: FormData) {
     status,
     comment,
   });
+  await publishInternHoursEvent({
+    intern,
+    eventType:
+      status === "changes_requested"
+        ? SITGURU_DOMAIN_EVENTS.INTERN_HOURS_REVIEWED
+        : SITGURU_DOMAIN_EVENTS.INTERN_HOURS_APPROVED,
+    resourceId: id,
+    actor: { userId: actor.userId, label: actor.email },
+    approved: status !== "changes_requested",
+    changesRequested: status === "changes_requested",
+  });
   refresh("/intern/manage");
   bounce("/intern/manage?tab=reviews", "ok", status === "changes_requested" ? "Hours sent back." : "Hours approved.");
 }
@@ -181,17 +218,26 @@ export async function askAva(formData: FormData) {
   if (question.length < 4) bounce("/intern", "error", "Write the question you want your manager to see.");
   const askedByRole = actor.kind === "intern" ? "intern" : actor.kind;
   if (askedByRole === "none") bounce("/intern", "error", "Sign in to ask your manager.");
-  const { error } = await supabaseAdmin.from("internship_questions").insert({
-    intern_id: internId,
-    target_type: text(formData, "targetType"),
-    target_id: text(formData, "targetId"),
-    target_title: text(formData, "targetTitle"),
-    question,
-    urgency: text(formData, "urgency") === "high" ? "high" : "normal",
-    status: "open",
-    asked_by_role: askedByRole === "intern" ? "intern" : "manager",
-  });
+  const { data: asked, error } = await supabaseAdmin
+    .from("internship_questions")
+    .insert({
+      intern_id: internId,
+      target_type: text(formData, "targetType"),
+      target_id: text(formData, "targetId"),
+      target_title: text(formData, "targetTitle"),
+      question,
+      urgency: text(formData, "urgency") === "high" ? "high" : "normal",
+      status: "open",
+      asked_by_role: askedByRole === "intern" ? "intern" : "manager",
+    })
+    .select("id")
+    .maybeSingle();
   if (error) bounce(text(formData, "returnTo") || "/intern", "error", "Question could not be sent.");
+  await publishInternQuestionEvent({
+    intern,
+    resourceId: String(asked?.id || stableEventId([internId, question, actor.userId])),
+    actor: { userId: actor.userId, label: actor.email },
+  });
   refresh("/intern");
   bounce(text(formData, "returnTo") || "/intern", "ok", askedByRole === "intern" ? "Your manager has your question." : "Question sent to the intern.");
 }
@@ -215,6 +261,12 @@ export async function answerInternQuestion(formData: FormData) {
     .eq("id", text(formData, "id"))
     .eq("intern_id", internId);
   if (error) bounce("/intern/manage?tab=questions", "error", "Answer could not be saved.");
+  await publishInternQuestionEvent({
+    intern,
+    resourceId: text(formData, "id"),
+    actor: { userId: actor.userId, label: actor.email },
+    answered: true,
+  });
   refresh("/intern/manage");
   bounce("/intern/manage?tab=questions", "ok", "Answer saved.");
 }
@@ -341,6 +393,43 @@ export async function reviewPortalSubmission(formData: FormData) {
     status: next.stage,
     comment,
   });
+
+  if (targetType === "weekly") {
+    await publishInternCheckinEvent({
+      intern,
+      eventType:
+        action === "request_changes" || action === "ceo_request_changes"
+          ? SITGURU_DOMAIN_EVENTS.INTERN_CHECKIN_REVIEWED
+          : SITGURU_DOMAIN_EVENTS.INTERN_CHECKIN_REVIEWED,
+      resourceId: targetId,
+      actor: { userId: actor.userId, label: actor.email },
+      needsChanges:
+        action === "request_changes" || action === "ceo_request_changes",
+    });
+  } else if (official) {
+    await publishLiveSignals({
+      eventType: SITGURU_DOMAIN_EVENTS.INTERN_MILESTONE_COMPLETED,
+      eventId: stableEventId([
+        SITGURU_DOMAIN_EVENTS.INTERN_MILESTONE_COMPLETED,
+        targetId,
+        actor.userId,
+      ]),
+      recipientUserIds: await recipientsForInternWorkspace(intern, {
+        includeOversight: true,
+      }),
+      resourceType: targetType,
+      resourceId: targetId,
+      scope: "intern",
+      paths: pathsForInternWorkspace(),
+      actorUserId: actor.userId,
+      actorLabel: actor.email,
+      revalidatePaths: pathsForInternWorkspace(),
+      notify: true,
+      notifyTitle: "Milestone approved",
+      notifyBody: "Your internship progress was updated.",
+      notifyHref: "/intern?tab=home",
+    });
+  }
 
   if (official) {
     const body = targetType === "weekly"

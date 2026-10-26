@@ -120,6 +120,20 @@ export async function saveInternshipAssignment(formData: FormData) {
     });
   }
 
+  const { publishInternAssignmentEvent } = await import(
+    "@/lib/realtime/publish-internship"
+  );
+  await publishInternAssignmentEvent({
+    intern: {
+      ...intern,
+      managerUserId: managerId || null,
+      supervisorUserId: supervisorId || null,
+    },
+    resourceId: internId,
+    actor: { userId: actor.id, label: actor.email },
+    created: Boolean(managerId && managerId !== intern.managerUserId),
+  });
+
   revalidatePath("/admin/internship/interns");
   revalidatePath("/intern/manage");
   revalidatePath("/intern");

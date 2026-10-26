@@ -249,6 +249,23 @@ export async function recordInternOnboardingSubmit(
     ...internOnboardingIdentitySnapshot(intern, workspace),
   });
   if (error) return { ok: false, error: error.message };
+
+  try {
+    const { publishOnboardingEvent } = await import(
+      "@/lib/realtime/publish-internship"
+    );
+    await publishOnboardingEvent({
+      intern,
+      resourceId: internId,
+      actor: {
+        userId: intern.userId,
+        label: intern.email || intern.studentEmail || "",
+      },
+    });
+  } catch (publishError) {
+    console.warn("[realtime] onboarding publish", publishError);
+  }
+
   return {
     ok: true,
     message: "Submitted. Email confirmation will be sent to your email on file.",

@@ -69,6 +69,16 @@ export async function saveGrowthEventResultAction(formData: FormData) {
     return { ok: false as const, error: "Could not save event results." };
   }
 
+  const { publishGrowthWorkspaceEvent, SITGURU_DOMAIN_EVENTS } = await import(
+    "@/lib/realtime/publish-internship"
+  );
+  await publishGrowthWorkspaceEvent({
+    eventType: SITGURU_DOMAIN_EVENTS.GROWTH_EVENT_RECORDED,
+    resourceType: "growth_event_results",
+    resourceId: id || "new",
+    actor: { userId: access.actor.id, label: access.actor.email },
+  });
+
   refresh();
   return { ok: true as const };
 }
@@ -110,6 +120,16 @@ export async function saveGrowthIntelligenceAction(formData: FormData) {
     return { ok: false as const, error: "Could not save growth insight." };
   }
 
+  const { publishGrowthWorkspaceEvent, SITGURU_DOMAIN_EVENTS } = await import(
+    "@/lib/realtime/publish-internship"
+  );
+  await publishGrowthWorkspaceEvent({
+    eventType: SITGURU_DOMAIN_EVENTS.GROWTH_INTELLIGENCE_RECORDED,
+    resourceType: "growth_intelligence_entries",
+    resourceId: id || "new",
+    actor: { userId: access.actor.id, label: access.actor.email },
+  });
+
   refresh();
   return { ok: true as const };
 }
@@ -136,11 +156,25 @@ export async function saveGrowthInitiativeAction(formData: FormData) {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabaseAdmin.from("growth_initiatives").insert(payload);
+  const { data: created, error } = await supabaseAdmin
+    .from("growth_initiatives")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.warn("saveGrowthInitiativeAction", error);
     return { ok: false as const, error: "Could not save initiative." };
   }
+
+  const { publishGrowthWorkspaceEvent, SITGURU_DOMAIN_EVENTS } = await import(
+    "@/lib/realtime/publish-internship"
+  );
+  await publishGrowthWorkspaceEvent({
+    eventType: SITGURU_DOMAIN_EVENTS.GROWTH_INITIATIVE_CREATED,
+    resourceType: "growth_initiatives",
+    resourceId: String(created?.id || name),
+    actor: { userId: access.actor.id, label: access.actor.email },
+  });
 
   refresh();
   return { ok: true as const };

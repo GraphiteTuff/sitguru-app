@@ -46,6 +46,7 @@ import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
+import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const adminRoutes = {
@@ -1128,6 +1129,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </div>
 
     </div>
+
+      <WorkspaceLiveSyncMount />
 
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       <SafeAssistantBubble>
