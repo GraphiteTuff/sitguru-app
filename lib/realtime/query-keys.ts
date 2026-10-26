@@ -31,7 +31,11 @@ export const WORKSPACE_REFRESH_PATHS = {
   internOnboarding: "/intern/onboarding",
   adminInternship: "/admin/internship",
   adminGrowth: "/admin/growth",
+  adminMyTime: "/admin/growth/my-time",
+  adminMyPayments: "/admin/growth/payments",
   adminHr: "/admin/hr",
+  adminPeople: "/admin/hr/people",
+  adminTeamPayments: "/admin/hr/people/payments",
   adminPayments: "/admin/payments",
   messages: "/messages",
 } as const;
@@ -57,9 +61,22 @@ export function pathsForManagerDesk() {
 export function pathsForGrowthWorkspace() {
   return [
     WORKSPACE_REFRESH_PATHS.adminGrowth,
+    WORKSPACE_REFRESH_PATHS.adminMyTime,
+    WORKSPACE_REFRESH_PATHS.adminMyPayments,
     WORKSPACE_REFRESH_PATHS.internGrowth,
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.managerDesk,
+  ];
+}
+
+export function pathsForStaffTimekeeper() {
+  return [
+    WORKSPACE_REFRESH_PATHS.adminGrowth,
+    WORKSPACE_REFRESH_PATHS.adminMyTime,
+    WORKSPACE_REFRESH_PATHS.adminMyPayments,
+    WORKSPACE_REFRESH_PATHS.adminPeople,
+    WORKSPACE_REFRESH_PATHS.adminTeamPayments,
+    WORKSPACE_REFRESH_PATHS.adminHr,
   ];
 }
 

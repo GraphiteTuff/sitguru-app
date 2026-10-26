@@ -434,7 +434,22 @@ export default async function AdminOperationsDashboard() {
         ["Guru Approvals", "/admin/guru-approvals"],
         ["Ambassadors", "/admin/ambassadors"],
         ["HR", "/admin/hr"],
+        ["People & Administration", "/admin/hr/people"],
+        ["Team Payments", "/admin/hr/people/payments"],
         ["Internship Program", "/admin/internship"],
+        ["Intern Portal Oversight", "/admin/internship/portal"],
+      ],
+    },
+    {
+      title: "Growth & Manager",
+      links: [
+        ["Growth Workspace", "/admin/growth"],
+        ["Manager Desk", "/intern/manage"],
+        ["My Time (Manager)", "/admin/growth/my-time"],
+        ["My Payments (Manager)", "/admin/growth/payments"],
+        ["Manager Help", "/admin/help/manager"],
+        ["Admin Help Directory", "/admin/help"],
+        ["Messaging", "/admin/messages"],
       ],
     },
     {
@@ -452,6 +467,7 @@ export default async function AdminOperationsDashboard() {
       links: [
         ["Financials", "/admin/financials"],
         ["Payouts", "/admin/payouts"],
+        ["Team Member Payments", "/admin/hr/people/payments"],
         ["Payment Gateway", "/admin/financials/payment-gateway"],
         ["Commissions", "/admin/commissions"],
         ["Partner Payouts", "/admin/partners/payouts"],

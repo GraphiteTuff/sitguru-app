@@ -3,6 +3,8 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  Clock3,
+  CreditCard,
   Lightbulb,
   Megaphone,
   Users,
@@ -64,6 +66,21 @@ export default function GrowthQuickActions({
       label: intern ? "Intern Portal" : "Manager Desk",
       icon: Users,
     },
+    ...(!intern
+      ? [
+          {
+            href: "/admin/growth/my-time",
+            label: "Add Time",
+            icon: Clock3,
+            primary: true as const,
+          },
+          {
+            href: "/admin/growth/payments",
+            label: "My Payments",
+            icon: CreditCard,
+          },
+        ]
+      : []),
   ];
 
   if (planner) {

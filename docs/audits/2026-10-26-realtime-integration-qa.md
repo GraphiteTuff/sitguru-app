@@ -1,7 +1,9 @@
 # Real-Time Integration — SitGuru QA Report
 
 **Date:** October 26, 2026 (America/New_York)  
+**Updated:** October 26, 2026 (America/New_York) — Ava Timekeeper + Payments  
 **Branch:** `cursor/realtime-workspace-sync-69fa`  
+**PR:** #178  
 **Principle:** One action → one authoritative update → all relevant authorized views refresh automatically.
 
 ---
@@ -10,143 +12,162 @@
 
 | Mechanism | Status | Primary surfaces |
 |-----------|--------|------------------|
-| Supabase Realtime `postgres_changes` | Production | Messaging threads/inbox, NotificationBell, Guru live profile/search, Admin live walks, Support inbox |
-| SSE + in-process walk event bus | Production | PawReport live GPS (`/api/walk/stream/[bookingId]`) |
-| Debounced `router.refresh()` | Production | MessageRealtimeRefresh, Guru bridges |
-| Poll + visibility/focus fallback | Production | MessageAutoRefresh, GlobalMessageNotifier, Admin live walks (5s) |
+| Supabase Realtime `postgres_changes` | Production | Messaging, NotificationBell, Guru live, Admin live walks, Support |
+| SSE + walk event bus | Production | PawReport GPS |
+| Debounced `router.refresh()` | Production | MessageRealtimeRefresh, Guru bridges, workspace sync |
+| Poll + visibility/focus fallback | Production | MessageAutoRefresh, Admin live walks |
 | Mobile `useRealtimeSubscription` | Production | Messages, notifications, bookings, PawReport |
-| TanStack Query / SWR | Installed, **unused** for app data | — |
-| Kafka / Redis streams / microservices | **Not present** | — |
+| `sitguru_live_signals` | **Shipped** | Authorized workspace sync bus (RLS own rows) |
+| TanStack Query / Kafka / Redis streams | Unused / absent | — |
 
-**Critical constraint:** Internship and Growth business tables are **service-role only** (`revoke all from anon, authenticated`). Browser clients cannot subscribe to those tables directly without breaking the security model.
+Internship/Growth/Staff business tables remain **service-role only**. Clients sync via `sitguru_live_signals`, not direct table subscriptions.
 
 ---
 
 ## 2. Realtime architecture reused
 
-- Extended the **Supabase Realtime + filtered channel + debounce + refresh** pattern from Messaging / Admin Live Walks / mobile `useRealtimeSubscription`.
-- Did **not** introduce a second framework, Kafka, RabbitMQ, Redis streams, or TanStack Query wiring.
-- Messaging realtime left intact (req 86, 111).
-- Walk SSE left intact.
+- Extended Messaging / Admin Live Walks / mobile subscription patterns.
+- **No second framework.**
+- Messaging + PawReport realtime **unchanged**.
 
 ---
 
 ## 3. New subscriptions / events added
 
-### Table: `sitguru_live_signals`
-- Migration: `supabase/migrations/20261027_sitguru_live_signals.sql`
-- RLS: `SELECT` only where `recipient_user_id = auth.uid()`
-- Writes: service role only
-- Added to `supabase_realtime` publication
-- Payload: sync metadata only (event type, resource keys, path hints, actor attribution) — **never** W-9 contents, compensation, or tax docs
+### `sitguru_live_signals` (prior)
+RLS: `recipient_user_id = auth.uid()`. Service-role writes. Realtime publication enabled.
 
-### Domain events (`lib/realtime/events.ts`)
-Includes: `intern.hours.*`, `intern.checkin.*`, `intern.assignment.*`, `intern.milestone.completed`, `growth.initiative.*`, `growth.event.recorded`, `onboarding.item.completed`, `access.updated`, payment/timekeeper names reserved for future Ava Timekeeper modules, `message.created` (Messaging remains on its existing bus).
+### Staff Timekeeper / Payment events (this update)
+| Event | Publisher |
+|-------|-----------|
+| `time.entry.created` | Manual entry / start timer |
+| `time.entry.updated` | Edit / delete draft / stop timer |
+| `time.period.submitted` | Ava submits payment period |
+| `time.period.returned` | Admin Needs Correction |
+| `time.period.approved` | Admin approve → Ready for Payment |
+| `payment.ready` | After approve |
+| `payment.paid` | Admin Mark Paid (manual_bank_ach) |
+| `compensation.rate.updated` | Effective-dated rate change |
 
-### Client
-- Web: `hooks/useRealtimeSubscription.ts`, `hooks/useWorkspaceLiveSync.ts`, `hooks/useRefreshOnFocus.ts`
-- Bridge: `components/realtime/WorkspaceLiveSyncMount.tsx` mounted on Intern layout, Admin layout, Admin Internship layout
-- Mobile: `useWorkspaceLiveSync` + `REALTIME_CHANNELS.liveSignals` (parity)
+Client mounts unchanged: Intern / Admin / Internship layouts via `WorkspaceLiveSyncMount`.
 
 ---
 
 ## 4. Modules now synchronized
 
-| Module | Sync path |
-|--------|-----------|
-| Intern Portal | Live signals + path revalidation after hours/check-in/questions/milestones |
-| Manager Desk (`/intern/manage`) | Same bus; manager receives intern submission signals |
-| Admin Internship / View Intern Portal (`?view=`) | Admin layout + internship layout subscribe; preview uses live `getInternWorkspace` data + refresh |
-| Growth Workspace | Initiative / event / intelligence mutations publish growth-scoped signals |
-| Onboarding | Submit publishes onboarding signals |
-| Help | Covered by Intern layout mount + refresh-on-focus (Help re-queries server state) |
-| Messaging | **Unchanged** existing realtime |
-| Ava Timekeeper / contractor Payment periods | **Not built as product modules yet** — event names + query keys reserved; do not claim live Ava payroll sync |
+| Module | Status |
+|--------|--------|
+| Intern Portal / Manager Desk / Growth / Onboarding | Synced (prior) |
+| **Ava My Time** `/admin/growth/my-time` | **Added** + live signals |
+| **Ava My Payments** `/admin/growth/payments` | **Added** + live signals |
+| **Admin Team Payments** `/admin/hr/people/payments` | **Added** + live signals |
+| **People & Administration** `/admin/hr/people` | **Added** |
+| Manager Home extras (Needs Attention / My Time / Payment) | **Added** on Growth Home |
+| Help (Manager live answers) `/admin/help/manager` | **Added** |
+| Admin View-As Growth Manager `/admin/growth/preview/[userId]` | **Added** (read-only) |
+| Messaging | Unchanged |
 
 ---
 
 ## 5. Cache invalidation strategy
 
-1. Authoritative mutation succeeds (DB write).
-2. `revalidatePath` for relevant workspace routes (existing pattern, extended).
-3. `publishLiveSignals` upserts recipient rows (idempotent on `event_id + recipient_user_id`).
-4. Subscribed clients debounce → `router.refresh()` (web) or `onRefresh` (mobile).
-5. Refresh-on-focus / visibility as missed-event fallback (**not** multi-second polling of every API).
-
-Query-key conventions documented in `lib/realtime/query-keys.ts` for future optional React Query adoption.
+1. Authoritative DB write  
+2. `revalidatePath` for Growth / My Time / Payments / People routes  
+3. Idempotent `sitguru_live_signals` upsert  
+4. Client debounce → `router.refresh()`  
+5. Refresh-on-focus fallback  
 
 ---
 
 ## 6. Mobile / web synchronization
 
-- Same authoritative tables and same `sitguru_live_signals` bus.
-- Mobile hook mirrors web channel naming: `sitguru-live-signals:{userId}`.
-- No separate web-only / mobile-only business copies.
+Same bus + channel naming (`sitguru-live-signals:{userId}`). Staff Time UI is web-first in this delivery; mobile hook parity remains available for future native Manager screens.
+
+| Item | Status |
+|------|--------|
+| Web My Time / Payments | Implemented |
+| Mobile Manager Time screens | **Not Tested** / not shipped as native routes this pass |
+| Web↔Admin signal refresh | Unit + architecture Ready; dual-session **Blocked** on staging accounts |
 
 ---
 
 ## 7. Admin View-As synchronization
 
-- Admin Intern Portal preview (`/intern?view={internId}`) already loads **live** workspace data via `getInternWorkspace` (not a screenshot).
-- Admin sessions mount `WorkspaceLiveSyncMount`; when they are manager/supervisor/oversight recipients of a signal, the preview refreshes with normal realtime behavior.
-- Actor attribution on signals uses the **actual admin/intern actor**, never the View-As target (req 101).
+| Surface | Status |
+|---------|--------|
+| Intern Portal `?view=` | Prior — live workspace data |
+| Growth Manager preview `/admin/growth/preview/[userId]` | **Added** — same `loadMyTimeDashboard`, read-only (`pointer-events-none`), persistent banner |
+| Mutations while previewing | Blocked in UI; server still requires real actor |
 
 ---
 
 ## 8. Authorization protection
 
-- Clients only receive signal rows for `auth.uid() = recipient_user_id` (RLS).
-- Business tables remain service-role; signals carry no sensitive document contents.
-- Recipient fan-out is limited to intern + assigned manager + supervisor (+ scoped Growth oversight roles when requested).
+| Rule | Status |
+|------|--------|
+| Ava cannot approve own payment | Enforced in `approvePaymentPeriod` / `recordStaffPaymentPaid` |
+| Ava cannot change own compensation (non-super) | Enforced in `updateEngagementRate` |
+| W-9 contents never in UI/Help | Status label only |
+| No bank routing/account storage | Confirmed in schema |
+| Signal RLS own rows only | Confirmed |
+| Staff tables revoke authenticated | Confirmed |
 
 ---
 
-## 9. Failure / reconnection behavior
+## 9. Failure / reconnection
 
-- Mutations do not depend on realtime delivery; DB success is authoritative (req 104).
-- Channel error / timeout → sync mode falls back to focus refresh; optional “Reconnecting…” label.
-- On reconnect / focus, `router.refresh()` reconciles from server state.
-- Typing in inputs does not force focus refresh (same guard as MessageAutoRefresh).
-
----
-
-## 10. Concurrency handling
-
-- Existing status guards retained (e.g. hour review `.eq("status", "submitted")`).
-- Helper `checkRecordVersion` / `STALE_RECORD_MESSAGE` added for UI “record changed since you opened it” flows.
-- Idempotent signal upserts prevent duplicate notify spam on retry (req 99).
-
----
-
-## 11. Realtime tests performed
+Unchanged architecture: DB write authoritative; channel error → focus fallback; reconnect refreshes.
 
 | Test | Result |
 |------|--------|
-| Unit: domain events notify subset, stable event ids, recipient dedupe, path conventions, concurrency guards | **Pass** (`tsx --test lib/realtime/events.test.ts`) |
-| Dual-session Ava↔Jason / Intern↔Manager browser matrix (req 108 Tests 1–10) | **Not executed in this environment** — requires authenticated multi-role staging accounts; blocked on credentials + live migration apply verification |
-| Messaging regression | Architecture preserved; no Messaging channel changes |
-
-**Production-ready claim:** Core sync infrastructure + mutation publishers are implemented and unit-tested. Full dual-session acceptance (req 108) must be run on staging with Ava/Jason/Ryan accounts after migration apply before calling the entire matrix production-ready.
+| Disconnect does not lose submitted work | **Not Tested** (requires live browser) |
+| Duplicate signal idempotency | **Passed** (unit: stable event ids + upsert conflict) |
 
 ---
 
-## 12. Intentional refresh-on-focus (not realtime) surfaces
+## 10. Concurrency
+
+| Test | Result |
+|------|--------|
+| Status guards on approve (`.eq("status","submitted")`) | Implemented |
+| `checkRecordVersion` helper | **Passed** (unit) |
+| Dual-user stale open conflict UI | **Not Tested** |
+
+---
+
+## 11. Realtime / feature tests
+
+| Test | Result |
+|------|--------|
+| Domain events / notify subset / paths / concurrency units | **Passed** |
+| Money: 26×$16.75=$435.50; split-rate periods; biweekly Nov 2–15 | **Passed** |
+| Dual-session Ava Time → Jason approve → Paid | **Blocked** — needs Ava/Jason staging sessions |
+| Dual-session Ryan hours / check-in / assignment | **Blocked** — needs Ryan/Ava/Jason staging |
+| Growth initiative dual-session | **Blocked** |
+| Admin View-As live update while Ava mutates | **Blocked** |
+| Mobile/desktop cross-device | **Blocked** |
+| Messaging regression | **Not Tested** this pass (no Messaging code changes) |
+
+---
+
+## 12. Intentional refresh-on-focus surfaces
 
 | Surface | Why |
 |---------|-----|
-| Low-priority Help article static content | Content is CMS/static; personalization status comes from parent layout refresh |
-| Ava contractor Timekeeper / Payment Queue | Modules not present; when built, wire to `sitguru_live_signals` + reserved event names |
-| Global message unread poller | Existing Messaging fallback — left unchanged to avoid dual messaging frameworks |
+| Static Help article bodies | Personalization comes from live context queries on Manager Help |
+| Native mobile Manager Time | Screens not shipped; when added, use `useWorkspaceLiveSync` |
 
 ---
 
-## Build philosophy check
+## Schema applied
 
-**Preserve → Enhance → Integrate → Synchronize → Beautify → Secure → Test → Deliver Once**
+- `20261027_sitguru_live_signals.sql` — SitGuru + Staging  
+- `20261027_staff_timekeeper_payments.sql` — SitGuru + Staging  
 
-- Preserved Messaging + PawReport realtime
-- Enhanced with one authorized sync bus
-- Integrated Intern / Manager / Growth / Admin / Onboarding publishers
-- Synchronized via Realtime + focus fallback
-- Secured with recipient RLS
-- Unit-tested; dual-session QA remaining before final production declaration
+---
+
+## Production readiness (this PR slice)
+
+**Integrated feature set for Manager Time/Payments is implemented and unit-tested.**  
+**Full dual-session staging matrix remains Blocked** until Ava / Jason / Ryan accounts are exercised.  
+Do **not** claim the entire SitGuru internal platform production-ready until that matrix is Passed.

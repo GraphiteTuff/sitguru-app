@@ -6,11 +6,14 @@
 
 export const SITGURU_DOMAIN_EVENTS = {
   TIME_ENTRY_CREATED: "time.entry.created",
+  TIME_ENTRY_UPDATED: "time.entry.updated",
   TIME_PERIOD_SUBMITTED: "time.period.submitted",
+  TIME_PERIOD_RETURNED: "time.period.returned",
   TIME_PERIOD_APPROVED: "time.period.approved",
   PAYMENT_READY: "payment.ready",
   PAYMENT_PROCESSING: "payment.processing",
   PAYMENT_PAID: "payment.paid",
+  COMPENSATION_RATE_UPDATED: "compensation.rate.updated",
   INTERN_HOURS_SUBMITTED: "intern.hours.submitted",
   INTERN_HOURS_REVIEWED: "intern.hours.reviewed",
   INTERN_HOURS_APPROVED: "intern.hours.approved",
@@ -46,6 +49,7 @@ export const NOTIFY_WORTHY_EVENTS = new Set<SitGuruDomainEvent>([
   SITGURU_DOMAIN_EVENTS.INTERN_MILESTONE_COMPLETED,
   SITGURU_DOMAIN_EVENTS.INTERN_QUESTION_ASKED,
   SITGURU_DOMAIN_EVENTS.TIME_PERIOD_SUBMITTED,
+  SITGURU_DOMAIN_EVENTS.TIME_PERIOD_RETURNED,
   SITGURU_DOMAIN_EVENTS.TIME_PERIOD_APPROVED,
   SITGURU_DOMAIN_EVENTS.PAYMENT_READY,
   SITGURU_DOMAIN_EVENTS.PAYMENT_PAID,

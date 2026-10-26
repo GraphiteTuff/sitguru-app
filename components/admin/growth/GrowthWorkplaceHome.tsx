@@ -44,6 +44,8 @@ import GrowthEmptyState from "@/components/admin/growth/GrowthEmptyState";
 import GrowthQuickActions from "@/components/admin/growth/GrowthQuickActions";
 import GrowthResourcesPanel from "@/components/admin/growth/GrowthResourcesPanel";
 import GrowthTeamPanel from "@/components/admin/growth/GrowthTeamPanel";
+import ManagerHomeTimeCards from "@/components/admin/growth/ManagerHomeTimeCards";
+import { loadManagerHomeExtras } from "@/lib/staff-time/home-summary";
 
 function formatEventWhen(iso: string | null) {
   if (!iso) return "Date TBD";
@@ -74,6 +76,7 @@ export async function GrowthWorkplaceHome({
     intelligence,
     initiatives,
     team,
+    managerExtras,
   ] = documentation
     ? [
         documentationGrowthHomeStats(),
@@ -84,6 +87,7 @@ export async function GrowthWorkplaceHome({
         [],
         [],
         [],
+        { myTime: null, needsAttention: [] },
       ]
     : await Promise.all([
         getGrowthHomeStats(),
@@ -97,6 +101,13 @@ export async function GrowthWorkplaceHome({
           ? Promise.resolve([])
           : listGrowthTeamSummary({
               actorUserId: workplace.actor.id,
+              isSuperUser: workplace.actor.isSuperUser,
+            }),
+        intern
+          ? Promise.resolve({ myTime: null, needsAttention: [] })
+          : loadManagerHomeExtras({
+              userId: workplace.actor.id,
+              email: workplace.actor.email,
               isSuperUser: workplace.actor.isSuperUser,
             }),
       ]);
@@ -205,6 +216,22 @@ export async function GrowthWorkplaceHome({
         : "Formal intern oversight",
       icon: Users,
     },
+    ...(!intern
+      ? [
+          {
+            href: "/admin/growth/my-time",
+            label: "My Time",
+            detail: "Log hours and current payment period",
+            icon: ClipboardList,
+          },
+          {
+            href: "/admin/growth/payments",
+            label: "My Payments",
+            detail: "Payment history and status",
+            icon: CheckCircle2,
+          },
+        ]
+      : []),
     {
       href: growthHref(base, "/create"),
       label: "Tracking link",
@@ -289,8 +316,10 @@ export async function GrowthWorkplaceHome({
       ) : null}
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
+        {!intern ? <ManagerHomeTimeCards extras={managerExtras} /> : null}
+
         {/* Overview */}
-        <section className="order-1 min-w-0 space-y-3 lg:col-span-12">
+        <section className="order-2 min-w-0 space-y-3 lg:col-span-12">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
               Overview
