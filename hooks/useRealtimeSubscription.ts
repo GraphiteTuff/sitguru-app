@@ -47,9 +47,11 @@ export function useRealtimeSubscription<
   const onStatusRef = useRef(onStatus);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  onPayloadRef.current = onPayload;
-  onChangeRef.current = onChange;
-  onStatusRef.current = onStatus;
+  useEffect(() => {
+    onPayloadRef.current = onPayload;
+    onChangeRef.current = onChange;
+    onStatusRef.current = onStatus;
+  }, [onPayload, onChange, onStatus]);
 
   const scheduleChange = useCallback(() => {
     if (!onChangeRef.current) return;

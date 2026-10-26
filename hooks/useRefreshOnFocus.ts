@@ -32,7 +32,10 @@ export function useRefreshOnFocus(options: UseRefreshOnFocusOptions = {}) {
   const minIntervalMs = options.minIntervalMs ?? 4000;
   const lastRef = useRef(0);
   const onRefreshRef = useRef(options.onRefresh);
-  onRefreshRef.current = options.onRefresh;
+
+  useEffect(() => {
+    onRefreshRef.current = options.onRefresh;
+  }, [options.onRefresh]);
 
   useEffect(() => {
     if (!enabled) return;

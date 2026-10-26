@@ -1,10 +1,25 @@
 # Real-Time Integration — SitGuru QA Report
 
 **Date:** October 26, 2026 (America/New_York)  
-**Updated:** October 26, 2026 (America/New_York) — Ava Timekeeper + Payments  
+**Updated:** October 26, 2026 (America/New_York) — Manager Time/Payments pre-staging  
 **Branch:** `cursor/realtime-workspace-sync-69fa`  
 **PR:** #178  
 **Principle:** One action → one authoritative update → all relevant authorized views refresh automatically.
+
+---
+
+## Pre-staging summary
+
+| Area | Status |
+|------|--------|
+| Architecture (single `sitguru_live_signals` bus) | **Passed** |
+| Time / payment / rate publishers | **Passed** (implemented) |
+| Subscriptions + refresh-on-focus fallback | **Passed** (implemented) |
+| Unit tests (events, idempotency, paths, concurrency + money) | **Passed** (11/11) |
+| Help live state (authorized, no tax/bank) | **Passed** (code review) |
+| Admin View-As read-only | **Passed** (code review) |
+| Mobile native Manager Time parity | **Not Tested** / not shipped |
+| Dual-session Ava / Jason / Ryan matrix | **Blocked** |
 
 ---
 
@@ -38,6 +53,7 @@ Internship/Growth/Staff business tables remain **service-role only**. Clients sy
 RLS: `recipient_user_id = auth.uid()`. Service-role writes. Realtime publication enabled.
 
 ### Staff Timekeeper / Payment events (this update)
+
 | Event | Publisher |
 |-------|-----------|
 | `time.entry.created` | Manual entry / start timer |
@@ -46,10 +62,13 @@ RLS: `recipient_user_id = auth.uid()`. Service-role writes. Realtime publication
 | `time.period.returned` | Admin Needs Correction |
 | `time.period.approved` | Admin approve → Ready for Payment |
 | `payment.ready` | After approve |
+| `payment.processing` | Reserved in catalog if used |
 | `payment.paid` | Admin Mark Paid (manual_bank_ach) |
 | `compensation.rate.updated` | Effective-dated rate change |
 
 Client mounts unchanged: Intern / Admin / Internship layouts via `WorkspaceLiveSyncMount`.
+
+Publish path: `lib/realtime/publish-staff-time.ts` → `publish-live-signal.ts` → `sitguru_live_signals` upsert (idempotent event ids).
 
 ---
 
@@ -72,10 +91,21 @@ Client mounts unchanged: Intern / Admin / Internship layouts via `WorkspaceLiveS
 ## 5. Cache invalidation strategy
 
 1. Authoritative DB write  
-2. `revalidatePath` for Growth / My Time / Payments / People routes  
+2. `revalidatePath` for Growth / My Time / Payments / People routes (`STAFF_TIME_PATHS`)  
 3. Idempotent `sitguru_live_signals` upsert  
 4. Client debounce → `router.refresh()`  
-5. Refresh-on-focus fallback  
+5. Refresh-on-focus fallback (`useRefreshOnFocus`)  
+
+### Expected refresh targets
+
+| Mutation | Surfaces |
+|----------|----------|
+| Ava time change | My Time, Growth Home My Time summary, payment period summary, Admin authorized time views |
+| Payment submission | Ava status, Admin approval queue, Needs Attention, payment estimate/state |
+| Approval | Ava Time, Ava Payments, Growth Home, Admin Payments |
+| Paid | Ava Payments, Payment History, annual Paid total, Admin queue, People profile, Help live status |
+
+Avoids whole-app polling; scoped paths + recipient-filtered signals.
 
 ---
 
@@ -96,8 +126,9 @@ Same bus + channel naming (`sitguru-live-signals:{userId}`). Staff Time UI is we
 | Surface | Status |
 |---------|--------|
 | Intern Portal `?view=` | Prior — live workspace data |
-| Growth Manager preview `/admin/growth/preview/[userId]` | **Added** — same `loadMyTimeDashboard`, read-only (`pointer-events-none`), persistent banner |
+| Growth Manager preview `/admin/growth/preview/[userId]` | **Added** — same `loadMyTimeDashboard`, read-only (`pointer-events-none`), persistent banner + Exit Preview |
 | Mutations while previewing | Blocked in UI; server still requires real actor |
+| Act-As / password impersonation | **Not implemented** (intentional) |
 
 ---
 
@@ -139,8 +170,8 @@ Unchanged architecture: DB write authoritative; channel error → focus fallback
 
 | Test | Result |
 |------|--------|
-| Domain events / notify subset / paths / concurrency units | **Passed** |
-| Money: 26×$16.75=$435.50; split-rate periods; biweekly Nov 2–15 | **Passed** |
+| Domain events / notify subset / paths / concurrency units | **Passed** (7/7 realtime) |
+| Money: 26×$16.75=$435.50; split-rate periods; biweekly Nov 2–15 | **Passed** (+4 → **11/11** combined) |
 | Dual-session Ava Time → Jason approve → Paid | **Blocked** — needs Ava/Jason staging sessions |
 | Dual-session Ryan hours / check-in / assignment | **Blocked** — needs Ryan/Ava/Jason staging |
 | Growth initiative dual-session | **Blocked** |
@@ -171,3 +202,6 @@ Unchanged architecture: DB write authoritative; channel error → focus fallback
 **Integrated feature set for Manager Time/Payments is implemented and unit-tested.**  
 **Full dual-session staging matrix remains Blocked** until Ava / Jason / Ryan accounts are exercised.  
 Do **not** claim the entire SitGuru internal platform production-ready until that matrix is Passed.
+
+**Production merge performed: NO**  
+**Status: READY FOR STAGING ACCEPTANCE**
