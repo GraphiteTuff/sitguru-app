@@ -4,27 +4,30 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
   CircleHelp,
   Clock3,
   CreditCard,
+  Home,
   LayoutDashboard,
   Megaphone,
   MessageCircle,
+  PawPrint,
   Search,
   Users,
 } from "lucide-react";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
-import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { PortalDeskProfileLive } from "@/components/portal/PortalDeskProfile";
 import {
   isManagerGrowthPath,
   MANAGER_PORTAL_BRAND,
   MANAGER_PORTAL_SIDEBAR,
 } from "@/lib/admin/growth/manager-portal";
+import { DESK_UI } from "@/lib/portal/desk-ui";
 
 const GROWTH_MANAGER_BASE = "/manager";
 
 const ICONS = {
+  Home,
   "Manager Desk": LayoutDashboard,
   Interns: Users,
   Growth: Megaphone,
@@ -35,7 +38,8 @@ const ICONS = {
 } as const;
 
 function navActive(pathname: string, item: (typeof MANAGER_PORTAL_SIDEBAR)[number]) {
-  if (item.match === "exact") return pathname === item.href;
+  if (item.match === "none") return false;
+  if (item.match === "exact") return pathname === item.href || pathname === `${item.href}/`;
   if (item.match === "growth") return isManagerGrowthPath(pathname);
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
@@ -50,43 +54,48 @@ export default function ManagerPortalShell({
   const pathname = usePathname() || GROWTH_MANAGER_BASE;
 
   return (
-    <div className="min-h-dvh bg-[#F3F6F4] text-slate-950">
+    <div className={`min-h-dvh ${DESK_UI.pageBg} text-[#0F2744]`}>
       <div className="mx-auto flex min-h-dvh max-w-[1600px]">
-        <aside className="public-dark-section sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col bg-[#0D5C3A] text-white xl:flex">
-          <div className="border-b border-white/10 px-5 py-5">
+        <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
+          <div className="border-b border-slate-100 px-5 py-5">
             <Link href={MANAGER_PORTAL_BRAND.homePath} className="block" aria-label="SitGuru Manager Portal">
-              <Image
-                src="/images/email/sitguru-logo-on-dark.png"
-                alt="SitGuru"
-                width={148}
-                height={40}
-                className="h-10 w-auto"
-                priority
-              />
-              <p className="mt-2 text-[11px] font-semibold leading-4 !text-white/80">
-                Happy Pets. Stronger Communities.
-              </p>
+              <div className="flex items-center gap-2.5">
+                <Image
+                  src="/images/sitguru-logo-mark.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
+                  priority
+                />
+                <div>
+                  <p className="text-lg font-black leading-none text-[#0F2744]">SitGuru</p>
+                  <p className="mt-1 text-[10px] font-semibold leading-3 text-slate-500">
+                    Happy Pets. Stronger Communities.
+                  </p>
+                </div>
+              </div>
             </Link>
           </div>
 
           <nav aria-label="Manager Portal" className="flex flex-1 flex-col gap-1 px-3 py-4">
             {MANAGER_PORTAL_SIDEBAR.map((item) => {
-              const Icon = ICONS[item.label];
+              const Icon = ICONS[item.label as keyof typeof ICONS] || LayoutDashboard;
               const active = navActive(pathname, item);
               return (
                 <Link
-                  key={item.href}
+                  key={item.href + item.label}
                   href={item.href}
                   className={
                     active
-                      ? "flex min-h-11 items-center gap-3 rounded-2xl bg-white/15 px-3 text-sm font-black !text-white"
-                      : "flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold !text-white/85 hover:bg-white/10"
+                      ? `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
+                      : `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
                   }
                 >
                   <Icon size={18} className="shrink-0 opacity-90" />
                   <span className="flex-1">{item.label}</span>
                   {item.label === "Messaging" && unreadMessages > 0 ? (
-                    <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black !text-white">
+                    <span className="rounded-full bg-[#F05A4A] px-2 py-0.5 text-[10px] font-black !text-white">
                       {unreadMessages > 9 ? "9+" : unreadMessages}
                     </span>
                   ) : null}
@@ -95,8 +104,8 @@ export default function ManagerPortalShell({
             })}
           </nav>
 
-          <div className="mt-auto border-t border-white/10 p-4">
-            <div className="overflow-hidden rounded-[1.4rem] bg-white/10">
+          <div className="mt-auto p-4">
+            <div className="overflow-hidden rounded-2xl bg-[#F0FDFA]">
               <div className="relative h-28">
                 <Image
                   src="/images/homepage/sitguru-dog-walking-hero.jpg"
@@ -106,7 +115,8 @@ export default function ManagerPortalShell({
                   sizes="220px"
                 />
               </div>
-              <p className="px-3 py-3 text-xs font-semibold leading-5 !text-white/90">
+              <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
+                <PawPrint size={14} className="mt-0.5 shrink-0 text-[#0D5C3A]" />
                 {MANAGER_PORTAL_BRAND.tagline}
               </p>
             </div>
@@ -114,13 +124,13 @@ export default function ManagerPortalShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40 border-b border-emerald-100/80 bg-[#F3F6F4]/95 backdrop-blur">
+          <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
             <div className="flex min-h-16 items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
               <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 xl:hidden">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
                   {MANAGER_PORTAL_BRAND.kicker}
                 </p>
-                <p className="truncate text-sm font-black text-slate-950">
+                <p className="truncate text-sm font-black text-[#0F2744]">
                   {MANAGER_PORTAL_BRAND.deskTitle}
                 </p>
               </Link>
@@ -128,25 +138,20 @@ export default function ManagerPortalShell({
               <label className="relative mx-auto hidden min-w-0 max-w-xl flex-1 md:block">
                 <Search
                   size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="search"
                   placeholder="Search interns, tasks, messages, or help..."
-                  className="min-h-11 w-full rounded-2xl border border-emerald-100 bg-white pl-10 pr-3 text-sm font-semibold text-slate-800 outline-none ring-emerald-700/20 focus:ring-2"
+                  className={DESK_UI.search}
                 />
               </label>
 
-              <div className="ml-auto flex items-center gap-2">
-                <Link
-                  href="/manager/events"
-                  className="hidden min-h-11 items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3 text-xs font-black text-emerald-950 sm:inline-flex"
-                >
-                  <CalendarDays size={14} />
-                  Events
-                </Link>
-                <SiteAccountMenu />
-              </div>
+              <PortalDeskProfileLive
+                title={MANAGER_PORTAL_BRAND.kicker}
+                notifications={unreadMessages || 5}
+                notificationsHref="/manager/messages"
+              />
             </div>
           </header>
 

@@ -15,6 +15,7 @@ export const MANAGER_PORTAL_BRAND = {
 
 /** Desktop sidebar — matches Ava Manager Desk mockup. */
 export const MANAGER_PORTAL_SIDEBAR = [
+  { href: "/manager", label: "Home", match: "none" as const },
   { href: "/manager", label: "Manager Desk", match: "exact" as const },
   { href: "/intern/manage", label: "Interns", match: "prefix" as const },
   { href: "/manager/campaigns", label: "Growth", match: "growth" as const },

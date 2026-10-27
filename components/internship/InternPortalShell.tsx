@@ -12,9 +12,10 @@ import {
   Clock3,
   Home,
   MessageCircle,
+  PawPrint,
   Search,
 } from "lucide-react";
-import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { PortalDeskProfileLive } from "@/components/portal/PortalDeskProfile";
 import {
   INTERN_PORTAL_BRAND,
   INTERN_PORTAL_MOBILE_MORE,
@@ -22,7 +23,7 @@ import {
   internPortalNavActive,
   isInternPortalChromePath,
 } from "@/lib/internship/intern-portal-nav";
-import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
+import { DESK_UI } from "@/lib/portal/desk-ui";
 
 const ICONS = {
   Home,
@@ -39,11 +40,13 @@ export default function InternPortalShell({
   assigned = false,
   onboarded = false,
   unreadMessages = 0,
+  profileTitle = "Social Media & Content Intern",
 }: {
   children: React.ReactNode;
   assigned?: boolean;
   onboarded?: boolean;
   unreadMessages?: number;
+  profileTitle?: string;
 }) {
   const pathname = usePathname() || "/intern";
   const searchParams = useSearchParams();
@@ -57,23 +60,28 @@ export default function InternPortalShell({
   const showFullChrome = assigned && onboarded;
 
   return (
-    <div className="min-h-dvh bg-[#F3F6F4] text-slate-950">
+    <div className={`min-h-dvh ${DESK_UI.pageBg} text-[#0F2744]`}>
       <div className="mx-auto flex min-h-dvh max-w-[1600px]">
         {showFullChrome ? (
-          <aside className="public-dark-section sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col bg-[#0D5C3A] text-white xl:flex">
-            <div className="border-b border-white/10 px-4 py-5">
+          <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
+            <div className="border-b border-slate-100 px-4 py-5">
               <Link href="/intern" className="block" aria-label="SitGuru Intern Portal">
-                <Image
-                  src="/images/email/sitguru-logo-on-dark.png"
-                  alt="SitGuru"
-                  width={140}
-                  height={36}
-                  className="h-9 w-auto"
-                  priority
-                />
-                <p className="mt-2 text-[11px] font-semibold leading-4 !text-white/80">
-                  {INTERN_PORTAL_BRAND.tagline}
-                </p>
+                <div className="flex items-center gap-2.5">
+                  <Image
+                    src="/images/sitguru-logo-mark.png"
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 object-contain"
+                    priority
+                  />
+                  <div>
+                    <p className="text-lg font-black leading-none text-[#0F2744]">SitGuru</p>
+                    <p className="mt-1 text-[10px] font-semibold leading-3 text-slate-500">
+                      {INTERN_PORTAL_BRAND.tagline}
+                    </p>
+                  </div>
+                </div>
               </Link>
             </div>
             <nav aria-label="Intern Portal" className="flex flex-1 flex-col gap-1 px-3 py-4">
@@ -86,14 +94,14 @@ export default function InternPortalShell({
                     href={item.href}
                     className={
                       active
-                        ? "flex min-h-11 items-center gap-3 rounded-2xl bg-white/15 px-3 text-sm font-black !text-white"
-                        : "flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold !text-white/85 hover:bg-white/10"
+                        ? `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
+                        : `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
                     }
                   >
                     <Icon size={18} className="shrink-0 opacity-90" />
                     <span className="flex-1">{item.label}</span>
                     {item.id === "messages" && unreadMessages > 0 ? (
-                      <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black !text-white">
+                      <span className="rounded-full bg-[#F05A4A] px-2 py-0.5 text-[10px] font-black !text-white">
                         {unreadMessages > 9 ? "9+" : unreadMessages}
                       </span>
                     ) : null}
@@ -101,8 +109,8 @@ export default function InternPortalShell({
                 );
               })}
             </nav>
-            <div className="mt-auto border-t border-white/10 p-4">
-              <div className="overflow-hidden rounded-[1.4rem] bg-white/10">
+            <div className="mt-auto p-4">
+              <div className="overflow-hidden rounded-2xl bg-[#EFF6FF]">
                 <div className="relative h-28">
                   <Image
                     src="/images/homepage/sitguru-dog-walking-hero.jpg"
@@ -112,7 +120,8 @@ export default function InternPortalShell({
                     sizes="220px"
                   />
                 </div>
-                <p className="px-3 py-3 text-xs font-semibold leading-5 !text-white/90">
+                <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
+                  <PawPrint size={14} className="mt-0.5 shrink-0 text-[#0D5C3A]" />
                   {INTERN_PORTAL_BRAND.sidebarFooter}
                 </p>
               </div>
@@ -121,13 +130,13 @@ export default function InternPortalShell({
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40 border-b border-emerald-100/80 bg-[#F3F6F4]/95 backdrop-blur print:hidden">
+          <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur print:hidden">
             <div className="flex min-h-14 items-center gap-2 px-3 py-2 sm:min-h-16 sm:gap-3 sm:px-5 lg:px-6">
               <Link href="/intern" className="min-w-0 xl:hidden">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
                   SitGuru Internship
                 </p>
-                <p className="truncate text-sm font-black text-slate-950">
+                <p className="truncate text-sm font-black text-[#0F2744]">
                   {INTERN_PORTAL_BRAND.title}
                 </p>
               </Link>
@@ -136,44 +145,38 @@ export default function InternPortalShell({
                 <label className="relative mx-auto hidden min-w-0 max-w-xl flex-1 md:block">
                   <Search
                     size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
                     type="search"
                     placeholder="Search assignments, messages, or help..."
-                    className="min-h-11 w-full rounded-2xl border border-emerald-100 bg-white pl-10 pr-3 text-sm font-semibold text-slate-800 outline-none ring-emerald-700/20 focus:ring-2"
+                    className={DESK_UI.search}
                   />
                 </label>
               ) : (
                 <div className="flex-1" />
               )}
 
-              <div className="ml-auto flex items-center gap-2">
-                {showFullChrome ? (
-                  <Link
-                    href={INTERN_GROWTH_WORKPLACE.href}
-                    className="hidden min-h-11 items-center rounded-2xl border border-emerald-100 bg-white px-3 text-xs font-black text-emerald-950 lg:inline-flex"
-                  >
-                    Growth
-                  </Link>
-                ) : null}
-                <SiteAccountMenu compact />
-              </div>
+              <PortalDeskProfileLive
+                title={profileTitle}
+                notifications={unreadMessages || 3}
+                notificationsHref="/intern?tab=home&focus=messages"
+              />
             </div>
           </header>
 
           <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">{children}</main>
 
           {showFullChrome ? (
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur xl:hidden">
+            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur xl:hidden">
               {moreOpen ? (
-                <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl bg-emerald-50 p-2">
+                <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl bg-[#EEF2F6] p-2">
                   {INTERN_PORTAL_MOBILE_MORE.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
-                      className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-2 text-center text-sm font-black text-slate-900"
+                      className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-2 text-center text-sm font-bold text-[#0F2744]"
                     >
                       {item.label}
                     </Link>
@@ -191,8 +194,10 @@ export default function InternPortalShell({
                       key={item.id}
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
-                      className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${
-                        active && !moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
+                      className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-bold ${
+                        active && !moreOpen
+                          ? "bg-[#E7F5EE] text-[#0D5C3A]"
+                          : "text-slate-500"
                       }`}
                     >
                       <Icon size={18} />
@@ -203,8 +208,8 @@ export default function InternPortalShell({
                 <button
                   type="button"
                   onClick={() => setMoreOpen((open) => !open)}
-                  className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${
-                    moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
+                  className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-bold ${
+                    moreOpen ? "bg-[#E7F5EE] text-[#0D5C3A]" : "text-slate-500"
                   }`}
                   aria-expanded={moreOpen}
                 >

@@ -32,7 +32,16 @@ function getInitials(name: string, email: string) {
   return `${parts[0]?.charAt(0) || "S"}${parts[1]?.charAt(0) || ""}`.toUpperCase();
 }
 
-export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
+export function SiteAccountMenu({
+  compact = false,
+  variant = "default",
+  deskTitle,
+}: {
+  compact?: boolean;
+  /** Desk portals: circular avatar + name + job title under it. */
+  variant?: "default" | "desk";
+  deskTitle?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -206,25 +215,57 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
     );
   }
 
+  const deskRoleTitle =
+    deskTitle ||
+    (currentRole === "growth"
+      ? "Social Media & Community Growth Manager"
+      : currentRole === "intern"
+        ? "SitGuru Intern"
+        : roleLabel);
+
   return (
     <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        className={
+          variant === "desk"
+            ? "flex items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/20"
+            : "flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        }
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open account menu"
       >
-        <Avatar sizeClass={compact ? "h-9 w-9" : "h-11 w-11"} />
-        {compact ? null : (
-          <span className="hidden max-w-[100px] truncate text-sm font-semibold text-slate-950 xl:block">
-            {loadedAccount.name}
-          </span>
+        <Avatar sizeClass={compact && variant !== "desk" ? "h-9 w-9" : "h-11 w-11"} />
+        {variant === "desk" ? (
+          <>
+            <span className="hidden min-w-0 text-left sm:block">
+              <span className="block max-w-[10rem] truncate text-sm font-bold leading-tight text-[#0F2744] lg:max-w-[12rem]">
+                {loadedAccount.name}
+              </span>
+              <span className="mt-0.5 block max-w-[11rem] truncate text-[11px] font-medium leading-snug text-slate-500 lg:max-w-[14rem]">
+                {deskRoleTitle}
+              </span>
+            </span>
+            {open ? (
+              <ChevronUp className="hidden h-4 w-4 text-[#0F2744] sm:block" />
+            ) : (
+              <ChevronDown className="hidden h-4 w-4 text-[#0F2744] sm:block" />
+            )}
+          </>
+        ) : (
+          <>
+            {compact ? null : (
+              <span className="hidden max-w-[100px] truncate text-sm font-semibold text-slate-950 xl:block">
+                {loadedAccount.name}
+              </span>
+            )}
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+              {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </span>
+          </>
         )}
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </span>
       </button>
 
       {open ? (

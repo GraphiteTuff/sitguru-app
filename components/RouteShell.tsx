@@ -74,10 +74,17 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   const isInternPrivatePage =
     pathname === "/intern" || pathname.startsWith("/intern/");
 
+  const isManagerPrivatePage =
+    pathname === "/manager" || pathname.startsWith("/manager/");
+
+  const isDevMockupPage =
+    pathname === "/dev" || pathname.startsWith("/dev/");
+
   const isGuruPrivatePage =
     !isPublicPage &&
     !isAuthPage &&
     !isInternPrivatePage &&
+    !isManagerPrivatePage &&
     (isGuruWorkspacePath(pathname) ||
       (pathname.startsWith("/guru/") &&
         !isPublicGuruOnboardingPath(pathname) &&
@@ -151,6 +158,8 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     pathname !== "/become-a-guru" &&
     !pathname.startsWith("/become-a-guru/") &&
     !isInternPrivatePage &&
+    !isManagerPrivatePage &&
+    !isDevMockupPage &&
     (isHomePage || isPublicPage || isPetParentCompanionPage);
 
   const shouldShowScoutOrTaco =
@@ -188,6 +197,16 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     return (
       <>
         <main className="site-main min-h-screen">{children}</main>
+        {floatingControls}
+      </>
+    );
+  }
+
+  if (isDevMockupPage || isManagerPrivatePage) {
+    return (
+      <>
+        <main className="site-main min-h-screen">{children}</main>
+        {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
         {floatingControls}
       </>
     );
