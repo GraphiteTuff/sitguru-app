@@ -44,12 +44,16 @@ function isActive(pathname: string, basePath: string, suffix: string) {
 export default function GrowthPhoneBar({
   pathname,
   basePath = "/admin/growth",
+  hideFrom = "lg",
 }: {
   pathname: string;
   basePath?: string;
+  /** Tailwind breakpoint at which the bar hides (sidebar takes over). */
+  hideFrom?: "lg" | "xl";
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const staffHome = basePath === "/admin/growth" || basePath === "/manager";
+  const rootClass = hideFrom === "xl" ? "xl:hidden" : "lg:hidden";
   const primary = staffHome
     ? [
         { suffix: suffixes.home, label: "Home", icon: Home, href: "" },
@@ -91,7 +95,7 @@ export default function GrowthPhoneBar({
   }
 
   return (
-    <div className="lg:hidden">
+    <div className={rootClass}>
       <div className="h-28" />
       {moreOpen ? (
         <div className="fixed inset-x-0 bottom-24 z-40 px-3">

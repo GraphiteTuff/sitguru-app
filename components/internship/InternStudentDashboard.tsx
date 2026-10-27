@@ -80,7 +80,9 @@ import {
   isSitGuruWorkEmail,
   sitguruTeamsHref,
 } from "@/lib/admin/growth/teams-access";
+import InternPortalHome from "@/components/internship/InternPortalHome";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
+import { useRouter } from "next/navigation";
 
 const TABS = [
   { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
@@ -191,6 +193,7 @@ export default function InternStudentDashboard({
   initialDate?: string;
   initialProfileOpen?: boolean;
 }) {
+  const router = useRouter();
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
   const firstName = internPortalFirstName(data.intern);
@@ -310,7 +313,7 @@ export default function InternStudentDashboard({
   }
 
   return (
-    <div className="space-y-4 pb-24 sm:pb-8">
+    <div className="space-y-4 pb-28 xl:pb-8">
       {notice ? (
         <p
           className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
@@ -323,6 +326,7 @@ export default function InternStudentDashboard({
         </p>
       ) : null}
 
+      {tab !== "home" ? (
       <article className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div
           className="flex min-h-[5.5rem] items-end gap-4 px-5 pb-3 sm:px-6"
@@ -396,132 +400,29 @@ export default function InternStudentDashboard({
           </div>
         </div>
       </article>
-
-      {tab === "home" && !tool ? (
-      <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <div className={`grid gap-6 px-5 py-6 sm:px-6 sm:py-7 lg:grid-cols-[1.25fr_0.75fr] lg:items-center ${internPortalHeroClass(data.intern.portalTheme)}`}>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
-                SitGuru Intern Portal
-              </span>
-              <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] !text-white">
-                Your work area
-              </span>
-              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
-                {internStatusLabel(data.intern.status)}
-              </span>
-            </div>
-            <div className="mt-4 flex items-center gap-4">
-              <InternAvatar
-                name={data.intern.fullName}
-                email={data.intern.email}
-                src={data.intern.avatarUrl}
-                size="lg"
-                className="ring-white/70"
-                onClick={() => setProfileOpen(true)}
-                label="Open intern page"
-              />
-              <div className="min-w-0">
-                <h1 className="truncate text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
-                  Welcome, {firstName}.
-                </h1>
-                <p className="mt-1 text-sm font-semibold text-slate-700">
-                  {hourSummary.weekLabel} · {focusWeek <= 0 ? "Start here" : process.deliverable.title}
-                </p>
-              </div>
-            </div>
-            <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-800">
-              Do your weekly check-in, finish tasks, and grow SitGuru this week.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <InternPageTrigger onOpen={() => setProfileOpen(true)} />
-              <Link
-                href={INTERN_GROWTH_WORKPLACE.href}
-                className={`${internPrimaryBtnClass} rounded-full min-h-11 px-4`}
-              >
-                <Megaphone size={14} />
-                {INTERN_GROWTH_WORKPLACE.label}
-              </Link>
-              <button
-                type="button"
-                onClick={() => openTool("social")}
-                className={`${internPillBtnClass} bg-rose-600 !text-white shadow-sm hover:bg-rose-700`}
-              >
-                Post
-              </button>
-              <button
-                type="button"
-                onClick={() => openTool("tracking")}
-                className={`${internPillBtnClass} bg-white text-sky-800 shadow-sm ring-1 ring-sky-200 hover:bg-sky-50`}
-              >
-                Tracking links
-              </button>
-              <button
-                type="button"
-                onClick={() => openTab("work")}
-                className={`${internPillBtnClass} bg-white text-violet-800 shadow-sm ring-1 ring-violet-200 hover:bg-violet-50`}
-              >
-                Do your work
-              </button>
-            </div>
-          </div>
-          <div className="rounded-[1.6rem] border border-white/80 bg-white/95 p-5 shadow-xl">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              This week’s focus
-            </p>
-            <h2 className="mt-2 text-xl font-black text-slate-950">
-              {hourSummary.weekLabel}
-            </h2>
-            <p className="mt-1 text-sm font-black text-slate-800">
-              {focusWeek <= 0 ? "Start here" : process.deliverable.title}
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-              {focusWeek <= 0
-                ? "Finish Start Here before Week 1 counts."
-                : process.deliverable.demonstrates}
-            </p>
-            <div className="mt-4 grid gap-2 text-sm font-bold text-slate-700">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                {process.weeklyThisWeek ? "Check-in is done" : "Do your weekly check-in"}
-              </div>
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-violet-700" />
-                This week {workload.counts.current} · Upcoming {workload.counts.upcoming} · Later {workload.counts.later}
-              </div>
-              <div className="flex items-center gap-2">
-                <Share2 className="h-4 w-4 text-rose-700" />
-                {waitingOnAva} waiting on your manager
-                {returnedWork.length ? ` · ${returnedWork.length} returned to you` : ""}
-              </div>
-            </div>
-            <p className="mt-3 text-sm font-black text-slate-950">Pace: {hourSummary.paceLabel}</p>
-            <button
-              type="button"
-              onClick={() => openTab("work")}
-              className={`${internPrimaryBtnClass} mt-4 w-full`}
-            >
-              Start this week
-            </button>
-            <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
-              Your report is {growthReport.percent}% done ·{" "}
-              {growthReport.outcomes.length} checked results ·{" "}
-              {growthReport.lessons.length} lessons
-            </p>
-            <button
-              type="button"
-              onClick={() => openTab("project")}
-              className={`mt-3 text-left text-xs font-black text-emerald-800 underline hover:text-emerald-950 ${internPressClass} shadow-none hover:shadow-none`}
-            >
-              Open your report
-            </button>
-          </div>
-        </div>
-      </section>
       ) : null}
 
+      {tab === "home" && !tool ? (
+        <InternPortalHome
+          data={data}
+          hourSummary={hourSummary}
+          firstName={firstName}
+          weeklyDone={Boolean(process.weeklyThisWeek)}
+          currentAssignmentTitle={
+            data.tasks.find((task) => task.status === "in_progress" || task.status === "submitted")?.title ||
+            process.deliverable.title
+          }
+          preview={preview}
+          onOpenWork={() => openTab("work")}
+          onOpenCheckIn={() => openTab("work")}
+          onOpenHours={() => router.push("/intern/time")}
+          onOpenMilestones={() => openTab("project")}
+        />
+      ) : null}
+
+      {tab !== "home" ? (
       <div className="hidden gap-2 sm:flex">
+
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -538,6 +439,7 @@ export default function InternStudentDashboard({
           </button>
         ))}
       </div>
+      ) : null}
 
       {tab === "home" && tool ? (
         <InternStudentTools
@@ -547,372 +449,6 @@ export default function InternStudentDashboard({
           onBack={() => setTool(null)}
           preview={preview}
         />
-      ) : null}
-
-      {tab === "home" && !tool ? (
-        <div className="space-y-4">
-          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => openTab("home")}
-              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
-              aria-label="Open this week’s check-in"
-            >
-              <ThemeStatCard
-                label="This week"
-                value={process.weeklyThisWeek ? "Done" : "Due"}
-                helper={process.weeklyThisWeek ? "Check-in is in" : "Do your weekly check-in"}
-                tone="emerald"
-                icon={<CheckCircle2 size={18} />}
-                className="h-full"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => openTab("work")}
-              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
-              aria-label="Open your work"
-            >
-              <ThemeStatCard
-                label="This week"
-                value={workload.counts.current}
-                helper={`${workload.counts.upcoming} upcoming · ${workload.counts.later} later`}
-                tone="violet"
-                icon={<ClipboardList size={18} />}
-                className="h-full"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => openTab("metrics")}
-              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
-              aria-label="Open metrics"
-            >
-              <ThemeStatCard
-                label="Metrics"
-                value={verifiedMetrics.length}
-                helper="Numbers SitGuru checked"
-                tone="amber"
-                icon={<BarChart3 size={18} />}
-                className="h-full"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => openTool("social")}
-              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
-              aria-label="Open social posts"
-            >
-              <ThemeStatCard
-                label="Social"
-                value={data.content.length}
-                helper="Posts you’ve logged"
-                tone="rose"
-                icon={<Share2 size={18} />}
-                className="h-full"
-              />
-            </button>
-          </section>
-
-          <InternKpiBoard internId={data.intern.id} />
-
-          <section className="overflow-hidden rounded-[1.8rem] border border-emerald-200 bg-white shadow-sm">
-            <span className="block h-2.5 w-full bg-[#166534]" />
-            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-                  Your campaign workspace
-                </p>
-                <h2 className="mt-1 font-black text-slate-950">
-                  {INTERN_GROWTH_WORKPLACE.label}
-                </h2>
-                <p className="mt-1 max-w-xl text-sm font-semibold text-slate-600">
-                  {INTERN_GROWTH_WORKPLACE.blurb}
-                </p>
-              </div>
-              <Link
-                href={INTERN_GROWTH_WORKPLACE.href}
-                className={`${internPrimaryBtnClass} shrink-0`}
-              >
-                Open workplace
-              </Link>
-            </div>
-          </section>
-
-          <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-                  Quick tools
-                </p>
-                <h2 className="mt-1 font-black text-slate-950">Intern toolkit</h2>
-              </div>
-              <p className="text-xs font-semibold text-slate-500">Tap a card to open it</p>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {INTERN_HOME_TOOLS.map((item) => {
-                const Icon = toolIcons[item.id];
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setTool(item.id)}
-                    className={`overflow-hidden rounded-[1.4rem] border text-left shadow-sm ${item.tile} ${internPressClass}`}
-                  >
-                    <span className={`block h-2.5 w-full ${item.bar}`} />
-                    <span className="flex min-h-[5.25rem] flex-col items-start justify-center gap-2 px-3 py-3">
-                      <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-xl !text-white ${item.bar}`}
-                      >
-                        <Icon size={16} />
-                      </span>
-                      <span>
-                        <span className="block text-sm font-black text-slate-950">
-                          {item.label}
-                        </span>
-                        <span className={`mt-0.5 block text-[11px] font-semibold ${item.ink}`}>
-                          {item.blurb}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <Link
-              href={INTERNSHIP_HELP_PATH}
-              className={`mt-3 flex min-h-14 items-center justify-between gap-3 rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-left ${internPressClass}`}
-            >
-              <span className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#166534] !text-white">
-                  <CircleHelp size={16} />
-                </span>
-                <span>
-                  <span className="block text-sm font-black text-slate-950">Intern help</span>
-                  <span className="mt-0.5 block text-[11px] font-semibold text-emerald-800">
-                    Search how to check in, log hours, and use tracking links
-                  </span>
-                </span>
-              </span>
-              <span className="shrink-0 text-xs font-black text-emerald-800">Open →</span>
-            </Link>
-          </section>
-
-          <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">Your SitGuru team</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-[#FAF6EE] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Manager</p>
-                <p className="mt-1 font-black text-slate-950">{data.intern.managerName || "Not assigned yet"}</p>
-                <p className="text-sm font-semibold text-slate-600">{data.intern.managerTitle || "Day-to-day internship manager"}</p>
-              </div>
-              <div className="rounded-2xl bg-[#FAF6EE] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Formal supervisor</p>
-                <p className="mt-1 font-black text-slate-950">{data.intern.supervisorName || "Not assigned yet"}</p>
-                <p className="text-sm font-semibold text-slate-600">{data.intern.supervisorTitle || "University and formal review"}</p>
-              </div>
-            </div>
-          </section>
-
-          <InternWeekZeroCard
-            internId={data.intern.id}
-            completedKeys={data.startChecks || []}
-            ready={weekZeroReady}
-            preview={preview}
-          />
-
-          <section className="grid grid-cols-2 gap-2">
-            {[
-              [preview ? `/intern/time?view=${data.intern.id}` : "/intern/time", "Time"],
-              [preview ? `/intern?view=${data.intern.id}&tab=work` : "/intern?tab=work", "Weekly check-in"],
-            ].map(([href, label]) => (
-              <Link key={label} href={href} className="flex min-h-14 items-center justify-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white">
-                {label}
-              </Link>
-            ))}
-          </section>
-
-          <InternHoursPanel
-            internId={data.intern.id}
-            summary={hourSummary}
-            logs={data.timeLogs || []}
-            tasks={data.tasks}
-            preview={preview}
-          />
-
-          {(data.questions || []).filter((question) => question.status === "open" || question.answer).slice(0, 3).map((question) => (
-            <article key={question.id} className="rounded-[1.4rem] border border-sky-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-800">
-                {question.askedByRole === "manager" ? "Your manager asked" : "Question for your manager"} · {question.status === "answered" ? "Answered" : "Open"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{question.question}</p>
-              {question.answer ? <p className="mt-2 text-sm font-semibold text-emerald-900">{question.answer}</p> : null}
-            </article>
-          ))}
-
-          <section className="rounded-[1.4rem] border border-sky-200 bg-white p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-black text-slate-950">Up next</h2>
-              <button
-                type="button"
-                onClick={() => openTab("calendar")}
-                className={`${internGhostBtnClass} min-h-10 px-3 text-xs`}
-              >
-                Open calendar
-              </button>
-            </div>
-            {upcoming.length ? (
-              <ul className="mt-3 space-y-2">
-                {upcoming.map((event) => (
-                  <li key={event.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        openTab("calendar");
-                        setSelectedDate(event.date);
-                        setCalendarMonth(new Date(`${event.date}T12:00:00`));
-                      }}
-                      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2 text-left hover:bg-emerald-100 ${internPressClass}`}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-slate-950">
-                          {event.title}
-                        </p>
-                        <p className="text-xs font-semibold text-slate-500">
-                          {kindLabel(event.kind)} · {event.date}
-                        </p>
-                      </div>
-                      {event.status ? (
-                        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-800">
-                          {event.status.replaceAll("_", " ")}
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm font-semibold text-slate-500">
-                No due dates yet. When SitGuru assigns dates, they show up here.
-              </p>
-            )}
-          </section>
-
-          {!process.weeklyThisWeek && !preview ? (
-            <>
-            <form
-              id="checkin"
-              action={saveWeeklyReview}
-              className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
-            >
-              <h2 className="font-black text-slate-950">This week’s check-in</h2>
-              <p className="text-sm font-semibold text-slate-500">
-                Tell SitGuru what you finished this week. Be specific — this goes in
-                your report.
-              </p>
-              <input type="hidden" name="internId" value={data.intern.id} />
-              <input type="hidden" name="mode" value="intern" />
-              <input type="hidden" name="weekOf" value={weekOf} />
-              <FinalSectionSelect defaultValue={defaultFinalSectionForWeek(process.weekNumber)} />
-              <p className="text-xs font-semibold leading-5 text-slate-500">
-                What part of the Final Growth Report did your work advance this week? Pick the closest chapter. SitGuru
-                can move it later. Approved weeks become official report material; unapproved weeks stay Draft / Not Yet
-                Approved.
-              </p>
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  What did you add, test, learn, or improve?
-                </span>
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                  Be specific. This is how the weekly story lands in the Final Growth Report instead of a loose note.
-                </p>
-                <textarea
-                  name="contributionAdded"
-                  required
-                  rows={3}
-                  placeholder="What you added, tested, learned, or improved — and who it reached."
-                  className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
-                />
-              </label>
-              {[
-                ["accomplished", "What did you finish?"],
-                ["dataShowed", "What did the numbers show?"],
-                ["didntWork", "What didn’t work?"],
-                ["changingNextWeek", "What’s next?"],
-              ].map(([name, label]) => (
-                <label key={name} className="block">
-                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                    {label}
-                  </span>
-                  <textarea
-                    name={name}
-                    rows={2}
-                    className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
-                  />
-                </label>
-              ))}
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  What worked?
-                </span>
-                <textarea name="whatWorked" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
-              </label>
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  What did you learn?
-                </span>
-                <textarea name="learning" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
-              </label>
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Blockers or questions for your manager
-                </span>
-                <textarea name="blockers" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold text-slate-950" />
-              </label>
-              <p className="text-sm font-semibold text-slate-600">
-                Hours logged this week: {hourSummary.loggedThisWeek}. Log them above before you send this check-in.
-              </p>
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Main number (SitGuru will check it)
-                </span>
-                <input
-                  name="internReportedKpi"
-                  placeholder="Example: 27 Pet Parent signups"
-                  className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold text-slate-950"
-                />
-              </label>
-              <button className={`${internPrimaryBtnClass} w-full`}>
-                <CheckCircle2 size={16} />
-                Send weekly check-in to your manager
-              </button>
-            </form>
-              <AskAvaForm
-                internId={data.intern.id}
-                targetType="weekly"
-                targetTitle={`Week ${focusWeek || 0} check-in`}
-                label="Ask your manager"
-              />
-            </>
-          ) : process.weeklyThisWeek ? (
-            <div className="space-y-3">
-              <p className="flex min-h-12 items-center gap-2 rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-900">
-                <CheckCircle2 size={16} />
-                This week’s check-in is done.
-              </p>
-              <article className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-                <InternWorkAttachments
-                  internId={data.intern.id}
-                  itemType="weekly"
-                  itemId={thisWeekReview?.id || weekOf}
-                  attachments={data.attachments || []}
-                  preview={preview}
-                  label="This week’s evidence"
-                />
-              </article>
-            </div>
-          ) : null}
-        </div>
       ) : null}
 
       {tab === "calendar" ? (
@@ -1385,45 +921,7 @@ export default function InternStudentDashboard({
         onClose={() => setProfileOpen(false)}
       />
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
-        {moreOpen ? (
-          <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl bg-emerald-50 p-2">
-            <button type="button" onClick={() => { setMoreOpen(false); openTab("calendar"); }} className="min-h-12 rounded-2xl bg-white text-sm font-black text-slate-900">Calendar</button>
-            <Link href={INTERN_GROWTH_WORKPLACE.href} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900">Growth Workplace</Link>
-            <Link href={INTERNSHIP_HELP_PATH} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900">Help</Link>
-            <button type="button" onClick={() => { setMoreOpen(false); setProfileOpen(true); }} className="min-h-12 rounded-2xl bg-white text-sm font-black text-slate-900">Profile</button>
-          </div>
-        ) : null}
-        <div className="grid grid-cols-5 gap-1">
-          {([
-            ["home", "Home", Home],
-            ["work", "Work", ClipboardList],
-            ["project", "Report", BookOpen],
-            ["metrics", "Metrics", BarChart3],
-          ] as const).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { setMoreOpen(false); openTab(id); }}
-              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${internPressClass} ${
-                tab === id && !moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
-              }`}
-            >
-              <Icon size={18} />
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setMoreOpen((open) => !open)}
-            className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${moreOpen ? "bg-emerald-50 text-emerald-900" : "text-slate-500"}`}
-            aria-expanded={moreOpen}
-          >
-            <MoreHorizontal size={18} />
-            More
-          </button>
-        </div>
-      </nav>
+      
     </div>
   );
 }

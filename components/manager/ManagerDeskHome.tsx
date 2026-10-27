@@ -14,7 +14,7 @@ import {
 import {
   buildManagerDeskReviewQueue,
   type ManagerDeskBundle,
-} from "@/lib/admin/growth/manager-desk-data";
+} from "@/lib/admin/growth/manager-desk-model";
 import { MANAGER_PORTAL_BRAND } from "@/lib/admin/growth/manager-portal";
 import { formatHours } from "@/lib/staff-time/money";
 

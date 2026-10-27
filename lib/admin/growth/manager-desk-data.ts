@@ -1,85 +1,19 @@
 import { getAdminIdentity } from "@/lib/admin/access";
 import { listGrowthInitiatives } from "@/lib/admin/growth/outcomes";
+import {
+  buildManagerDeskReviewQueue,
+  type ManagerDeskBundle,
+} from "@/lib/admin/growth/manager-desk-model";
 import { internshipActorKind } from "@/lib/internship/manager-access";
 import { loadManagerDashboard } from "@/lib/internship/manager-data";
-import type { ManagerInternCard, ManagerQuestion, ManagerReviewItem } from "@/lib/internship/manager-dashboard";
 import { loadStaffInbox } from "@/lib/messaging/staff-data";
 import {
   loadManagerHomeExtras,
   myTimeSnapshotLines,
-  type ManagerHomeExtras,
 } from "@/lib/staff-time/home-summary";
-import type { GrowthInitiative } from "@/lib/admin/growth/outcomes";
 
-export type ManagerDeskMessage = {
-  id: string;
-  author: string;
-  avatarUrl: string;
-  preview: string;
-  unread: boolean;
-};
-
-export type ManagerDeskBundle = {
-  firstName: string;
-  fullName: string;
-  email: string;
-  title: string;
-  cards: ManagerInternCard[];
-  reviews: ManagerReviewItem[];
-  questions: ManagerQuestion[];
-  initiatives: GrowthInitiative[];
-  messages: ManagerDeskMessage[];
-  extras: ManagerHomeExtras;
-  myTimeSnap: ReturnType<typeof myTimeSnapshotLines> | null;
-};
-
-function reviewQueueBuckets(reviews: ManagerReviewItem[], questions: ManagerQuestion[]) {
-  const weekly = reviews.filter((item) => item.targetType === "weekly");
-  const hours = reviews.filter((item) => item.targetType === "hours");
-  const assignments = reviews.filter(
-    (item) => item.targetType === "task" || item.targetType === "content",
-  );
-  const openQuestions = questions.filter((item) => item.status === "open");
-  return [
-    {
-      id: "weekly",
-      label: "Weekly check-ins",
-      count: weekly.length,
-      href: "/intern/manage?tab=reviews",
-      detail: weekly.length ? `${weekly.length} submission${weekly.length === 1 ? "" : "s"}` : "Clear",
-    },
-    {
-      id: "hours",
-      label: "Intern hours",
-      count: hours.length,
-      href: "/intern/manage?tab=reviews",
-      detail: hours.length ? `${hours.length} set${hours.length === 1 ? "" : "s"}` : "Clear",
-    },
-    {
-      id: "assignments",
-      label: "Assignment feedback",
-      count: assignments.length,
-      href: "/intern/manage?tab=reviews",
-      detail: assignments.length
-        ? `${assignments.length} submission${assignments.length === 1 ? "" : "s"}`
-        : "Clear",
-    },
-    {
-      id: "questions",
-      label: "Questions from interns",
-      count: openQuestions.length,
-      href: "/intern/manage?tab=more",
-      detail: openQuestions.length ? `${openQuestions.length} open` : "Clear",
-    },
-  ] as const;
-}
-
-export function buildManagerDeskReviewQueue(
-  reviews: ManagerReviewItem[],
-  questions: ManagerQuestion[],
-) {
-  return reviewQueueBuckets(reviews, questions);
-}
+export type { ManagerDeskBundle, ManagerDeskMessage } from "@/lib/admin/growth/manager-desk-model";
+export { buildManagerDeskReviewQueue } from "@/lib/admin/growth/manager-desk-model";
 
 export async function loadManagerDeskBundle(): Promise<ManagerDeskBundle | null> {
   const actor = await getAdminIdentity();
@@ -135,3 +69,6 @@ export async function loadManagerDeskBundle(): Promise<ManagerDeskBundle | null>
     myTimeSnap: extras.myTime ? myTimeSnapshotLines(extras.myTime) : null,
   };
 }
+
+// keep helper re-export used by home UI
+void buildManagerDeskReviewQueue;

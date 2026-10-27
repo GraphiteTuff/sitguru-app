@@ -55,7 +55,7 @@ export default async function InternPortalPage({
     );
     const panel = first(params.panel);
     return (
-      <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-4 sm:px-5 lg:px-6">
+      <div className="w-full min-w-0 space-y-4">
         {panel === "workspace" ? (
           <InternshipGrowthWorkspace
             data={workspace}
@@ -75,7 +75,7 @@ export default async function InternPortalPage({
             initialProfileOpen={first(params.edit) === "page"}
           />
         )}
-      </main>
+      </div>
     );
   }
 
@@ -194,7 +194,7 @@ export default async function InternPortalPage({
   const promoteEvents = await listInternPromoteEvents();
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-4 sm:px-5 lg:px-6">
+    <div className="w-full min-w-0 space-y-4">
       {preview ? (
         <section className="space-y-3">
           <InternshipBackToProgram />
@@ -228,6 +228,6 @@ export default async function InternPortalPage({
         initialDate={first(params.date)}
         initialProfileOpen={first(params.edit) === "page"}
       />
-    </main>
+    </div>
   );
 }

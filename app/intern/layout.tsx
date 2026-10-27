@@ -1,4 +1,5 @@
-import InternPortalHeader from "@/components/internship/InternPortalHeader";
+import { Suspense } from "react";
+import InternPortalShell from "@/components/internship/InternPortalShell";
 import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
@@ -12,10 +13,14 @@ export default async function InternLayout({
 }) {
   if (internDocumentationModeEnabled()) {
     return (
-      <div className="min-h-dvh overflow-x-hidden bg-[#FAF6EE]">
-        <InternPortalHeader assigned onboarded />
-        {children}
-      </div>
+      <>
+        <WorkspaceLiveSyncMount />
+        <Suspense fallback={<div className="min-h-dvh bg-[#F3F6F4]" />}>
+          <InternPortalShell assigned onboarded>
+            {children}
+          </InternPortalShell>
+        </Suspense>
+      </>
     );
   }
 
@@ -23,10 +28,16 @@ export default async function InternLayout({
   const ack = intern ? await getInternOnboarding(intern.id) : null;
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-[#FAF6EE]">
+    <>
       <WorkspaceLiveSyncMount />
-      <InternPortalHeader assigned={Boolean(intern)} onboarded={internOnboardingComplete(ack)} />
-      {children}
-    </div>
+      <Suspense fallback={<div className="min-h-dvh bg-[#F3F6F4]" />}>
+        <InternPortalShell
+          assigned={Boolean(intern)}
+          onboarded={internOnboardingComplete(ack)}
+        >
+          {children}
+        </InternPortalShell>
+      </Suspense>
+    </>
   );
 }

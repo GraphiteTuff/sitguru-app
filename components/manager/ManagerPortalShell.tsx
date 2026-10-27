@@ -21,7 +21,8 @@ import {
   MANAGER_PORTAL_BRAND,
   MANAGER_PORTAL_SIDEBAR,
 } from "@/lib/admin/growth/manager-portal";
-import { GROWTH_MANAGER_BASE } from "@/lib/admin/growth/workplace";
+
+const GROWTH_MANAGER_BASE = "/manager";
 
 const ICONS = {
   "Manager Desk": LayoutDashboard,
@@ -51,7 +52,7 @@ export default function ManagerPortalShell({
   return (
     <div className="min-h-dvh bg-[#F3F6F4] text-slate-950">
       <div className="mx-auto flex min-h-dvh max-w-[1600px]">
-        <aside className="public-dark-section sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col bg-[#0D5C3A] text-white lg:flex">
+        <aside className="public-dark-section sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col bg-[#0D5C3A] text-white xl:flex">
           <div className="border-b border-white/10 px-5 py-5">
             <Link href={MANAGER_PORTAL_BRAND.homePath} className="block" aria-label="SitGuru Manager Portal">
               <Image
@@ -115,7 +116,7 @@ export default function ManagerPortalShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 border-b border-emerald-100/80 bg-[#F3F6F4]/95 backdrop-blur">
             <div className="flex min-h-16 items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 lg:hidden">
+              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 xl:hidden">
                 <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
                   {MANAGER_PORTAL_BRAND.kicker}
                 </p>
@@ -150,7 +151,11 @@ export default function ManagerPortalShell({
           </header>
 
           <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">{children}</main>
-          <GrowthPhoneBar pathname={pathname} basePath={GROWTH_MANAGER_BASE} />
+          <GrowthPhoneBar
+            pathname={pathname}
+            basePath={GROWTH_MANAGER_BASE}
+            hideFrom="xl"
+          />
         </div>
       </div>
     </div>
