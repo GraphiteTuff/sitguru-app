@@ -16,18 +16,18 @@ export function GrowthPageFrame({
   action?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-6xl space-y-5 pb-4">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-4 overflow-x-hidden pb-6 sm:space-y-5 sm:pb-4">
       <section
-        className="public-dark-section overflow-hidden rounded-[1.75rem] border border-emerald-100 p-5 shadow-sm sm:p-7"
+        className="public-dark-section overflow-hidden rounded-[1.5rem] border border-emerald-100 p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
         data-brand-green
         style={{ background: "#0D5C3A" }}
       >
-        <p className="text-xs font-black uppercase tracking-[0.24em] !text-white">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] !text-white sm:text-xs">
           {kicker}
         </p>
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-black leading-tight tracking-tight !text-white sm:text-4xl">
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-black leading-tight tracking-tight !text-white sm:text-3xl md:text-4xl">
               {title}
             </h1>
             {detail ? (
@@ -36,7 +36,7 @@ export function GrowthPageFrame({
               </p>
             ) : null}
           </div>
-          {action}
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       </section>
       {children}
@@ -56,7 +56,7 @@ export function GrowthCard({
   return (
     <section
       id={id}
-      className={`scroll-mt-24 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
+      className={`min-w-0 scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
     >
       {children}
     </section>

@@ -1077,14 +1077,41 @@ export async function saveWeeklyReview(formData: FormData) {
   }
 
   const payload = { ...internFields, ...supervisorFields };
-  const { error } = existing?.id
+  const { data: saved, error } = existing?.id
     ? await supabaseAdmin
         .from("internship_weekly_reviews")
         .update(payload)
         .eq("id", existing.id)
-    : await supabaseAdmin.from("internship_weekly_reviews").insert(payload);
+        .select("id")
+        .maybeSingle()
+    : await supabaseAdmin
+        .from("internship_weekly_reviews")
+        .insert(payload)
+        .select("id")
+        .maybeSingle();
 
   if (error) bounce(workspacePath(internId, mode), "error", error.message);
+
+  if (mode === "intern") {
+    const intern = await findInternById(internId);
+    if (intern) {
+      const { publishInternCheckinEvent, SITGURU_DOMAIN_EVENTS } = await import(
+        "@/lib/realtime/publish-internship"
+      );
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      await publishInternCheckinEvent({
+        intern,
+        eventType: SITGURU_DOMAIN_EVENTS.INTERN_CHECKIN_SUBMITTED,
+        resourceId: String(saved?.id || existing?.id || weekOf),
+        actor: { userId: user?.id, label: user?.email || "" },
+        resubmitted: Boolean(existing?.id),
+      });
+    }
+  }
+
   refreshInternship(workspacePath(internId, mode));
   bounce(
     workspacePath(internId, mode),

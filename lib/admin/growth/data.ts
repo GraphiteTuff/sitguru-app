@@ -257,6 +257,7 @@ export async function listGrowthMedia(): Promise<GrowthMediaItem[]> {
 export type GrowthHomeStats = {
   petParents: number;
   gurus: number;
+  ambassadors: number;
   referrals: number;
   visits: number;
   signups: number;
@@ -266,6 +267,7 @@ export type GrowthHomeStats = {
   trends: {
     petParents: KpiTrend;
     gurus: KpiTrend;
+    ambassadors: KpiTrend;
     referrals: KpiTrend;
     visits: KpiTrend;
     signups: KpiTrend;
@@ -275,12 +277,21 @@ export type GrowthHomeStats = {
   };
 };
 
+export type GrowthUpcomingEvent = {
+  id: string;
+  name: string;
+  detail: string;
+  href: string;
+  market: string;
+  startAt: string | null;
+};
+
 export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
   const nowIso = new Date().toISOString();
   const thisWeekStart = isoDaysAgo(7);
   const priorWeekStart = isoDaysAgo(14);
 
-  const [parentRows, guruRows, referralRows, events, campaigns, content] =
+  const [parentRows, guruRows, ambassadorRows, referralRows, events, campaigns, content] =
     await Promise.all([
       safeRows<AnyRow>(
         supabaseAdmin
@@ -299,6 +310,14 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
           .gte("created_at", priorWeekStart)
           .limit(1000),
         "growth_week_gurus",
+      ),
+      safeRows<AnyRow>(
+        supabaseAdmin
+          .from("ambassadors")
+          .select("id,created_at")
+          .gte("created_at", priorWeekStart)
+          .limit(1000),
+        "growth_week_ambassadors",
       ),
       safeRows<AnyRow>(
         supabaseAdmin
@@ -343,6 +362,12 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
   const priorPetParents = countRows(liveParents, priorWeekStart, thisWeekStart);
   const gurus = countRows(guruRows, thisWeekStart, nowIso);
   const priorGurus = countRows(guruRows, priorWeekStart, thisWeekStart);
+  const ambassadors = countRows(ambassadorRows, thisWeekStart, nowIso);
+  const priorAmbassadors = countRows(
+    ambassadorRows,
+    priorWeekStart,
+    thisWeekStart,
+  );
   const referrals = countRows(referralRows, thisWeekStart, nowIso);
   const priorReferrals = countRows(referralRows, priorWeekStart, thisWeekStart);
   const visits = countRows(events, thisWeekStart, nowIso, isVisit);
@@ -380,6 +405,7 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
   return {
     petParents,
     gurus,
+    ambassadors,
     referrals,
     visits,
     signups,
@@ -389,6 +415,7 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
     trends: {
       petParents: compareKpi(petParents, priorPetParents),
       gurus: compareKpi(gurus, priorGurus),
+      ambassadors: compareKpi(ambassadors, priorAmbassadors),
       referrals: compareKpi(referrals, priorReferrals),
       visits: compareKpi(visits, priorVisits),
       signups: compareKpi(signups, priorSignups),
@@ -404,6 +431,38 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
       }),
     },
   };
+}
+
+/** Upcoming published community events for Growth Workspace "Upcoming Work". */
+export async function listUpcomingGrowthEvents(
+  limit = 6,
+): Promise<GrowthUpcomingEvent[]> {
+  const nowIso = new Date().toISOString();
+  const rows = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("community_events")
+      .select(
+        "id,title,slug,short_description,city,state,start_at,status,venue_name",
+      )
+      .gte("start_at", nowIso)
+      .order("start_at", { ascending: true })
+      .limit(limit),
+    "growth_upcoming_events",
+  );
+
+  return rows
+    .filter((row) => {
+      const status = text(row.status).toLowerCase();
+      return !status || ["published", "active", "approved", "live"].includes(status);
+    })
+    .map((row) => ({
+      id: text(row.id),
+      name: text(row.title) || "Pet event",
+      detail: text(row.short_description) || text(row.venue_name) || "Local pet event",
+      href: text(row.slug) ? `/community/events/${text(row.slug)}` : "/community",
+      market: [text(row.city), text(row.state)].filter(Boolean).join(", "),
+      startAt: text(row.start_at) || null,
+    }));
 }
 
 export async function uniqueCampaignSlug(base: string) {

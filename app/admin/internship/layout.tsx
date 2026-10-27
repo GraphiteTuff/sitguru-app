@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import InternshipAdminBackBar from "@/components/internship/InternshipAdminBackBar";
+import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 
@@ -14,6 +15,7 @@ export default async function InternshipAdminLayout({
 
   return (
     <div className="min-w-0 overflow-x-hidden">
+      <WorkspaceLiveSyncMount />
       <InternshipAdminBackBar />
       {children}
     </div>

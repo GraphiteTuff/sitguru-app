@@ -40,11 +40,13 @@ import {
   WalletCards,
   Images,
   FolderOpen,
+  Lightbulb,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
+import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const adminRoutes = {
@@ -67,6 +69,7 @@ const adminRoutes = {
   growthPartners: "/admin/growth/partners",
   growthMedia: "/admin/growth/media",
   growthAnalytics: "/admin/growth/analytics",
+  growthIntelligence: "/admin/growth/intelligence",
   trustSafety: "/admin/background-checks",
   hr: "/admin/hr",
   internship: "/admin/internship",
@@ -115,13 +118,18 @@ const growthNavSections = [
       { label: "Home", href: adminRoutes.growth, icon: Home },
       { label: "Messages", href: "/admin/growth/messages", icon: MessageCircle },
       { label: "Intern team", href: "/intern/manage", icon: Users },
-      { label: "Time", href: "/admin/growth/time", icon: ClipboardCheck },
+      { label: "My Time", href: "/admin/growth/my-time", icon: ClipboardCheck },
+      { label: "My Payments", href: "/admin/growth/payments", icon: CreditCard },
       { label: "Onboarding", href: "/admin/growth/onboarding", icon: GraduationCap },
-      { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
-      { label: "Content", href: adminRoutes.growthContent, icon: FolderOpen },
       { label: "Events", href: adminRoutes.growthEvents, icon: CalendarDays },
+      { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
+      { label: "Intelligence", href: adminRoutes.growthIntelligence, icon: Lightbulb },
+      { label: "Analytics", href: adminRoutes.growthAnalytics, icon: BarChart3 },
+      { label: "Tracking links", href: adminRoutes.growthCreate, icon: Plus },
+      { label: "Content", href: adminRoutes.growthContent, icon: FolderOpen },
+      { label: "Gurus", href: adminRoutes.growthGurus, icon: PawPrint },
       { label: "Partners", href: adminRoutes.growthPartners, icon: HandCoins },
-      { label: "Create", href: adminRoutes.growthCreate, icon: Plus },
+      { label: "Media", href: adminRoutes.growthMedia, icon: Images },
     ],
   },
 ];
@@ -130,7 +138,8 @@ const growthHeaderLinks = [
   { label: "Home", href: adminRoutes.growth },
   { label: "Messages", href: "/admin/growth/messages" },
   { label: "Intern team", href: "/intern/manage" },
-  { label: "Time", href: "/admin/growth/time" },
+  { label: "My Time", href: "/admin/growth/my-time" },
+  { label: "My Payments", href: "/admin/growth/payments" },
   { label: "Onboarding", href: "/admin/growth/onboarding" },
 ];
 
@@ -1126,6 +1135,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </div>
 
     </div>
+
+      <WorkspaceLiveSyncMount />
 
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       <SafeAssistantBubble>

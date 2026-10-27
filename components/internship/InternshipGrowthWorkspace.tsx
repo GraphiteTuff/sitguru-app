@@ -199,14 +199,19 @@ export default function InternshipGrowthWorkspace({
 
       <InternshipKpiLetterBoard data={data} />
 
-      <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0">
-        <div className="flex min-w-max flex-wrap gap-2 sm:min-w-0">
+      <div
+        role="tablist"
+        aria-label="Growth workspace sections"
+        className="flex flex-wrap gap-2"
+      >
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
-            className={`min-h-12 rounded-2xl px-4 text-sm font-black ${
+            className={`min-h-11 min-w-[5.5rem] flex-1 rounded-2xl px-3 text-sm font-black sm:min-w-0 sm:flex-none sm:px-4 ${
               tab === item.id
                 ? "bg-[#166534] !text-white"
                 : "border border-emerald-100 bg-white text-emerald-900"
@@ -215,7 +220,6 @@ export default function InternshipGrowthWorkspace({
             {item.label}
           </button>
         ))}
-        </div>
       </div>
 
       {tab === "plan" ? (

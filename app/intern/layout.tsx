@@ -1,4 +1,5 @@
 import InternPortalHeader from "@/components/internship/InternPortalHeader";
+import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import { currentAssignedIntern } from "@/lib/admin/growth/workplace";
@@ -23,6 +24,7 @@ export default async function InternLayout({
 
   return (
     <div className="min-h-dvh overflow-x-hidden bg-[#FAF6EE]">
+      <WorkspaceLiveSyncMount />
       <InternPortalHeader assigned={Boolean(intern)} onboarded={internOnboardingComplete(ack)} />
       {children}
     </div>

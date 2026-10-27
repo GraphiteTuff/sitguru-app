@@ -908,6 +908,7 @@ export function documentationGrowthHomeStats(): GrowthHomeStats {
   return {
     petParents: 9,
     gurus: 3,
+    ambassadors: 2,
     referrals: 14,
     visits: 118,
     signups: 9,
@@ -917,6 +918,7 @@ export function documentationGrowthHomeStats(): GrowthHomeStats {
     trends: {
       petParents: trend(9),
       gurus: trend(3),
+      ambassadors: trend(2),
       referrals: trend(4),
       visits: trend(22),
       signups: trend(9),

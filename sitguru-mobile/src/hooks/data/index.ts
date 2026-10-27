@@ -7,6 +7,7 @@
  */
 
 export { useRealtimeSubscription } from '@/hooks/data/useRealtimeSubscription';
+export { useWorkspaceLiveSync } from '@/hooks/data/useWorkspaceLiveSync';
 export { usePets } from '@/hooks/data/usePets';
 export { useBookings, useBooking } from '@/hooks/data/useBookings';
 export { useConversations, useConversation } from '@/hooks/data/useMessages';

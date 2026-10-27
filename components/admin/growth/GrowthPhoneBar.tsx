@@ -5,15 +5,17 @@ import { useState } from "react";
 import {
   BarChart3,
   CalendarDays,
+  ClipboardCheck,
+  ClipboardList,
   FolderOpen,
   Handshake,
   Home,
   Images,
+  Lightbulb,
   Megaphone,
   MessageCircle,
   Plus,
   Users,
-  ClipboardCheck,
 } from "lucide-react";
 
 const suffixes = {
@@ -26,6 +28,7 @@ const suffixes = {
   events: "/events",
   partners: "/partners",
   analytics: "/analytics",
+  intelligence: "/intelligence",
 } as const;
 
 function href(basePath: string, suffix: string) {
@@ -60,12 +63,15 @@ export default function GrowthPhoneBar({
       ];
   const moreLinks = staffHome
     ? [
-        { suffix: "/time", label: "Time", icon: ClipboardCheck, href: "" },
+        { suffix: "/my-time", label: "My Time", icon: ClipboardCheck, href: "" },
+        { suffix: "/payments", label: "Payments", icon: ClipboardList, href: "" },
         { suffix: "/onboarding", label: "Onboarding", icon: ClipboardCheck, href: "" },
+        { suffix: suffixes.intelligence, label: "Insights", icon: Lightbulb, href: "" },
         { suffix: suffixes.create, label: "Create", icon: Plus, href: "" },
         { suffix: suffixes.content, label: "Content", icon: FolderOpen, href: "" },
         { suffix: suffixes.events, label: "Events", icon: CalendarDays, href: "" },
         { suffix: suffixes.partners, label: "Partners", icon: Handshake, href: "" },
+        { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3, href: "" },
       ]
     : [
         { suffix: suffixes.create, label: "Create", icon: Plus, href: "" },
@@ -102,8 +108,8 @@ export default function GrowthPhoneBar({
                     onClick={() => setMoreOpen(false)}
                     className={
                       active
-                    ? "flex min-h-14 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
-                    : "flex min-h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
+                        ? "flex min-h-14 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
+                        : "flex min-h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
                     }
                   >
                     <Icon size={16} />
@@ -137,12 +143,12 @@ export default function GrowthPhoneBar({
           })}
 
           <Link
-            href={href(basePath, suffixes.create)}
-            aria-label="Create"
+            href={href(basePath, `${suffixes.events}#record-results`)}
+            aria-label="Record event results"
             className="mb-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
             style={{ background: "#0D5C3A" }}
           >
-            <Plus size={30} />
+            <ClipboardList size={28} />
           </Link>
 
           {primary.slice(2).map((item) => {

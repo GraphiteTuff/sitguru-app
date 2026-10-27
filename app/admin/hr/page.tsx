@@ -61,6 +61,9 @@ const routes = {
   careers: "/admin/hr/careers",
   internship: "/admin/internship",
   growthPortal: "/admin/growth",
+  people: "/admin/hr/people",
+  teamPayments: "/admin/hr/people/payments",
+  myTime: "/admin/growth/my-time",
   users: "/admin/users",
   messages: "/admin/messages",
   exports: "/admin/exports",
@@ -744,6 +747,20 @@ export default async function AdminHrPage() {
         }`}
         links={
           <>
+            <Link
+              href={routes.people}
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              <Users size={13} className="mr-1 inline" />
+              People
+            </Link>
+            <Link
+              href={routes.teamPayments}
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              <WalletCards size={13} className="mr-1 inline" />
+              Team Payments
+            </Link>
             <Link
               href={routes.payroll}
               className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
