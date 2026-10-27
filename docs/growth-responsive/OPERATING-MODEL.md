@@ -22,35 +22,40 @@ The Growth Workspace was refined so it **measures business outcomes** and does *
 
 Founder direction → Growth Manager strategy → Teams discussion → Planner execution → Growth Workspace results → learning → next experiment.
 
-## Removed / simplified
+## Microsoft Teams (teams.cloud.microsoft)
 
-- **No Growth Work Items task tracker** — never built as Planner duplicate; high-level **Current Initiatives** only (name/purpose/status/market).
-- **Content calendar demoted** — reframed as inventory; production workflow language points to Planner.
-- **Home Quick Actions** — outcome-focused (Record Event Results, Intelligence, Manager Desk) instead of “create a post” task language.
-- **Phone bar center action** — Record event results (measurement), not a generic create task.
-- **No Microsoft Graph sync** — configurable optional URL env vars only.
+Team: **SitGuru | Marketing & Community Growth**
 
-## Growth Workspace sections
+SitGuru does **not** mirror channel welcome handbooks. Channel folders stay in Teams; SitGuru holds the matching data, reports, and formal processes.
 
-1. Overview (business KPIs)
-2. Analytics / Results (trends)
-3. Current Initiatives (lightweight themes)
-4. Community & Events (activation + results)
-5. Campaigns (performance / tracking)
-6. Ambassador Growth
-7. Growth Intelligence (surveys/polls/tests)
-8. Team (dynamic assigned interns → Manager Desk)
-9. Resources (Teams / Planner / Brand Kit / portals when configured)
-10. Results & Learning bridge copy
+| Teams channel | SitGuru system of record |
+| --- | --- |
+| General | Manager Desk / Growth home |
+| Growth and Strategy | Campaigns, initiatives, Growth Workspace |
+| Content and Social | Content / media / campaign outcomes |
+| Intern Projects | Intern Portal + Intern Team Desk |
+| Partnerships and Community | Partners, events, community results |
+| Analytics and Results | Analytics, Intelligence, KPI reports |
+| Leadership - Jason, Danette, and Ava (private) | Leadership chat only — HR/payroll stay in Admin |
 
-## Schema (new)
+Default open URL: `https://teams.cloud.microsoft`
 
-Migration `20261025_growth_workspace_outcomes.sql`:
+Optional deep links:
 
-- `growth_initiatives` — high-level themes (optional future `microsoft_*` refs unused)
-- `growth_event_results` — event acquisition outcomes + manual/system metric sources
-- `growth_intelligence_entries` — Test → Learn → Recommend → Act
-- Optional outcome columns on existing `growth_campaigns` when present
+```bash
+NEXT_PUBLIC_SITGURU_TEAMS_GROWTH_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_GENERAL_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_ANALYTICS_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_CONTENT_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_STRATEGY_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_INTERNS_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_LEADERSHIP_URL=
+NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_PARTNERSHIPS_URL=
+NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL=
+NEXT_PUBLIC_SITGURU_BRAND_KIT_URL=
+```
+
+Channel ↔ path map: `lib/admin/growth/teams-access.ts`
 
 ## Permissions
 
@@ -58,15 +63,7 @@ Growth Manager (`social_community_manager` / Growth portal): Growth Workspace, e
 
 Not granted: Stripe admin, payroll, banking, legal, system-wide auth admin, unrestricted Admin HQ.
 
-Founder approval remains reserved for spend, paid ads, contracts, legal/policy, compensation, brand-risk decisions.
-
-## Configurable links
-
-```bash
-NEXT_PUBLIC_SITGURU_TEAMS_GROWTH_URL=
-NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL=
-NEXT_PUBLIC_SITGURU_BRAND_KIT_URL=
-```
+Founder / Super Admin retain full Admin HQ plus Manager Portal access via growth workplace gates.
 
 ## Future (not in this milestone)
 

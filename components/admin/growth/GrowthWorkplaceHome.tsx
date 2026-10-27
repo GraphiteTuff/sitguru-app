@@ -248,6 +248,7 @@ export async function GrowthWorkplaceHome({
   const resourceLinks = getGrowthResourceLinks({
     intern,
     email: workplace.actor.email,
+    includeChannels: false,
   });
 
   return (
@@ -751,7 +752,11 @@ export async function GrowthWorkplaceHome({
             title="External work systems"
             defaultOpen={false}
           >
-            <GrowthResourcesPanel intern={intern} links={resourceLinks} />
+            <GrowthResourcesPanel
+              intern={intern}
+              email={workplace.actor.email}
+              links={resourceLinks}
+            />
           </GrowthCollapsibleSection>
         </div>
 

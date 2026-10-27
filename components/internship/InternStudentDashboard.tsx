@@ -472,12 +472,12 @@ export default function InternStudentDashboard({
                   rel="noreferrer"
                   className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800"
                 >
-                  Weekly Growth Meeting · Open in Microsoft Teams
+                  Marketing & Community Growth · Open in Teams
                 </a>
               ) : (
                 <p className="mt-2 text-sm font-semibold text-slate-600">
-                  Weekly Growth Meetings are hosted in Microsoft Teams for SitGuru
-                  work accounts (@sitguru.com). Your manager will share the invite.
+                  Microsoft Teams (teams.cloud.microsoft) is for SitGuru work
+                  accounts (@sitguru.com). Your manager will share channel access.
                 </p>
               )}
             </div>

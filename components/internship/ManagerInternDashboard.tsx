@@ -404,11 +404,11 @@ export default function ManagerInternDashboard({
                 rel="noreferrer"
                 className={internPrimaryBtnClass}
               >
-                Weekly Growth Meeting · Open in Microsoft Teams
+                Marketing & Community Growth · Open in Teams
               </a>
             ) : (
               <p className="w-full text-sm font-semibold text-slate-600">
-                Microsoft Teams opens only for SitGuru work accounts
+                Teams (teams.cloud.microsoft) opens only for SitGuru work accounts
                 (@sitguru.com), such as jason@sitguru.com or ava@sitguru.com.
               </p>
             )}

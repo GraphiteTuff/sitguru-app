@@ -20,6 +20,10 @@ import {
   type ManagerDeskBundle,
 } from "@/lib/admin/growth/manager-desk-model";
 import { MANAGER_PORTAL_BRAND } from "@/lib/admin/growth/manager-portal";
+import {
+  sitguruTeamsHref,
+  SITGURU_GROWTH_TEAMS_TEAM,
+} from "@/lib/admin/growth/teams-access";
 import { DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
 import { formatHours } from "@/lib/staff-time/money";
 
@@ -471,6 +475,14 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
                 {label}
               </Link>
             ))}
+            <a
+              href={sitguruTeamsHref()}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#E0F2F1] px-3 text-center text-sm font-bold text-[#0F766E] sm:col-span-2"
+            >
+              Open Teams · {SITGURU_GROWTH_TEAMS_TEAM.shortName} →
+            </a>
           </div>
           <div className="relative mt-4 h-24 overflow-hidden rounded-2xl bg-[#FFF7ED]">
             <Image
