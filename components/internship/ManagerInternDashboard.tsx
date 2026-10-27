@@ -12,6 +12,12 @@ import {
 import AskAvaForm from "@/components/internship/AskAvaForm";
 import type { ManagerInternCard, ManagerQuestion, ManagerReviewItem } from "@/lib/internship/manager-dashboard";
 import type { InternshipIntern } from "@/lib/internship/types";
+import {
+  internGhostBtnClass,
+  internPressClass,
+  internPrimaryBtnClass,
+} from "@/lib/internship/intern-ui";
+import { internPortalHeroClass } from "@/lib/internship/portal";
 
 const TABS = [
   { id: "dashboard", label: "Dashboard" },
@@ -23,9 +29,35 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+const CARD_SHELL =
+  "overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-5";
+
 function StatusText({ label }: { label: string }) {
+  const tone = label.toLowerCase();
+  const classes =
+    tone.includes("ready") ||
+    tone.includes("approved") ||
+    tone.includes("on track") ||
+    tone.includes("active")
+      ? "bg-emerald-50 text-emerald-900 ring-emerald-200"
+      : tone.includes("review") ||
+          tone.includes("waiting") ||
+          tone.includes("pending") ||
+          tone.includes("submitted")
+        ? "bg-amber-50 text-amber-950 ring-amber-200"
+        : tone.includes("block") ||
+            tone.includes("overdue") ||
+            tone.includes("behind") ||
+            tone.includes("change")
+          ? "bg-rose-50 text-rose-900 ring-rose-200"
+          : tone.includes("question") || tone.includes("ask")
+            ? "bg-sky-50 text-sky-900 ring-sky-200"
+            : "bg-white text-slate-800 ring-amber-100";
+
   return (
-    <span className="inline-flex min-h-8 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200">
+    <span
+      className={`inline-flex min-h-8 items-center rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] ring-1 ${classes}`}
+    >
       {label}
     </span>
   );
@@ -33,13 +65,20 @@ function StatusText({ label }: { label: string }) {
 
 function InternCard({ card }: { card: ManagerInternCard }) {
   return (
-    <article className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm">
+    <article className={CARD_SHELL}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-xl font-black text-slate-950">{card.name}</h2>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-800">
+            Assigned intern
+          </p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+            {card.name}
+          </h2>
           <p className="text-sm font-semibold text-slate-600">{card.school}</p>
         </div>
-        <p className="text-sm font-black text-emerald-900">{card.weekLabel}</p>
+        <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] !text-white">
+          {card.weekLabel}
+        </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {card.statuses.map((status) => (
@@ -61,8 +100,13 @@ function InternCard({ card }: { card: ManagerInternCard }) {
           ["Next deadline", card.nextDeadline],
           ["Last submission", card.lastSubmission],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl bg-[#FAF6EE] px-3 py-2">
-            <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">{label}</dt>
+          <div
+            key={label}
+            className="rounded-2xl border border-amber-100/80 bg-[#FAF6EE] px-3 py-2"
+          >
+            <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+              {label}
+            </dt>
             <dd className="mt-1 font-bold text-slate-950">{value}</dd>
           </div>
         ))}
@@ -80,10 +124,12 @@ function ReviewCard({
 }) {
   const locked = item.ceo && !canCeo;
   return (
-    <article className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm">
+    <article className={CARD_SHELL}>
       <div className="flex flex-wrap items-center gap-2">
         <StatusText label={item.statusLabel} />
-        <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{item.internName}</span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-950 ring-1 ring-amber-200">
+          {item.internName}
+        </span>
       </div>
       <h3 className="mt-2 text-lg font-black text-slate-950">{item.title}</h3>
       <p className="mt-1 text-sm font-semibold text-slate-600">
@@ -92,39 +138,68 @@ function ReviewCard({
         {item.reportSection ? ` · ${item.reportSection.replaceAll("_", " ")}` : ""}
       </p>
       {item.submittedAt ? (
-        <p className="mt-1 text-xs font-semibold text-slate-500">Submitted {item.submittedAt.slice(0, 10)}</p>
+        <p className="mt-1 text-xs font-semibold text-slate-500">
+          Submitted {item.submittedAt.slice(0, 10)}
+        </p>
       ) : null}
       {item.evidence ? (
-        <a href={item.evidence} className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800">
+        <a
+          href={item.evidence}
+          className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800"
+        >
           Open evidence
         </a>
       ) : null}
       {locked ? (
-        <p className="mt-3 text-sm font-semibold text-amber-900">Needs CEO review. Jason takes this one.</p>
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+          Needs CEO review. Jason takes this one.
+        </p>
       ) : (
         <form action={reviewPortalSubmission} className="mt-3 space-y-2">
           <input type="hidden" name="internId" value={item.internId} />
           <input type="hidden" name="targetType" value={item.targetType} />
           <input type="hidden" name="targetId" value={item.id} />
           <label className="block">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Note</span>
-            <textarea name="comment" rows={2} className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold" />
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+              Note
+            </span>
+            <textarea
+              name="comment"
+              rows={2}
+              className="mt-1 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/60 px-3 py-3 text-base font-semibold"
+            />
           </label>
           <div className="grid gap-2 sm:grid-cols-2">
             {item.ceo ? (
-              <button name="reviewAction" value="ceo_approve" className="min-h-12 rounded-2xl bg-[#166534] px-3 text-sm font-black !text-white">
+              <button
+                name="reviewAction"
+                value="ceo_approve"
+                className={internPrimaryBtnClass}
+              >
                 CEO approve
               </button>
             ) : (
-              <button name="reviewAction" value="approve" className="min-h-12 rounded-2xl bg-[#166534] px-3 text-sm font-black !text-white">
+              <button
+                name="reviewAction"
+                value="approve"
+                className={internPrimaryBtnClass}
+              >
                 Approve
               </button>
             )}
-            <button name="reviewAction" value={item.ceo ? "ceo_request_changes" : "request_changes"} className="min-h-12 rounded-2xl border border-amber-300 bg-amber-50 px-3 text-sm font-black text-amber-950">
+            <button
+              name="reviewAction"
+              value={item.ceo ? "ceo_request_changes" : "request_changes"}
+              className={`min-h-12 rounded-2xl border border-amber-300 bg-amber-50 px-3 text-sm font-black text-amber-950 ${internPressClass}`}
+            >
               Request changes
             </button>
             {!item.ceo ? (
-              <button name="reviewAction" value="escalate" className="min-h-12 rounded-2xl border border-slate-200 px-3 text-sm font-black text-slate-800">
+              <button
+                name="reviewAction"
+                value="escalate"
+                className={internGhostBtnClass}
+              >
                 Escalate to supervisor
               </button>
             ) : null}
@@ -171,37 +246,78 @@ export default function ManagerInternDashboard({
   return (
     <div className="space-y-4 pb-24 sm:pb-8">
       {notice ? (
-        <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${notice.kind === "ok" ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-800"}`}>
+        <p
+          className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
+            notice.kind === "ok"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-rose-200 bg-rose-50 text-rose-800"
+          }`}
+        >
           {notice.message}
         </p>
       ) : null}
       {notices.map((item) => (
-        <section key={item.id} className="rounded-[1.6rem] border border-sky-200 bg-sky-50 p-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-800">{item.title}</p>
+        <section
+          key={item.id}
+          className="overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50 p-4 shadow-sm"
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-800">
+            {item.title}
+          </p>
           <p className="mt-2 text-sm font-semibold text-slate-800">{item.body}</p>
           <form action={dismissStaffNotice} className="mt-3">
             <input type="hidden" name="id" value={item.id} />
-            <button className="min-h-11 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">Got it</button>
+            <button className={internPrimaryBtnClass}>Got it</button>
           </form>
         </section>
       ))}
-      <header className="rounded-[1.8rem] bg-[#FAF6EE] p-1">
-        <div className="public-dark-section rounded-[1.6rem] px-4 py-5 sm:px-6" data-brand-green style={{ background: "#0D5C3A" }}>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-white/80">Intern team</p>
-          <h1 className="mt-1 text-3xl font-black !text-white">My intern team</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold !text-white/90">
-            You see the interns assigned to you. Routine work stays here. Your supervisor sees what you escalate.
-          </p>
+
+      <header className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div
+          className={`grid gap-4 px-5 py-6 sm:px-6 sm:py-7 ${internPortalHeroClass("emerald")}`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-900 shadow-sm">
+              Manager Desk
+            </span>
+            <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] !text-white">
+              Intern team
+            </span>
+            <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
+              {cards.length} assigned
+            </span>
+          </div>
+          <div>
+            <h1 className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
+              My intern team
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-800">
+              You see the interns assigned to you. Routine work stays here. Your
+              supervisor sees what you escalate.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/growth" className={`${internPrimaryBtnClass} rounded-full`}>
+              Growth Workspace
+            </Link>
+            <Link href="/intern" className={`${internGhostBtnClass} rounded-full`}>
+              Intern portal
+            </Link>
+          </div>
         </div>
       </header>
 
-      <div className="hidden gap-2 sm:flex">
+      <div className="hidden flex-wrap gap-2 sm:flex">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`min-h-11 flex-1 rounded-2xl px-3 text-sm font-black ${tab === item.id ? "bg-[#166534] !text-white" : "bg-white text-slate-700 ring-1 ring-slate-200"}`}
+            className={
+              tab === item.id
+                ? `min-h-11 rounded-full bg-[#166534] px-4 text-sm font-black !text-white ${internPressClass}`
+                : `min-h-11 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-black text-amber-950 ${internPressClass}`
+            }
           >
             {item.label}
           </button>
@@ -214,7 +330,9 @@ export default function ManagerInternDashboard({
             <InternCard key={card.id} card={card} />
           ))}
           {!cards.length ? (
-            <p className="rounded-[1.4rem] bg-white p-4 text-sm font-semibold text-slate-600">No active interns are assigned yet.</p>
+            <p className="rounded-[2rem] border border-amber-100 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm">
+              No active interns are assigned yet.
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -222,43 +340,65 @@ export default function ManagerInternDashboard({
       {tab === "reviews" ? (
         <section className="space-y-3">
           <h2 className="text-xl font-black text-slate-950">Needs manager review</h2>
-          {reviews.filter((item) => !item.ceo).map((item) => (
-            <ReviewCard key={`${item.targetType}-${item.id}`} item={item} canCeo={canCeo} />
-          ))}
+          {reviews
+            .filter((item) => !item.ceo)
+            .map((item) => (
+              <ReviewCard
+                key={`${item.targetType}-${item.id}`}
+                item={item}
+                canCeo={canCeo}
+              />
+            ))}
           {!reviews.some((item) => !item.ceo) ? (
-            <p className="rounded-[1.4rem] bg-white p-4 text-sm font-semibold text-slate-600">Nothing is waiting on you.</p>
+            <p className="rounded-[2rem] border border-amber-100 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm">
+              Nothing is waiting on you.
+            </p>
           ) : null}
           <h2 className="pt-2 text-xl font-black text-slate-950">Needs CEO review</h2>
-          {reviews.filter((item) => item.ceo).map((item) => (
-            <ReviewCard key={`ceo-${item.id}`} item={item} canCeo={canCeo} />
-          ))}
+          {reviews
+            .filter((item) => item.ceo)
+            .map((item) => (
+              <ReviewCard key={`ceo-${item.id}`} item={item} canCeo={canCeo} />
+            ))}
           {!reviews.some((item) => item.ceo) ? (
-            <p className="rounded-[1.4rem] bg-white p-4 text-sm font-semibold text-slate-600">No escalations.</p>
+            <p className="rounded-[2rem] border border-amber-100 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm">
+              No escalations.
+            </p>
           ) : null}
         </section>
       ) : null}
 
       {tab === "calendar" ? (
-        <section className="space-y-3 rounded-[1.6rem] border border-emerald-100 bg-white p-4">
+        <section className={CARD_SHELL}>
           <h2 className="text-xl font-black text-slate-950">Internship calendar</h2>
-          <p className="text-sm font-semibold text-slate-600">
+          <p className="mt-1 text-sm font-semibold text-slate-600">
             Milestones live here. Meetings stay in Teams and Outlook.
           </p>
-          <ul className="space-y-2">
+          <ul className="mt-4 space-y-2">
             {cards.map((card) => (
-              <li key={card.id} className="rounded-2xl bg-[#FAF6EE] px-3 py-3">
+              <li
+                key={card.id}
+                className="rounded-2xl border border-amber-100/80 bg-[#FAF6EE] px-3 py-3"
+              >
                 <p className="font-black text-slate-950">{card.name}</p>
-                <p className="text-sm font-semibold text-slate-600">Next deadline: {card.nextDeadline}</p>
+                <p className="text-sm font-semibold text-slate-600">
+                  Next deadline: {card.nextDeadline}
+                </p>
                 <p className="text-sm font-semibold text-slate-600">{card.milestone}</p>
               </li>
             ))}
           </ul>
-          <a href="https://teams.microsoft.com" className="inline-flex min-h-12 items-center rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">
-            Weekly Growth Meeting · Open in Microsoft Teams
-          </a>
-          <Link href="/admin/internship/timeline" className="inline-flex min-h-12 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">
-            Open milestone timeline
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a
+              href="https://teams.microsoft.com"
+              className={internPrimaryBtnClass}
+            >
+              Weekly Growth Meeting · Open in Microsoft Teams
+            </a>
+            <Link href="/admin/internship/timeline" className={internGhostBtnClass}>
+              Open milestone timeline
+            </Link>
+          </div>
         </section>
       ) : null}
 
@@ -267,93 +407,209 @@ export default function ManagerInternDashboard({
           <section className="space-y-3">
             <h2 className="text-xl font-black text-slate-950">Questions / blockers</h2>
             {openQuestions.map((question) => (
-              <article key={question.id} className="rounded-[1.6rem] border border-sky-100 bg-white p-4">
+              <article key={question.id} className={CARD_SHELL}>
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-800">
-                  {question.internName} · {question.urgency === "high" ? "Blocking" : "Question"} · {question.status}
+                  {question.internName} ·{" "}
+                  {question.urgency === "high" ? "Blocking" : "Question"} ·{" "}
+                  {question.status}
                 </p>
-                <h3 className="mt-1 font-black text-slate-950">{question.targetTitle || "Internship question"}</h3>
-                <p className="mt-2 text-sm font-semibold text-slate-700">{question.question}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">{question.askedAt.slice(0, 10)}</p>
-                {question.answer ? <p className="mt-2 text-sm font-semibold text-emerald-900">{question.answer}</p> : null}
+                <h3 className="mt-1 font-black text-slate-950">
+                  {question.targetTitle || "Internship question"}
+                </h3>
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  {question.question}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {question.askedAt.slice(0, 10)}
+                </p>
+                {question.answer ? (
+                  <p className="mt-2 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+                    {question.answer}
+                  </p>
+                ) : null}
                 {question.status === "open" ? (
                   <form action={answerInternQuestion} className="mt-3 space-y-2">
                     <input type="hidden" name="internId" value={question.internId} />
                     <input type="hidden" name="id" value={question.id} />
-                    <textarea name="answer" required rows={2} placeholder="Answer, or point them to the right guide" className="w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold" />
-                    <button className="min-h-12 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">Save answer</button>
+                    <textarea
+                      name="answer"
+                      required
+                      rows={2}
+                      placeholder="Answer, or point them to the right guide"
+                      className="w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/60 px-3 py-3 text-base font-semibold"
+                    />
+                    <button className={internPrimaryBtnClass}>Save answer</button>
                   </form>
                 ) : null}
               </article>
             ))}
-            {!openQuestions.length ? <p className="text-sm font-semibold text-slate-600">No open questions.</p> : null}
+            {!openQuestions.length ? (
+              <p className="text-sm font-semibold text-slate-600">No open questions.</p>
+            ) : null}
           </section>
 
           {canEdit ? (
-            <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4">
-              <h2 className="text-xl font-black text-slate-950">University requirements</h2>
+            <section className={CARD_SHELL}>
+              <h2 className="text-xl font-black text-slate-950">
+                University requirements
+              </h2>
               <p className="mt-1 text-sm font-semibold text-slate-600">
                 Changes are audited. Approved hour entries stay as they were.
               </p>
               {interns.map((intern) => (
-                <form key={intern.id} action={saveRequirementConfig} className="mt-4 grid gap-3 border-t border-emerald-50 pt-4 sm:grid-cols-2">
+                <form
+                  key={intern.id}
+                  action={saveRequirementConfig}
+                  className="mt-4 grid gap-3 border-t border-amber-100 pt-4 sm:grid-cols-2"
+                >
                   <input type="hidden" name="internId" value={intern.id} />
-                  <p className="font-black text-slate-950 sm:col-span-2">{intern.fullName}</p>
-                  <label className="block text-sm font-semibold">Credits
-                    <input name="credits" defaultValue={intern.credits ?? ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <p className="font-black text-slate-950 sm:col-span-2">
+                    {intern.fullName}
+                  </p>
+                  <label className="block text-sm font-semibold">
+                    Credits
+                    <input
+                      name="credits"
+                      defaultValue={intern.credits ?? ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Required hours
-                    <input name="requiredHours" defaultValue={intern.requiredHours ?? ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Required hours
+                    <input
+                      name="requiredHours"
+                      defaultValue={intern.requiredHours ?? ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Weekly plan
-                    <input name="plannedWeeklyHours" defaultValue={intern.plannedWeeklyHours ?? ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Weekly plan
+                    <input
+                      name="plannedWeeklyHours"
+                      defaultValue={intern.plannedWeeklyHours ?? ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Weeks
-                    <input name="internshipWeeks" defaultValue={intern.internshipWeeks ?? ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Weeks
+                    <input
+                      name="internshipWeeks"
+                      defaultValue={intern.internshipWeeks ?? ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Start
-                    <input type="date" name="startDate" defaultValue={intern.academicStartDate || ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Start
+                    <input
+                      type="date"
+                      name="startDate"
+                      defaultValue={intern.academicStartDate || ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">End
-                    <input type="date" name="endDate" defaultValue={intern.academicEndDate || ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    End
+                    <input
+                      type="date"
+                      name="endDate"
+                      defaultValue={intern.academicEndDate || ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Term
-                    <input name="semester" defaultValue={intern.semester} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Term
+                    <input
+                      name="semester"
+                      defaultValue={intern.semester}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Academic year
-                    <input name="academicYear" defaultValue={intern.academicYear || ""} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Academic year
+                    <input
+                      name="academicYear"
+                      defaultValue={intern.academicYear || ""}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Requirement
-                    <select name="requirementStatus" defaultValue={intern.requirementStatus || "pending"} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
+                  <label className="block text-sm font-semibold">
+                    Requirement
+                    <select
+                      name="requirementStatus"
+                      defaultValue={intern.requirementStatus || "pending"}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    >
                       <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="amended">Amended</option>
                     </select>
                   </label>
-                  <label className="block text-sm font-semibold">School verification
-                    <select name="verificationStatus" defaultValue={intern.universityVerificationStatus || "pending"} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
+                  <label className="block text-sm font-semibold">
+                    School verification
+                    <select
+                      name="verificationStatus"
+                      defaultValue={intern.universityVerificationStatus || "pending"}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    >
                       <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
                     </select>
                   </label>
-                  <label className="block text-sm font-semibold">Day-to-day manager
-                    <input name="managerName" defaultValue={intern.dayToDayManagerName || "Ava"} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Day-to-day manager
+                    <input
+                      name="managerName"
+                      defaultValue={intern.dayToDayManagerName || "Ava"}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Supervisor
-                    <input name="supervisorName" defaultValue={intern.siteSupervisorName || "Jason"} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Supervisor
+                    <input
+                      name="supervisorName"
+                      defaultValue={intern.siteSupervisorName || "Jason"}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold sm:col-span-2">University notes
-                    <textarea name="universityNotes" defaultValue={intern.universityNotes || ""} rows={2} className="mt-1 w-full rounded-xl border px-3 py-3 text-base" />
+                  <label className="block text-sm font-semibold sm:col-span-2">
+                    University notes
+                    <textarea
+                      name="universityNotes"
+                      defaultValue={intern.universityNotes || ""}
+                      rows={2}
+                      className="mt-1 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 py-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Exception week
-                    <input name="exceptionWeek" inputMode="numeric" className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Exception week
+                    <input
+                      name="exceptionWeek"
+                      inputMode="numeric"
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold">Exception hours
-                    <input name="exceptionHours" inputMode="decimal" className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold">
+                    Exception hours
+                    <input
+                      name="exceptionHours"
+                      inputMode="decimal"
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <label className="block text-sm font-semibold sm:col-span-2">Reason
-                    <input name="reason" required placeholder="Why this requirement changed" className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
+                  <label className="block text-sm font-semibold sm:col-span-2">
+                    Reason
+                    <input
+                      name="reason"
+                      required
+                      placeholder="Why this requirement changed"
+                      className="mt-1 min-h-12 w-full rounded-xl border border-amber-100 bg-[#FAF6EE]/40 px-3 text-base"
+                    />
                   </label>
-                  <button className="min-h-12 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white sm:col-span-2">Save requirements</button>
+                  <button
+                    className={`${internPrimaryBtnClass} sm:col-span-2`}
+                  >
+                    Save requirements
+                  </button>
                 </form>
               ))}
               {interns.map((intern) => (
@@ -366,19 +622,25 @@ export default function ManagerInternDashboard({
               ))}
             </section>
           ) : (
-            <p className="text-sm font-semibold text-slate-600">Requirement changes stay with Jason.</p>
+            <p className="text-sm font-semibold text-slate-600">
+              Requirement changes stay with Jason.
+            </p>
           )}
         </div>
       ) : null}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-200/80 bg-[#FAF6EE]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
         <div className="grid grid-cols-5 gap-1">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`min-h-12 rounded-2xl text-[11px] font-black ${tab === item.id ? "bg-emerald-50 text-emerald-900" : "text-slate-500"}`}
+              className={`min-h-12 rounded-2xl text-[11px] font-black ${
+                tab === item.id
+                  ? "bg-[#166534] !text-white"
+                  : "text-slate-600"
+              }`}
             >
               {item.label}
             </button>
