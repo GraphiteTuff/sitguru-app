@@ -11,6 +11,7 @@ export type DashboardSwitchRole =
   | "guru"
   | "ambassador"
   | "intern"
+  | "manager"
   | "growth"
   | "admin";
 
@@ -52,6 +53,13 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
     helper: "Internship portal, weekly tasks, and growth work",
   },
   {
+    id: "manager",
+    label: "Switch to Manager Desk",
+    shortLabel: "Manager Desk",
+    path: "/intern/manage",
+    helper: "Assigned intern team, reviews, coaching, and pace",
+  },
+  {
     id: "growth",
     label: "Switch to Social & Growth Manager",
     shortLabel: "Social & Growth Manager",
@@ -72,6 +80,7 @@ export type DashboardAccessFlags = {
   guru?: boolean;
   ambassador?: boolean;
   intern?: boolean;
+  manager?: boolean;
   growth?: boolean;
   admin?: boolean;
 };
@@ -81,16 +90,33 @@ const ROLE_ORDER: DashboardSwitchRole[] = [
   "guru",
   "ambassador",
   "intern",
+  "manager",
   "growth",
   "admin",
 ];
 
+/** HQ Super Admin switcher — includes Manager Desk + Growth for Ava preview. */
 const SUPER_USER_SWITCH_ROLES: DashboardSwitchRole[] = [
   "parent",
   "guru",
   "ambassador",
   "intern",
+  "manager",
+  "growth",
   "admin",
+];
+
+/**
+ * Jason's personal marketplace login (jasongraff1978@gmail.com).
+ * Marketplace roles + Manager Desk / Growth preview — never full Admin HQ.
+ */
+const FOUNDER_PERSONAL_SWITCH_ROLES: DashboardSwitchRole[] = [
+  "parent",
+  "guru",
+  "ambassador",
+  "intern",
+  "manager",
+  "growth",
 ];
 
 function normalizeToken(value: unknown) {
@@ -136,7 +162,15 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     raw === "social_growth_manager" ||
     raw === "growth_manager"
   ) {
-    return ["growth"];
+    return ["manager", "growth"];
+  }
+
+  if (
+    raw === "intern_manager" ||
+    raw === "manager_desk" ||
+    raw === "internship_manager"
+  ) {
+    return ["manager"];
   }
 
   if (
@@ -223,6 +257,7 @@ export function accessFlagsFromAuthorizedRoles(
     guru: roles.includes("guru"),
     ambassador: roles.includes("ambassador"),
     intern: roles.includes("intern"),
+    manager: roles.includes("manager"),
     growth: roles.includes("growth"),
     admin: roles.includes("admin"),
   };
@@ -237,6 +272,7 @@ export function authorizedRolesFromAccessFlags(
   if (access.guru) roles.push("guru");
   if (access.ambassador) roles.push("ambassador");
   if (access.intern) roles.push("intern");
+  if (access.manager) roles.push("manager");
   if (access.growth) roles.push("growth");
   if (access.admin) roles.push("admin");
   return roles;
@@ -267,7 +303,7 @@ export function resolveAuthorizedRolesFromProfile(input: {
   }
 
   if (isFounderPersonalMarketplaceEmail(email)) {
-    return ["parent", "guru", "ambassador", "intern"];
+    return [...FOUNDER_PERSONAL_SWITCH_ROLES];
   }
 
   const explicit = uniqueOrderedRoles([
@@ -353,6 +389,7 @@ export function resolveDashboardRoleFromPath(
   const path = String(pathname || "");
   if (path.startsWith("/admin/growth")) return "growth";
   if (path.startsWith("/admin")) return "admin";
+  if (path.startsWith("/intern/manage")) return "manager";
   if (path.startsWith("/intern")) return "intern";
   if (path.startsWith("/ambassador")) return "ambassador";
   if (path.startsWith("/guru")) return "guru";

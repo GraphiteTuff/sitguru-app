@@ -6,7 +6,10 @@ import {
   isFinanceRole,
   type FinanceAdminIdentity,
 } from "@/lib/admin/financials/access";
-import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
+import {
+  isFounderPersonalMarketplaceEmail,
+  isHardcodedSuperUserEmail,
+} from "@/lib/admin/super-users";
 
 /** Roles that unlock general /admin access across SitGuru. */
 export const ADMIN_ROLES = [
@@ -189,6 +192,18 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
       id: user.id,
       email,
       role: "super_admin",
+      ...caps,
+    };
+  }
+
+  // Founder personal marketplace login may preview Ava's Growth / Manager Desk
+  // as social_community_manager — never full HQ Super Admin.
+  if (isFounderPersonalMarketplaceEmail(email)) {
+    const caps = buildCapabilities("social_community_manager");
+    return {
+      id: user.id,
+      email,
+      role: "social_community_manager",
       ...caps,
     };
   }

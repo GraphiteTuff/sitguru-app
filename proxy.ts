@@ -476,6 +476,22 @@ export async function proxy(request: NextRequest) {
   }
 
   if (requiresAdminAccess && !isSuperUser) {
+    // Founder personal marketplace login may preview Ava Growth Workspace only —
+    // never full Admin HQ.
+    if (isFounderPersonalMarketplaceEmail(userEmail)) {
+      if (
+        pathname === "/admin" ||
+        pathname === "/admin/" ||
+        !isGrowthAllowedAdminPath(pathname)
+      ) {
+        const growthUrl = request.nextUrl.clone();
+        growthUrl.pathname = "/admin/growth";
+        growthUrl.search = "";
+        return NextResponse.redirect(growthUrl);
+      }
+      return responseRef.current;
+    }
+
     const [{ data: adminProfile }, { data: adminRoleRows }] = await Promise.all([
       supabase
         .from("profiles")

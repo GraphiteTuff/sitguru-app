@@ -186,6 +186,8 @@ const FOUNDER_ROLES: DashboardSwitchRole[] = [
   "guru",
   "ambassador",
   "intern",
+  "manager",
+  "growth",
   "admin",
 ];
 

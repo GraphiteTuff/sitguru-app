@@ -2,12 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ManagerInternDashboard from "@/components/internship/ManagerInternDashboard";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { canEditRequirements, canGiveCeoReview, internshipActorKind, isPortalUserId } from "@/lib/internship/manager-access";
 import { loadManagerDashboard } from "@/lib/internship/manager-data";
 import { internReadiness } from "@/lib/onboarding/data";
 import { saveMessagingPermission } from "@/lib/messaging/staff-actions";
 import { reviewInternWeek } from "@/lib/timekeeper/actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+/** Growth Manager login used for Ava's assigned intern desk preview. */
+const AVA_MANAGER_EMAIL = "ava@sitguru.com";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +26,12 @@ export default async function InternManagerPage({
 }) {
   const actor = await getAdminIdentity();
   if (!actor) redirect("/intern/login?next=/intern/manage");
-  const kind = internshipActorKind({ role: actor.role, isSuperUser: actor.isSuperUser });
+  const founderPersonal = isFounderPersonalMarketplaceEmail(actor.email);
+  // Founder personal marketplace preview uses supervisor visibility so Jason can
+  // open Ava's assigned desk (manager filter) without becoming HQ Super Admin.
+  const kind = founderPersonal
+    ? "supervisor"
+    : internshipActorKind({ role: actor.role, isSuperUser: actor.isSuperUser });
   if (kind !== "manager" && kind !== "supervisor") {
     return (
       <main className="mx-auto max-w-lg px-4 py-10">
@@ -40,7 +49,17 @@ export default async function InternManagerPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const requestedManager = kind === "supervisor" ? first(params.manager) : "";
+  let requestedManager = kind === "supervisor" ? first(params.manager) : "";
+  if (founderPersonal && !requestedManager) {
+    const { data: avaProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", AVA_MANAGER_EMAIL)
+      .maybeSingle();
+    if (avaProfile?.id && isPortalUserId(String(avaProfile.id))) {
+      redirect(`/intern/manage?manager=${avaProfile.id}`);
+    }
+  }
   const managerFilter = isPortalUserId(requestedManager) ? requestedManager : "";
   const managerProfile = managerFilter
     ? await supabaseAdmin.from("profiles").select("full_name,email").eq("id", managerFilter).maybeSingle()
