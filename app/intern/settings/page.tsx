@@ -1,6 +1,7 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import DeskSettings, { type DeskSettingsPrefs } from "@/components/portal/DeskSettings";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
+import { getUniversity } from "@/lib/internship/queries";
 import { createClient } from "@/lib/supabase/server";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 
@@ -38,6 +39,7 @@ export default async function InternSettingsPage({
   const notice = (Array.isArray(params.error) ? params.error[0] : params.error) || (Array.isArray(params.ok) ? params.ok[0] : params.ok) || "";
   const data = await loadInternSectionWorkspace();
   const intern = data?.workspace.intern;
+  const school = intern?.universityId ? await getUniversity(intern.universityId) : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -56,6 +58,7 @@ export default async function InternSettingsPage({
       teamsConnected={isSitGuruWorkEmail(intern?.email || access.actor.email)}
       prefs={prefs(saved)}
       notice={notice || null}
+      schoolLogoUrl={school?.logoUrl || ""}
     />
   );
 }

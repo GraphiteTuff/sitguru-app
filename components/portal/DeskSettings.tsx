@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
-import { saveDeskPreferences, saveDeskProfile } from "@/lib/portal/desk-settings-actions";
+import { saveDeskPreferences, saveDeskProfile, saveInternSchoolLogo } from "@/lib/portal/desk-settings-actions";
 import { sitguruTeamsHref } from "@/lib/admin/growth/teams-access";
 import { supabase } from "@/lib/supabase";
 import { DESK_UI } from "@/lib/portal/desk-ui";
@@ -40,6 +40,7 @@ export default function DeskSettings({
   teamsConnected,
   prefs,
   notice,
+  schoolLogoUrl = "",
 }: {
   audience: "manager" | "intern";
   fullName: string;
@@ -51,6 +52,7 @@ export default function DeskSettings({
   teamsConnected: boolean;
   prefs: DeskSettingsPrefs;
   notice?: string | null;
+  schoolLogoUrl?: string;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Account");
   const [passwordNote, setPasswordNote] = useState("");
@@ -121,6 +123,27 @@ export default function DeskSettings({
             </div>
             <button className="mt-4 rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Save Profile</button>
           </form>
+          {audience === "intern" ? (
+            <form action={saveInternSchoolLogo} className={`${DESK_UI.card} p-4`}>
+              <h2 className="text-lg font-black text-[#0F2744]">School logo</h2>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                This replaces the photo under Settings in the sidebar.
+              </p>
+              <div className="mt-3 flex h-24 items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200">
+                {schoolLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={schoolLogoUrl} alt="Current school logo" className="max-h-20 max-w-[80%] object-contain mix-blend-multiply" />
+                ) : (
+                  <span className="text-sm font-semibold text-slate-400">No school logo yet</span>
+                )}
+              </div>
+              <label className="mt-3 block text-xs font-bold text-slate-500">
+                Upload logo
+                <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" required className="mt-1 block w-full text-sm" />
+              </label>
+              <button className="mt-3 rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Save school logo</button>
+            </form>
+          ) : null}
           <form action={changePassword} className={`${DESK_UI.card} p-4`}>
             <h2 className="text-lg font-black text-[#0F2744]">Account Access</h2>
             <p className="mt-2 text-sm font-semibold text-slate-600">{email}</p>

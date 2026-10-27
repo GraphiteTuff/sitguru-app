@@ -60,12 +60,14 @@ export default function InternPortalShell({
   onboarded = false,
   unreadMessages = 0,
   profileTitle = "Social Media & Content Intern",
+  schoolLogoUrl = "",
 }: {
   children: React.ReactNode;
   assigned?: boolean;
   onboarded?: boolean;
   unreadMessages?: number;
   profileTitle?: string;
+  schoolLogoUrl?: string;
 }) {
   const pathname = usePathname() || "/intern";
   const searchParams = useSearchParams();
@@ -135,14 +137,23 @@ export default function InternPortalShell({
                 Settings
               </Link>
               <div className="overflow-hidden rounded-2xl bg-[#EFF6FF]">
-                <div className="relative h-24">
-                  <Image
-                    src={INTERN_BANNER}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="220px"
-                  />
+                <div className="relative flex h-24 items-center justify-center bg-white">
+                  {schoolLogoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={schoolLogoUrl}
+                      alt="School logo"
+                      className="max-h-20 max-w-[85%] object-contain mix-blend-multiply"
+                    />
+                  ) : (
+                    <Image
+                      src={INTERN_BANNER}
+                      alt=""
+                      fill
+                      className="object-cover object-center"
+                      sizes="220px"
+                    />
+                  )}
                 </div>
                 <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
                   <PawPrint size={14} className="mt-0.5 shrink-0 text-[#2563EB]" />

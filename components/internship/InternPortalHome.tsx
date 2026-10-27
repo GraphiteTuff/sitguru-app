@@ -524,20 +524,9 @@ export default function InternPortalHome({
               Open Help
             </Link>
           </div>
-          <div className="relative mt-4 overflow-hidden rounded-2xl bg-[#FFF7ED]">
-            <div className="relative h-24">
-              <Image
-                src="/images/rogue-avatar.png"
-                alt=""
-                fill
-                className="object-cover object-top"
-                sizes="360px"
-              />
-            </div>
-            <p className="px-3 py-2 text-xs font-bold text-[#0F2744]">
-              {INTERN_PORTAL_BRAND.quickActionsLine}
-            </p>
-          </div>
+          <p className="mt-4 rounded-2xl bg-[#FFF7ED] px-3 py-3 text-xs font-bold text-[#0F2744]">
+            {INTERN_PORTAL_BRAND.quickActionsLine}
+          </p>
         </article>
 
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
