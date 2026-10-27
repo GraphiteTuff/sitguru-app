@@ -16,6 +16,7 @@ import {
   Trophy,
 } from "lucide-react";
 import AskAvaForm from "@/components/internship/AskAvaForm";
+import InternWorkSystemsCard from "@/components/internship/InternWorkSystemsCard";
 import { INTERN_PORTAL_BRAND } from "@/lib/internship/intern-portal-nav";
 import { INTERNSHIP_HELP_PATH, INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 import { taskStatusLabel } from "@/lib/internship/labels";
@@ -573,6 +574,8 @@ export default function InternPortalHome({
           </Link>
         </article>
       </section>
+
+      <InternWorkSystemsCard />
     </div>
   );
 }

@@ -55,7 +55,29 @@ NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL=
 NEXT_PUBLIC_SITGURU_BRAND_KIT_URL=
 ```
 
-Channel ↔ path map: `lib/admin/growth/teams-access.ts`
+Channel ↔ path map: `lib/admin/growth/teams-access.ts`  
+SharePoint Documents shortcuts: `lib/admin/growth/sharepoint-files.ts`  
+OneNote notebook sections: `lib/admin/growth/onenote-notebook.ts`
+
+Configure:
+
+```bash
+NEXT_PUBLIC_SITGURU_SHAREPOINT_GROWTH_URL=
+NEXT_PUBLIC_SITGURU_ONENOTE_GROWTH_URL=
+# plus optional per-folder / per-section URL env keys in those modules
+```
+
+## Intern collaboration (Marketing & Community Growth)
+
+| System | Use |
+| --- | --- |
+| **SitGuru Intern Portal** | Official hours, check-ins, milestones, evidence, reviews, university requirements, final project |
+| **Teams** | Questions, communication, updates, collaboration, meetings |
+| **Planner** | Assigned work, owners, deadlines, status, manager review workflow |
+| **SharePoint** | Shared internship files, research, presentations, approved materials |
+| **OneNote** | Brainstorming, meeting notes, lessons learned — never official hours/evaluations |
+
+Intern “where work happens” card: `lib/internship/intern-work-systems.ts`
 
 ## Permissions
 

@@ -19,8 +19,11 @@ import {
   buildManagerDeskReviewQueue,
   type ManagerDeskBundle,
 } from "@/lib/admin/growth/manager-desk-model";
+import GrowthOneNoteShortcuts from "@/components/admin/growth/GrowthOneNoteShortcuts";
+import GrowthSharePointShortcuts from "@/components/admin/growth/GrowthSharePointShortcuts";
 import { MANAGER_PORTAL_BRAND } from "@/lib/admin/growth/manager-portal";
 import {
+  isSitGuruWorkEmail,
   sitguruTeamsHref,
   SITGURU_GROWTH_TEAMS_TEAM,
 } from "@/lib/admin/growth/teams-access";
@@ -533,6 +536,27 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
           </ul>
         </article>
       </section>
+
+      {isSitGuruWorkEmail(desk.email) ? (
+        <section className="space-y-4">
+          <div className={`${DESK_UI.card} space-y-4 p-4 sm:p-5`}>
+            <h2 className="text-lg font-black text-[#0F2744]">
+              Work systems · Ava, Jason & Danette
+            </h2>
+            <p className="text-sm font-medium text-slate-600">
+              Teams for discussion, SharePoint for official files, OneNote for
+              working knowledge. SitGuru keeps the formal reports and internship
+              records.
+            </p>
+            <GrowthSharePointShortcuts
+              email={desk.email}
+              includeLeadership
+              compact
+            />
+            <GrowthOneNoteShortcuts email={desk.email} compact />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
