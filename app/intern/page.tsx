@@ -28,6 +28,7 @@ import {
 import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
 import Link from "next/link";
+import { internLegacySectionRedirect } from "@/lib/internship/intern-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,18 @@ export default async function InternPortalPage({
   const viewId = first(params.view);
   const ok = first(params.ok);
   const error = first(params.error);
+
+  // Flat IA: legacy tab/tool queries redirect to one-click sidebar pages.
+  if (!viewId) {
+    const flat = internLegacySectionRedirect({
+      tab: first(params.tab),
+      focus: first(params.focus),
+      tool: first(params.tool),
+      work: first(params.work),
+      edit: first(params.edit),
+    });
+    if (flat && flat !== "/intern") redirect(flat);
+  }
 
   if (internDocumentationModeEnabled()) {
     const workspace = documentationInternWorkspace(

@@ -122,7 +122,7 @@ export default function InternGrowthWorkspaceHome({
               <ClipboardList size={18} className="text-[#7C3AED]" />
               My Assignments
             </h2>
-            <Link href="/intern?tab=work" className={`text-xs font-bold ${DESK_UI.link}`}>
+            <Link href="/intern/assignments" className={`text-xs font-bold ${DESK_UI.link}`}>
               View all →
             </Link>
           </div>
@@ -256,13 +256,13 @@ export default function InternGrowthWorkspaceHome({
               <Clock3 size={16} /> Log Hours
             </Link>
             <Link
-              href="/intern?tab=work&focus=checkin"
+              href="/intern/check-ins"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#EFF6FF] px-3 text-sm font-bold text-[#1D4ED8]"
             >
               <CheckCircle2 size={16} /> Open Check-In
             </Link>
             <Link
-              href="/intern?tab=work"
+              href="/intern/assignments"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#F5F3FF] px-3 text-sm font-bold text-[#6D28D9]"
             >
               <ClipboardList size={16} /> View Assignments

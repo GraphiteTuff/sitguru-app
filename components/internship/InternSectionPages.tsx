@@ -276,7 +276,7 @@ export function InternCheckInsPageView({
           <h2 className="text-lg font-black text-[#0F2744]">This Week&apos;s Check-In</h2>
           <p className="mt-2 text-sm font-medium text-slate-600">Reflect, report progress, and plan next week.</p>
           <Link
-            href="/intern?tab=work&focus=checkin"
+            href="/intern/check-ins"
             className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
           >
             Start My Check-In
@@ -300,7 +300,7 @@ export function InternCheckInsPageView({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
           <div className="mt-4 grid gap-2">
-            <Link href="/intern?tab=work&focus=checkin" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
+            <Link href="/intern/check-ins" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
               Start Check-In
             </Link>
             <Link href="/intern/time" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-center text-sm font-bold text-[#1D4ED8]">
@@ -333,8 +333,8 @@ export function InternMessagesPageView() {
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-[#0F2744]">Conversations</h2>
-            <Link href="/intern?tab=home&focus=messages" className={`text-xs font-bold ${DESK_UI.link}`}>
-              Open inbox →
+            <Link href="/intern/messages" className={`text-xs font-bold ${DESK_UI.link}`}>
+              Refresh →
             </Link>
           </div>
           <ul className="mt-4 space-y-2">

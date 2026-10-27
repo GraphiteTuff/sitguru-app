@@ -136,7 +136,7 @@ export default async function InternGrowthHomePage() {
           title: openTasks[0]
             ? `Complete “${openTasks[0].title}”`
             : "Review your open assignments",
-          href: "/intern?tab=work",
+          href: "/intern/assignments",
           cta: "Open assignment",
         },
         {
@@ -148,7 +148,7 @@ export default async function InternGrowthHomePage() {
         {
           step: 3,
           title: weeklyDone ? "You’re set for check-in" : "Prepare for weekly check-in",
-          href: "/intern?tab=work&focus=checkin",
+          href: "/intern/check-ins",
           cta: weeklyDone ? "View check-in" : "Start check-in",
         },
       ]}

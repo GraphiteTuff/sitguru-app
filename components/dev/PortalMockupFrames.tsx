@@ -55,7 +55,13 @@ function MockSidebar({
           ["Check-Ins", ClipboardCheck, false],
           ["Milestones", BookOpen, false],
           ["Messaging", MessageCircle, false],
-          ["Reports", Megaphone, false],
+          ["Live Results", BarChart3, false],
+          ["Calendar", CalendarDays, false],
+          ["Metrics", Megaphone, false],
+          ["Reports", BarChart3, false],
+          ["Manager Toolkit", Wrench, false],
+          ["Training", GraduationCap, false],
+          ["Resources", FolderOpen, false],
           ["Help", CircleHelp, false],
         ]
       : [

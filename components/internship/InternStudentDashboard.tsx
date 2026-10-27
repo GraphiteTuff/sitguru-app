@@ -413,10 +413,10 @@ export default function InternStudentDashboard({
             process.deliverable.title
           }
           preview={preview}
-          onOpenWork={() => openTab("work")}
-          onOpenCheckIn={() => openTab("work")}
+          onOpenWork={() => router.push("/intern/work")}
+          onOpenCheckIn={() => router.push("/intern/check-ins")}
           onOpenHours={() => router.push("/intern/time")}
-          onOpenMilestones={() => openTab("project")}
+          onOpenMilestones={() => router.push("/intern/milestones")}
         />
       ) : null}
 

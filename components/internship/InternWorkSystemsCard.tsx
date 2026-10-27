@@ -9,7 +9,7 @@ import {
 
 /** Compact “where work happens” card for Marketing & Community Growth interns. */
 export default function InternWorkSystemsCard({
-  askAvaHref = "/intern?tab=home&focus=messages",
+  askAvaHref = "/intern/messages",
 }: {
   askAvaHref?: string;
 }) {

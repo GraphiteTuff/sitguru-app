@@ -134,8 +134,12 @@ export default function InternPortalShell({
             </nav>
             <div className="space-y-3 p-4">
               <Link
-                href="/intern?edit=page"
-                className={`flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`}
+                href="/intern/settings"
+                className={`flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${
+                  pathname === "/intern/settings" || pathname.startsWith("/intern/settings/")
+                    ? DESK_UI.sidebarActive
+                    : DESK_UI.sidebarIdle
+                }`}
               >
                 <Settings size={17} />
                 Settings

@@ -6,19 +6,24 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CalendarCheck2,
+  CalendarDays,
   CircleHelp,
   ClipboardList,
   Clock3,
   CreditCard,
   Flag,
+  FolderOpen,
+  GraduationCap,
   Home,
   LayoutDashboard,
+  LineChart,
   MessageCircle,
   PawPrint,
   Search,
   Settings,
   Sparkles,
   Users,
+  Wrench,
 } from "lucide-react";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import { PortalDeskProfileLive } from "@/components/portal/PortalDeskProfile";
@@ -42,7 +47,13 @@ const ICONS = {
   "Check-Ins": CalendarCheck2,
   Milestones: Flag,
   Messaging: MessageCircle,
+  "Live Results": LineChart,
+  Calendar: CalendarDays,
+  Metrics: BarChart3,
   Reports: BarChart3,
+  "Manager Toolkit": Wrench,
+  Training: GraduationCap,
+  Resources: FolderOpen,
   Help: CircleHelp,
 } as const;
 
@@ -116,7 +127,12 @@ export default function ManagerPortalShell({
           <div className="space-y-3 p-4">
             <Link
               href={MANAGER_PORTAL_BRAND.settingsPath}
-              className={`flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`}
+              className={`flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${
+                pathname === MANAGER_PORTAL_BRAND.settingsPath ||
+                pathname.startsWith(`${MANAGER_PORTAL_BRAND.settingsPath}/`)
+                  ? DESK_UI.sidebarActive
+                  : DESK_UI.sidebarIdle
+              }`}
             >
               <Settings size={17} />
               Settings
@@ -166,7 +182,7 @@ export default function ManagerPortalShell({
               <PortalDeskProfileLive
                 title={MANAGER_PORTAL_BRAND.kicker}
                 notifications={unreadMessages || 5}
-                notificationsHref="/manager/messages"
+                notificationsHref={MANAGER_PORTAL_BRAND.messagesPath}
               />
             </div>
           </header>

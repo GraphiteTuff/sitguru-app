@@ -1,22 +1,30 @@
 /** Ava-facing Manager Portal — not Intern Portal, not Admin HQ identity. */
 
+import { MANAGER_ROUTES } from "@/lib/admin/growth/manager-routes";
+
 export const MANAGER_PORTAL_BRAND = {
   kicker: "Social Media & Community Growth Manager",
   title: "Manager Portal",
   deskTitle: "Manager Desk",
   growthTitle: "Growth Home",
-  homePath: "/manager",
-  deskPath: "/manager",
-  growthPath: "/manager/growth",
-  campaignsPath: "/manager/campaigns",
-  teamPath: "/manager/team",
-  assignmentsPath: "/manager/assignments",
-  checkInsPath: "/manager/check-ins",
-  milestonesPath: "/manager/milestones",
-  messagesPath: "/manager/messages",
-  reportsPath: "/manager/analytics",
-  helpPath: "/admin/help/manager",
-  settingsPath: "/manager/onboarding",
+  homePath: MANAGER_ROUTES.home,
+  deskPath: MANAGER_ROUTES.desk,
+  growthPath: MANAGER_ROUTES.growth,
+  campaignsPath: MANAGER_ROUTES.campaigns,
+  teamPath: MANAGER_ROUTES.team,
+  assignmentsPath: MANAGER_ROUTES.assignments,
+  checkInsPath: MANAGER_ROUTES.checkIns,
+  milestonesPath: MANAGER_ROUTES.milestones,
+  messagesPath: MANAGER_ROUTES.messages,
+  resultsPath: MANAGER_ROUTES.results,
+  calendarPath: MANAGER_ROUTES.calendar,
+  metricsPath: MANAGER_ROUTES.metrics,
+  reportsPath: MANAGER_ROUTES.reports,
+  toolkitPath: MANAGER_ROUTES.toolkit,
+  trainingPath: MANAGER_ROUTES.training,
+  resourcesPath: MANAGER_ROUTES.resources,
+  helpPath: MANAGER_ROUTES.help,
+  settingsPath: MANAGER_ROUTES.settings,
   adminGrowthPath: "/admin/growth",
   tagline: "People grow. Pets bring us together.",
   heroLine: "Same people. Happier pets. Bigger impact.",
@@ -24,31 +32,37 @@ export const MANAGER_PORTAL_BRAND = {
 
 /**
  * Desktop sidebar — light chrome + SitGuru green active.
- * Content layouts follow the full Manager Portal mockup set.
+ * Peers intern menu where Ava needs the same one-click surfaces.
  */
 export const MANAGER_PORTAL_SIDEBAR = [
-  { href: "/manager", label: "Home", match: "none" as const },
-  { href: "/manager/growth", label: "Growth Home", match: "growth-home" as const },
-  { href: "/manager", label: "Manager Desk", match: "exact" as const },
-  { href: "/manager/my-time", label: "My Time", match: "prefix" as const },
-  { href: "/manager/payments", label: "My Payments", match: "prefix" as const },
-  { href: "/manager/team", label: "My Team", match: "prefix" as const },
-  { href: "/manager/assignments", label: "Assignments", match: "prefix" as const },
-  { href: "/manager/check-ins", label: "Check-Ins", match: "prefix" as const },
-  { href: "/manager/milestones", label: "Milestones", match: "prefix" as const },
-  { href: "/manager/messages", label: "Messaging", match: "prefix" as const },
-  { href: "/manager/analytics", label: "Reports", match: "prefix" as const },
-  { href: "/admin/help/manager", label: "Help", match: "prefix" as const },
+  { href: MANAGER_ROUTES.home, label: "Home", match: "none" as const },
+  { href: MANAGER_ROUTES.growth, label: "Growth Home", match: "growth-home" as const },
+  { href: MANAGER_ROUTES.desk, label: "Manager Desk", match: "exact" as const },
+  { href: MANAGER_ROUTES.myTime, label: "My Time", match: "prefix" as const },
+  { href: MANAGER_ROUTES.payments, label: "My Payments", match: "prefix" as const },
+  { href: MANAGER_ROUTES.team, label: "My Team", match: "prefix" as const },
+  { href: MANAGER_ROUTES.assignments, label: "Assignments", match: "prefix" as const },
+  { href: MANAGER_ROUTES.checkIns, label: "Check-Ins", match: "prefix" as const },
+  { href: MANAGER_ROUTES.milestones, label: "Milestones", match: "prefix" as const },
+  { href: MANAGER_ROUTES.messages, label: "Messaging", match: "prefix" as const },
+  { href: MANAGER_ROUTES.results, label: "Live Results", match: "prefix" as const },
+  { href: MANAGER_ROUTES.calendar, label: "Calendar", match: "prefix" as const },
+  { href: MANAGER_ROUTES.metrics, label: "Metrics", match: "prefix" as const },
+  { href: MANAGER_ROUTES.reports, label: "Reports", match: "prefix" as const },
+  { href: MANAGER_ROUTES.toolkit, label: "Manager Toolkit", match: "prefix" as const },
+  { href: MANAGER_ROUTES.training, label: "Training", match: "prefix" as const },
+  { href: MANAGER_ROUTES.resources, label: "Resources", match: "prefix" as const },
+  { href: MANAGER_ROUTES.help, label: "Help", match: "prefix" as const },
 ] as const;
 
 /** Compact top/mobile nav. */
 export const MANAGER_PORTAL_NAV = [
-  { href: "/manager", label: "Desk" },
-  { href: "/manager/growth", label: "Growth" },
-  { href: "/manager/messages", label: "Messages" },
-  { href: "/manager/team", label: "Team" },
-  { href: "/manager/my-time", label: "My Time" },
-  { href: "/manager/payments", label: "Pay" },
+  { href: MANAGER_ROUTES.desk, label: "Desk" },
+  { href: MANAGER_ROUTES.growth, label: "Growth" },
+  { href: MANAGER_ROUTES.messages, label: "Messages" },
+  { href: MANAGER_ROUTES.team, label: "Team" },
+  { href: MANAGER_ROUTES.results, label: "Results" },
+  { href: MANAGER_ROUTES.myTime, label: "My Time" },
 ] as const;
 
 export const MANAGER_GROWTH_PREFIXES = [
@@ -62,6 +76,8 @@ export const MANAGER_GROWTH_PREFIXES = [
   "/manager/create",
   "/manager/gurus",
   "/manager/partners",
+  "/manager/results",
+  "/manager/metrics",
 ] as const;
 
 export function isManagerGrowthPath(pathname: string) {
