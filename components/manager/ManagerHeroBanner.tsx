@@ -1,12 +1,13 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { DESK_BANNER } from "@/lib/portal/desk-ui";
 
 export default function ManagerHeroBanner({
   title,
   subtitle,
   icon,
   overlay = "People grow. Pets bring us together.",
-  imageSrc = "/images/homepage/sitguru-dog-walking-hero.jpg",
+  imageSrc = DESK_BANNER,
 }: {
   title: string;
   subtitle: string;
@@ -43,10 +44,7 @@ export default function ManagerHeroBanner({
             sizes="(max-width: 1024px) 100vw, 40vw"
             priority={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-l from-black/25 via-black/10 to-transparent" />
-          <p className="absolute bottom-3 right-3 max-w-[220px] text-right text-sm font-semibold italic !text-white drop-shadow">
-            {overlay}
-          </p>
+          <span className="sr-only">{overlay}</span>
         </div>
       </div>
     </section>

@@ -33,7 +33,7 @@ import {
   internPortalNavActive,
   isInternPortalChromePath,
 } from "@/lib/internship/intern-portal-nav";
-import { DESK_UI } from "@/lib/portal/desk-ui";
+import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
 
 const ICONS = {
   Home,
@@ -84,22 +84,14 @@ export default function InternPortalShell({
           <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
             <div className="border-b border-slate-100 px-4 py-5">
               <Link href="/intern" className="block" aria-label="SitGuru Intern Portal">
-                <div className="flex items-center gap-2.5">
-                  <Image
-                    src="/images/sitguru-logo-mark.png"
-                    alt=""
-                    width={32}
-                    height={32}
-                    className="h-8 w-8 object-contain"
-                    priority
-                  />
-                  <div>
-                    <p className="text-lg font-black leading-none text-[#0F2744]">SitGuru</p>
-                    <p className="mt-1 text-[10px] font-semibold leading-3 text-slate-500">
-                      {INTERN_PORTAL_BRAND.tagline}
-                    </p>
-                  </div>
-                </div>
+                <Image
+                  src={DESK_LOGO}
+                  alt="SitGuru. Trusted Pet Care Simplified."
+                  width={420}
+                  height={140}
+                  className="h-14 w-full object-contain object-left mix-blend-multiply"
+                  priority
+                />
               </Link>
             </div>
             <nav
@@ -145,7 +137,7 @@ export default function InternPortalShell({
               <div className="overflow-hidden rounded-2xl bg-[#EFF6FF]">
                 <div className="relative h-24">
                   <Image
-                    src="/images/homepage/sitguru-dog-walking-hero.jpg"
+                    src={DESK_BANNER}
                     alt=""
                     fill
                     className="object-cover"

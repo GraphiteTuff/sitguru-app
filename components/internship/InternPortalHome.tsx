@@ -23,7 +23,7 @@ import { taskStatusLabel } from "@/lib/internship/labels";
 import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import { internPressClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
-import { DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+import { DESK_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
 
 function statusTone(status: string, reviewStage?: string | null) {
   const label = taskStatusLabel(status, reviewStage).toLowerCase();
@@ -110,19 +110,13 @@ export default function InternPortalHome({
           </div>
           <div className="relative min-h-[140px] overflow-hidden rounded-2xl sm:min-h-[160px]">
             <Image
-              src="/images/homepage/sitguru-dog-walking-hero.jpg"
-              alt=""
+              src={DESK_BANNER}
+              alt="Real support. Real community. Happier pets."
               fill
-              className="object-cover"
+              className="object-cover object-center"
               sizes="(max-width: 1280px) 100vw, 45vw"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0F2744]/50 via-[#0F2744]/15 to-transparent" />
-            <div className="relative flex h-full min-h-[140px] flex-col justify-end p-4 sm:min-h-[160px]">
-              <p className="max-w-sm text-lg font-black leading-snug !text-white sm:text-xl">
-                {INTERN_PORTAL_BRAND.impactLine}
-              </p>
-            </div>
           </div>
         </div>
       </section>

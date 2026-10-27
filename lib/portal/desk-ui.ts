@@ -1,5 +1,8 @@
 /** Shared Manager Desk + Intern Portal visual tokens (mockup palette). */
 
+export const DESK_LOGO = "/images/portal/sitguru-wordmark.jpg";
+export const DESK_BANNER = "/images/portal/real-support-banner.png";
+
 export const DESK_UI = {
   pageBg: "bg-[#F4F7FB]",
   navy: "#0F2744",

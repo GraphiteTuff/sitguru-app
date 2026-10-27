@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { DESK_BANNER } from "@/lib/portal/desk-ui";
 
 export default function DeskPageHero({
   icon,
@@ -23,19 +24,15 @@ export default function DeskPageHero({
           <p className="mt-1 max-w-xl text-sm font-medium text-slate-600">{subtitle}</p>
         </div>
       </div>
-      <div className="relative min-h-[132px] overflow-hidden rounded-2xl sm:min-h-[148px]">
+      <div className="relative min-h-[148px] overflow-hidden rounded-2xl sm:min-h-[168px]">
         <Image
-          src="/images/homepage/sitguru-dog-walking-hero.jpg"
-          alt=""
+          src={DESK_BANNER}
+          alt="Real support. Real community. Happier pets."
           fill
-          className="object-cover object-[18%_40%]"
+          className="object-cover object-center"
           sizes="(max-width: 1024px) 100vw, 42vw"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-l from-[#0F2744]/45 via-[#0F2744]/10 to-transparent" />
-        <p className="absolute right-4 top-3 max-w-[230px] whitespace-pre-line text-right font-serif text-[15px] font-semibold italic leading-snug !text-white drop-shadow sm:text-lg">
-          {quote}
-        </p>
       </div>
     </section>
   );
