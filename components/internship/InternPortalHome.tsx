@@ -120,7 +120,7 @@ export default function InternPortalHome({
               sizes="(max-width: 1280px) 100vw, 45vw"
               priority
             />
-            <p className={`${script.className} absolute left-4 top-3 max-w-[15rem] text-[1.7rem] font-bold leading-[1.05] text-[#16345C] drop-shadow-[0_1px_0_rgba(255,255,255,0.7)] sm:text-[2rem]`}>
+            <p className={`${script.className} absolute left-3 top-3 max-w-[16rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm sm:left-4 sm:text-[1.7rem]`}>
               Learn. Create.
               <br />
               Make an impact.

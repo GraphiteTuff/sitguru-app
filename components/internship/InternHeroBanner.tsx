@@ -41,7 +41,7 @@ export default function InternHeroBanner({
         </div>
         <div className="relative min-h-[120px] overflow-hidden lg:min-h-full">
           <Image src={imageSrc} alt="Golden retriever on a walk" fill className="object-cover object-[center_40%]" sizes="(max-width: 1024px) 100vw, 40vw" />
-          <p className={`${script.className} absolute left-3 top-3 max-w-[14rem] text-[1.55rem] font-bold leading-[1.05] text-[#16345C] drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]`}>
+          <p className={`${script.className} absolute left-3 top-3 max-w-[15rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm`}>
             Learn. Create.
             <br />
             Make an impact.
