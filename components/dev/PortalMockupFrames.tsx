@@ -2,20 +2,26 @@
 
 import Image from "next/image";
 import {
+  BarChart3,
   BookOpen,
+  CalendarDays,
   CircleHelp,
   ClipboardCheck,
   ClipboardList,
   Clock3,
   CreditCard,
+  FolderOpen,
+  GraduationCap,
   Home,
   LayoutDashboard,
   Megaphone,
   MessageCircle,
   PawPrint,
   Search,
+  Settings,
   Sparkles,
   Users,
+  Wrench,
 } from "lucide-react";
 import ManagerDeskHome from "@/components/manager/ManagerDeskHome";
 import ManagerGrowthWorkspaceHome from "@/components/manager/ManagerGrowthWorkspaceHome";
@@ -61,13 +67,18 @@ function MockSidebar({
           ["My Hours", Clock3, false],
           ["My Check-Ins", ClipboardCheck, false],
           ["Messages", MessageCircle, false],
-          ["Live Results", Megaphone, false],
+          ["Live Results", BarChart3, false],
+          ["Calendar", CalendarDays, false],
+          ["Metrics", Megaphone, false],
           ["Business Growth Report", Sparkles, active === "growth"],
+          ["Intern Toolkit", Wrench, false],
+          ["Training", GraduationCap, false],
+          ["Resources", FolderOpen, false],
           ["Help", CircleHelp, false],
         ];
 
   return (
-    <aside className="sticky top-0 hidden h-full min-h-[720px] w-[232px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
+    <aside className="sticky top-0 hidden h-full min-h-[720px] w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
       <div className="border-b border-slate-100 px-4 py-5">
         <div className="flex items-center gap-2.5">
           <Image
@@ -85,20 +96,20 @@ function MockSidebar({
           </div>
         </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
-        {items.map(([label, Icon, active]) => {
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3">
+        {items.map(([label, Icon, itemActive]) => {
           const IconCmp = Icon as typeof LayoutDashboard;
-          const isActive = Boolean(active);
+          const isActive = Boolean(itemActive);
           return (
             <div
               key={String(label)}
               className={
                 isActive
-                  ? `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
-                  : `flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
+                  ? `flex min-h-9 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
+                  : `flex min-h-9 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
               }
             >
-              <IconCmp size={18} />
+              <IconCmp size={16} />
               <span className="flex-1">{String(label)}</span>
               {label === "Messaging" || label === "Messages" ? (
                 <span className="rounded-full bg-[#F05A4A] px-2 py-0.5 text-[10px] font-black !text-white">
@@ -109,11 +120,15 @@ function MockSidebar({
           );
         })}
       </nav>
-      <div className="mt-auto p-4">
+      <div className="space-y-3 p-4">
+        <div className={`flex min-h-9 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`}>
+          <Settings size={16} />
+          Settings
+        </div>
         <div
           className={`overflow-hidden rounded-2xl ${kind === "manager" ? "bg-[#F0FDFA]" : "bg-[#EFF6FF]"}`}
         >
-          <div className="relative h-24">
+          <div className="relative h-20">
             <Image
               src="/images/homepage/sitguru-dog-walking-hero.jpg"
               alt=""
