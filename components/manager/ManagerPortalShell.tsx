@@ -190,14 +190,12 @@ export default function ManagerPortalShell({
               { label: "Check-Ins", href: "/manager/check-ins", icon: CalendarCheck2, match: (path) => path.startsWith("/manager/check-ins") },
               { label: "Messages", href: "/manager/messages", icon: MessageCircle, match: (path) => path.startsWith("/manager/messages") },
             ]}
-            more={MANAGER_PORTAL_SIDEBAR.filter(
-              (item) =>
-                !["/manager", "/manager/team", "/manager/check-ins", "/manager/messages"].includes(item.href) ||
-                item.label === "Growth Home",
-            )
-              .filter((item) => item.label !== "Home")
-              .concat([{ href: MANAGER_PORTAL_BRAND.settingsPath, label: "Settings", match: "prefix" }])
-              .map((item) => ({ label: item.label, href: item.href }))}
+            more={[
+              ...MANAGER_PORTAL_SIDEBAR.filter(
+                (item) => item.label !== "Home" && item.label !== "Manager Desk" && item.label !== "My Team" && item.label !== "Check-Ins" && item.label !== "Messaging",
+              ).map((item) => ({ label: item.label, href: item.href })),
+              { label: "Settings", href: MANAGER_PORTAL_BRAND.settingsPath },
+            ]}
           />
         </div>
       </div>
