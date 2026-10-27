@@ -32,6 +32,15 @@ function bounce(path: string, kind: "ok" | "error", message: string): never {
   redirect(`${base}?${params.toString()}`);
 }
 
+/** Manager Portal or Admin Growth onboarding — never arbitrary returnTo. */
+function onboardingHome(formData?: FormData) {
+  const raw = formData ? text(formData, "returnTo") : "";
+  if (raw === "/manager/onboarding" || raw.startsWith("/manager/onboarding?")) {
+    return "/manager/onboarding";
+  }
+  return "/admin/growth/onboarding";
+}
+
 async function actor() {
   const admin = await getAdminIdentity();
   const supabase = await createClient();
@@ -140,8 +149,10 @@ async function refreshCompletion(instanceId: string) {
 
 function refreshPaths() {
   revalidatePath("/admin/growth/onboarding");
+  revalidatePath("/manager/onboarding");
   revalidatePath("/admin/hr/onboarding");
   revalidatePath("/admin/growth");
+  revalidatePath("/manager");
   revalidatePath("/intern/manage");
 }
 
@@ -246,7 +257,7 @@ export async function startOnboardingReview(formData: FormData) {
   const row = await loadItem(text(formData, "itemId"));
   const instance = row ? await instanceFor(row) : null;
   if (!row || !instance || instance.subject_user_id !== who.userId || row.kind !== "review") {
-    bounce("/admin/growth/onboarding", "error", "That document is not on your onboarding.");
+    bounce(onboardingHome(formData), "error", "That document is not on your onboarding.");
   }
   const next = openForReview(String(row.status));
   if (next.status !== row.status) {
@@ -254,7 +265,7 @@ export async function startOnboardingReview(formData: FormData) {
     await audit({ instanceId: instance.id, itemId: row.id, actorId: who.userId, actorRole: who.role || "growth", subjectUserId: who.userId, action: "document_opened", previous: String(row.status), next: next.status, versionId: String(row.version_id) });
   }
   refreshPaths();
-  bounce("/admin/growth/onboarding", "ok", "Document opened. Confirm the review when you are finished.");
+  bounce(onboardingHome(formData), "ok", "Document opened. Confirm the review when you are finished.");
 }
 
 export async function openOnboardingDocument(formData: FormData) {
@@ -262,7 +273,7 @@ export async function openOnboardingDocument(formData: FormData) {
   const row = await loadItem(text(formData, "itemId"));
   const instance = row ? await instanceFor(row) : null;
   if (!row || !instance || instance.subject_user_id !== who.userId) {
-    bounce("/admin/growth/onboarding", "error", "That document is not on your onboarding.");
+    bounce(onboardingHome(formData), "error", "That document is not on your onboarding.");
   }
   if (row.kind === "review") {
     const next = openForReview(String(row.status));
@@ -280,15 +291,15 @@ export async function confirmOnboardingReview(formData: FormData) {
   const row = await loadItem(text(formData, "itemId"));
   const instance = row ? await instanceFor(row) : null;
   if (!row || !instance || instance.subject_user_id !== who.userId || row.kind !== "review") {
-    bounce("/admin/growth/onboarding", "error", "You can only review your own assigned documents.");
+    bounce(onboardingHome(formData), "error", "You can only review your own assigned documents.");
   }
   const next = confirmReview(String(row.status));
-  if (!next.ok) bounce("/admin/growth/onboarding", "error", next.error);
+  if (!next.ok) bounce(onboardingHome(formData), "error", next.error);
   await supabaseAdmin.from("onboarding_items").update({ status: next.status, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", row.id);
   await audit({ instanceId: instance.id, itemId: row.id, actorId: who.userId, actorRole: who.role || "growth", subjectUserId: who.userId, action: "document_acknowledged", previous: String(row.status), next: next.status, versionId: String(row.version_id) });
   await refreshCompletion(instance.id);
   refreshPaths();
-  bounce("/admin/growth/onboarding", "ok", "Marked as reviewed.");
+  bounce(onboardingHome(formData), "ok", "Marked as reviewed.");
 }
 
 export async function followOnboardingSignature(formData: FormData) {
@@ -296,18 +307,18 @@ export async function followOnboardingSignature(formData: FormData) {
   const row = await loadItem(text(formData, "itemId"));
   const instance = row ? await instanceFor(row) : null;
   if (!row || !instance || instance.subject_user_id !== who.userId) {
-    bounce("/admin/growth/onboarding", "error", "That signing request is not yours.");
+    bounce(onboardingHome(formData), "error", "That signing request is not yours.");
   }
   if (row.kind === "acknowledgment") {
     const siblings = await siblingStates(instance.id);
     if (!acknowledgmentUnlocked(siblings)) {
-      bounce("/admin/growth/onboarding", "error", "Review the required documents before the acknowledgment.");
+      bounce(onboardingHome(formData), "error", "Review the required documents before the acknowledgment.");
     }
   }
   const next = followSigningLink(String(row.status));
-  if (!next.ok) bounce("/admin/growth/onboarding", "error", next.error);
+  if (!next.ok) bounce(onboardingHome(formData), "error", next.error);
   const url = String(row.signing_url || "");
-  if (!url.startsWith("https://")) bounce("/admin/growth/onboarding", "error", "The signing link is not ready yet.");
+  if (!url.startsWith("https://")) bounce(onboardingHome(formData), "error", "The signing link is not ready yet.");
   await supabaseAdmin.from("onboarding_items").update({ status: next.status, viewed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", row.id);
   await audit({ instanceId: instance.id, itemId: row.id, actorId: who.userId, actorRole: who.role || "growth", subjectUserId: who.userId, action: "signing_link_opened", previous: String(row.status), next: next.status, versionId: String(row.version_id) });
   refreshPaths();

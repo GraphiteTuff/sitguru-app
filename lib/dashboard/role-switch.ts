@@ -54,17 +54,17 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
   },
   {
     id: "manager",
-    label: "Switch to Manager Desk",
-    shortLabel: "Manager Desk",
+    label: "Switch to Intern Team Desk",
+    shortLabel: "Intern Team Desk",
     path: "/intern/manage",
     helper: "Assigned intern team, reviews, coaching, and pace",
   },
   {
     id: "growth",
-    label: "Switch to Social & Growth Manager",
-    shortLabel: "Social & Growth Manager",
-    path: "/admin/growth",
-    helper: "Campaigns, community, content, and assigned intern leadership",
+    label: "Switch to Manager Portal",
+    shortLabel: "Manager Portal",
+    path: "/manager",
+    helper: "Social Media & Community Growth Manager workplace",
   },
   {
     id: "admin",
@@ -95,7 +95,7 @@ const ROLE_ORDER: DashboardSwitchRole[] = [
   "admin",
 ];
 
-/** HQ Super Admin switcher — includes Manager Desk + Growth for Ava preview. */
+/** HQ Super Admin switcher — includes Intern Team Desk + Manager Portal for Ava preview. */
 const SUPER_USER_SWITCH_ROLES: DashboardSwitchRole[] = [
   "parent",
   "guru",
@@ -108,7 +108,7 @@ const SUPER_USER_SWITCH_ROLES: DashboardSwitchRole[] = [
 
 /**
  * Jason's personal marketplace login (jasongraff1978@gmail.com).
- * Marketplace roles + Manager Desk / Growth preview — never full Admin HQ.
+ * Marketplace roles + Intern Team Desk / Manager Portal preview — never full Admin HQ.
  */
 const FOUNDER_PERSONAL_SWITCH_ROLES: DashboardSwitchRole[] = [
   "parent",
@@ -387,6 +387,7 @@ export function resolveDashboardRoleFromPath(
   pathname: string | null | undefined,
 ): DashboardSwitchRole | null {
   const path = String(pathname || "");
+  if (path.startsWith("/manager")) return "growth";
   if (path.startsWith("/admin/growth")) return "growth";
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/intern/manage")) return "manager";

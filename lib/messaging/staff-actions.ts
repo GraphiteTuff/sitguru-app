@@ -17,6 +17,21 @@ function bounce(path: string, kind: "ok" | "error", message: string): never {
   redirect(`${path}?${kind}=${encodeURIComponent(message)}`);
 }
 
+/** Manager Portal or Admin Growth messages — never arbitrary returnTo. */
+function messagesHome(formData?: FormData) {
+  const raw = formData ? field(formData, "returnTo") : "";
+  if (raw === "/manager/messages" || raw.startsWith("/manager/messages?")) {
+    return "/manager/messages";
+  }
+  return "/admin/growth/messages";
+}
+
+function refreshMessages(path: string) {
+  revalidatePath("/admin/growth/messages");
+  revalidatePath("/manager/messages");
+  revalidatePath(path);
+}
+
 async function actor() {
   const admin = await getAdminIdentity();
   const supabase = await createClient();
@@ -32,7 +47,8 @@ async function actor() {
 
 export async function postStaffMessage(formData: FormData) {
   const who = await actor();
-  if (who.role === "none" || !who.userId) bounce("/admin/growth/messages", "error", "Sign in with a growth or founder login.");
+  const home = messagesHome(formData);
+  if (who.role === "none" || !who.userId) bounce(home, "error", "Sign in with a growth or founder login.");
   const body = field(formData, "body");
   const visibility = field(formData, "visibility") === "internal_note" ? "internal_note" : "participant";
   let media: { url: string; mimeType?: string; name?: string }[] = [];
@@ -44,9 +60,9 @@ export async function postStaffMessage(formData: FormData) {
   } catch {
     media = [];
   }
-  if (body.length < 1 && !media.length) bounce("/admin/growth/messages", "error", "Write a message or attach a file.");
+  if (body.length < 1 && !media.length) bounce(home, "error", "Write a message or attach a file.");
   const sensitive = scanSensitive(body);
-  if (sensitive.flag) bounce("/admin/growth/messages", "error", sensitive.message);
+  if (sensitive.flag) bounce(home, "error", sensitive.message);
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("first_name, full_name, avatar_url")
@@ -73,7 +89,7 @@ export async function postStaffMessage(formData: FormData) {
       })
       .select("id")
       .single();
-    if (error || !data) bounce("/admin/growth/messages", "error", "The conversation could not be started.");
+    if (error || !data) bounce(home, "error", "The conversation could not be started.");
     conversationId = String(data.id);
     await supabaseAdmin.from("conversation_participants").insert({
       conversation_id: conversationId,
@@ -95,9 +111,9 @@ export async function postStaffMessage(formData: FormData) {
     status: "unread",
     created_at: new Date().toISOString(),
   });
-  if (error) bounce("/admin/growth/messages", "error", "The message could not be saved.");
-  revalidatePath("/admin/growth/messages");
-  bounce("/admin/growth/messages", "ok", visibility === "internal_note" ? "Internal note saved." : "Message sent.");
+  if (error) bounce(home, "error", "The message could not be saved.");
+  refreshMessages(home);
+  bounce(home, "ok", visibility === "internal_note" ? "Internal note saved." : "Message sent.");
 }
 
 export async function resolveMessageReport(formData: FormData) {
@@ -119,7 +135,8 @@ export async function resolveMessageReport(formData: FormData) {
 
 export async function assignConversation(formData: FormData) {
   const who = await actor();
-  if (who.role === "none") bounce("/admin/growth/messages", "error", "You cannot assign this conversation.");
+  const home = messagesHome(formData);
+  if (who.role === "none") bounce(home, "error", "You cannot assign this conversation.");
   const conversationId = field(formData, "conversationId");
   const assignee = field(formData, "assigneeId");
   await supabaseAdmin.from("conversations").update({
@@ -128,8 +145,8 @@ export async function assignConversation(formData: FormData) {
     assigned_at: new Date().toISOString(),
     workflow_status: assignee ? "assigned" : "unassigned",
   }).eq("id", conversationId);
-  revalidatePath("/admin/growth/messages");
-  bounce("/admin/growth/messages", "ok", assignee ? "Conversation assigned." : "Conversation is unassigned.");
+  refreshMessages(home);
+  bounce(home, "ok", assignee ? "Conversation assigned." : "Conversation is unassigned.");
 }
 
 export async function saveMessagingPermission(formData: FormData) {

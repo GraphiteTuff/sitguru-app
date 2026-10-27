@@ -20,14 +20,20 @@ export default function MyTimePanel({
   data,
   notice,
   initiatives,
+  basePath = "/admin/growth",
 }: {
   data: MyTimeDashboard;
   notice?: { kind: "ok" | "error"; message: string } | null;
   initiatives: Array<{ id: string; name: string }>;
+  /** Manager Portal (`/manager`) or Admin Growth (`/admin/growth`). */
+  basePath?: string;
 }) {
   const running = data.entries.find((entry) => entry.timerStartedAt && !entry.timerStoppedAt);
   const editable =
     data.period.status === "draft" || data.period.status === "needs_correction";
+  const returnBase = basePath === "/manager" ? "/manager" : "/admin/growth";
+  const paymentsHref = `${returnBase}/payments`;
+  const returnField = <input type="hidden" name="returnBase" value={returnBase} />;
 
   return (
     <div className="space-y-4">
@@ -104,6 +110,7 @@ export default function MyTimePanel({
           <div className="mt-3 flex flex-col gap-2">
             {running ? (
               <form action={stopTimer}>
+                {returnField}
                 <input type="hidden" name="id" value={running.id} />
                 <button
                   type="submit"
@@ -114,6 +121,7 @@ export default function MyTimePanel({
               </form>
             ) : (
               <form action={startTimer} className="grid gap-2">
+                {returnField}
                 <select
                   name="categorySlug"
                   className="min-h-11 rounded-2xl border border-emerald-100 px-3 text-sm font-semibold"
@@ -136,7 +144,7 @@ export default function MyTimePanel({
               </form>
             )}
             <Link
-              href="/admin/growth/payments"
+              href={paymentsHref}
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"
             >
               My Payments
@@ -152,6 +160,7 @@ export default function MyTimePanel({
             <h2 className="text-lg font-black text-slate-950">Add Time Manually</h2>
           </div>
           <form action={saveManualTimeEntry} className="mt-4 grid gap-3 md:grid-cols-2">
+            {returnField}
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Date
               <input
@@ -227,6 +236,7 @@ export default function MyTimePanel({
           <h2 className="text-lg font-black text-slate-950">Period time entries</h2>
           {editable ? (
             <form action={submitPaymentPeriod}>
+              {returnField}
               <input type="hidden" name="periodId" value={data.period.id} />
               <button
                 type="submit"
@@ -252,6 +262,7 @@ export default function MyTimePanel({
               <p className="mt-1 text-sm text-slate-600">{entry.description}</p>
               {editable && entry.status === "draft" ? (
                 <form action={deleteDraftTimeEntry} className="mt-2">
+                  {returnField}
                   <input type="hidden" name="id" value={entry.id} />
                   <button
                     type="submit"
@@ -291,6 +302,7 @@ export default function MyTimePanel({
                   <td className="px-2 py-3">
                     {editable && entry.status === "draft" ? (
                       <form action={deleteDraftTimeEntry}>
+                        {returnField}
                         <input type="hidden" name="id" value={entry.id} />
                         <button type="submit" className="font-black text-rose-800">
                           Delete

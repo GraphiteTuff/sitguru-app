@@ -111,6 +111,7 @@ export async function GrowthWorkplaceHome({
               userId: workplace.actor.id,
               email: workplace.actor.email,
               isSuperUser: workplace.actor.isSuperUser,
+              basePath: base,
             }),
       ]);
 
@@ -212,7 +213,7 @@ export async function GrowthWorkplaceHome({
     },
     {
       href: intern ? "/intern" : "/intern/manage",
-      label: intern ? "Intern Portal" : "Manager Desk",
+      label: intern ? "Intern Portal" : "Intern Team Desk",
       detail: intern
         ? "Hours & university record"
         : "Formal intern oversight",
@@ -221,13 +222,13 @@ export async function GrowthWorkplaceHome({
     ...(!intern
       ? [
           {
-            href: "/admin/growth/my-time",
+            href: growthHref(base, "/my-time"),
             label: "My Time",
             detail: "Log hours and current payment period",
             icon: ClipboardList,
           },
           {
-            href: "/admin/growth/payments",
+            href: growthHref(base, "/payments"),
             label: "My Payments",
             detail: "Payment history and status",
             icon: CheckCircle2,
@@ -244,7 +245,11 @@ export async function GrowthWorkplaceHome({
 
   const linkClass =
     "inline-flex min-h-11 items-center rounded-2xl px-3 text-sm font-black text-emerald-800";
-  const resourceLinks = getGrowthResourceLinks({ intern });
+  const resourceLinks = getGrowthResourceLinks({
+    intern,
+    email: workplace.actor.email,
+    includeChannels: false,
+  });
 
   return (
     <GrowthPageFrame
@@ -259,7 +264,7 @@ export async function GrowthWorkplaceHome({
       detail={
         intern
           ? "Outcomes and learning live here. Planner owns assignments. Intern Portal owns hours and university requirements."
-          : "Teams communicates. Planner manages work. This workspace records results — Messages, My Time, and Manager Desk stay one tap away."
+          : "Teams communicates. Planner manages work. This workspace records results — Messages, My Time, and Intern Team Desk stay one tap away."
       }
       action={
         intern ? (
@@ -274,7 +279,7 @@ export async function GrowthWorkplaceHome({
             href="/intern/manage"
             className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-emerald-900"
           >
-            Manager Desk
+            Intern Team Desk
           </Link>
         )
       }
@@ -289,11 +294,11 @@ export async function GrowthWorkplaceHome({
       {!intern ? (
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ["/admin/growth/messages", "Messages"],
+            [growthHref(base, "/messages"), "Messages"],
             ["/intern/manage", "Intern team"],
-            ["/admin/growth/my-time", "My Time"],
-            ["/admin/growth/payments", "My Payments"],
-            ["/admin/growth/onboarding", "Onboarding"],
+            [growthHref(base, "/my-time"), "My Time"],
+            [growthHref(base, "/payments"), "My Payments"],
+            [growthHref(base, "/onboarding"), "Onboarding"],
             ...(workplace.actor.isSuperUser
               ? [
                   ["/admin/internship/time", "Approve hours"],
@@ -343,7 +348,9 @@ export async function GrowthWorkplaceHome({
       ) : null}
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
-        {!intern ? <ManagerHomeTimeCards extras={managerExtras} /> : null}
+        {!intern ? (
+          <ManagerHomeTimeCards extras={managerExtras} basePath={base} />
+        ) : null}
 
         {/* Overview */}
         <section className="order-2 min-w-0 space-y-3 lg:col-span-12">
@@ -745,7 +752,11 @@ export async function GrowthWorkplaceHome({
             title="External work systems"
             defaultOpen={false}
           >
-            <GrowthResourcesPanel intern={intern} links={resourceLinks} />
+            <GrowthResourcesPanel
+              intern={intern}
+              email={workplace.actor.email}
+              links={resourceLinks}
+            />
           </GrowthCollapsibleSection>
         </div>
 

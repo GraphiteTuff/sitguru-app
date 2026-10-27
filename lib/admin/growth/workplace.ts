@@ -11,15 +11,16 @@ import { internDocumentationModeEnabled } from "@/lib/internship/documentation-m
 import type { InternshipIntern } from "@/lib/internship/types";
 
 export const GROWTH_ADMIN_BASE = "/admin/growth";
+export const GROWTH_MANAGER_BASE = "/manager";
 export const GROWTH_INTERN_BASE = INTERNSHIP_GROWTH_PATH;
 
-export type GrowthWorkplaceKind = "admin" | "intern";
+export type GrowthWorkplaceKind = "admin" | "manager" | "intern";
 
 export type GrowthWorkplaceActor = {
   id: string;
   email: string;
   isSuperUser: boolean;
-  kind: "admin" | "intern";
+  kind: "admin" | "manager" | "intern";
 };
 
 export type GrowthWorkplaceAccess = {
@@ -80,12 +81,15 @@ function internToActor(intern: InternshipIntern): GrowthWorkplaceActor {
   };
 }
 
-function adminToActor(actor: AdminIdentity): GrowthWorkplaceActor {
+function adminToActor(
+  actor: AdminIdentity,
+  kind: Extract<GrowthWorkplaceKind, "admin" | "manager"> = "admin",
+): GrowthWorkplaceActor {
   return {
     id: actor.id,
     email: actor.email,
     isSuperUser: actor.isSuperUser,
-    kind: "admin",
+    kind,
   };
 }
 
@@ -153,6 +157,18 @@ export async function requireGrowthWorkplace(
     return { ok: false, ui: internDeniedUI() };
   }
 
+  if (kind === "manager") {
+    const access = await requireGrowthPortal();
+    if (!access.ok) return access;
+    return {
+      ok: true,
+      kind,
+      basePath: GROWTH_MANAGER_BASE,
+      actor: adminToActor(access.actor, "manager"),
+      canApprove: access.actor.isSuperUser,
+    };
+  }
+
   const access = await requireGrowthPortal();
   if (!access.ok) return access;
 
@@ -160,7 +176,7 @@ export async function requireGrowthWorkplace(
     ok: true,
     kind,
     basePath: GROWTH_ADMIN_BASE,
-    actor: adminToActor(access.actor),
+    actor: adminToActor(access.actor, "admin"),
     canApprove: access.actor.isSuperUser,
   };
 }

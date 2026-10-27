@@ -82,7 +82,10 @@ export async function GET() {
       isSuperUser: Boolean(admin?.isSuperUser),
     },
     permissions,
-    resources: getGrowthResourceLinks({ intern: actorKind === "intern" }),
+    resources: getGrowthResourceLinks({
+      intern: actorKind === "intern",
+      email: intern?.email || intern?.studentEmail || admin?.email || null,
+    }),
     kpis: {
       petParents: stats.petParents,
       gurus: stats.gurus,

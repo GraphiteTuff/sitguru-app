@@ -485,7 +485,7 @@ export async function proxy(request: NextRequest) {
         !isGrowthAllowedAdminPath(pathname)
       ) {
         const growthUrl = request.nextUrl.clone();
-        growthUrl.pathname = "/admin/growth";
+        growthUrl.pathname = "/manager";
         growthUrl.search = "";
         return NextResponse.redirect(growthUrl);
       }
@@ -523,7 +523,7 @@ export async function proxy(request: NextRequest) {
           !isGrowthAllowedAdminPath(pathname))
       ) {
         const growthUrl = request.nextUrl.clone();
-        growthUrl.pathname = "/admin/growth";
+        growthUrl.pathname = "/manager";
         growthUrl.search = "";
         return NextResponse.redirect(growthUrl);
       }

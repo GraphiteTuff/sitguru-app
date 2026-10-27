@@ -3,6 +3,13 @@
  * Growth Workspace measures outcomes. No Graph sync in this milestone.
  */
 
+import {
+  isSitGuruWorkEmail,
+  sitguruGrowthTeamsChannelLinks,
+  sitguruTeamsHref,
+  SITGURU_GROWTH_TEAMS_TEAM,
+} from "@/lib/admin/growth/teams-access";
+
 export type GrowthResourceLink = {
   id: string;
   label: string;
@@ -23,22 +30,40 @@ function envUrl(name: string) {
   }
 }
 
-/** Configurable deep links — never hardcode tenant-specific Microsoft URLs. */
+/**
+ * Teams opens on teams.cloud.microsoft for @sitguru.com work mailboxes.
+ * Optional NEXT_PUBLIC_SITGURU_TEAMS_* env vars deep-link into the live team/channels.
+ */
 export function getGrowthResourceLinks(input?: {
   intern?: boolean;
+  /** Viewer email — Teams shortcuts only for @sitguru.com work mailboxes. */
+  email?: string | null;
+  /** Include per-channel Marketing & Community Growth shortcuts. */
+  includeChannels?: boolean;
 }): GrowthResourceLink[] {
   const intern = Boolean(input?.intern);
   const links: GrowthResourceLink[] = [];
 
-  const teams = envUrl("NEXT_PUBLIC_SITGURU_TEAMS_GROWTH_URL");
-  if (teams) {
+  if (isSitGuruWorkEmail(input?.email)) {
     links.push({
       id: "teams",
       label: "Open Teams workspace",
-      detail: "SitGuru | Marketing & Community Growth — discuss, meet, share context",
-      href: teams,
+      detail: `${SITGURU_GROWTH_TEAMS_TEAM.name} · teams.cloud.microsoft`,
+      href: sitguruTeamsHref(),
       external: true,
     });
+
+    if (input?.includeChannels !== false) {
+      for (const channel of sitguruGrowthTeamsChannelLinks()) {
+        links.push({
+          id: `teams-${channel.id}`,
+          label: channel.label,
+          detail: channel.detail,
+          href: channel.href,
+          external: true,
+        });
+      }
+    }
   }
 
   const planner = envUrl("NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL");
@@ -73,7 +98,7 @@ export function getGrowthResourceLinks(input?: {
   } else {
     links.push({
       id: "manager-desk",
-      label: "Manager Desk",
+      label: "Intern Team Desk",
       detail: "Formal oversight of interns assigned to the Growth Manager",
       href: "/intern/manage",
     });

@@ -16,7 +16,10 @@ export async function loadManagerHomeExtras(input: {
   email?: string | null;
   role?: string | null;
   isSuperUser?: boolean;
+  /** Manager Portal (`/manager`) or Admin Growth (`/admin/growth`). */
+  basePath?: string;
 }): Promise<ManagerHomeExtras> {
+  const timeBase = input.basePath === "/manager" ? "/manager" : "/admin/growth";
   const engagement = await resolveManagerEngagement({
     userId: input.userId,
     email: input.email,
@@ -64,14 +67,14 @@ export async function loadManagerHomeExtras(input: {
     if (myTime.period.status === "needs_correction") {
       needsAttention.push({
         label: "Payment period needs correction",
-        href: "/admin/growth/my-time",
+        href: `${timeBase}/my-time`,
         count: 1,
       });
     }
     if (myTime.week.aboveExpected) {
       needsAttention.push({
         label: "Weekly hours above expected range",
-        href: "/admin/growth/my-time",
+        href: `${timeBase}/my-time`,
         count: 1,
       });
     }

@@ -7,9 +7,12 @@ import { GrowthCard } from "@/components/admin/growth/GrowthPageFrame";
 
 export default function ManagerHomeTimeCards({
   extras,
+  basePath = "/admin/growth",
 }: {
   extras: ManagerHomeExtras;
+  basePath?: string;
 }) {
+  const timeBase = basePath === "/manager" ? "/manager" : "/admin/growth";
   const { myTime, needsAttention } = extras;
   if (!myTime && !needsAttention.length) return null;
   const snap = myTime ? myTimeSnapshotLines(myTime) : null;
@@ -69,7 +72,7 @@ export default function ManagerHomeTimeCards({
                 {snap.rangeLabel}
               </p>
               <Link
-                href="/admin/growth/my-time"
+                href={`${timeBase}/my-time`}
                 className="mt-3 inline-flex min-h-11 items-center text-sm font-black text-emerald-900"
               >
                 Open My Time
@@ -91,7 +94,7 @@ export default function ManagerHomeTimeCards({
                 <StatusChip status={myTime.period.status} label={snap.statusLabel} />
               </div>
               <Link
-                href="/admin/growth/payments"
+                href={`${timeBase}/payments`}
                 className="mt-3 inline-flex min-h-11 items-center text-sm font-black text-emerald-900"
               >
                 View Payments
@@ -104,11 +107,11 @@ export default function ManagerHomeTimeCards({
               </p>
               <div className="mt-3 grid gap-2">
                 {[
-                  ["/admin/growth/create", "Create Growth Initiative"],
+                  [`${timeBase}/create`, "Create Growth Initiative"],
                   ["/intern/manage", "Review Intern Work"],
-                  ["/admin/growth/my-time", "Add Time"],
-                  ["/admin/messages", "Open Messages"],
-                  ["/admin/growth/payments", "View Payments"],
+                  [`${timeBase}/my-time`, "Add Time"],
+                  [`${timeBase}/messages`, "Open Messages"],
+                  [`${timeBase}/payments`, "View Payments"],
                 ].map(([href, label]) => (
                   <Link
                     key={href}

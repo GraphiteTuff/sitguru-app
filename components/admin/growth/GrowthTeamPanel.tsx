@@ -44,7 +44,7 @@ export default function GrowthTeamPanel({
               className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
               style={{ background: "#0D5C3A" }}
             >
-              Open Manager Desk
+              Open Intern Team Desk
             </Link>
           }
         />
@@ -74,7 +74,7 @@ export default function GrowthTeamPanel({
                   href={member.managerDeskHref}
                   className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-black text-emerald-900"
                 >
-                  Manager Desk
+                  Intern Team Desk
                 </Link>
               </div>
             </li>

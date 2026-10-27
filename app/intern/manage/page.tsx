@@ -163,8 +163,9 @@ export default async function InternManagerPage({
         questions={data.questions}
         interns={data.interns}
         notices={data.notices}
-        canEdit={canEditRequirements(kind)}
-        canCeo={canGiveCeoReview(kind)}
+        canEdit={!founderPersonal && canEditRequirements(kind)}
+        canCeo={!founderPersonal && canGiveCeoReview(kind)}
+        actorEmail={actor.email}
         notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
       />
     </main>
