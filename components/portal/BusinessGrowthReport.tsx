@@ -29,6 +29,7 @@ export default function BusinessGrowthReport({
         icon={<BarChart3 size={22} />}
         title="Business Growth Report"
         subtitle="See how SitGuru is growing, where we are making an impact, and what is next."
+        banner={audience === "intern" ? "intern" : "manager"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

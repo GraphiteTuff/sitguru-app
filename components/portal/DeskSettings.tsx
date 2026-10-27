@@ -86,6 +86,7 @@ export default function DeskSettings({
         icon={<Settings size={22} />}
         title="Settings"
         subtitle="Manage your account, preferences, notifications, and more."
+        banner={audience === "intern" ? "intern" : "manager"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
       {notice ? <p className="rounded-2xl bg-[#ECFDF5] px-4 py-3 text-sm font-bold text-[#047857]">{notice}</p> : null}

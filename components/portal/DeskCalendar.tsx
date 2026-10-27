@@ -122,6 +122,7 @@ export default function DeskCalendar({
             ? "Stay organized with intern deadlines, check-ins, meetings, and milestones."
             : "Stay organized with your assignments, meetings, and important dates."
         }
+        banner={manager ? "manager" : "intern"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
 

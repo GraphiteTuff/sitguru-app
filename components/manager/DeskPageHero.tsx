@@ -1,19 +1,25 @@
 import Image from "next/image";
+import { Caveat } from "next/font/google";
 import type { ReactNode } from "react";
-import { DESK_BANNER } from "@/lib/portal/desk-ui";
+import { DESK_BANNER, INTERN_BANNER } from "@/lib/portal/desk-ui";
+
+const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
 export default function DeskPageHero({
   icon,
   title,
   subtitle,
   quote,
+  banner = "manager",
 }: {
   icon: ReactNode;
   title: string;
   subtitle: string;
   quote: string;
+  banner?: "manager" | "intern";
 }) {
   void quote;
+  const intern = banner === "intern";
   return (
     <section className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(260px,0.95fr)]">
       <div className="flex min-w-0 items-start gap-3">
@@ -27,13 +33,24 @@ export default function DeskPageHero({
       </div>
       <div className="relative min-h-[148px] overflow-hidden rounded-2xl sm:min-h-[168px]">
         <Image
-          src={DESK_BANNER}
-          alt="Real support. Real community. Happier pets."
+          src={intern ? INTERN_BANNER : DESK_BANNER}
+          alt={intern ? "Golden retriever on a walk" : "Real support. Real community. Happier pets."}
           fill
-          className="object-cover object-center"
+          className={intern ? "object-cover object-[center_40%]" : "object-cover object-center"}
           sizes="(max-width: 1024px) 100vw, 42vw"
           priority
         />
+        {intern ? (
+          <p className={`${script.className} absolute left-4 top-3 max-w-[15rem] text-[1.7rem] font-bold leading-[1.05] text-[#16345C] drop-shadow-[0_1px_0_rgba(255,255,255,0.65)] sm:text-[2rem]`}>
+            Learn. Create.
+            <br />
+            Make an impact.
+            <br />
+            <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">Happier pets.</span>
+            <br />
+            Brighter communities.
+          </p>
+        ) : null}
       </div>
     </section>
   );

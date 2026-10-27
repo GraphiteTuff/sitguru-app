@@ -114,6 +114,7 @@ export default function ResourcesBoard({ audience }: { audience: "manager" | "in
         icon={<FolderOpen size={22} />}
         title="Resources"
         subtitle="Everything you need in one place. Find files, links, templates, guides, and inspiration."
+        banner={manager ? "manager" : "intern"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
 

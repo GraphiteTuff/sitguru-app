@@ -23,7 +23,10 @@ import { taskStatusLabel } from "@/lib/internship/labels";
 import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import { internPressClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
-import { DESK_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+import { Caveat } from "next/font/google";
+import { INTERN_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+
+const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
 function statusTone(status: string, reviewStage?: string | null) {
   const label = taskStatusLabel(status, reviewStage).toLowerCase();
@@ -110,13 +113,22 @@ export default function InternPortalHome({
           </div>
           <div className="relative min-h-[140px] overflow-hidden rounded-2xl sm:min-h-[160px]">
             <Image
-              src={DESK_BANNER}
-              alt="Real support. Real community. Happier pets."
+              src={INTERN_BANNER}
+              alt="Golden retriever on a walk"
               fill
-              className="object-cover object-center"
+              className="object-cover object-[center_40%]"
               sizes="(max-width: 1280px) 100vw, 45vw"
               priority
             />
+            <p className={`${script.className} absolute left-4 top-3 max-w-[15rem] text-[1.7rem] font-bold leading-[1.05] text-[#16345C] drop-shadow-[0_1px_0_rgba(255,255,255,0.7)] sm:text-[2rem]`}>
+              Learn. Create.
+              <br />
+              Make an impact.
+              <br />
+              <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">Happier pets.</span>
+              <br />
+              Brighter communities.
+            </p>
           </div>
         </div>
       </section>

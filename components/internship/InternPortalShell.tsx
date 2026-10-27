@@ -33,7 +33,7 @@ import {
   internPortalNavActive,
   isInternPortalChromePath,
 } from "@/lib/internship/intern-portal-nav";
-import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
+import { INTERN_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
 
 const ICONS = {
   Home,
@@ -137,7 +137,7 @@ export default function InternPortalShell({
               <div className="overflow-hidden rounded-2xl bg-[#EFF6FF]">
                 <div className="relative h-24">
                   <Image
-                    src={DESK_BANNER}
+                    src={INTERN_BANNER}
                     alt=""
                     fill
                     className="object-cover"

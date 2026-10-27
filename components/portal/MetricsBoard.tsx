@@ -41,6 +41,7 @@ export default function MetricsBoard({
         icon={<BarChart3 size={22} />}
         title="Metrics"
         subtitle="Track your impact, see your progress, and help grow the SitGuru community."
+        banner={manager ? "manager" : "intern"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

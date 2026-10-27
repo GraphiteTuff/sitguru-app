@@ -1,14 +1,17 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { INTERN_PORTAL_BRAND } from "@/lib/internship/intern-portal-nav";
-import { DESK_BANNER } from "@/lib/portal/desk-ui";
+import { Caveat } from "next/font/google";
+import { INTERN_BANNER } from "@/lib/portal/desk-ui";
+
+const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
 export default function InternHeroBanner({
   title,
   subtitle,
   icon,
   overlay = INTERN_PORTAL_BRAND.impactLine,
-  imageSrc = DESK_BANNER,
+  imageSrc = INTERN_BANNER,
 }: {
   title: string;
   subtitle: string;
@@ -37,7 +40,16 @@ export default function InternHeroBanner({
           </div>
         </div>
         <div className="relative min-h-[120px] overflow-hidden lg:min-h-full">
-          <Image src={imageSrc} alt="" fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
+          <Image src={imageSrc} alt="Golden retriever on a walk" fill className="object-cover object-[center_40%]" sizes="(max-width: 1024px) 100vw, 40vw" />
+          <p className={`${script.className} absolute left-3 top-3 max-w-[14rem] text-[1.55rem] font-bold leading-[1.05] text-[#16345C] drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]`}>
+            Learn. Create.
+            <br />
+            Make an impact.
+            <br />
+            <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">Happier pets.</span>
+            <br />
+            Brighter communities.
+          </p>
           <span className="sr-only">{overlay}</span>
         </div>
       </div>

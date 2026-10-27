@@ -2,6 +2,7 @@
 
 export const DESK_LOGO = "/images/portal/sitguru-wordmark.jpg";
 export const DESK_BANNER = "/images/portal/real-support-banner.png";
+export const INTERN_BANNER = "/images/portal/intern-dog-leash.jpg";
 
 export const DESK_UI = {
   pageBg: "bg-[#F4F7FB]",

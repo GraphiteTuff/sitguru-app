@@ -48,6 +48,7 @@ export default function TrainingBoard({ audience }: { audience: "manager" | "int
             ? "Learn, lead, and get everything you need to coach the growth team."
             : "Learn, build skills, and get everything you need to succeed at SitGuru."
         }
+        banner={manager ? "manager" : "intern"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
 

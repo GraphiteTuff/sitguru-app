@@ -94,7 +94,8 @@ export default function LiveResultsBoard({ audience }: { audience: "manager" | "
             ? "Track live SitGuru growth from content, campaigns, and community work."
             : "Track real SitGuru results from your content, campaigns, and community growth."
         }
-        quote={"Same people.\nHappier pets.\nBigger impact.®"}
+        banner={manager ? "manager" : "intern"}
+        quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
