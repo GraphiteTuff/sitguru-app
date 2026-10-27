@@ -165,6 +165,7 @@ export default async function InternManagerPage({
         notices={data.notices}
         canEdit={!founderPersonal && canEditRequirements(kind)}
         canCeo={!founderPersonal && canGiveCeoReview(kind)}
+        actorEmail={actor.email}
         notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
       />
     </main>

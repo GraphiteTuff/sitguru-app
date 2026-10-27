@@ -18,6 +18,10 @@ import {
   internPrimaryBtnClass,
 } from "@/lib/internship/intern-ui";
 import { internPortalHeroClass } from "@/lib/internship/portal";
+import {
+  isSitGuruWorkEmail,
+  sitguruTeamsHref,
+} from "@/lib/admin/growth/teams-access";
 
 const TABS = [
   { id: "dashboard", label: "Dashboard" },
@@ -230,6 +234,7 @@ export default function ManagerInternDashboard({
   canCeo,
   notices = [],
   notice,
+  actorEmail = null,
 }: {
   cards: ManagerInternCard[];
   reviews: ManagerReviewItem[];
@@ -239,9 +244,12 @@ export default function ManagerInternDashboard({
   canEdit: boolean;
   canCeo: boolean;
   notice?: { kind: "ok" | "error"; message: string } | null;
+  /** Viewer email — Teams deep links only for @sitguru.com work mailboxes. */
+  actorEmail?: string | null;
 }) {
   const [tab, setTab] = useState<TabId>("dashboard");
   const openQuestions = questions.filter((question) => question.status === "open");
+  const canOpenTeams = isSitGuruWorkEmail(actorEmail);
 
   return (
     <div className="space-y-4 pb-24 sm:pb-8">
@@ -278,7 +286,7 @@ export default function ManagerInternDashboard({
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-900 shadow-sm">
-              Manager Desk
+              Intern Team Desk
             </span>
             <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] !text-white">
               Intern team
@@ -297,8 +305,8 @@ export default function ManagerInternDashboard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/growth" className={`${internPrimaryBtnClass} rounded-full`}>
-              Growth Workspace
+            <Link href="/manager" className={`${internPrimaryBtnClass} rounded-full`}>
+              Manager Portal
             </Link>
             <Link href="/intern" className={`${internGhostBtnClass} rounded-full`}>
               Intern portal
@@ -389,12 +397,21 @@ export default function ManagerInternDashboard({
             ))}
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
-            <a
-              href="https://teams.microsoft.com"
-              className={internPrimaryBtnClass}
-            >
-              Weekly Growth Meeting · Open in Microsoft Teams
-            </a>
+            {canOpenTeams ? (
+              <a
+                href={sitguruTeamsHref()}
+                target="_blank"
+                rel="noreferrer"
+                className={internPrimaryBtnClass}
+              >
+                Weekly Growth Meeting · Open in Microsoft Teams
+              </a>
+            ) : (
+              <p className="w-full text-sm font-semibold text-slate-600">
+                Microsoft Teams opens only for SitGuru work accounts
+                (@sitguru.com), such as jason@sitguru.com or ava@sitguru.com.
+              </p>
+            )}
             <Link href="/admin/internship/timeline" className={internGhostBtnClass}>
               Open milestone timeline
             </Link>

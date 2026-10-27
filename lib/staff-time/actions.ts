@@ -36,10 +36,27 @@ function bounce(path: string, kind: "ok" | "error", message: string): never {
   redirect(`${base}?${params.toString()}`);
 }
 
+/** Manager Portal or Admin Growth — never arbitrary returnBase. */
+function staffPortalBase(formData?: FormData) {
+  const raw = formData ? text(formData, "returnBase") : "";
+  return raw === "/manager" ? "/manager" : "/admin/growth";
+}
+
+function myTimeHome(formData?: FormData) {
+  return `${staffPortalBase(formData)}/my-time`;
+}
+
+function paymentsHome(formData?: FormData) {
+  return `${staffPortalBase(formData)}/payments`;
+}
+
 function refreshStaffPaths() {
   revalidatePath("/admin/growth", "layout");
   revalidatePath("/admin/growth/my-time");
   revalidatePath("/admin/growth/payments");
+  revalidatePath("/manager", "layout");
+  revalidatePath("/manager/my-time");
+  revalidatePath("/manager/payments");
   revalidatePath("/admin/hr/people");
   revalidatePath("/admin/hr/people/payments");
   revalidatePath("/admin/hr");
@@ -85,24 +102,24 @@ function canApprovePayments(actor: { isSuperUser: boolean; role: string }) {
 export async function saveManualTimeEntry(formData: FormData) {
   const { actor, engagement } = await requireOwnEngagement();
   const hours = parsePositiveHours(text(formData, "hours"));
-  if (!hours.ok) bounce("/admin/growth/my-time", "error", hours.error);
+  if (!hours.ok) bounce(myTimeHome(formData), "error", hours.error);
 
   const workedOn = text(formData, "workedOn") || isoToday();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(workedOn)) {
-    bounce("/admin/growth/my-time", "error", "Choose a valid work date.");
+    bounce(myTimeHome(formData), "error", "Choose a valid work date.");
   }
   if (workedOn > isoToday()) {
-    bounce("/admin/growth/my-time", "error", "You can’t log future time.");
+    bounce(myTimeHome(formData), "error", "You can’t log future time.");
   }
 
   const category = text(formData, "categorySlug") || "other_approved";
   if (!isStaffTimeCategory(category)) {
-    bounce("/admin/growth/my-time", "error", "Pick a valid time category.");
+    bounce(myTimeHome(formData), "error", "Pick a valid time category.");
   }
 
   const description = text(formData, "description");
   if (description.length < 3) {
-    bounce("/admin/growth/my-time", "error", "Add a short work description.");
+    bounce(myTimeHome(formData), "error", "Add a short work description.");
   }
 
   const period = await ensurePaymentPeriod(engagement, workedOn);
@@ -136,16 +153,16 @@ export async function saveManualTimeEntry(formData: FormData) {
       .eq("id", entryId)
       .eq("engagement_id", engagement.id)
       .maybeSingle();
-    if (!existing) bounce("/admin/growth/my-time", "error", "That draft was not found.");
+    if (!existing) bounce(myTimeHome(formData), "error", "That draft was not found.");
     const entry = mapTimeEntry(existing as Record<string, unknown>);
     if (!canEditTimeEntry(entry.status, period.status)) {
-      bounce("/admin/growth/my-time", "error", "That entry can no longer be edited.");
+      bounce(myTimeHome(formData), "error", "That entry can no longer be edited.");
     }
     const { error } = await supabaseAdmin
       .from("staff_time_entries")
       .update(payload)
       .eq("id", entryId);
-    if (error) bounce("/admin/growth/my-time", "error", "Time could not be updated.");
+    if (error) bounce(myTimeHome(formData), "error", "Time could not be updated.");
     await recalculatePeriod(period.id);
     await publishStaffTimeEvent({
       engagement,
@@ -161,7 +178,7 @@ export async function saveManualTimeEntry(formData: FormData) {
       .insert(payload)
       .select("id")
       .maybeSingle();
-    if (error) bounce("/admin/growth/my-time", "error", "Time could not be saved.");
+    if (error) bounce(myTimeHome(formData), "error", "Time could not be saved.");
     await recalculatePeriod(period.id);
     await publishStaffTimeEvent({
       engagement,
@@ -174,7 +191,7 @@ export async function saveManualTimeEntry(formData: FormData) {
   }
 
   refreshStaffPaths();
-  bounce("/admin/growth/my-time", "ok", entryId ? "Time updated." : "Time saved.");
+  bounce(myTimeHome(formData), "ok", entryId ? "Time updated." : "Time saved.");
 }
 
 export async function deleteDraftTimeEntry(formData: FormData) {
@@ -186,7 +203,7 @@ export async function deleteDraftTimeEntry(formData: FormData) {
     .eq("id", id)
     .eq("engagement_id", engagement.id)
     .maybeSingle();
-  if (!existing) bounce("/admin/growth/my-time", "error", "Entry not found.");
+  if (!existing) bounce(myTimeHome(formData), "error", "Entry not found.");
   const entry = mapTimeEntry(existing as Record<string, unknown>);
   const period = entry.paymentPeriodId
     ? (
@@ -198,7 +215,7 @@ export async function deleteDraftTimeEntry(formData: FormData) {
       ).data
     : null;
   if (!canEditTimeEntry(entry.status, String(period?.status || "draft"))) {
-    bounce("/admin/growth/my-time", "error", "Only draft entries can be deleted.");
+    bounce(myTimeHome(formData), "error", "Only draft entries can be deleted.");
   }
   await supabaseAdmin.from("staff_time_entries").delete().eq("id", id);
   if (entry.paymentPeriodId) await recalculatePeriod(entry.paymentPeriodId);
@@ -211,7 +228,7 @@ export async function deleteDraftTimeEntry(formData: FormData) {
     actorLabel: actor.email,
   });
   refreshStaffPaths();
-  bounce("/admin/growth/my-time", "ok", "Draft time removed.");
+  bounce(myTimeHome(formData), "ok", "Draft time removed.");
 }
 
 export async function startTimer(formData: FormData) {
@@ -219,7 +236,7 @@ export async function startTimer(formData: FormData) {
   const workedOn = isoToday();
   const period = await ensurePaymentPeriod(engagement, workedOn);
   if (["approved", "ready_for_payment", "processing", "paid"].includes(period.status)) {
-    bounce("/admin/growth/my-time", "error", "This payment period is locked.");
+    bounce(myTimeHome(formData), "error", "This payment period is locked.");
   }
   const category = text(formData, "categorySlug") || "other_approved";
   const description = text(formData, "description") || "In progress";
@@ -240,7 +257,7 @@ export async function startTimer(formData: FormData) {
     })
     .select("id")
     .maybeSingle();
-  if (error) bounce("/admin/growth/my-time", "error", "Timer could not start.");
+  if (error) bounce(myTimeHome(formData), "error", "Timer could not start.");
   await publishStaffTimeEvent({
     engagement,
     eventType: SITGURU_DOMAIN_EVENTS.TIME_ENTRY_CREATED,
@@ -250,7 +267,7 @@ export async function startTimer(formData: FormData) {
     actorLabel: actor.email,
   });
   refreshStaffPaths();
-  bounce("/admin/growth/my-time", "ok", "Timer started.");
+  bounce(myTimeHome(formData), "ok", "Timer started.");
 }
 
 export async function stopTimer(formData: FormData) {
@@ -263,7 +280,7 @@ export async function stopTimer(formData: FormData) {
     .eq("engagement_id", engagement.id)
     .maybeSingle();
   if (!existing?.timer_started_at) {
-    bounce("/admin/growth/my-time", "error", "No running timer found.");
+    bounce(myTimeHome(formData), "error", "No running timer found.");
   }
   const started = Date.parse(String(existing.timer_started_at));
   const elapsedHours = Math.max(
@@ -283,7 +300,7 @@ export async function stopTimer(formData: FormData) {
         String(existing.description || "Timed work"),
     })
     .eq("id", id);
-  if (error) bounce("/admin/growth/my-time", "error", "Timer could not stop.");
+  if (error) bounce(myTimeHome(formData), "error", "Timer could not stop.");
   if (existing.payment_period_id) {
     await recalculatePeriod(String(existing.payment_period_id));
   }
@@ -296,7 +313,7 @@ export async function stopTimer(formData: FormData) {
     actorLabel: actor.email,
   });
   refreshStaffPaths();
-  bounce("/admin/growth/my-time", "ok", `Timer stopped · ${capped} hrs logged.`);
+  bounce(myTimeHome(formData), "ok", `Timer stopped · ${capped} hrs logged.`);
 }
 
 export async function submitPaymentPeriod(formData: FormData) {
@@ -308,14 +325,14 @@ export async function submitPaymentPeriod(formData: FormData) {
     .eq("id", periodId)
     .eq("engagement_id", engagement.id)
     .maybeSingle();
-  if (!periodRow) bounce("/admin/growth/my-time", "error", "Payment period not found.");
+  if (!periodRow) bounce(myTimeHome(formData), "error", "Payment period not found.");
   if (!["draft", "needs_correction"].includes(String(periodRow.status))) {
-    bounce("/admin/growth/my-time", "error", "This period was already submitted.");
+    bounce(myTimeHome(formData), "error", "This period was already submitted.");
   }
 
   const refreshed = await recalculatePeriod(periodId);
   if (!refreshed || refreshed.totalHours <= 0) {
-    bounce("/admin/growth/my-time", "error", "Add time before submitting this period.");
+    bounce(myTimeHome(formData), "error", "Add time before submitting this period.");
   }
 
   const now = new Date().toISOString();
@@ -336,7 +353,7 @@ export async function submitPaymentPeriod(formData: FormData) {
       updated_at: now,
     })
     .eq("id", periodId);
-  if (error) bounce("/admin/growth/my-time", "error", "Could not submit payment period.");
+  if (error) bounce(myTimeHome(formData), "error", "Could not submit payment period.");
 
   await publishStaffTimeEvent({
     engagement,
@@ -353,7 +370,7 @@ export async function submitPaymentPeriod(formData: FormData) {
   });
 
   refreshStaffPaths();
-  bounce("/admin/growth/my-time", "ok", "Payment period submitted for review.");
+  bounce(myTimeHome(formData), "ok", "Payment period submitted for review.");
 }
 
 export async function approvePaymentPeriod(formData: FormData) {

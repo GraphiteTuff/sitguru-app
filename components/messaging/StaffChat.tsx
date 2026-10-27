@@ -41,10 +41,13 @@ export default function StaffChat({
   me,
   conversations,
   showAdminRecord,
+  returnTo = "/admin/growth/messages",
 }: {
   me: { firstName: string; avatarUrl: string };
   conversations: Conversation[];
   showAdminRecord: boolean;
+  /** Where message actions bounce after save — Manager Portal or Admin Growth. */
+  returnTo?: string;
 }) {
   const [selectedId, setSelectedId] = useState(conversations[0]?.id || "");
   const [fileLabel, setFileLabel] = useState("");
@@ -152,6 +155,7 @@ export default function StaffChat({
           <input type="hidden" name="conversationId" value={selected?.id || ""} />
           <input type="hidden" name="visibility" value="internal_note" />
           <input type="hidden" name="type" value="internal_direct" />
+          <input type="hidden" name="returnTo" value={returnTo} />
           <input type="hidden" name="media" value={JSON.stringify(media)} />
           {!selected ? (
             <input name="subject" placeholder="Who or what is this about?" className="min-h-12 rounded-2xl border border-emerald-100 px-3 text-base font-semibold" />
@@ -182,7 +186,7 @@ export default function StaffChat({
           {selected ? (
             <form action={reportMessage} className="grid gap-2 sm:grid-cols-[1fr_auto]">
               <input type="hidden" name="conversationId" value={selected.id} />
-              <input type="hidden" name="returnTo" value="/admin/growth/messages" />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <select name="reason" className="min-h-11 rounded-xl border border-rose-100 px-3 text-sm font-semibold">
                 <option>Harassment</option>
                 <option>Safety Concern</option>

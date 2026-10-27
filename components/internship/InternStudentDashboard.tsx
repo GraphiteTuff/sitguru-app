@@ -76,6 +76,10 @@ import {
   internPressClass,
   internPrimaryBtnClass,
 } from "@/lib/internship/intern-ui";
+import {
+  isSitGuruWorkEmail,
+  sitguruTeamsHref,
+} from "@/lib/admin/growth/teams-access";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 const TABS = [
@@ -924,12 +928,22 @@ export default function InternStudentDashboard({
                   year: "numeric",
                 })}
               </h2>
-              <a
-                href="https://teams.microsoft.com"
-                className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800"
-              >
-                Weekly Growth Meeting · Open in Microsoft Teams
-              </a>
+              {isSitGuruWorkEmail(data.intern.email) ||
+              isSitGuruWorkEmail(data.intern.studentEmail) ? (
+                <a
+                  href={sitguruTeamsHref()}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-emerald-800"
+                >
+                  Weekly Growth Meeting · Open in Microsoft Teams
+                </a>
+              ) : (
+                <p className="mt-2 text-sm font-semibold text-slate-600">
+                  Weekly Growth Meetings are hosted in Microsoft Teams for SitGuru
+                  work accounts (@sitguru.com). Your manager will share the invite.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <button

@@ -3,6 +3,8 @@
  * Growth Workspace measures outcomes. No Graph sync in this milestone.
  */
 
+import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
+
 export type GrowthResourceLink = {
   id: string;
   label: string;
@@ -26,12 +28,14 @@ function envUrl(name: string) {
 /** Configurable deep links — never hardcode tenant-specific Microsoft URLs. */
 export function getGrowthResourceLinks(input?: {
   intern?: boolean;
+  /** Viewer email — Teams shortcuts only for @sitguru.com work mailboxes. */
+  email?: string | null;
 }): GrowthResourceLink[] {
   const intern = Boolean(input?.intern);
   const links: GrowthResourceLink[] = [];
 
   const teams = envUrl("NEXT_PUBLIC_SITGURU_TEAMS_GROWTH_URL");
-  if (teams) {
+  if (teams && isSitGuruWorkEmail(input?.email)) {
     links.push({
       id: "teams",
       label: "Open Teams workspace",
@@ -73,7 +77,7 @@ export function getGrowthResourceLinks(input?: {
   } else {
     links.push({
       id: "manager-desk",
-      label: "Manager Desk",
+      label: "Intern Team Desk",
       detail: "Formal oversight of interns assigned to the Growth Manager",
       href: "/intern/manage",
     });

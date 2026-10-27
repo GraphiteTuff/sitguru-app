@@ -32,7 +32,10 @@ export default function GrowthQuickActions({
 }) {
   const base = workplace.basePath;
   const intern = workplace.kind === "intern";
-  const planner = getGrowthResourceLinks({ intern }).find((item) => item.id === "planner");
+  const planner = getGrowthResourceLinks({
+    intern,
+    email: workplace.actor.email,
+  }).find((item) => item.id === "planner");
 
   const actions: QuickAction[] = [
     {
@@ -63,19 +66,19 @@ export default function GrowthQuickActions({
     },
     {
       href: intern ? "/intern" : "/intern/manage",
-      label: intern ? "Intern Portal" : "Manager Desk",
+      label: intern ? "Intern Portal" : "Intern Team Desk",
       icon: Users,
     },
     ...(!intern
       ? [
           {
-            href: "/admin/growth/my-time",
+            href: growthHref(base, "/my-time"),
             label: "Add Time",
             icon: Clock3,
             primary: true as const,
           },
           {
-            href: "/admin/growth/payments",
+            href: growthHref(base, "/payments"),
             label: "My Payments",
             icon: CreditCard,
           },

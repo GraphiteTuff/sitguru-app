@@ -49,7 +49,7 @@ export default function GrowthPhoneBar({
   basePath?: string;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const staffHome = basePath === "/admin/growth";
+  const staffHome = basePath === "/admin/growth" || basePath === "/manager";
   const primary = staffHome
     ? [
         { suffix: suffixes.home, label: "Home", icon: Home, href: "" },

@@ -7,12 +7,15 @@ import {
 
 export default function GrowthResourcesPanel({
   intern = false,
+  email = null,
   links,
 }: {
   intern?: boolean;
+  /** Viewer email — Teams shortcuts only for @sitguru.com. */
+  email?: string | null;
   links?: GrowthResourceLink[];
 }) {
-  const items = links || getGrowthResourceLinks({ intern });
+  const items = links || getGrowthResourceLinks({ intern, email });
 
   return (
     <div className="space-y-3 pt-4">

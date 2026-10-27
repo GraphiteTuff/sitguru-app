@@ -7,7 +7,7 @@ import {
 } from "./role-switch";
 
 describe("founder personal marketplace roles", () => {
-  it("gives jasongraff1978@gmail.com marketplace roles plus Manager Desk / Growth — not Admin", () => {
+  it("gives jasongraff1978@gmail.com marketplace roles plus Intern Team Desk / Manager Portal — not Admin", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "jasongraff1978@gmail.com",
     });
@@ -29,7 +29,7 @@ describe("founder personal marketplace roles", () => {
     assert.ok(switches.some((item) => item.id === "growth"));
   });
 
-  it("lets the HQ login switch to Intern, Manager Desk, Growth, marketplace, and Admin", () => {
+  it("lets the HQ login switch to Intern, Intern Team Desk, Manager Portal, marketplace, and Admin", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "jason@sitguru.com",
     });
@@ -44,7 +44,7 @@ describe("founder personal marketplace roles", () => {
     ]);
   });
 
-  it("gives the Social & Growth Manager desk + growth workspace and not full Admin", () => {
+  it("gives the Social & Growth Manager Intern Team Desk + Manager Portal and not full Admin", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "growth.manager@sitguru.com",
       roleRows: ["social_community_manager"],
@@ -54,11 +54,12 @@ describe("founder personal marketplace roles", () => {
       currentRole: "parent",
       authorizedRoles: roles,
     });
-    assert.equal(switches[0]?.shortLabel, "Manager Desk");
+    assert.equal(switches[0]?.shortLabel, "Intern Team Desk");
     assert.equal(switches[0]?.path, "/intern/manage");
-    assert.equal(switches[1]?.shortLabel, "Social & Growth Manager");
-    assert.equal(switches[1]?.path, "/admin/growth");
+    assert.equal(switches[1]?.shortLabel, "Manager Portal");
+    assert.equal(switches[1]?.path, "/manager");
     assert.equal(resolveDashboardRoleFromPath("/intern/manage"), "manager");
+    assert.equal(resolveDashboardRoleFromPath("/manager"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/growth"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/hr"), "admin");
   });
