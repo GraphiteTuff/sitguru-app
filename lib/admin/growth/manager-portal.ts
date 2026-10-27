@@ -5,7 +5,7 @@ import { MANAGER_ROUTES } from "@/lib/admin/growth/manager-routes";
 export const MANAGER_PORTAL_BRAND = {
   kicker: "Social Media & Community Growth Manager",
   title: "Manager Portal",
-  deskTitle: "Manager Desk",
+  deskTitle: "Manager's Desk",
   growthTitle: "Growth Home",
   homePath: MANAGER_ROUTES.home,
   deskPath: MANAGER_ROUTES.desk,
@@ -37,7 +37,7 @@ export const MANAGER_PORTAL_BRAND = {
 export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.home, label: "Home", match: "none" as const },
   { href: MANAGER_ROUTES.growth, label: "Growth Home", match: "growth-home" as const },
-  { href: MANAGER_ROUTES.desk, label: "Manager Desk", match: "exact" as const },
+  { href: MANAGER_ROUTES.desk, label: "Manager's Desk", match: "exact" as const },
   { href: MANAGER_ROUTES.myTime, label: "My Time", match: "prefix" as const },
   { href: MANAGER_ROUTES.payments, label: "My Payments", match: "prefix" as const },
   { href: MANAGER_ROUTES.team, label: "My Team", match: "prefix" as const },

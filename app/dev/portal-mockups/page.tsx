@@ -280,21 +280,21 @@ export default async function PortalMockupsPage({
       <header className="mx-auto max-w-[1600px] rounded-[1.5rem] bg-white p-4 shadow-sm">
         <h1 className="text-2xl font-black text-slate-950">Portal mockups</h1>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          Manager Desk, Intern Portal, and Growth Workspace — same pastel desk color theme.
+          Manager's Desk, Intern Portal, and Growth Workspace — same pastel desk color theme.
         </p>
         <MockupLinks />
       </header>
 
       {(view === "manager" || view === "both") && (
         <section className="mx-auto max-w-[1600px] space-y-4">
-          <h2 className="text-lg font-black text-slate-950">Manager Desk · desktop / laptop</h2>
+          <h2 className="text-lg font-black text-slate-950">Manager's Desk · desktop / laptop</h2>
           <div
             data-frame="manager-desktop"
             className="overflow-hidden rounded-[1.5rem] border border-slate-300 bg-white shadow-xl"
           >
             <ManagerMockFrame desk={manager} />
           </div>
-          <h2 className="text-lg font-black text-slate-950">Manager Desk · mobile / webapp</h2>
+          <h2 className="text-lg font-black text-slate-950">Manager's Desk · mobile / webapp</h2>
           <div
             data-frame="manager-mobile"
             className="mx-auto max-w-[390px] overflow-hidden rounded-[1.75rem] border border-slate-300 bg-white shadow-xl"

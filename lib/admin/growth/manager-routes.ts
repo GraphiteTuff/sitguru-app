@@ -26,7 +26,7 @@ export const MANAGER_ROUTES = {
 export const MANAGER_MENU_WIRED = [
   { key: "home", label: "Home", href: MANAGER_ROUTES.home },
   { key: "growth", label: "Growth Home", href: MANAGER_ROUTES.growth },
-  { key: "desk", label: "Manager Desk", href: MANAGER_ROUTES.desk },
+  { key: "desk", label: "Manager's Desk", href: MANAGER_ROUTES.desk },
   { key: "myTime", label: "My Time", href: MANAGER_ROUTES.myTime },
   { key: "payments", label: "My Payments", href: MANAGER_ROUTES.payments },
   { key: "team", label: "My Team", href: MANAGER_ROUTES.team },

@@ -6,7 +6,7 @@ export type DeskSearchHit = {
 };
 
 const MANAGER: DeskSearchHit[] = [
-  { href: "/manager", title: "Manager Desk", detail: "Home, team pace, and review queue", keywords: "home desk interns overview" },
+  { href: "/manager", title: "Manager's Desk", detail: "Home, team pace, and review queue", keywords: "home desk interns overview" },
   { href: "/manager/growth", title: "Growth Home", detail: "Campaigns and growth workspace", keywords: "growth workspace campaigns" },
   { href: "/manager/team", title: "My Team", detail: "Assigned interns", keywords: "interns team people roster" },
   { href: "/manager/assignments", title: "Assignments", detail: "Intern work and deadlines", keywords: "assignments tasks work due" },

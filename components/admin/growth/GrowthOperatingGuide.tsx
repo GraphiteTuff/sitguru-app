@@ -7,7 +7,7 @@ const SYSTEMS = [
   ["SharePoint", "Official shared files, assets, research, and event materials."],
   ["Growth Workspace", "Campaigns, events, experiments, and what the business learned."],
   ["Intern Portal", "The academic record: hours, evidence, weekly reports, and the final project."],
-  ["Manager Desk", "The assigned intern team: coaching, reviews, and pace."],
+  ["Manager's Desk", "The assigned intern team: coaching, reviews, and pace."],
   ["Timekeeper", "Official hours after they are submitted, reviewed, and approved."],
 ] as const;
 

@@ -39,7 +39,7 @@ const GROWTH_MANAGER_BASE = "/manager";
 const ICONS = {
   Home,
   "Growth Home": Sparkles,
-  "Manager Desk": LayoutDashboard,
+  "Manager's Desk": LayoutDashboard,
   "My Time": Clock3,
   "My Payments": CreditCard,
   "My Team": Users,
@@ -184,7 +184,7 @@ export default function ManagerPortalShell({
             ]}
             more={[
               ...MANAGER_PORTAL_SIDEBAR.filter(
-                (item) => item.label !== "Home" && item.label !== "Manager Desk" && item.label !== "My Team" && item.label !== "Check-Ins" && item.label !== "Messaging",
+                (item) => item.label !== "Home" && item.label !== "Manager's Desk" && item.label !== "My Team" && item.label !== "Check-Ins" && item.label !== "Messaging",
               ).map((item) => ({ label: item.label, href: item.href })),
               { label: "Settings", href: MANAGER_PORTAL_BRAND.settingsPath },
             ]}

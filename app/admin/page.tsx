@@ -444,7 +444,7 @@ export default async function AdminOperationsDashboard() {
       title: "Growth & Manager",
       links: [
         ["Growth Workspace", "/admin/growth"],
-        ["Manager Desk", "/intern/manage"],
+        ["Manager's Desk", "/intern/manage"],
         ["My Time (Manager)", "/admin/growth/my-time"],
         ["My Payments (Manager)", "/admin/growth/payments"],
         ["Manager Help", "/admin/help/manager"],

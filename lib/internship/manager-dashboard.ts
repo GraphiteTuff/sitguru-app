@@ -123,7 +123,7 @@ export function buildManagerSchedule(input: {
       items.push({
         id: `desk-${cursor}`,
         date: cursor,
-        title: "Manager desk review",
+        title: "Manager's Desk review",
         kind: "meeting",
         time: "1:00 PM",
       });

@@ -43,7 +43,7 @@ export async function publishInternHoursEvent(input: {
         ? "Hours need changes"
         : "Hours updated";
   const body = input.submitted
-    ? "Review submitted internship hours on Manager Desk."
+    ? "Review submitted internship hours on Manager's Desk."
     : input.approved
       ? "Your internship hours were approved."
       : input.changesRequested
@@ -103,7 +103,7 @@ export async function publishInternCheckinEvent(input: {
         : `${input.intern.fullName} submitted a weekly check-in`,
     notifyBody: input.needsChanges
       ? "Review manager feedback and resubmit."
-      : "Open Manager Desk to review.",
+      : "Open Manager's Desk to review.",
     notifyHref: input.needsChanges ? "/intern?tab=home" : "/intern/manage?tab=reviews",
   });
 }

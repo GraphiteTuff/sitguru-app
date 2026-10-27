@@ -19,17 +19,17 @@ export const dynamic = "force-dynamic";
 const TOPICS = [
   {
     title: "Getting Started",
-    detail: "Manager desk, team overview, and the first week.",
+    detail: "Manager's Desk, team overview, and the first week.",
     tone: "bg-[#FFF1F2] text-[#BE123C]",
     items: [
-      ["Open Manager Desk", "/manager"],
+      ["Open Manager's Desk", "/manager"],
       ["My Team", "/manager/team"],
       ["Roles and expectations", "/manager/training"],
       ["First week checklist", "/manager/onboarding"],
     ],
   },
   {
-    title: "Manager Desk",
+    title: "Manager's Desk",
     detail: "Check-ins, hour review, milestones, and assignments.",
     tone: "bg-[#EFF6FF] text-[#1D4ED8]",
     items: [
@@ -93,7 +93,7 @@ export default async function ManagerHelpPage() {
       <DeskPageHero
         icon={<CircleHelp size={22} />}
         title="Help"
-        subtitle="Find answers, step-by-step guides, and everything you need on the Manager Desk."
+        subtitle="Find answers, step-by-step guides, and everything you need on the Manager's Desk."
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
 
@@ -128,7 +128,7 @@ export default async function ManagerHelpPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black text-[#0F2744]">Help Topics</h2>
-            <p className="text-sm font-medium text-slate-500">Every topic opens a Manager Desk page. Nothing here sends you to Admin.</p>
+            <p className="text-sm font-medium text-slate-500">Every topic opens a Manager's Desk page. Nothing here sends you to Admin.</p>
           </div>
         </div>
         <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -182,7 +182,7 @@ export default async function ManagerHelpPage() {
           <div className="mt-3 grid gap-2">
             <a href={teams} className="rounded-2xl bg-[#F5F3FF] px-3 py-3 text-sm font-bold text-[#6D28D9]">Ask a Question in Teams →</a>
             <Link href="/manager/messages" className="rounded-2xl bg-[#ECFDF5] px-3 py-3 text-sm font-bold text-[#047857]">Message the team →</Link>
-            <Link href="/manager" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-sm font-bold text-[#1D4ED8]">Back to Manager Desk →</Link>
+            <Link href="/manager" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-sm font-bold text-[#1D4ED8]">Back to Manager's Desk →</Link>
           </div>
         </article>
         <article className={`${DESK_UI.card} p-4`}>

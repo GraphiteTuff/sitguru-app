@@ -127,7 +127,7 @@ export default function DeskSettings({
             <button className="mt-3 rounded-full border border-slate-200 px-4 py-2 text-sm font-bold">Change password</button>
             {passwordNote ? <p className="mt-2 text-xs font-semibold text-slate-600">{passwordNote}</p> : null}
             <Link href="/forgot-password" className="mt-3 block text-sm font-bold text-[#2563EB]">Email me a reset link</Link>
-            <Link href={home} className="mt-2 block text-sm font-bold text-[#2563EB]">Back to {audience === "manager" ? "Manager Desk" : "Intern Portal"}</Link>
+            <Link href={home} className="mt-2 block text-sm font-bold text-[#2563EB]">Back to {audience === "manager" ? "Manager's Desk" : "Intern Portal"}</Link>
           </form>
         </section>
       ) : null}
@@ -185,7 +185,7 @@ export default function DeskSettings({
               <legend className="text-lg font-black text-[#0F2744]">Preferences</legend>
               <label className="text-xs font-bold text-slate-500">Default landing page
                 <select name="landing" defaultValue={prefs.landing || home} className="mt-1 min-h-10 w-full rounded-xl border px-3 text-sm">
-                  <option value={home}>{audience === "manager" ? "Manager Desk" : "Intern Portal"}</option>
+                  <option value={home}>{audience === "manager" ? "Manager's Desk" : "Intern Portal"}</option>
                   <option value={audience === "manager" ? "/manager/my-time" : "/intern/work"}>Work</option>
                   <option value={audience === "manager" ? "/manager/messages" : "/intern/messages"}>Messages</option>
                 </select>

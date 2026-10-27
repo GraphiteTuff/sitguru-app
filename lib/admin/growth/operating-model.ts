@@ -169,7 +169,7 @@ export const GROWTH_RESPONSIBILITY_MAP = [
     owns: ["Hours", "University requirements", "Milestones", "Weekly check-ins", "Final project"],
   },
   {
-    system: "Ava Manager Desk",
+    system: "Ava Manager's Desk",
     purpose: "Formal oversight of assigned interns",
     owns: ["Intern assignment review", "Hours approval", "Academic evidence"],
   },

@@ -41,7 +41,7 @@ export const SITGURU_GROWTH_TEAMS_CHANNELS: readonly SitguruGrowthTeamsChannel[]
   {
     id: "general",
     label: "General",
-    process: "Team-wide coordination. Formal outcomes stay in SitGuru Growth / Manager Desk.",
+    process: "Team-wide coordination. Formal outcomes stay in SitGuru Growth / Manager's Desk.",
     sitguruPaths: ["/manager", "/manager/campaigns"],
     envKey: "NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_GENERAL_URL",
   },

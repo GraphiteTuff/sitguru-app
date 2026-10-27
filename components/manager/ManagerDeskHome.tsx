@@ -139,7 +139,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
     <div className="space-y-4 pb-28 lg:pb-8">
       <DeskPageHero
         icon={<PawPrint size={22} />}
-        title="Manager Desk"
+        title="Manager's Desk"
         subtitle="Support, review, and grow your interns."
         quote={"Support.\nDevelop.\nCreate Opportunities.\nBigger Impact.®"}
       />

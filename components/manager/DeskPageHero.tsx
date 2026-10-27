@@ -13,6 +13,7 @@ export default function DeskPageHero({
   subtitle: string;
   quote: string;
 }) {
+  void quote;
   return (
     <section className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(260px,0.95fr)]">
       <div className="flex min-w-0 items-start gap-3">

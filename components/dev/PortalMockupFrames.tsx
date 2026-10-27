@@ -47,7 +47,7 @@ function MockSidebar({
       ? [
           ["Home", Home, false],
           ["Growth Home", Sparkles, active === "growth"],
-          ["Manager Desk", LayoutDashboard, active === "desk"],
+          ["Manager's Desk", LayoutDashboard, active === "desk"],
           ["My Time", Clock3, false],
           ["My Payments", CreditCard, false],
           ["My Team", Users, false],
@@ -463,7 +463,7 @@ export function MockupLinks() {
   return (
     <div className="mt-3 flex flex-wrap gap-2 text-sm font-black">
       <a href="?view=manager" className="rounded-full bg-[#0D5C3A] px-3 py-2 !text-white">
-        Manager Desk
+        Manager's Desk
       </a>
       <a href="?view=intern" className="rounded-full bg-[#0D5C3A] px-3 py-2 !text-white">
         Intern Portal
