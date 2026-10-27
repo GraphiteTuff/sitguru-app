@@ -86,8 +86,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
               Welcome back, {desk.firstName}.
             </h1>
             <p className="mt-2 max-w-xl text-sm font-medium leading-6 text-slate-600">
-              Here&apos;s what&apos;s happening with your interns, growth initiatives, and
-              community work.
+              Support, review, and grow your interns.
             </p>
           </div>
           <div className="relative min-h-[140px] overflow-hidden rounded-2xl sm:min-h-[160px]">

@@ -40,11 +40,14 @@ function MockSidebar({
     kind === "manager"
       ? [
           ["Home", Home, false],
-          ["Growth Workspace", Sparkles, active === "growth"],
+          ["Growth Home", Sparkles, active === "growth"],
           ["Manager Desk", LayoutDashboard, active === "desk"],
           ["My Time", Clock3, false],
           ["My Payments", CreditCard, false],
           ["My Team", Users, false],
+          ["Assignments", ClipboardList, false],
+          ["Check-Ins", ClipboardCheck, false],
+          ["Milestones", BookOpen, false],
           ["Messaging", MessageCircle, false],
           ["Reports", Megaphone, false],
           ["Help", CircleHelp, false],
