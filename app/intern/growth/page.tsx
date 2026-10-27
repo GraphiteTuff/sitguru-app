@@ -78,7 +78,7 @@ export default async function InternGrowthHomePage() {
 
   const weeklyDone = Boolean(
     (workspace.weeklyReviews || []).some((row) => {
-      const status = String(row.status || "").toLowerCase();
+      const status = String(row.reviewStatus || "").toLowerCase();
       return status.includes("submit") || status.includes("approv") || status === "complete";
     }),
   );

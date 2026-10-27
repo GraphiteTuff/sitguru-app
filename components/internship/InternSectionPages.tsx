@@ -285,13 +285,16 @@ export function InternCheckInsPageView({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Recent Check-Ins</h2>
           <ul className="mt-4 space-y-2">
-            {(reviews.length ? reviews : [{ id: "1", weekOf: "2026-10-13", status: "approved" }])
+            {(reviews.length
+              ? reviews
+              : [{ id: "1", weekOf: "2026-10-13", reviewStatus: "approved" } as (typeof reviews)[number]]
+            )
               .slice(0, 4)
               .map((row) => (
                 <li key={row.id} className="rounded-2xl bg-[#F8FAFC] px-3 py-3 text-sm font-medium text-slate-700">
                   Week of {row.weekOf}
                   <span className="ml-2 rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#166534]">
-                    {String(row.status || "submitted")}
+                    {String(row.reviewStatus || "submitted")}
                   </span>
                 </li>
               ))}

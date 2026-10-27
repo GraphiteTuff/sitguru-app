@@ -546,7 +546,7 @@ export default function InternPortalHome({
                 className="rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3 py-3 text-sm font-medium text-slate-700"
               >
                 Weekly check-in · {row.weekOf?.slice(0, 10) || "this week"}
-                <span className="mt-1 block text-xs text-slate-500">{row.status}</span>
+                <span className="mt-1 block text-xs text-slate-500">{row.reviewStatus || "submitted"}</span>
               </li>
             ))}
             {assignments.slice(0, 2).map((task) => (
