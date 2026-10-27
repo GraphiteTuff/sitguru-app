@@ -6,36 +6,39 @@ export const MANAGER_PORTAL_BRAND = {
   deskTitle: "Manager Desk",
   homePath: "/manager",
   deskPath: "/intern/manage",
-  growthPath: "/manager/campaigns",
+  growthPath: "/manager/growth",
+  campaignsPath: "/manager/campaigns",
   adminGrowthPath: "/admin/growth",
   helpPath: "/admin/help/manager",
   tagline: "People grow. Pets bring us together.",
   heroLine: "Same people. Happier pets. Bigger impact.",
 } as const;
 
-/** Desktop sidebar — matches Ava Manager Desk mockup. */
+/** Desktop sidebar — Manager Desk + Growth Workspace mockups. */
 export const MANAGER_PORTAL_SIDEBAR = [
   { href: "/manager", label: "Home", match: "none" as const },
+  { href: "/manager/growth", label: "Growth Workspace", match: "growth" as const },
   { href: "/manager", label: "Manager Desk", match: "exact" as const },
-  { href: "/intern/manage", label: "Interns", match: "prefix" as const },
-  { href: "/manager/campaigns", label: "Growth", match: "growth" as const },
-  { href: "/manager/messages", label: "Messaging", match: "prefix" as const },
   { href: "/manager/my-time", label: "My Time", match: "prefix" as const },
-  { href: "/manager/payments", label: "Payments", match: "prefix" as const },
+  { href: "/manager/payments", label: "My Payments", match: "prefix" as const },
+  { href: "/intern/manage", label: "My Team", match: "prefix" as const },
+  { href: "/manager/messages", label: "Messaging", match: "prefix" as const },
+  { href: "/manager/analytics", label: "Reports", match: "prefix" as const },
   { href: "/admin/help/manager", label: "Help", match: "prefix" as const },
 ] as const;
 
 /** Compact top/mobile nav. */
 export const MANAGER_PORTAL_NAV = [
   { href: "/manager", label: "Desk" },
+  { href: "/manager/growth", label: "Growth" },
   { href: "/manager/messages", label: "Messages" },
-  { href: "/intern/manage", label: "Interns" },
+  { href: "/intern/manage", label: "Team" },
   { href: "/manager/my-time", label: "My Time" },
-  { href: "/manager/payments", label: "Payments" },
-  { href: "/manager/campaigns", label: "Growth" },
+  { href: "/manager/payments", label: "Pay" },
 ] as const;
 
 export const MANAGER_GROWTH_PREFIXES = [
+  "/manager/growth",
   "/manager/campaigns",
   "/manager/events",
   "/manager/analytics",

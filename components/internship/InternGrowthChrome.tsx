@@ -41,6 +41,10 @@ export default function InternGrowthChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() || INTERNSHIP_GROWTH_PATH;
+  /** Overview uses Intern Portal shell + Growth Workspace home (mockup). */
+  if (pathname === INTERNSHIP_GROWTH_PATH) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-4 sm:px-5">

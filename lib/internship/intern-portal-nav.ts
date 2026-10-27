@@ -12,11 +12,27 @@ export const INTERN_PORTAL_BRAND = {
 
 export const INTERN_PORTAL_SIDEBAR = [
   { id: "home", href: "/intern", label: "Home", match: "exact" as const },
-  { id: "work", href: "/intern?tab=work", label: "My Work", match: "work" as const },
-  { id: "hours", href: "/intern/time", label: "Hours", match: "hours" as const },
-  { id: "checkins", href: "/intern?tab=work&focus=checkin", label: "Check-Ins", match: "checkin" as const },
-  { id: "messages", href: "/intern?tab=home&focus=messages", label: "Messages", match: "messages" as const },
-  { id: "milestones", href: "/intern?tab=project", label: "Milestones", match: "project" as const },
+  {
+    id: "growth",
+    href: INTERNSHIP_GROWTH_PATH,
+    label: "Growth Workspace",
+    match: "growth" as const,
+  },
+  { id: "work", href: "/intern?tab=work", label: "My Assignments", match: "work" as const },
+  { id: "hours", href: "/intern/time", label: "My Hours", match: "hours" as const },
+  {
+    id: "checkins",
+    href: "/intern?tab=work&focus=checkin",
+    label: "My Check-ins",
+    match: "checkin" as const,
+  },
+  { id: "milestones", href: "/intern?tab=project", label: "My Progress", match: "project" as const },
+  {
+    id: "messages",
+    href: "/intern?tab=home&focus=messages",
+    label: "Messages",
+    match: "messages" as const,
+  },
   { id: "help", href: INTERNSHIP_HELP_PATH, label: "Help", match: "help" as const },
 ] as const;
 
@@ -30,8 +46,8 @@ export const INTERN_PORTAL_MOBILE_PRIMARY = [
 ] as const;
 
 export const INTERN_PORTAL_MOBILE_MORE = [
-  { href: "/intern?tab=project", label: "Milestones" },
-  { href: INTERNSHIP_GROWTH_PATH, label: "Growth Workplace" },
+  { href: INTERNSHIP_GROWTH_PATH, label: "Growth Workspace" },
+  { href: "/intern?tab=project", label: "My Progress" },
   { href: INTERNSHIP_HELP_PATH, label: "Help" },
   { href: "/intern?edit=page", label: "Your page" },
 ] as const;
@@ -54,6 +70,9 @@ export function internPortalNavActive(
 
   if (item.match === "exact") {
     return (pathname === "/intern" || pathname === "/intern/") && !tab;
+  }
+  if (item.match === "growth") {
+    return pathname === INTERNSHIP_GROWTH_PATH || pathname.startsWith(`${INTERNSHIP_GROWTH_PATH}/`);
   }
   if (item.match === "hours") {
     return pathname === "/intern/time" || pathname.startsWith("/intern/time/");
