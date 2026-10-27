@@ -22,7 +22,12 @@ export default async function ManagerMilestonesPage() {
     intern: card.name,
     category: card.phase || "Growth",
     due: card.nextDeadline || "Soon",
-    status: card.paceTone === "at_risk" || card.paceTone === "behind" ? "Overdue" : "In Progress",
+    status:
+      card.paceTone === "behind"
+        ? "Overdue"
+        : card.paceTone === "done"
+          ? "Complete"
+          : "In Progress",
     progress: Math.min(100, Math.round(card.summary.progressPercent || 40)),
   }));
 
