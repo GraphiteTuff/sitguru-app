@@ -1,4 +1,4 @@
-/** Intern Portal chrome — matches student desk mockup across desktop + mobile. */
+/** Intern Portal chrome — light sidebar + SitGuru green active; mockups drive page content. */
 
 import { INTERNSHIP_HELP_PATH, INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 
@@ -7,31 +7,80 @@ export const INTERN_PORTAL_BRAND = {
   tagline: "Happy Pets. Stronger Communities.",
   sidebarFooter: "Good work today makes a brighter tomorrow for pets.",
   heroLine: "Same people. Happier pets. Bigger impact.",
+  impactLine: "Learn. Create. Make an impact. Happier pets. Brighter communities.",
   quickActionsLine: "Small steps create big change!",
 } as const;
 
 export const INTERN_PORTAL_SIDEBAR = [
   { id: "home", href: "/intern", label: "Home", match: "exact" as const },
+  { id: "portal", href: "/intern", label: "Intern Portal", match: "none" as const },
+  { id: "work", href: "/intern/work", label: "My Work", match: "prefix" as const },
   {
-    id: "growth",
-    href: INTERNSHIP_GROWTH_PATH,
-    label: "Growth Workspace",
-    match: "growth" as const,
+    id: "assignments",
+    href: "/intern/assignments",
+    label: "My Assignments",
+    match: "prefix" as const,
   },
-  { id: "work", href: "/intern?tab=work", label: "My Assignments", match: "work" as const },
+  {
+    id: "milestones",
+    href: "/intern/milestones",
+    label: "My Milestones",
+    match: "prefix" as const,
+  },
   { id: "hours", href: "/intern/time", label: "My Hours", match: "hours" as const },
   {
     id: "checkins",
-    href: "/intern?tab=work&focus=checkin",
-    label: "My Check-ins",
-    match: "checkin" as const,
+    href: "/intern/check-ins",
+    label: "My Check-Ins",
+    match: "prefix" as const,
   },
-  { id: "milestones", href: "/intern?tab=project", label: "My Progress", match: "project" as const },
   {
     id: "messages",
-    href: "/intern?tab=home&focus=messages",
+    href: "/intern/messages",
     label: "Messages",
-    match: "messages" as const,
+    match: "prefix" as const,
+  },
+  {
+    id: "results",
+    href: "/intern/results",
+    label: "Live Results",
+    match: "prefix" as const,
+  },
+  {
+    id: "calendar",
+    href: "/intern/calendar",
+    label: "Calendar",
+    match: "prefix" as const,
+  },
+  {
+    id: "metrics",
+    href: "/intern/metrics",
+    label: "Metrics",
+    match: "prefix" as const,
+  },
+  {
+    id: "growth",
+    href: INTERNSHIP_GROWTH_PATH,
+    label: "Business Growth Report",
+    match: "growth" as const,
+  },
+  {
+    id: "toolkit",
+    href: "/intern/toolkit",
+    label: "Intern Toolkit",
+    match: "prefix" as const,
+  },
+  {
+    id: "training",
+    href: "/intern/training",
+    label: "Training",
+    match: "prefix" as const,
+  },
+  {
+    id: "resources",
+    href: "/intern/resources",
+    label: "Resources",
+    match: "prefix" as const,
   },
   { id: "help", href: INTERNSHIP_HELP_PATH, label: "Help", match: "help" as const },
 ] as const;
@@ -39,15 +88,19 @@ export const INTERN_PORTAL_SIDEBAR = [
 /** Primary mobile bottom bar — 5 slots max for thumb reach. */
 export const INTERN_PORTAL_MOBILE_PRIMARY = [
   { id: "home", href: "/intern", label: "Home" },
-  { id: "work", href: "/intern?tab=work", label: "Work" },
+  { id: "work", href: "/intern/work", label: "Work" },
   { id: "hours", href: "/intern/time", label: "Hours" },
-  { id: "checkins", href: "/intern?tab=work&focus=checkin", label: "Check-In" },
+  { id: "checkins", href: "/intern/check-ins", label: "Check-In" },
   { id: "more", href: "#more", label: "More" },
 ] as const;
 
 export const INTERN_PORTAL_MOBILE_MORE = [
-  { href: INTERNSHIP_GROWTH_PATH, label: "Growth Workspace" },
-  { href: "/intern?tab=project", label: "My Progress" },
+  { href: "/intern/assignments", label: "My Assignments" },
+  { href: "/intern/milestones", label: "My Milestones" },
+  { href: "/intern/messages", label: "Messages" },
+  { href: "/intern/results", label: "Live Results" },
+  { href: INTERNSHIP_GROWTH_PATH, label: "Growth Report" },
+  { href: "/intern/toolkit", label: "Toolkit" },
   { href: INTERNSHIP_HELP_PATH, label: "Help" },
   { href: "/intern?edit=page", label: "Your page" },
 ] as const;
@@ -55,6 +108,7 @@ export const INTERN_PORTAL_MOBILE_MORE = [
 export function isInternPortalChromePath(pathname: string) {
   if (pathname === "/intern/login" || pathname.startsWith("/intern/login/")) return false;
   if (pathname === "/intern/onboarding" || pathname.startsWith("/intern/onboarding/")) return false;
+  if (pathname === "/intern/manage" || pathname.startsWith("/intern/manage/")) return false;
   if (pathname.endsWith("/print")) return false;
   return pathname === "/intern" || pathname.startsWith("/intern/");
 }
@@ -66,8 +120,8 @@ export function internPortalNavActive(
 ) {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const tab = params.get("tab") || "";
-  const focus = params.get("focus") || "";
 
+  if (item.match === "none") return false;
   if (item.match === "exact") {
     return (pathname === "/intern" || pathname === "/intern/") && !tab;
   }
@@ -80,17 +134,8 @@ export function internPortalNavActive(
   if (item.match === "help") {
     return pathname === INTERNSHIP_HELP_PATH || pathname.startsWith(`${INTERNSHIP_HELP_PATH}/`);
   }
-  if (item.match === "work") {
-    return (pathname === "/intern" || pathname === "/intern/") && tab === "work" && focus !== "checkin";
-  }
-  if (item.match === "checkin") {
-    return (pathname === "/intern" || pathname === "/intern/") && focus === "checkin";
-  }
-  if (item.match === "messages") {
-    return focus === "messages";
-  }
-  if (item.match === "project") {
-    return (pathname === "/intern" || pathname === "/intern/") && tab === "project";
+  if (item.match === "prefix") {
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
   return false;
 }

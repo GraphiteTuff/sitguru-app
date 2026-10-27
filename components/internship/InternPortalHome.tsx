@@ -120,7 +120,7 @@ export default function InternPortalHome({
             <div className="absolute inset-0 bg-gradient-to-r from-[#0F2744]/50 via-[#0F2744]/15 to-transparent" />
             <div className="relative flex h-full min-h-[140px] flex-col justify-end p-4 sm:min-h-[160px]">
               <p className="max-w-sm text-lg font-black leading-snug !text-white sm:text-xl">
-                {INTERN_PORTAL_BRAND.heroLine}
+                {INTERN_PORTAL_BRAND.impactLine}
               </p>
             </div>
           </div>

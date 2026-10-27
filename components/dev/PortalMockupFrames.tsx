@@ -54,12 +54,15 @@ function MockSidebar({
         ]
       : [
           ["Home", LayoutDashboard, active === "desk"],
-          ["Growth Workspace", Sparkles, active === "growth"],
+          ["Intern Portal", LayoutDashboard, false],
+          ["My Work", ClipboardList, false],
           ["My Assignments", ClipboardList, false],
+          ["My Milestones", BookOpen, false],
           ["My Hours", Clock3, false],
-          ["My Check-ins", ClipboardCheck, false],
-          ["My Progress", BookOpen, false],
+          ["My Check-Ins", ClipboardCheck, false],
           ["Messages", MessageCircle, false],
+          ["Live Results", Megaphone, false],
+          ["Business Growth Report", Sparkles, active === "growth"],
           ["Help", CircleHelp, false],
         ];
 
