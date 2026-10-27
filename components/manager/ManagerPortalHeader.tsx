@@ -50,8 +50,8 @@ export default function ManagerPortalHeader() {
                 href={item.href}
                 className={
                   active
-                    ? "whitespace-nowrap rounded-full bg-[#166534] px-3 py-2 text-xs font-black !text-white"
-                    : "whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-950"
+                    ? "whitespace-nowrap rounded-full bg-[#2563EB] px-3 py-2 text-xs font-black !text-white"
+                    : "whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-[#0F2744]"
                 }
               >
                 {item.label}

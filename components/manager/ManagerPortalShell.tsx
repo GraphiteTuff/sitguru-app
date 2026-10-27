@@ -19,14 +19,14 @@ import {
   LineChart,
   MessageCircle,
   PawPrint,
-  Search,
   Settings,
   Sparkles,
   Users,
   Wrench,
 } from "lucide-react";
-import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import { PortalDeskProfileLive } from "@/components/portal/PortalDeskProfile";
+import DeskSearch from "@/components/portal/DeskSearch";
+import WebappBottomNav from "@/components/portal/WebappBottomNav";
 import {
   isManagerGrowthHomePath,
   MANAGER_PORTAL_BRAND,
@@ -51,6 +51,7 @@ const ICONS = {
   Calendar: CalendarDays,
   Metrics: BarChart3,
   Reports: BarChart3,
+  "Business Growth Report": BarChart3,
   "Manager Toolkit": Wrench,
   Training: GraduationCap,
   Resources: FolderOpen,
@@ -148,7 +149,7 @@ export default function ManagerPortalShell({
                 />
               </div>
               <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
-                <PawPrint size={14} className="mt-0.5 shrink-0 text-[#0D5C3A]" />
+                <PawPrint size={14} className="mt-0.5 shrink-0 text-[#2563EB]" />
                 {MANAGER_PORTAL_BRAND.tagline}
               </p>
             </div>
@@ -157,9 +158,9 @@ export default function ManagerPortalShell({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
-            <div className="flex min-h-16 items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 xl:hidden">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+            <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
+              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 shrink-0 xl:hidden">
+                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#2563EB]">
                   {MANAGER_PORTAL_BRAND.kicker}
                 </p>
                 <p className="truncate text-sm font-black text-[#0F2744]">
@@ -167,17 +168,10 @@ export default function ManagerPortalShell({
                 </p>
               </Link>
 
-              <label className="relative mx-auto hidden min-w-0 max-w-xl flex-1 md:block">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  type="search"
-                  placeholder="Search interns, assignments, check-ins, messages, or help..."
-                  className={DESK_UI.search}
-                />
-              </label>
+              <DeskSearch
+                audience="manager"
+                placeholder="Search interns, assignments, check-ins, messages, or help..."
+              />
 
               <PortalDeskProfileLive
                 title={MANAGER_PORTAL_BRAND.kicker}
@@ -187,11 +181,23 @@ export default function ManagerPortalShell({
             </div>
           </header>
 
-          <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">{children}</main>
-          <GrowthPhoneBar
-            pathname={pathname}
-            basePath={GROWTH_MANAGER_BASE}
-            hideFrom="xl"
+          <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
+          <WebappBottomNav
+            label="Manager navigation"
+            items={[
+              { label: "Desk", href: "/manager", icon: LayoutDashboard, match: (path) => path === "/manager" || path === "/manager/" },
+              { label: "Team", href: "/manager/team", icon: Users, match: (path) => path.startsWith("/manager/team") },
+              { label: "Check-Ins", href: "/manager/check-ins", icon: CalendarCheck2, match: (path) => path.startsWith("/manager/check-ins") },
+              { label: "Messages", href: "/manager/messages", icon: MessageCircle, match: (path) => path.startsWith("/manager/messages") },
+            ]}
+            more={MANAGER_PORTAL_SIDEBAR.filter(
+              (item) =>
+                !["/manager", "/manager/team", "/manager/check-ins", "/manager/messages"].includes(item.href) ||
+                item.label === "Growth Home",
+            )
+              .filter((item) => item.label !== "Home")
+              .concat([{ href: MANAGER_PORTAL_BRAND.settingsPath, label: "Settings", match: "prefix" }])
+              .map((item) => ({ label: item.label, href: item.href }))}
           />
         </div>
       </div>

@@ -8,30 +8,38 @@ export function GrowthPageFrame({
   detail,
   children,
   action,
+  variant = "green",
 }: {
   kicker?: string;
   title: string;
   detail?: string;
   children: ReactNode;
   action?: ReactNode;
+  /** Desk portals (Ava + interns) use the pastel mockup header instead of SitGuru green. */
+  variant?: "green" | "desk";
 }) {
+  const desk = variant === "desk";
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-4 overflow-x-hidden pb-6 sm:space-y-5 sm:pb-4">
       <section
-        className="public-dark-section overflow-hidden rounded-[1.5rem] border border-emerald-100 p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
-        data-brand-green
-        style={{ background: "#0D5C3A" }}
+        className={
+          desk
+            ? "overflow-hidden rounded-[1.5rem] border border-sky-100 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F5F3FF] p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
+            : "public-dark-section overflow-hidden rounded-[1.5rem] border border-emerald-100 p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
+        }
+        data-brand-green={desk ? undefined : true}
+        style={desk ? undefined : { background: "#0D5C3A" }}
       >
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] !text-white sm:text-xs">
+        <p className={`text-[10px] font-black uppercase tracking-[0.24em] sm:text-xs ${desk ? "text-[#2563EB]" : "!text-white"}`}>
           {kicker}
         </p>
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <h1 className="break-words text-2xl font-black leading-tight tracking-tight !text-white sm:text-3xl md:text-4xl">
+            <h1 className={`break-words text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl ${desk ? "text-[#0F2744]" : "!text-white"}`}>
               {title}
             </h1>
             {detail ? (
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 !text-white/90">
+              <p className={`mt-3 max-w-2xl text-sm font-semibold leading-6 ${desk ? "text-slate-600" : "!text-white/90"}`}>
                 {detail}
               </p>
             ) : null}

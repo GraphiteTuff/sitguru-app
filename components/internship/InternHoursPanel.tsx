@@ -48,7 +48,7 @@ export default function InternHoursPanel({
             aria-label="Approved internship hours"
           >
             <div
-              className="h-full rounded-full bg-[#166534]"
+              className="h-full rounded-full bg-[#2563EB]"
               style={{ width: `${summary.progressPercent || 0}%` }}
             />
           </div>
@@ -152,7 +152,7 @@ export default function InternHoursPanel({
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">Evidence link</span>
             <input name="evidenceUrl" placeholder="https://" className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
           </label>
-          <button name="submit" value="yes" className="min-h-12 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">
+          <button name="submit" value="yes" className="min-h-12 rounded-2xl bg-[#2563EB] px-4 text-sm font-black !text-white">
             Submit hours to Ava
           </button>
           <button name="submit" value="no" className="min-h-12 rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">

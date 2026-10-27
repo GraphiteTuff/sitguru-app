@@ -323,7 +323,7 @@ export default function ManagerInternDashboard({
             onClick={() => setTab(item.id)}
             className={
               tab === item.id
-                ? `min-h-11 rounded-full bg-[#166534] px-4 text-sm font-black !text-white ${internPressClass}`
+                ? `min-h-11 rounded-full bg-[#2563EB] px-4 text-sm font-black !text-white ${internPressClass}`
                 : `min-h-11 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-black text-amber-950 ${internPressClass}`
             }
           >
@@ -646,24 +646,6 @@ export default function ManagerInternDashboard({
         </div>
       ) : null}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-200/80 bg-[#FAF6EE]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-5 gap-1">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={`min-h-12 rounded-2xl text-[11px] font-black ${
-                tab === item.id
-                  ? "bg-[#166534] !text-white"
-                  : "text-slate-600"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }

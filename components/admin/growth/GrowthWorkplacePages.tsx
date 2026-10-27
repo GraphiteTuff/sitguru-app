@@ -69,6 +69,7 @@ export async function GrowthCreateScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Tracking link"
       detail="Create a measurable destination for a campaign or promotion. Write captions and run production in Canva / CapCut / Meta / TikTok via Planner. Routine posts do not require Founder approval — escalate only paid ads, major spend, sensitive messaging, or CEO-level decisions."
@@ -114,6 +115,7 @@ export async function GrowthContentScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Content inventory"
       detail="SitGuru stores captions and tracking destinations for measurement. Production workflow (Ideas → In Progress → Ava Review → Jason Approval when required → Scheduled → Results & Learning) lives in Microsoft Planner — not a second task board here."
@@ -184,6 +186,7 @@ export async function GrowthCampaignsScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Campaign outcomes"
       detail="Track destinations, status, and acquisition impact. Creative production, checklists, and review stages stay in Planner. Don’t count a result SitGuru can’t verify."
@@ -239,6 +242,7 @@ export async function GrowthCampaignDetailScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title={campaign.name}
       detail="Copy this link into Instagram, Facebook, TikTok, or a Facebook group. SitGuru records the click."
@@ -333,6 +337,7 @@ export async function GrowthPromoteScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title={copy.title}
       detail={copy.detail}
@@ -425,6 +430,7 @@ export async function GrowthIntelligenceScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Growth Intelligence"
       detail="Surveys, polls, and market tests: capture findings and recommendations. Drafting and distribution stay in Teams + Planner. Discuss results in the Analytics and Results channel."
@@ -499,6 +505,7 @@ export async function GrowthMediaScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Media"
       detail="Drop Canva or CapCut links here. SitGuru does not publish to Instagram — you still post in Meta and TikTok."
@@ -612,6 +619,7 @@ export async function GrowthAnalyticsScreen({
 
   return (
     <GrowthPageFrame
+      variant={workplace.kind === "admin" ? "green" : "desk"}
       kicker={workplace.kind === "intern" ? "Intern portal · Growth workplace" : undefined}
       title="Analytics / Results"
       detail={

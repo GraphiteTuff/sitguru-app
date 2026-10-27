@@ -1,10 +1,10 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
-import { InternSimpleToolsPage } from "@/components/internship/InternSectionPages";
+import TrainingBoard from "@/components/portal/TrainingBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function InternTrainingPage() {
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
-  return <InternSimpleToolsPage kind="training" />;
+  return <TrainingBoard audience="intern" />;
 }

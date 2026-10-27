@@ -94,7 +94,7 @@ export default function InternWorkHome({
           </div>
           <Link
             href="/intern/assignments"
-            className="inline-flex min-h-10 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
+            className="inline-flex min-h-10 items-center rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white"
           >
             View Assignments
           </Link>

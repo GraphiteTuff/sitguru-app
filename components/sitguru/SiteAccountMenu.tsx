@@ -18,6 +18,7 @@ import {
   normalizePetParentAvatarUrl,
   resolvePetParentAvatarUrl,
 } from "@/lib/pet-parent-avatar";
+import { deskRoleLines } from "@/lib/portal/desk-ui";
 
 type LoadedAccount = {
   name: string;
@@ -195,21 +196,33 @@ export function SiteAccountMenu({
   }
 
   function Avatar({ sizeClass }: { sizeClass: string }) {
+    const desk = variant === "desk";
     return (
       <span
-        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
+        className={
+          desk
+            ? `relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-sm font-semibold text-[#0F2744] shadow-sm ring-1 ring-slate-200`
+            : `flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`
+        }
       >
+        {desk ? <span className="absolute inset-0 bg-white" /> : null}
         {loadedAccount.avatarUrl ? (
           <Image
             src={loadedAccount.avatarUrl}
             alt={`${loadedAccount.name} profile photo`}
             width={64}
             height={64}
-            className="sg-face-photo h-full w-full"
+            className={
+              desk
+                ? "relative z-[1] h-full w-full object-cover object-center"
+                : "sg-face-photo h-full w-full"
+            }
             unoptimized
           />
         ) : (
-          initials || <UserRound className="h-5 w-5" />
+          <span className={desk ? "relative z-[1]" : ""}>
+            {initials || <UserRound className="h-5 w-5" />}
+          </span>
         )}
       </span>
     );
@@ -230,22 +243,26 @@ export function SiteAccountMenu({
         onClick={() => setOpen((current) => !current)}
         className={
           variant === "desk"
-            ? "flex items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/20"
+            ? "flex shrink-0 items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/20"
             : "flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         }
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open account menu"
       >
-        <Avatar sizeClass={compact && variant !== "desk" ? "h-9 w-9" : "h-11 w-11"} />
+        <Avatar sizeClass={compact && variant !== "desk" ? "h-9 w-9" : variant === "desk" ? "h-12 w-12" : "h-11 w-11"} />
         {variant === "desk" ? (
           <>
-            <span className="hidden min-w-0 text-left sm:block">
-              <span className="block max-w-[10rem] truncate text-sm font-bold leading-tight text-[#0F2744] lg:max-w-[12rem]">
+            <span className="hidden shrink-0 text-left sm:block">
+              <span className="block whitespace-nowrap text-sm font-bold leading-tight text-[#0F2744]">
                 {loadedAccount.name}
               </span>
-              <span className="mt-0.5 block max-w-[11rem] truncate text-[11px] font-medium leading-snug text-slate-500 lg:max-w-[14rem]">
-                {deskRoleTitle}
+              <span className="mt-0.5 block text-[11px] font-medium leading-[1.15] text-slate-500">
+                {deskRoleLines(deskRoleTitle).map((line) => (
+                  <span key={line} className="block whitespace-nowrap">
+                    {line}
+                  </span>
+                ))}
               </span>
             </span>
             {open ? (

@@ -1,8 +1,7 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { internshipActorKind } from "@/lib/internship/manager-access";
-import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
-import StaffChat from "@/components/messaging/StaffChat";
+import ManagerMessagesHome from "@/components/manager/ManagerMessagesHome";
 import { loadStaffInbox } from "@/lib/messaging/staff-data";
 
 export const dynamic = "force-dynamic";
@@ -23,22 +22,12 @@ export default async function ManagerMessagesPage({
   const inbox = await loadStaffInbox(access.actor.id, seeAll);
 
   return (
-    <GrowthPageFrame
-      kicker="Messages"
-      title={`Hi, ${inbox.me.firstName}.`}
-      detail="Team notes use first names and avatars, and every message is kept in Admin. Attach a photo, PDF, or text file when the work needs it."
-    >
-      {notice || error ? (
-        <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}>
-          {error || notice}
-        </p>
-      ) : null}
-      <StaffChat
-        me={inbox.me}
-        conversations={inbox.conversations}
-        showAdminRecord={access.actor.isSuperUser}
-        returnTo="/manager/messages"
-      />
-    </GrowthPageFrame>
+    <ManagerMessagesHome
+      me={inbox.me}
+      conversations={inbox.conversations}
+      showAdminRecord={access.actor.isSuperUser}
+      returnTo="/manager/messages"
+      notice={error || notice || null}
+    />
   );
 }

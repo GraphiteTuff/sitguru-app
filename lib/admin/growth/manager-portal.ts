@@ -48,7 +48,7 @@ export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.results, label: "Live Results", match: "prefix" as const },
   { href: MANAGER_ROUTES.calendar, label: "Calendar", match: "prefix" as const },
   { href: MANAGER_ROUTES.metrics, label: "Metrics", match: "prefix" as const },
-  { href: MANAGER_ROUTES.reports, label: "Reports", match: "prefix" as const },
+  { href: MANAGER_ROUTES.reports, label: "Business Growth Report", match: "prefix" as const },
   { href: MANAGER_ROUTES.toolkit, label: "Manager Toolkit", match: "prefix" as const },
   { href: MANAGER_ROUTES.training, label: "Training", match: "prefix" as const },
   { href: MANAGER_ROUTES.resources, label: "Resources", match: "prefix" as const },

@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   back: { alignSelf: 'flex-start', marginBottom: 8 },
   backText: { color: BrandColors.greenDark, fontSize: 15, fontWeight: '800' },
   eyebrow: {
-    color: BrandColors.greenDark,
+    color: '#2563EB',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 16,
   },
-  cardSelected: { borderColor: BrandColors.greenDark },
+  cardSelected: { borderColor: '#2563EB' },
   cardTitle: { color: BrandColors.ink, fontSize: 17, fontWeight: '800' },
   caption: { color: BrandColors.slate, fontSize: 13, fontWeight: '600', marginTop: 4 },
   letterRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   notes: { minHeight: 96, paddingTop: 12, textAlignVertical: 'top' },
   primaryBtn: {
     alignItems: 'center',
-    backgroundColor: BrandColors.greenDark,
+    backgroundColor: '#2563EB',
     borderRadius: 18,
     justifyContent: 'center',
     minHeight: 56,

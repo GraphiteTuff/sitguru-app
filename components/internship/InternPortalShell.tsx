@@ -3,10 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
 import {
   BarChart3,
-  BookOpen,
   Briefcase,
   CalendarDays,
   CircleHelp,
@@ -21,12 +19,13 @@ import {
   LineChart,
   MessageCircle,
   PawPrint,
-  Search,
   Settings,
   Sparkles,
   Wrench,
 } from "lucide-react";
 import { PortalDeskProfileLive } from "@/components/portal/PortalDeskProfile";
+import DeskSearch from "@/components/portal/DeskSearch";
+import WebappBottomNav from "@/components/portal/WebappBottomNav";
 import {
   INTERN_PORTAL_BRAND,
   INTERN_PORTAL_MOBILE_MORE,
@@ -71,7 +70,6 @@ export default function InternPortalShell({
   const pathname = usePathname() || "/intern";
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ? `?${searchParams.toString()}` : "";
-  const [moreOpen, setMoreOpen] = useState(false);
 
   if (!isInternPortalChromePath(pathname)) {
     return <>{children}</>;
@@ -155,7 +153,7 @@ export default function InternPortalShell({
                   />
                 </div>
                 <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
-                  <PawPrint size={14} className="mt-0.5 shrink-0 text-[#0D5C3A]" />
+                  <PawPrint size={14} className="mt-0.5 shrink-0 text-[#2563EB]" />
                   {INTERN_PORTAL_BRAND.sidebarFooter}
                 </p>
               </div>
@@ -166,9 +164,9 @@ export default function InternPortalShell({
         <div className="flex min-w-0 flex-1 flex-col">
           {showFullChrome ? (
             <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
-              <div className="flex min-h-16 items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-                <Link href="/intern" className="min-w-0 xl:hidden">
-                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+              <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
+                <Link href="/intern" className="min-w-0 shrink-0 xl:hidden">
+                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#2563EB]">
                     SitGuru Internship
                   </p>
                   <p className="truncate text-sm font-black text-[#0F2744]">
@@ -176,17 +174,10 @@ export default function InternPortalShell({
                   </p>
                 </Link>
 
-                <label className="relative mx-auto hidden min-w-0 max-w-xl flex-1 md:block">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="search"
-                    placeholder="Search assignments, resources, or help..."
-                    className={DESK_UI.search}
-                  />
-                </label>
+                <DeskSearch
+                  audience="intern"
+                  placeholder="Search assignments, resources, or help..."
+                />
 
                 <PortalDeskProfileLive
                   title={profileTitle}
@@ -197,59 +188,19 @@ export default function InternPortalShell({
             </header>
           ) : null}
 
-          <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">{children}</main>
+          <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
 
           {showFullChrome ? (
-            <div className="sticky bottom-0 z-40 border-t border-slate-200 bg-white px-2 py-2 xl:hidden">
-              <div className="grid grid-cols-5 gap-1">
-                {[
-                  ["Home", "/intern", Home],
-                  ["Work", "/intern/work", Briefcase],
-                  ["Hours", "/intern/time", Clock3],
-                  ["Check-In", "/intern/check-ins", ClipboardCheck],
-                  ["More", "#more", BookOpen],
-                ].map(([label, href, Icon], index) => {
-                  const IconCmp = Icon as typeof Home;
-                  const isMore = href === "#more";
-                  const active =
-                    !isMore &&
-                    (pathname === href ||
-                      (href !== "/intern" && pathname.startsWith(String(href))));
-                  return (
-                    <button
-                      key={String(label)}
-                      type="button"
-                      onClick={() => {
-                        if (isMore) setMoreOpen((open) => !open);
-                        else window.location.href = String(href);
-                      }}
-                      className={`flex min-h-12 flex-col items-center justify-center rounded-2xl text-[11px] font-bold ${
-                        active || (isMore && moreOpen)
-                          ? "bg-[#E7F5EE] text-[#0D5C3A]"
-                          : "text-slate-500"
-                      }`}
-                    >
-                      <IconCmp size={16} />
-                      {String(label)}
-                    </button>
-                  );
-                })}
-              </div>
-              {moreOpen ? (
-                <div className="mt-2 grid gap-1 rounded-2xl border border-slate-200 bg-white p-2">
-                  {INTERN_PORTAL_MOBILE_MORE.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="rounded-xl px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-slate-50"
-                      onClick={() => setMoreOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <WebappBottomNav
+              label="Intern navigation"
+              items={[
+                { label: "Home", href: "/intern", icon: Home, match: (path) => path === "/intern" || path === "/intern/" },
+                { label: "Work", href: "/intern/work", icon: Briefcase, match: (path) => path.startsWith("/intern/work") },
+                { label: "Hours", href: "/intern/time", icon: Clock3, match: (path) => path.startsWith("/intern/time") },
+                { label: "Check-In", href: "/intern/check-ins", icon: ClipboardCheck, match: (path) => path.startsWith("/intern/check-ins") },
+              ]}
+              more={INTERN_PORTAL_MOBILE_MORE.map((item) => ({ label: item.label, href: item.href }))}
+            />
           ) : null}
         </div>
       </div>

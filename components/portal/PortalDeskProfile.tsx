@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bell, ChevronDown } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
-import { deskInitials } from "@/lib/portal/desk-ui";
+import { deskInitials, deskRoleLines } from "@/lib/portal/desk-ui";
 
 /** Presentational chip used in mockup frames (no auth menu). */
 export function PortalDeskProfileStatic({
@@ -46,27 +46,31 @@ export function PortalDeskProfileStatic({
           ) : null}
         </span>
       )}
-      <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-      <div className="flex items-center gap-2.5">
-        <span className="relative inline-flex h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EEF2F6] ring-2 ring-white">
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span className="relative inline-flex h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-slate-200">
+          <span className="absolute inset-0 bg-white" />
           {avatarUrl ? (
             <Image
               src={avatarUrl}
               alt=""
-              width={44}
-              height={44}
-              className="sg-face-photo h-full w-full object-cover"
+              width={48}
+              height={48}
+              className="relative z-[1] h-full w-full object-cover object-center"
             />
           ) : (
-            <span className="m-auto text-sm font-black text-[#0F2744]">{initials}</span>
+            <span className="relative z-[1] m-auto text-sm font-black text-[#0F2744]">{initials}</span>
           )}
         </span>
-        <span className="hidden min-w-0 text-left sm:block">
-          <span className="block truncate text-sm font-bold leading-tight text-[#0F2744]">
+        <span className="hidden shrink-0 text-left sm:block">
+          <span className="block whitespace-nowrap text-sm font-bold leading-tight text-[#0F2744]">
             {name}
           </span>
-          <span className="mt-0.5 block max-w-[11rem] truncate text-[11px] font-medium leading-snug text-slate-500 lg:max-w-[14rem]">
-            {title}
+          <span className="mt-0.5 block text-[11px] font-medium leading-[1.15] text-slate-500">
+            {deskRoleLines(title).map((line) => (
+              <span key={line} className="block whitespace-nowrap">
+                {line}
+              </span>
+            ))}
           </span>
         </span>
         <ChevronDown size={16} className="hidden text-[#0F2744] sm:block" />

@@ -35,6 +35,10 @@ export type ManagerInternCard = {
   lastSubmission: string;
   statuses: string[];
   summary: HourSummary;
+  role?: string;
+  avatarUrl?: string;
+  currentAssignment?: string;
+  roster?: "active" | "completed" | "archived";
 };
 
 export type ManagerReviewItem = {
@@ -54,6 +58,105 @@ export type ManagerReviewItem = {
 };
 
 export type ManagerQuestion = InternshipQuestion & { internName: string };
+
+export type ManagerScheduleKind =
+  | "assignment"
+  | "check-in"
+  | "milestone"
+  | "meeting"
+  | "deadline"
+  | "training"
+  | "event";
+
+export type ManagerScheduleItem = {
+  id: string;
+  date: string;
+  title: string;
+  kind: ManagerScheduleKind;
+  time: string;
+};
+
+function isoDate(value?: string | null) {
+  const key = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : "";
+}
+
+function addDaysKey(key: string, days: number) {
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Desk rhythm plus real due dates. Weekly check-ins land on Friday. */
+export function buildManagerSchedule(input: {
+  tasks: InternshipTask[];
+  reviews: InternshipWeeklyReview[];
+  names: Map<string, string>;
+  today?: string;
+}): ManagerScheduleItem[] {
+  const today =
+    input.today ||
+    new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const items: ManagerScheduleItem[] = [];
+  const start = addDaysKey(today, -14);
+  for (let cursor = start; cursor <= addDaysKey(today, 42); cursor = addDaysKey(cursor, 1)) {
+    const [year, month, day] = cursor.split("-").map(Number);
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    if (weekday === 5) {
+      items.push({
+        id: `checkin-${cursor}`,
+        date: cursor,
+        title: "Weekly check-in",
+        kind: "check-in",
+        time: "10:00 AM",
+      });
+      items.push({
+        id: `report-${cursor}`,
+        date: cursor,
+        title: "Weekly report due",
+        kind: "deadline",
+        time: "5:00 PM",
+      });
+    }
+    if (weekday === 1) {
+      items.push({
+        id: `desk-${cursor}`,
+        date: cursor,
+        title: "Manager desk review",
+        kind: "meeting",
+        time: "1:00 PM",
+      });
+    }
+  }
+
+  for (const task of input.tasks) {
+    const date = isoDate(task.dueOn);
+    if (!date) continue;
+    const submitted = task.status === "submitted" || task.reviewStage === "submitted_to_ava";
+    items.push({
+      id: task.id,
+      date,
+      title: task.title,
+      kind: submitted ? "deadline" : task.status === "todo" ? "assignment" : "event",
+      time: "",
+    });
+  }
+
+  for (const review of input.reviews) {
+    const date = isoDate(review.submittedAt || review.weekOf);
+    if (!date) continue;
+    items.push({
+      id: `review-${review.id}`,
+      date,
+      title: `${input.names.get(review.internId) || "Intern"} check-in`,
+      kind: "check-in",
+      time: "",
+    });
+  }
+
+  return items;
+}
 
 function dateLabel(value?: string | null) {
   const key = String(value || "").slice(0, 10);
@@ -121,6 +224,15 @@ export function buildInternManagerCard(input: {
     .filter(Boolean)
     .sort()
     .at(-1);
+  const openTask = [...input.tasks]
+    .filter((task) => task.status !== "approved" && task.status !== "not_accepted")
+    .sort((a, b) => String(a.dueOn || "9999-99-99").localeCompare(String(b.dueOn || "9999-99-99")))[0];
+  const roster =
+    input.intern.status === "completed"
+      ? "completed"
+      : input.intern.status === "withdrawn"
+        ? "archived"
+        : "active";
 
   const statuses = [
     summary.paceTone === "ahead"
@@ -156,6 +268,10 @@ export function buildInternManagerCard(input: {
     lastSubmission: lastSubmission ? dateLabel(lastSubmission) : "None yet",
     statuses,
     summary,
+    role: input.intern.internshipTitle || input.schoolName || "Growth Intern",
+    avatarUrl: input.intern.avatarUrl || "",
+    currentAssignment: openTask?.title || "",
+    roster,
   };
 }
 

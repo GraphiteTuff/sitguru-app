@@ -1,10 +1,21 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
-import { ManagerSimpleToolsPage } from "@/components/manager/ManagerSharedPages";
+import { getGrowthHomeStats, listGrowthContent } from "@/lib/admin/growth/data";
+import MetricsBoard from "@/components/portal/MetricsBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ManagerMetricsPage() {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
-  return <ManagerSimpleToolsPage kind="metrics" />;
+  const [stats, content] = await Promise.all([getGrowthHomeStats(), listGrowthContent()]);
+  return (
+    <MetricsBoard
+      audience="manager"
+      stats={stats}
+      content={content.slice(0, 4).map((item) => ({
+        title: item.title,
+        detail: [item.platform, item.status].filter(Boolean).join(" · "),
+      }))}
+    />
+  );
 }

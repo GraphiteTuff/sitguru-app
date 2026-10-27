@@ -1,10 +1,5 @@
-import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
-import { GrowthAnalyticsScreen } from "@/components/admin/growth/GrowthWorkplacePages";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function ManagerPage() {
-  const access = await requireGrowthWorkplace("manager");
-  if (!access.ok) return access.ui;
-  return <GrowthAnalyticsScreen workplace={access} />;
+export default function ManagerAnalyticsRedirect() {
+  redirect("/manager/reports");
 }

@@ -199,7 +199,7 @@ export function ManagerSimpleToolsPage({
           <Link
             key={href}
             href={href}
-            className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
+            className="inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white"
           >
             {label}
           </Link>

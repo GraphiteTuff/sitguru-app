@@ -59,7 +59,7 @@ export default function InternWeekZeroCard({
               <span>{item.label}</span>
             </label>
           ))}
-          <button className="min-h-12 w-full rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white sm:w-auto">
+          <button className="min-h-12 w-full rounded-2xl bg-[#2563EB] px-4 text-sm font-black !text-white sm:w-auto">
             Save Start Here
           </button>
         </form>

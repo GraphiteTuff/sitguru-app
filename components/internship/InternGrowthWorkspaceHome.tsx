@@ -251,7 +251,7 @@ export default function InternGrowthWorkspaceHome({
           <div className="mt-4 grid gap-2">
             <Link
               href="/intern/time"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-bold !text-white"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-3 text-sm font-bold !text-white"
             >
               <Clock3 size={16} /> Log Hours
             </Link>

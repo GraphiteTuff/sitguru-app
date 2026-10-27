@@ -277,7 +277,7 @@ export function InternCheckInsPageView({
           <p className="mt-2 text-sm font-medium text-slate-600">Reflect, report progress, and plan next week.</p>
           <Link
             href="/intern/check-ins"
-            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
+            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white"
           >
             Start My Check-In
           </Link>
@@ -512,7 +512,7 @@ export function InternSimpleToolsPage({
           <Link
             key={String(href)}
             href={String(href)}
-            className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
+            className="inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white"
           >
             {String(label)}
           </Link>

@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   buildInternManagerCard,
   buildManagerReviewQueue,
+  buildManagerSchedule,
   type ManagerInternCard,
   type ManagerQuestion,
   type ManagerReviewItem,
@@ -67,6 +68,7 @@ export async function loadManagerDashboard(input: {
       cards: [] as ManagerInternCard[],
       reviews: [] as ManagerReviewItem[],
       questions: [] as ManagerQuestion[],
+      schedule: [] as ReturnType<typeof buildManagerSchedule>,
       interns,
       notices,
     };
@@ -132,6 +134,7 @@ export async function loadManagerDashboard(input: {
     })),
     interns,
     notices,
+    schedule: buildManagerSchedule({ tasks, reviews, names }),
   };
 }
 

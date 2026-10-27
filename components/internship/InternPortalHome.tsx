@@ -396,7 +396,7 @@ export default function InternPortalHome({
           <button
             type="button"
             onClick={onOpenCheckIn}
-            className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-bold !text-white"
+            className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-bold !text-white"
           >
             {weeklyDone ? "View Check-In" : "Submit Check-In"}
           </button>
@@ -492,7 +492,7 @@ export default function InternPortalHome({
             <button
               type="button"
               onClick={onOpenHours}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-bold !text-white"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#2563EB] px-3 text-sm font-bold !text-white"
             >
               Log Hours
             </button>

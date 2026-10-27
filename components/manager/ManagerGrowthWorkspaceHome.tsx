@@ -367,7 +367,7 @@ export default function ManagerGrowthWorkspaceHome({
       <section className={`${DESK_UI.card} p-4 sm:p-5`}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-black text-[#0F2744]">What&apos;s Next This Week?</h2>
-          <Link href="/admin/help/manager" className={`text-xs font-bold ${DESK_UI.link}`}>
+          <Link href="/manager/help" className={`text-xs font-bold ${DESK_UI.link}`}>
             View Guide →
           </Link>
         </div>

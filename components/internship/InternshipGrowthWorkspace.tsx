@@ -213,7 +213,7 @@ export default function InternshipGrowthWorkspace({
             onClick={() => setTab(item.id)}
             className={`min-h-11 min-w-[5.5rem] flex-1 rounded-2xl px-3 text-sm font-black sm:min-w-0 sm:flex-none sm:px-4 ${
               tab === item.id
-                ? "bg-[#166534] !text-white"
+                ? "bg-[#2563EB] !text-white"
                 : "border border-emerald-100 bg-white text-emerald-900"
             }`}
           >
@@ -282,7 +282,7 @@ export default function InternshipGrowthWorkspace({
                           <label className="text-xs font-black">
                             <input type="checkbox" name="granted" defaultChecked={granted} /> Access
                           </label>
-                          <button className="min-h-9 rounded-xl bg-[#166534] px-3 text-xs font-black !text-white">
+                          <button className="min-h-9 rounded-xl bg-[#2563EB] px-3 text-xs font-black !text-white">
                             Sync
                           </button>
                         </form>
@@ -330,7 +330,7 @@ export default function InternshipGrowthWorkspace({
               <Input name="baselineValue" label="Baseline (from SitGuru-controlled source)" />
               <Input name="targetValue" label="Target" />
               <Input name="metricKey" label="Metric key" placeholder="pet_parent_registrations" />
-              <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                 Save SMART goal to both portals
               </button>
             </form>
@@ -415,7 +415,7 @@ export default function InternshipGrowthWorkspace({
               <FinalSectionSelect />
               <Input name="internReportedValue" label="Intern reported result" />
               <Input name="studentNotes" label="Student notes" />
-              <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                 Save task
               </button>
             </form>
@@ -465,7 +465,7 @@ export default function InternshipGrowthWorkspace({
               <Input name="publishedUrl" label="Published link" />
               <Input name="studentNotes" label="Notes" />
               <FinalSectionSelect defaultValue="content_system" />
-              <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                 Save content
               </button>
             </form>
@@ -530,7 +530,7 @@ export default function InternshipGrowthWorkspace({
               <p className="text-xs font-semibold leading-5 text-slate-500">
                 {ATTRIBUTION_RULE}
               </p>
-              <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                 Save campaign
               </button>
             </form>
@@ -574,7 +574,7 @@ export default function InternshipGrowthWorkspace({
                     </label>
                   </>
                 ) : null}
-                <button className="min-h-11 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white">
+                <button className="min-h-11 rounded-2xl bg-[#2563EB] px-4 text-sm font-black !text-white">
                   Log experiment
                 </button>
               </form>
@@ -614,7 +614,7 @@ export default function InternshipGrowthWorkspace({
                   <form action={verifyInternMetric} className="mt-3">
                     <input type="hidden" name="internId" value={data.intern.id} />
                     <input type="hidden" name="id" value={metric.id} />
-                    <button className="min-h-10 rounded-xl bg-[#166534] px-3 text-xs font-black !text-white">
+                    <button className="min-h-10 rounded-xl bg-[#2563EB] px-3 text-xs font-black !text-white">
                       Verify from SitGuru source
                     </button>
                   </form>
@@ -668,7 +668,7 @@ export default function InternshipGrowthWorkspace({
                   verification from SitGuru, Google Analytics, social analytics, or another approved source.
                 </p>
               )}
-              <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                 Save metric
               </button>
             </form>
@@ -822,7 +822,7 @@ export default function InternshipGrowthWorkspace({
                     </label>
                   </div>
                 ) : null}
-                <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+                <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                   Save weekly review
                 </button>
               </form>
@@ -874,7 +874,7 @@ export default function InternshipGrowthWorkspace({
                 </div>
                 <Input name="strongestContribution" label="Strongest contribution this period" />
                 <Input name="improvementRequired" label="Improvement required next period" />
-                <button className="min-h-11 w-full rounded-2xl bg-[#166534] text-sm font-black !text-white">
+                <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
                   Save scorecard
                 </button>
               </form>

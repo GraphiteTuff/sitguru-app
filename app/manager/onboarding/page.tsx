@@ -49,6 +49,7 @@ export default async function ManagerOnboardingPage({
 
   return (
     <GrowthPageFrame
+      variant="desk"
       kicker={viewingOther ? "Admin view" : "Your onboarding"}
       title={viewingOther ? subjectName : "Welcome to SitGuru"}
       detail={viewingOther

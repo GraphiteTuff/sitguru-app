@@ -1,14 +1,10 @@
-import Link from "next/link";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { listGrowthInitiatives } from "@/lib/admin/growth/outcomes";
 import { resolveManagerEngagement } from "@/lib/staff-time/engagement";
 import { loadMyTimeDashboard } from "@/lib/staff-time/queries";
-import MyTimePanel from "@/components/staff-time/MyTimePanel";
-import {
-  GrowthPageFrame,
-  GrowthPrimaryLink,
-} from "@/components/admin/growth/GrowthPageFrame";
+import MyTimeDesk from "@/components/staff-time/MyTimeDesk";
+import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +30,10 @@ export default async function ManagerMyTimePage({
 
   if (!engagement) {
     return (
-      <GrowthPageFrame
-        kicker="My Time"
-        title="Engagement required"
-        detail="My Time opens once your Growth Manager engagement is active."
-      >
-        <GrowthPrimaryLink href="/manager">Back to Manager Portal</GrowthPrimaryLink>
-      </GrowthPageFrame>
+      <div className={`${DESK_UI.card} p-6`}>
+        <h1 className="text-2xl font-black text-[#0F2744]">My Time</h1>
+        <p className="mt-2 text-sm font-medium text-slate-600">My Time opens once your Growth Manager engagement is active.</p>
+      </div>
     );
   }
 
@@ -51,34 +44,16 @@ export default async function ManagerMyTimePage({
   ]);
 
   return (
-    <GrowthPageFrame
-      kicker="Manager Portal"
-      title="My Time"
-      detail={`${engagement.displayName} · ${engagement.title}. Expected ${engagement.expectedWeeklyMinHours}–${engagement.expectedWeeklyMaxHours} hrs/week.`}
-      action={
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/manager/payments"
-            className="inline-flex min-h-11 items-center rounded-2xl border border-white/40 px-4 text-sm font-black !text-white"
-          >
-            My Payments
-          </Link>
-          <GrowthPrimaryLink href="/manager">Home</GrowthPrimaryLink>
-        </div>
+    <MyTimeDesk
+      data={data}
+      initiatives={initiatives.map((item) => ({ id: item.id, name: item.name }))}
+      notice={
+        first(params.ok)
+          ? { kind: "ok", message: first(params.ok) }
+          : first(params.error)
+            ? { kind: "error", message: first(params.error) }
+            : null
       }
-    >
-      <MyTimePanel
-        data={data}
-        basePath="/manager"
-        initiatives={initiatives.map((item) => ({ id: item.id, name: item.name }))}
-        notice={
-          first(params.ok)
-            ? { kind: "ok", message: first(params.ok) }
-            : first(params.error)
-              ? { kind: "error", message: first(params.error) }
-              : null
-        }
-      />
-    </GrowthPageFrame>
+    />
   );
 }

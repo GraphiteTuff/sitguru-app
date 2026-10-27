@@ -13,7 +13,7 @@ export async function loadStaffInbox(userId: string, founder: boolean) {
   const actor: StaffActor = founder ? "founder" : "growth";
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .select("id,subject,conversation_type,workflow_status,last_message_preview,assigned_user_id,started_by_user_id")
+    .select("id,subject,conversation_type,workflow_status,last_message_preview,assigned_user_id,started_by_user_id,updated_at")
     .neq("conversation_type", "marketplace")
     .order("updated_at", { ascending: false })
     .limit(40);
@@ -26,7 +26,7 @@ export async function loadStaffInbox(userId: string, founder: boolean) {
   const { data: messages } = ids.length
     ? await supabaseAdmin
         .from("messages")
-        .select("id,conversation_id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types")
+        .select("id,conversation_id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at")
         .in("conversation_id", ids)
         .order("created_at", { ascending: true })
         .limit(200)
@@ -67,6 +67,7 @@ export async function loadStaffInbox(userId: string, founder: boolean) {
         typeLabel: type.replaceAll("_", " "),
         statusLabel: text(row.workflow_status) || "open",
         preview: text(row.last_message_preview),
+        updatedAt: text(row.updated_at),
         messages: ((messages || []) as Record<string, unknown>[])
           .filter((message) => text(message.conversation_id) === id)
           .filter((message) =>
@@ -85,6 +86,7 @@ export async function loadStaffInbox(userId: string, founder: boolean) {
               author: person?.firstName || firstFrom(text(message.sender_name_snapshot)) || "SitGuru",
               avatarUrl: person?.avatarUrl || "",
               body: message.deleted_at ? "Message removed" : text(message.body || message.content),
+              createdAt: text(message.created_at),
               attachments: urls.map((url, index) => ({
                 url: String(url),
                 mimeType: String(types[index] || ""),
@@ -120,12 +122,14 @@ type InboxConversation = {
   typeLabel: string;
   statusLabel: string;
   preview: string;
+  updatedAt?: string;
   messages: {
     id: string;
     internal: boolean;
     author: string;
     avatarUrl: string;
     body: string;
+    createdAt?: string;
     attachments: { url: string; mimeType: string; name: string }[];
   }[];
 };

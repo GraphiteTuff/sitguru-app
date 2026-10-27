@@ -12,7 +12,7 @@ describe("manager flat routes", () => {
       "Manager Toolkit",
       "Training",
       "Resources",
-      "Reports",
+      "Business Growth Report",
       "Messaging",
     ]) {
       assert.equal(labels.includes(label), true, `missing ${label}`);

@@ -88,7 +88,7 @@ const TABS = [
   { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-sky-600 !text-white", chip: "bg-sky-50 text-sky-900" },
   { id: "work", label: "Work", icon: ClipboardList, active: "bg-violet-600 !text-white", chip: "bg-violet-50 text-violet-900" },
-  { id: "project", label: "Report", icon: BookOpen, active: "bg-[#166534] !text-white", chip: "bg-emerald-50 text-emerald-900" },
+  { id: "project", label: "Report", icon: BookOpen, active: "bg-[#2563EB] !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "metrics", label: "Metrics", icon: BarChart3, active: "bg-amber-500 !text-white", chip: "bg-amber-50 text-amber-900" },
 ] as const;
 
@@ -539,7 +539,7 @@ export default function InternStudentDashboard({
                   onClick={() => setSelectedDate(day.key)}
                   className={`flex min-h-12 flex-col items-center justify-center rounded-2xl text-xs font-black ${internPressClass} ${
                     selected
-                      ? "bg-[#166534] !text-white"
+                      ? "bg-[#2563EB] !text-white"
                       : today
                         ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
                         : day.inMonth
