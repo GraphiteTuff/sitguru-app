@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, ChevronUp, LogOut, Settings, UserRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
@@ -182,6 +182,13 @@ export function SiteAccountMenu({
           : currentRole === "admin"
             ? "/admin"
             : "/customer/dashboard";
+  const settingsHref = pathname.startsWith("/intern")
+    ? "/intern/settings"
+    : pathname.startsWith("/manager") || currentRole === "growth" || currentRole === "manager"
+      ? "/manager/settings"
+      : currentRole === "intern"
+        ? "/intern/settings"
+        : null;
 
   async function handleLogout() {
     setOpen(false);
@@ -324,6 +331,17 @@ export function SiteAccountMenu({
             >
               Dashboard
             </Link>
+            {settingsHref ? (
+              <Link
+                href={settingsHref}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="mt-1 flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <Settings className="h-5 w-5" />
+                Settings
+              </Link>
+            ) : null}
             <button
               type="button"
               role="menuitem"
