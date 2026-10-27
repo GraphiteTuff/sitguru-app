@@ -13,7 +13,7 @@ Jason approved production deployment prior to completion of the full multi-user 
 
 ## Production Release Status
 
-**Deployed / Verifying**
+**Deployed / Verified** — Vercel Production SUCCESS for `e292b847` on `sitguru-main`.
 
 ## Multi-User Acceptance
 
@@ -94,5 +94,5 @@ Applied to SitGuru production + Staging. RLS enabled on business tables.
 
 ## Final status
 
-**PRODUCTION COMPLETE** pending smoke confirmation in the release report.  
+**PRODUCTION COMPLETE**  
 Multi-user matrix remains **POST-PRODUCTION VALIDATION PENDING**.

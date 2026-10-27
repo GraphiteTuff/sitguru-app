@@ -10,7 +10,7 @@ Jason approved production deployment prior to completion of the full multi-user 
 
 ## Production Release Status
 
-**Deployed / Verifying** — see companion Realtime QA report for deployment confirmation.
+**Deployed / Verified** — `sitguru-main` @ `e292b847`; Vercel Production deployment SUCCESS (2026-10-26 America/New_York evening).
 
 Multi-user acceptance scenarios: **POST-PRODUCTION VALIDATION PENDING** (not marked Passed).
 
