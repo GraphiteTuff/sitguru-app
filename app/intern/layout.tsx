@@ -5,6 +5,8 @@ import { internDocumentationModeEnabled } from "@/lib/internship/documentation-m
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import { currentAssignedIntern } from "@/lib/admin/growth/workplace";
 import { getInternOnboarding, getUniversity } from "@/lib/internship/queries";
+import { countDeskUnread } from "@/lib/messaging/mark-conversation-read";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function InternLayout({
   children,
@@ -27,6 +29,9 @@ export default async function InternLayout({
   const intern = await currentAssignedIntern();
   const ack = intern ? await getInternOnboarding(intern.id) : null;
   const school = intern?.universityId ? await getUniversity(intern.universityId) : null;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const unreadMessages = user ? await countDeskUnread(user.id) : 0;
 
   return (
     <>
@@ -36,6 +41,7 @@ export default async function InternLayout({
           assigned={Boolean(intern)}
           onboarded={internOnboardingComplete(ack)}
           schoolLogoUrl={school?.logoUrl || ""}
+          unreadMessages={unreadMessages}
         >
           {children}
         </InternPortalShell>
