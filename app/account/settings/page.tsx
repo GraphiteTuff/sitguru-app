@@ -25,6 +25,11 @@ export default function AccountSettingsPage() {
 
         <div className="grid gap-5">
           <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">Staff Access</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Request a SitGuru team workspace on this same account. A request does not grant access.</p>
+            <Link href="/account/staff-access" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">Join the SitGuru Team</Link>
+          </section>
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
               Profile
             </h2>

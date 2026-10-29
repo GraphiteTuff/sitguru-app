@@ -20,6 +20,12 @@ function field(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+function decisionPath(formData: FormData) {
+  const value = field(formData, "returnTo");
+  if (value === "/admin/hr/staff-requests" || value === "/admin/hr/access-requests") return value;
+  return "/admin/hr/access-requests";
+}
+
 function bounce(path: string, kind: "ok" | "error", message: string): never {
   redirect(`${path}?${kind}=${encodeURIComponent(message)}`);
 }
@@ -82,8 +88,9 @@ export async function requestInternAccess(formData: FormData) {
 async function decide(formData: FormData, action: "ceo_approve" | "verify_university" | "deny" | "complete" | "revoke") {
   const actor = await getAdminIdentity();
   const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
+  const back = decisionPath(formData);
   if (!actor || !canEditRequirements(kind)) {
-    bounce("/admin/hr/access-requests", "error", "CEO approval is required for this decision.");
+    bounce(back, "error", "CEO approval is required for this decision.");
   }
   const id = field(formData, "requestId");
   const { data: request } = await supabaseAdmin
@@ -91,9 +98,9 @@ async function decide(formData: FormData, action: "ceo_approve" | "verify_univer
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (!request) bounce("/admin/hr/access-requests", "error", "That request was not found.");
+  if (!request) bounce(decisionPath(formData), "error", "That request was not found.");
   const next = nextInternAccessStatus({ status: String(request.status), action });
-  if (!next.ok) bounce("/admin/hr/access-requests", "error", next.error);
+  if (!next.ok) bounce(decisionPath(formData), "error", next.error);
 
   let internId = request.intern_id ? String(request.intern_id) : "";
   if (action === "verify_university") {
@@ -104,6 +111,7 @@ async function decide(formData: FormData, action: "ceo_approve" | "verify_univer
       universityName: String(request.university_name),
       academicProgram: String(request.academic_program),
       existingInternId: internId,
+      returnPath: back,
     });
   }
   if ((action === "revoke" || action === "deny") && internId) {
@@ -128,11 +136,12 @@ async function decide(formData: FormData, action: "ceo_approve" | "verify_univer
     decision_note: field(formData, "note"),
     updated_at: new Date().toISOString(),
   }).eq("id", id);
-  if (error) bounce("/admin/hr/access-requests", "error", "The decision could not be saved.");
+  if (error) bounce(decisionPath(formData), "error", "The decision could not be saved.");
   revalidatePath("/admin/hr/access-requests");
+  revalidatePath("/admin/hr/staff-requests");
   revalidatePath("/admin/internship/interns");
   revalidatePath("/intern");
-  bounce("/admin/hr/access-requests", "ok", `Request is now ${next.status.replaceAll("_", " ")}.`);
+  bounce(decisionPath(formData), "ok", `Request is now ${next.status.replaceAll("_", " ")}.`);
 }
 
 async function linkInternshipRecord(input: {
@@ -142,10 +151,11 @@ async function linkInternshipRecord(input: {
   universityName: string;
   academicProgram: string;
   existingInternId: string;
+  returnPath: string;
 }) {
   const cohort = await getActiveCohort();
   if (!cohort?.id) {
-    bounce("/admin/hr/access-requests", "error", "Set an active internship cohort before verifying a university.");
+    bounce(input.returnPath, "error", "Set an active internship cohort before verifying a university.");
   }
   const universityId = await universityFor(input.universityName);
   const managerUserId = await userIdForEmail(SPRING_2027_INTERN_MANAGER_EMAIL);

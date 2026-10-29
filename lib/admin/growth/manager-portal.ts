@@ -42,6 +42,7 @@ export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.myTime, label: "My Time", match: "prefix" as const },
   { href: MANAGER_ROUTES.payments, label: "My Payments", match: "prefix" as const },
   { href: MANAGER_ROUTES.team, label: "My Team", match: "prefix" as const },
+  { href: "/intern/manage", label: "Intern Team", match: "prefix" as const },
   { href: MANAGER_ROUTES.assignments, label: "Assignments", match: "prefix" as const },
   { href: MANAGER_ROUTES.checkIns, label: "Check-Ins", match: "prefix" as const },
   { href: MANAGER_ROUTES.milestones, label: "Milestones", match: "prefix" as const },

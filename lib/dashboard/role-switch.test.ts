@@ -24,9 +24,10 @@ describe("founder personal marketplace roles", () => {
       currentRole: "intern",
       authorizedRoles: roles,
     });
-    assert.ok(switches.some((item) => item.id === "manager"));
-    assert.ok(switches.some((item) => item.path === "/intern/manage"));
-    assert.ok(switches.some((item) => item.id === "growth"));
+    assert.equal(switches.some((item) => item.path === "/intern/manage"), false);
+    assert.ok(switches.some((item) => item.shortLabel === "Manager Portal" && item.path === "/manager"));
+    assert.ok(switches.some((item) => item.shortLabel === "Pet Parent"));
+    assert.ok(switches.some((item) => item.shortLabel === "Intern") === false);
   });
 
   it("lets the HQ login switch to Intern, Intern Team Desk, Manager Portal, marketplace, and Admin", () => {
@@ -44,7 +45,7 @@ describe("founder personal marketplace roles", () => {
     ]);
   });
 
-  it("gives the Social & Growth Manager Intern Team Desk + Manager Portal and not full Admin", () => {
+  it("shows Manager Portal once and keeps Intern Team out of the switcher", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "growth.manager@sitguru.com",
       roleRows: ["social_community_manager"],
@@ -54,14 +55,33 @@ describe("founder personal marketplace roles", () => {
       currentRole: "parent",
       authorizedRoles: roles,
     });
-    assert.equal(switches[0]?.shortLabel, "Intern Team Desk");
-    assert.equal(switches[0]?.path, "/intern/manage");
-    assert.equal(switches[1]?.shortLabel, "Manager Portal");
-    assert.equal(switches[1]?.path, "/manager");
+    assert.equal(switches.length, 1);
+    assert.equal(switches[0]?.shortLabel, "Manager Portal");
+    assert.equal(switches[0]?.path, "/manager");
     assert.equal(resolveDashboardRoleFromPath("/intern/manage"), "manager");
     assert.equal(resolveDashboardRoleFromPath("/manager"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/growth"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/hr"), "admin");
+  });
+
+  it("does not open a switcher for a single workspace", () => {
+    assert.deepEqual(getAvailableDashboardSwitches({
+      currentRole: "parent",
+      authorizedRoles: ["parent"],
+    }), []);
+    assert.deepEqual(getAvailableDashboardSwitches({
+      currentRole: "growth",
+      authorizedRoles: ["manager", "growth"],
+    }), []);
+  });
+
+  it("ignores staff roles planted in editable auth metadata", () => {
+    const roles = resolveAuthorizedRolesFromProfile({
+      email: "parent@example.com",
+      metadata: { role: "social_community_manager", authorizedRoles: ["admin", "intern"] },
+      roleRows: ["customer"],
+    });
+    assert.deepEqual(roles, ["parent"]);
   });
 
   it("adds Intern for assigned marketplace accounts without Admin", () => {

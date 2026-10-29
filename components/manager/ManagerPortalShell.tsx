@@ -44,6 +44,7 @@ const ICONS = {
   "My Time": Clock3,
   "My Payments": CreditCard,
   "My Team": Users,
+  "Intern Team": Users,
   Assignments: ClipboardList,
   "Check-Ins": CalendarCheck2,
   Milestones: Flag,

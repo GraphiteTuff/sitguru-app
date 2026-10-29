@@ -54,8 +54,8 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
   },
   {
     id: "manager",
-    label: "Switch to Intern Team Desk",
-    shortLabel: "Intern Team Desk",
+    label: "Manager Portal",
+    shortLabel: "Manager Portal",
     path: "/intern/manage",
     helper: "Assigned intern team, reviews, coaching, and pace",
   },
@@ -68,8 +68,8 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
   },
   {
     id: "admin",
-    label: "Admin Dashboard",
-    shortLabel: "Admin",
+    label: "Admin HQ",
+    shortLabel: "Admin HQ",
     path: "/admin",
     helper: "Operations, growth, and platform controls",
   },
@@ -219,6 +219,20 @@ function uniqueOrderedRoles(roles: DashboardSwitchRole[]) {
   return ROLE_ORDER.filter((role) => set.has(role));
 }
 
+const PRIVILEGED_SWITCH_ROLES = new Set<DashboardSwitchRole>(["intern", "manager", "growth", "admin"]);
+
+/** User-editable auth metadata cannot grant staff, intern, or admin portals. */
+export function withoutPrivilegedSwitchRoles(roles: readonly DashboardSwitchRole[]) {
+  return roles.filter((role) => !PRIVILEGED_SWITCH_ROLES.has(role));
+}
+
+/** Intern Team Desk is not its own switch destination when Manager Portal is available. */
+export function switchPortalRoles(roles: readonly DashboardSwitchRole[]) {
+  const ordered = uniqueOrderedRoles([...roles]);
+  if (ordered.includes("growth")) return ordered.filter((role) => role !== "manager");
+  return ordered;
+}
+
 /** Parse profile.authorizedRoles / authorized_roles (array, CSV, or JSON string). */
 export function parseAuthorizedRoles(value: unknown): DashboardSwitchRole[] {
   if (value == null) return [];
@@ -309,8 +323,8 @@ export function resolveAuthorizedRolesFromProfile(input: {
   const explicit = uniqueOrderedRoles([
     ...parseAuthorizedRoles(profile.authorizedRoles),
     ...parseAuthorizedRoles(profile.authorized_roles),
-    ...parseAuthorizedRoles(metadata.authorizedRoles),
-    ...parseAuthorizedRoles(metadata.authorized_roles),
+    ...withoutPrivilegedSwitchRoles(parseAuthorizedRoles(metadata.authorizedRoles)),
+    ...withoutPrivilegedSwitchRoles(parseAuthorizedRoles(metadata.authorized_roles)),
   ]);
 
   if (explicit.length) {
@@ -327,21 +341,30 @@ export function resolveAuthorizedRolesFromProfile(input: {
     return uniqueOrderedRoles(withRecords);
   }
 
-  const signals: unknown[] = [
-    profile.role,
-    profile.account_type,
-    profile.signup_role,
-    profile.account_intent,
+  const metadataSignals: unknown[] = [
     metadata.role,
     metadata.account_type,
     metadata.signup_role,
     metadata.account_intent,
+    metadata.authorizedRoles,
+    metadata.authorized_roles,
+  ];
+  const trustedSignals: unknown[] = [
+    profile.role,
+    profile.account_type,
+    profile.signup_role,
+    profile.account_intent,
+    profile.authorizedRoles,
+    profile.authorized_roles,
     ...(input.roleRows || []),
   ];
 
   const derived: DashboardSwitchRole[] = [];
-  for (const signal of signals) {
+  for (const signal of trustedSignals) {
     derived.push(...expandRoleToken(signal));
+  }
+  for (const signal of metadataSignals) {
+    derived.push(...withoutPrivilegedSwitchRoles(expandRoleToken(signal)));
   }
 
   if (profile.is_pet_parent === true || profile.is_customer === true) {
@@ -412,16 +435,17 @@ export function getAvailableDashboardSwitches(options: {
   includeAdmin?: boolean;
 }): DashboardSwitchTarget[] {
   const includeAdmin = options.includeAdmin !== false;
-  const authorized = uniqueOrderedRoles([
+  const authorized = switchPortalRoles([
     ...(options.authorizedRoles || []),
     ...authorizedRolesFromAccessFlags(options.access),
   ]);
 
-  if (!authorized.length) return [];
+  if (authorized.length <= 1 && (options.currentRole == null || authorized.includes(options.currentRole))) return [];
 
   return DASHBOARD_SWITCH_TARGETS.filter((target) => {
     if (target.id === options.currentRole) return false;
     if (target.id === "admin" && !includeAdmin) return false;
+    if (target.id === "manager" && authorized.includes("growth")) return false;
     return authorized.includes(target.id);
   });
 }

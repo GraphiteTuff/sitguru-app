@@ -169,17 +169,23 @@ export async function grantGrowthHireAccess(input: {
       const displayName = (input.name || found.name).trim();
       const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("id")
+        .select("id, role")
         .eq("id", found.userId)
         .maybeSingle();
       if (profile?.id) {
+        const existingRole = String((profile as { role?: string }).role || "");
+        const keepMarketplaceRole = existingRole && existingRole !== GROWTH_HIRE_ROLE;
         await supabaseAdmin
           .from("profiles")
           .update({
             full_name: displayName,
-            role: GROWTH_HIRE_ROLE,
-            signup_role: GROWTH_HIRE_ROLE,
-            account_type: GROWTH_HIRE_ROLE,
+            ...(keepMarketplaceRole
+              ? {}
+              : {
+                  role: GROWTH_HIRE_ROLE,
+                  signup_role: GROWTH_HIRE_ROLE,
+                  account_type: GROWTH_HIRE_ROLE,
+                }),
             is_active: true,
           })
           .eq("id", found.userId);

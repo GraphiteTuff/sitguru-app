@@ -48,7 +48,7 @@ export function AccountRoleSwitcher({
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white"
         >
           <Repeat2 className="h-4 w-4 shrink-0" />
-          {target.label}
+          {target.shortLabel}
         </Link>
       ))}
     </div>
