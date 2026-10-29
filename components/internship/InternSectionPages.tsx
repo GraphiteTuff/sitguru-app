@@ -33,8 +33,10 @@ function formatDue(iso: string | null | undefined) {
 
 export function InternAssignmentsPageView({
   workspace,
+  links = {},
 }: {
   workspace: InternshipWorkspaceData;
+  links?: Record<string, { planner?: string; files?: string; teams?: string; canva?: string }>;
 }) {
   const tasks = workspace.tasks || [];
   const open = tasks.filter(
@@ -93,6 +95,12 @@ export function InternAssignmentsPageView({
               </div>
               <span className="rounded-full bg-[#FFEDD5] px-2.5 py-1 text-[10px] font-bold text-[#9A3412]">
                 {taskStatusLabel(task.status, task.reviewStage)}
+              </span>
+              <span className="flex flex-wrap gap-2 text-xs font-bold text-[#2563EB]">
+                {links[task.id]?.planner ? <a href={links[task.id].planner}>Open Planner</a> : null}
+                {links[task.id]?.files ? <a href={links[task.id].files}>Open project files</a> : null}
+                {links[task.id]?.teams ? <a href={links[task.id].teams}>Open Teams</a> : null}
+                {links[task.id]?.canva ? <a href={links[task.id].canva}>Open Canva</a> : null}
               </span>
             </li>
           ))}

@@ -1,3 +1,4 @@
+import { assignmentIsVisibleToIntern } from "@/lib/internship/manager-assignment";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   internshipUniversitySlug,
@@ -581,7 +582,7 @@ export async function getInternWorkspace(
       ? mapCohort(cohort.data as Record<string, unknown>)
       : null,
     projects: rows(projects.data).map(mapProject),
-    tasks: rows(tasks.data).map(mapTask),
+    tasks: rows(tasks.data).map(mapTask).filter((task) => assignmentIsVisibleToIntern(task.status)),
     content: rows(content.data).map(mapContent),
     campaigns: rows(campaigns.data).map(mapCampaign),
     metrics: rows(metrics.data).map(mapMetric),

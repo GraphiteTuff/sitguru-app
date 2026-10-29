@@ -526,6 +526,7 @@ export default async function AdminHrPage() {
             {[
               ["/admin/internship/interns", "Intern records and invites"],
               ["/admin/internship/staff", "Who can manage or supervise"],
+              ["/admin/hr/microsoft", "Microsoft 365 connection"],
               ["/admin/hr/onboarding", "People and onboarding"],
               ["/admin/messages/moderation", "Message reports"],
               ["/admin/internship", "Internship program"],

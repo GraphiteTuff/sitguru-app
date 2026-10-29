@@ -40,6 +40,17 @@ const TOPICS = [
     ],
   },
   {
+    title: "Microsoft 365",
+    detail: "SitGuru keeps the internship record. Planner, SharePoint, and Teams do the day-to-day work.",
+    tone: "bg-[#F0FDFA] text-[#0F766E]",
+    items: [
+      ["How assignments work", "/manager/assignments"],
+      ["Open Planner", "/manager/resources"],
+      ["Project files", "/manager/resources"],
+      ["Teams channels", "/manager/messages"],
+    ],
+  },
+  {
     title: "Tracking & Analytics",
     detail: "Use tracking links, read results, and understand impact.",
     tone: "bg-[#FFF7ED] text-[#C2410C]",

@@ -12,13 +12,18 @@ export default function InternHeroBanner({
   icon,
   overlay = INTERN_PORTAL_BRAND.impactLine,
   imageSrc = INTERN_BANNER,
+  scriptLines,
 }: {
   title: string;
   subtitle: string;
   icon?: ReactNode;
   overlay?: string;
   imageSrc?: string;
+  scriptLines?: string[];
 }) {
+  const lines = scriptLines?.length
+    ? scriptLines
+    : ["Learn. Create.", "Make an impact.", "Happier pets.", "Brighter communities."];
   return (
     <section className="overflow-hidden rounded-2xl border border-sky-100/80 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F0FDF4] shadow-sm">
       <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
@@ -42,13 +47,16 @@ export default function InternHeroBanner({
         <div className="relative min-h-[120px] overflow-hidden lg:min-h-full">
           <Image src={imageSrc} alt="Golden retriever on a walk" fill className="object-cover object-[center_40%]" sizes="(max-width: 1024px) 100vw, 40vw" />
           <p className={`${script.className} absolute left-3 top-3 max-w-[15rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm`}>
-            Learn. Create.
-            <br />
-            Make an impact.
-            <br />
-            <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">Happier pets.</span>
-            <br />
-            Brighter communities.
+            {lines.map((line, index) => (
+              <span key={line}>
+                {index === 2 ? (
+                  <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">{line}</span>
+                ) : (
+                  line
+                )}
+                {index < lines.length - 1 ? <br /> : null}
+              </span>
+            ))}
           </p>
           <span className="sr-only">{overlay}</span>
         </div>

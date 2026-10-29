@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import InternTeamDeskHome from "@/components/internship/InternTeamDeskHome";
 import ManagerInternDashboard from "@/components/internship/ManagerInternDashboard";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
@@ -65,6 +66,13 @@ export default async function InternManagerPage({
     ? await supabaseAdmin.from("profiles").select("full_name,email").eq("id", managerFilter).maybeSingle()
     : { data: null };
   const managerName = String(managerProfile.data?.full_name || managerProfile.data?.email || "this manager");
+  const viewerProfile = managerFilter
+    ? null
+    : await supabaseAdmin.from("profiles").select("full_name,first_name").eq("id", actor.id).maybeSingle();
+  const welcomeSource = managerFilter
+    ? managerName
+    : String(viewerProfile?.data?.first_name || viewerProfile?.data?.full_name || "there");
+  const welcomeName = welcomeSource.split(/\s+/).filter(Boolean)[0] || "there";
   const data = await loadManagerDashboard({
     actorUserId: actor.id,
     actorKind: kind,
@@ -97,7 +105,41 @@ export default async function InternManagerPage({
           Every intern desk is open. Pick one manager from the intern team page to see only their interns.
         </p>
       ) : null}
-      <section className="mb-4 grid gap-3">
+      <InternTeamDeskHome
+        firstName={welcomeName}
+        activeInterns={data.interns.length}
+        pendingReviews={(waiting.data || []).length + data.reviews.filter((item) => !item.ceo).length}
+        weeklyCheckIns={data.reviews.filter((item) => item.targetType === "weekly").length}
+        onboardingItems={readiness.reduce(
+          (sum, intern) =>
+            sum +
+            (intern.onboarding?.items.filter((item) => !/reviewed|executed|complete/i.test(item.status)).length || 0),
+          0,
+        )}
+        questionsWaiting={data.questions.filter((item) => item.status === "open").length}
+        interns={readiness.map((intern) => ({
+          id: intern.id,
+          name: intern.name,
+          detail: intern.onboarding
+            ? `Onboarding ${intern.onboarding.percent}%`
+            : "Onboarding package not assigned",
+        }))}
+        activity={[
+          ...data.reviews.slice(0, 3).map((item) => ({
+            id: item.id,
+            title: `${item.internName} · ${item.title}`,
+            detail: item.statusLabel,
+            href: "#desk-reviews",
+          })),
+          ...data.questions.filter((item) => item.status === "open").slice(0, 2).map((item) => ({
+            id: item.id,
+            title: item.internName,
+            detail: item.question,
+            href: "#desk-reviews",
+          })),
+        ]}
+      />
+      <section id="onboarding" className="mb-4 grid gap-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-800">Coach the week</p>
@@ -157,6 +199,7 @@ export default async function InternManagerPage({
           </form>
         ))}
       </section>
+      <div id="desk-reviews">
       <ManagerInternDashboard
         cards={data.cards}
         reviews={data.reviews}
@@ -168,6 +211,7 @@ export default async function InternManagerPage({
         actorEmail={actor.email}
         notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
       />
+      </div>
     </main>
   );
 }

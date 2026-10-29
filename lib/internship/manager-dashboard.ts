@@ -1,4 +1,5 @@
 import { summarizeInternshipHours, type HourSummary } from "@/lib/internship/hours";
+import { assignmentIsVisibleToIntern } from "@/lib/internship/manager-assignment";
 import { isWeekZeroReady } from "@/lib/internship/week-zero";
 import {
   displayWorkStatus,
@@ -131,6 +132,7 @@ export function buildManagerSchedule(input: {
   }
 
   for (const task of input.tasks) {
+    if (!assignmentIsVisibleToIntern(task.status)) continue;
     const date = isoDate(task.dueOn);
     if (!date) continue;
     const submitted = task.status === "submitted" || task.reviewStage === "submitted_to_ava";
