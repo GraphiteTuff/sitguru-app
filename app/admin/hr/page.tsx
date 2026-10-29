@@ -370,6 +370,12 @@ export default async function AdminHrPage() {
       icon: HeartHandshake,
     },
     {
+      href: "/admin/hr/staff-requests",
+      label: "Staff role requests",
+      detail: "CEO review and approve staff access",
+      icon: ShieldCheck,
+    },
+    {
       href: routes.guruApprovals,
       label: "Guru approvals",
       detail: `${number(data.metrics.pendingGuruApplicants)} waiting`,
@@ -496,6 +502,7 @@ export default async function AdminHrPage() {
           </p>
           <div className="mt-4 grid gap-2">
             {[
+              ["/admin/hr/staff-requests", "Review staff role requests"],
               ["/admin/hr/growth-hire", "Create or update this login"],
               ["/admin/growth", "Open the Growth Workspace"],
               ["/admin/growth/onboarding", "Onboarding checklist"],
