@@ -1,9 +1,7 @@
 import Image from "next/image";
-import { Caveat } from "next/font/google";
 import type { ReactNode } from "react";
 import { DESK_BANNER, INTERN_BANNER } from "@/lib/portal/desk-ui";
-
-const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
+import { deskScriptFont as script } from "@/lib/portal/script-font";
 
 export default function DeskPageHero({
   icon,

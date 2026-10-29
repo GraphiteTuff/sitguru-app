@@ -23,10 +23,8 @@ import { taskStatusLabel } from "@/lib/internship/labels";
 import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import { internPressClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
-import { Caveat } from "next/font/google";
 import { INTERN_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
-
-const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
+import { deskScriptFont as script } from "@/lib/portal/script-font";
 
 function statusTone(status: string, reviewStage?: string | null) {
   const label = taskStatusLabel(status, reviewStage).toLowerCase();

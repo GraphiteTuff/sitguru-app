@@ -1,10 +1,8 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { INTERN_PORTAL_BRAND } from "@/lib/internship/intern-portal-nav";
-import { Caveat } from "next/font/google";
 import { INTERN_BANNER } from "@/lib/portal/desk-ui";
-
-const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
+import { deskScriptFont as script } from "@/lib/portal/script-font";
 
 export default function InternHeroBanner({
   title,
