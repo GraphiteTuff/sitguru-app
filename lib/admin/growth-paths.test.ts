@@ -5,6 +5,8 @@ import { isGrowthAllowedAdminPath, isGrowthOnlyRole } from "./growth-paths";
 describe("Growth Manager admin boundary", () => {
   it("keeps the Social Media & Community Growth Manager on growth systems", () => {
     assert.equal(isGrowthOnlyRole("social_community_manager"), true);
+    assert.equal(isGrowthOnlyRole("social_growth_manager"), true);
+    assert.equal(isGrowthOnlyRole("Social Media Community Growth Manager"), true);
     assert.equal(isGrowthAllowedAdminPath("/admin/growth"), true);
     assert.equal(isGrowthAllowedAdminPath("/admin/growth/campaigns"), true);
     assert.equal(isGrowthAllowedAdminPath("/admin/community/events"), true);

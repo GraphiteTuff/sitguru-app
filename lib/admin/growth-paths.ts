@@ -1,6 +1,11 @@
 /** Shared by proxy and Admin chrome. No service-role imports. */
 
-export const GROWTH_ONLY_ROLES = new Set(["social_community_manager"]);
+export const GROWTH_ONLY_ROLES = new Set([
+  "social_community_manager",
+  "social_growth_manager",
+  "growth_manager",
+  "social_media_community_growth_manager",
+]);
 
 export const GROWTH_ALLOWED_ADMIN_PREFIXES = [
   "/admin/growth",
@@ -14,7 +19,8 @@ export const GROWTH_ALLOWED_ADMIN_PREFIXES = [
 function normalizeRole(role: string | null | undefined) {
   return String(role || "")
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
 }
 
 export function isGrowthOnlyRole(role: string | null | undefined) {

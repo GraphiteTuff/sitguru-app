@@ -208,7 +208,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     };
   }
 
-  const [hqAccess, adminUser, profile, users] = await Promise.all([
+  const [hqAccess, adminUser, profile, users, roleRows] = await Promise.all([
     supabaseAdmin
       .from("admin_user_access")
       .select("role_key,email,is_active,access_level")
@@ -230,12 +230,19 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
       .select("role,email,is_active,can_access_financials")
       .eq("id", user.id)
       .limit(1),
+    supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id),
   ]);
 
   const hqRow = hqAccess.data?.[0] || null;
   const adminRow = adminUser.data?.[0] || null;
   const profileRow = profile.data?.[0] || null;
   const usersRow = users.data?.[0] || null;
+  const assignedRoles = ((roleRows.data || []) as Array<{ role?: string | null }>).map((row) =>
+    normalizeRoleCandidate(row.role),
+  );
   const row = adminRow || profileRow || usersRow || null;
 
   const role = pickBestRole([
@@ -243,6 +250,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     normalizeRoleCandidate(adminRow?.role),
     normalizeRoleCandidate(profileRow?.role),
     normalizeRoleCandidate(usersRow?.role),
+    ...assignedRoles,
   ]);
 
   if (!role || !isAdminRole(role)) return null;

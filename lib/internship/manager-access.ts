@@ -1,6 +1,9 @@
 const SUPERVISOR_ROLES = new Set(["founder", "owner", "super_admin", "admin"]);
 const MANAGER_ROLES = new Set([
   "social_community_manager",
+  "social_growth_manager",
+  "growth_manager",
+  "social_media_community_growth_manager",
   "marketing_admin",
   "intern_manager",
 ]);
