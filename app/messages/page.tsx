@@ -585,7 +585,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
       const firstOtherProfile =
         otherUserIds.length > 0 ? profilesById.get(otherUserIds[0]) || null : null;
 
-        otherUserName: firstName(kind === "admin" ? "SitGuru" : getProfileName(firstOtherProfile)),
+      const otherUserName = firstName(kind === "admin" ? "SitGuru" : getProfileName(firstOtherProfile));
 
       const otherUserRole =
         kind === "admin"
