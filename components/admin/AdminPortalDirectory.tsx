@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InternName } from "@/components/portal/PersonFace";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { listGrowthHires } from "@/lib/admin/growth/hire";
@@ -171,7 +172,9 @@ export default async function AdminPortalDirectory() {
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {visibleInterns.length ? visibleInterns.map((intern) => (
           <article key={intern.id} className="rounded-2xl border border-emerald-100 px-4 py-3">
-            <p className="font-black text-slate-950">{intern.preferredName || intern.fullName}</p>
+            <p className="font-black text-slate-950">
+              <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} />
+            </p>
             <p className="text-sm font-semibold text-slate-600">{intern.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link href={internPortalPreviewPath(intern.id)} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white">

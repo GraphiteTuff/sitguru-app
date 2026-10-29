@@ -213,7 +213,8 @@ export default async function InternPortalPage({
         <section className="space-y-3">
           <InternshipBackToProgram />
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-950">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-950">
+              <InternAvatar name={workspace.intern.fullName} email={workspace.intern.email} src={workspace.intern.avatarUrl} size="sm" />
               Student view for {workspace.intern.fullName}. Grade work from Employer review.
             </p>
             <Link

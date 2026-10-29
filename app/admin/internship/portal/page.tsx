@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InternName } from "@/components/portal/PersonFace";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import {
@@ -37,7 +38,9 @@ export default async function InternshipPortalAccessPage() {
               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm"
             >
               <div>
-                <p className="font-black text-slate-950">{intern.fullName}</p>
+                <p className="font-black text-slate-950">
+                  <InternName name={intern.fullName} src={intern.avatarUrl} />
+                </p>
                 <p className="text-xs font-semibold text-slate-500">
                   {[
                     intern.studentId ? `ID ${intern.studentId}` : "",

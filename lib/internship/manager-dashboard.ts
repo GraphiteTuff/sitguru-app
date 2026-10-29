@@ -46,6 +46,7 @@ export type ManagerReviewItem = {
   id: string;
   internId: string;
   internName: string;
+  avatarUrl?: string;
   targetType: "task" | "content" | "weekly" | "hours" | "milestone";
   title: string;
   weekLabel: string;
@@ -58,7 +59,7 @@ export type ManagerReviewItem = {
   ceo: boolean;
 };
 
-export type ManagerQuestion = InternshipQuestion & { internName: string };
+export type ManagerQuestion = InternshipQuestion & { internName: string; avatarUrl?: string };
 
 export type ManagerScheduleKind =
   | "assignment"
@@ -285,6 +286,7 @@ export function buildManagerReviewQueue(input: {
   logs: InternshipTimeLog[];
 }): ManagerReviewItem[] {
   const names = new Map(input.interns.map((intern) => [intern.id, intern.preferredName || intern.fullName]));
+  const avatars = new Map(input.interns.map((intern) => [intern.id, intern.avatarUrl || ""]));
   const items: ManagerReviewItem[] = [];
 
   for (const task of input.tasks) {
@@ -294,6 +296,7 @@ export function buildManagerReviewQueue(input: {
       id: task.id,
       internId: task.internId,
       internName: names.get(task.internId) || "Intern",
+      avatarUrl: avatars.get(task.internId) || "",
       targetType: "task",
       title: task.title,
       weekLabel: task.weekNumber ? `Week ${task.weekNumber}` : "Assignment",
@@ -314,6 +317,7 @@ export function buildManagerReviewQueue(input: {
       id: item.id,
       internId: item.internId,
       internName: names.get(item.internId) || "Intern",
+      avatarUrl: avatars.get(item.internId) || "",
       targetType: "content",
       title: item.title,
       weekLabel: "Content",
@@ -333,6 +337,7 @@ export function buildManagerReviewQueue(input: {
       id: review.id,
       internId: review.internId,
       internName: names.get(review.internId) || "Intern",
+      avatarUrl: avatars.get(review.internId) || "",
       targetType: "weekly",
       title: "Weekly check-in",
       weekLabel: review.weekOf ? `Week of ${review.weekOf}` : "This week",
@@ -352,6 +357,7 @@ export function buildManagerReviewQueue(input: {
       id: log.id,
       internId: log.internId,
       internName: names.get(log.internId) || "Intern",
+      avatarUrl: avatars.get(log.internId) || "",
       targetType: "hours",
       title: log.activity || "Hour entry",
       weekLabel: log.weekNumber ? `Week ${log.weekNumber}` : dateLabel(log.workedOn),

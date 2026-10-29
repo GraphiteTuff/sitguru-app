@@ -22,6 +22,7 @@ export default async function ManagerCheckInsPage() {
       id: item.id,
       week: item.weekLabel || "This week",
       intern: item.internName,
+      avatarUrl: desk.cards.find((card) => card.id === item.internId)?.avatarUrl || "",
       focus: "Growth work",
       submitted: item.submittedAt || "Recently",
       status: item.statusLabel,

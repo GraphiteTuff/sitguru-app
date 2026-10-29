@@ -7,7 +7,8 @@ import {
   Users,
 } from "lucide-react";
 import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";
-import { DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+import { InternName } from "@/components/portal/PersonFace";
+import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export default function ManagerCheckInsHome({
   rows,
@@ -16,6 +17,7 @@ export default function ManagerCheckInsHome({
     id: string;
     week: string;
     intern: string;
+    avatarUrl?: string;
     focus: string;
     submitted: string;
     status: string;
@@ -116,12 +118,7 @@ export default function ManagerCheckInsHome({
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-4 py-3 font-bold text-[#0F2744]">{row.week}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2 font-semibold text-slate-700">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#DBEAFE] text-[10px] font-black text-[#1D4ED8]">
-                        {deskInitials(row.intern)}
-                      </span>
-                      {row.intern}
-                    </span>
+                    <InternName name={row.intern} src={row.avatarUrl} className="font-semibold text-slate-700" />
                   </td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[10px] font-bold text-[#1D4ED8]">

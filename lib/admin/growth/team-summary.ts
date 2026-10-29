@@ -12,6 +12,7 @@ export type GrowthTeamMember = {
   hoursSubmitted: number;
   hoursApproved: number;
   managerDeskHref: string;
+  avatarUrl: string;
 };
 
 /**
@@ -93,6 +94,7 @@ export async function listGrowthTeamSummary(input: {
       hoursSubmitted: Math.round(hours.submitted * 10) / 10,
       hoursApproved: Math.round(hours.approved * 10) / 10,
       managerDeskHref: `/intern/manage`,
+      avatarUrl: intern.avatarUrl || "",
     };
   });
 }

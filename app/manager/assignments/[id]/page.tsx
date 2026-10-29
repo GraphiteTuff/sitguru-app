@@ -9,6 +9,7 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
 import { retryManagerAssignmentSync } from "@/lib/internship/manager-assignment-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export default async function ManagerAssignmentDetailPage({
         <p className="text-xs font-black uppercase tracking-[0.14em] text-[#2563EB]">{route.channelLabel}</p>
         <h1 className="mt-1 text-3xl font-black text-[#0F2744]">{String(task.title)}</h1>
         <p className="mt-2 text-sm font-semibold text-slate-600">
-          {intern.preferredName || intern.fullName} · Due {String(task.due_on || "not set")} · {String(task.status || "todo").replaceAll("_", " ")}
+          <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} /> · Due {String(task.due_on || "not set")} · {String(task.status || "todo").replaceAll("_", " ")}
         </p>
         <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{brief.description || String(task.business_objective || "")}</p>
         <p className="mt-2 text-sm font-semibold text-slate-600">Creative freedom: {brief.freedom || "Guided"} · {brief.review || "Manager Review Required"}</p>

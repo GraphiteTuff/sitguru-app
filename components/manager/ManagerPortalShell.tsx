@@ -33,6 +33,7 @@ import {
   MANAGER_PORTAL_SIDEBAR,
 } from "@/lib/admin/growth/manager-portal";
 import DeskChatDock from "@/components/messaging/DeskChatDock";
+import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
 
 const GROWTH_MANAGER_BASE = "/manager";
 

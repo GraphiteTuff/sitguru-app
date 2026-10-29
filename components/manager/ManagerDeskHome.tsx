@@ -17,6 +17,7 @@ import {
 import GrowthOneNoteShortcuts from "@/components/admin/growth/GrowthOneNoteShortcuts";
 import GrowthSharePointShortcuts from "@/components/admin/growth/GrowthSharePointShortcuts";
 import DeskPageHero from "@/components/manager/DeskPageHero";
+import { InternName } from "@/components/portal/PersonFace";
 import ManagerDeskRoster from "@/components/manager/ManagerDeskRoster";
 import {
   buildManagerDeskReviewQueue,
@@ -75,6 +76,7 @@ function weekAxis(now = new Date()) {
 export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
   const queue = buildManagerDeskReviewQueue(desk.reviews, desk.questions);
   const cards = desk.cards;
+  const avatarByName = new Map(cards.map((card) => [card.name, card.avatarUrl || ""]));
   const active = cards.filter((card) => (card.roster || "active") === "active");
   const logged = cards.reduce((sum, card) => sum + (card.summary.loggedThisWeek || 0), 0);
   const planned = cards.reduce((sum, card) => sum + (card.summary.plannedWeeklyHours || 0), 0);
@@ -333,7 +335,9 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-bold text-[#0F2744]">{row.title}</span>
-                  <span className="text-xs font-medium text-slate-500">{row.intern}</span>
+                  <span className="mt-1 inline-flex">
+                    <InternName name={row.intern} src={avatarByName.get(row.intern)} className="text-xs font-medium text-slate-500" />
+                  </span>
                 </span>
                 <span className="text-xs font-bold text-[#DC2626]">{row.due}</span>
                 <span className="rounded-full bg-[#FFEDD5] px-2 py-1 text-[10px] font-bold text-[#C2410C]">{row.status}</span>
@@ -358,7 +362,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
           <ul className="mt-4 space-y-3">
             {activity.map((item) => (
               <li key={item.id} className="flex items-start gap-3">
-                <Face name={item.name} />
+                <Face name={item.name} src={avatarByName.get(item.name)} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-[#0F2744]">{item.text}</span>
                 </span>

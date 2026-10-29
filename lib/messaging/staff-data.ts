@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { messageNeedsAttention } from "@/lib/messaging/mark-conversation-read";
+import { canAccessConversation, visibleMessage, type StaffActor } from "@/lib/messaging/staff-policy";
 
 function text(value: unknown) {
   return String(value || "").trim();

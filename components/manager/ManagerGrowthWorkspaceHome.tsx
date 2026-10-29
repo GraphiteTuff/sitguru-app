@@ -14,7 +14,8 @@ import {
 import type { GrowthTeamMember } from "@/lib/admin/growth/team-summary";
 import type { GrowthInitiative } from "@/lib/admin/growth/outcomes";
 import ManagerHeroBanner from "@/components/manager/ManagerHeroBanner";
-import { DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+import PersonFace from "@/components/portal/PersonFace";
+import { DESK_STAT, DESK_UI } from "@/lib/portal/desk-ui";
 
 function initiativePill(status: string) {
   const value = status.toLowerCase();
@@ -170,9 +171,7 @@ export default function ManagerGrowthWorkspaceHome({
               return (
                 <li key={member.id} className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-3">
                   <div className="flex items-start gap-3">
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DBEAFE] text-sm font-black text-[#1D4ED8]">
-                      {deskInitials(member.name)}
-                    </span>
+                    <PersonFace name={member.name} src={member.avatarUrl} size="lg" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>

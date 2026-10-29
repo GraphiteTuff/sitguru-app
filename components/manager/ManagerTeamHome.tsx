@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import type { GrowthTeamMember } from "@/lib/admin/growth/team-summary";
 import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";
-import { DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
+import PersonFace, { InternName } from "@/components/portal/PersonFace";
+import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export default function ManagerTeamHome({
   team,
@@ -97,9 +98,7 @@ export default function ManagerTeamHome({
               return (
                 <li key={member.id} className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-3">
                   <div className="flex items-start gap-3">
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DBEAFE] text-sm font-black text-[#1D4ED8]">
-                      {deskInitials(member.name)}
-                    </span>
+                    <PersonFace name={member.name} src={member.avatarUrl} size="lg" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
@@ -184,7 +183,9 @@ export default function ManagerTeamHome({
                 className="rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3 py-3"
               >
                 <p className="text-sm font-bold text-[#0F2744]">{item.title}</p>
-                <p className="mt-1 text-xs font-medium text-slate-500">{item.owner}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  <InternName name={item.owner} src={team.find((member) => member.name === item.owner)?.avatarUrl} size="xs" />
+                </p>
                 <p className="mt-1 text-xs font-bold text-[#DC2626]">{item.when}</p>
               </li>
             ))}
@@ -201,9 +202,9 @@ export default function ManagerTeamHome({
                 key={item.name + item.detail}
                 className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 px-3 py-3"
               >
-                <span>
-                  <span className="block text-sm font-bold text-[#0F2744]">{item.name}</span>
-                  <span className="text-xs font-medium text-slate-500">{item.detail}</span>
+                <span className="min-w-0">
+                  <InternName name={item.name} src={team.find((member) => member.name === item.name)?.avatarUrl} className="text-sm font-bold text-[#0F2744]" />
+                  <span className="mt-1 block text-xs font-medium text-slate-500">{item.detail}</span>
                 </span>
                 <Link
                   href="/manager/check-ins"
@@ -233,7 +234,7 @@ export default function ManagerTeamHome({
               >
                 <span>
                   <span className="block text-sm font-bold text-[#0F2744]">{item.title}</span>
-                  <span className="text-xs font-medium text-slate-500">{item.owner}</span>
+                  <InternName name={item.owner} src={team.find((member) => member.name === item.owner)?.avatarUrl} className="text-xs font-medium text-slate-500" />
                 </span>
                 <span className="rounded-full bg-[#DBEAFE] px-2.5 py-1 text-[10px] font-bold text-[#1D4ED8]">
                   {item.status}
@@ -298,7 +299,9 @@ export default function ManagerTeamHome({
                 const pct = Math.min(100, Math.round((approved / required) * 100));
                 return (
                   <tr key={member.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 font-bold text-[#0F2744]">{member.name}</td>
+                    <td className="px-4 py-3 font-bold text-[#0F2744]">
+                      <InternName name={member.name} src={member.avatarUrl} />
+                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       {member.program || member.school || "Intern"}
                     </td>

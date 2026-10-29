@@ -125,12 +125,14 @@ export async function loadManagerDashboard(input: {
   );
 
   const names = new Map(interns.map((intern) => [intern.id, intern.preferredName || intern.fullName]));
+  const avatars = new Map(interns.map((intern) => [intern.id, intern.avatarUrl || ""]));
   return {
     cards,
     reviews: buildManagerReviewQueue({ interns, tasks, content, reviews, logs }),
     questions: questions.map((question) => ({
       ...question,
       internName: names.get(question.internId) || "Intern",
+      avatarUrl: avatars.get(question.internId) || "",
     })),
     interns,
     notices,

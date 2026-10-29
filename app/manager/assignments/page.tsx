@@ -104,6 +104,7 @@ export default async function ManagerAssignmentsPage({
       taskId: String(row.id),
       internId: String(row.intern_id),
       intern: names.get(String(row.intern_id)) || "Intern",
+      avatarUrl: interns.find((intern) => intern.id === String(row.intern_id))?.avatarUrl || "",
       title: String(row.title || ""),
       category: brief.category || String(row.metric_affected || "Other"),
       milestoneId: brief.milestoneId || "",

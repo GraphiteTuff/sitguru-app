@@ -16,6 +16,7 @@ import {
   internStatusLabel,
 } from "@/lib/internship/labels";
 import { getActiveCohort, getCohortDashboard, listCohortMilestones } from "@/lib/internship/queries";
+import { InternName } from "@/components/portal/PersonFace";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
 
@@ -223,7 +224,9 @@ export default async function InternshipProgramDashboardPage() {
                     key={intern.id}
                     className="rounded-2xl border border-slate-100 px-4 py-3"
                   >
-                    <p className="font-black text-slate-950">{intern.fullName}</p>
+                    <p className="font-black text-slate-950">
+                      <InternName name={intern.fullName} src={intern.avatarUrl} />
+                    </p>
                     <p className="text-xs font-semibold text-slate-500">
                       {university?.displayName || "Student institution"}
                       {intern.academicProgram ? ` — ${intern.academicProgram}` : ""}

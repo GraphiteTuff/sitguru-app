@@ -276,6 +276,7 @@ export function ManagerGrowthMockFrame({
       hoursSubmitted: card.summary.submittedHours || 0,
       hoursApproved: card.summary.approvedHours || 0,
       managerDeskHref: `/intern/manage?intern=${card.id}`,
+      avatarUrl: card.avatarUrl || "",
     })),
     {
       id: "jordan",
@@ -287,6 +288,7 @@ export function ManagerGrowthMockFrame({
       hoursSubmitted: 44,
       hoursApproved: 40,
       managerDeskHref: "/intern/manage",
+      avatarUrl: "",
     },
   ];
 

@@ -1,6 +1,7 @@
 import { Clock3 } from "lucide-react";
 import { redirect } from "next/navigation";
 import InternHeroBanner from "@/components/internship/InternHeroBanner";
+import { InternName } from "@/components/portal/PersonFace";
 import InternHoursHome from "@/components/internship/InternHoursHome";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -109,7 +110,7 @@ export default async function InternTimePage({
       />
       {preview ? (
         <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
-          Read-only time for {intern.preferredName || intern.fullName}. Their timer and weekly submit stay on their login.
+          Read-only time for <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} />. Their timer and weekly submit stay on their login.
         </p>
       ) : null}
       {notice ? <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}>{notice}</p> : null}

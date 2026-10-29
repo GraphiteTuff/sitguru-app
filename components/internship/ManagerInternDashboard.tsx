@@ -10,6 +10,7 @@ import {
   saveRequirementConfig,
 } from "@/lib/internship/portal-actions";
 import AskAvaForm from "@/components/internship/AskAvaForm";
+import { InternName } from "@/components/portal/PersonFace";
 import type { ManagerInternCard, ManagerQuestion, ManagerReviewItem } from "@/lib/internship/manager-dashboard";
 import type { InternshipIntern } from "@/lib/internship/types";
 import {
@@ -76,7 +77,7 @@ function InternCard({ card }: { card: ManagerInternCard }) {
             Assigned intern
           </p>
           <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-            {card.name}
+            <InternName name={card.name} src={card.avatarUrl} size="sm" />
           </h2>
           <p className="text-sm font-semibold text-slate-600">{card.school}</p>
         </div>
@@ -132,7 +133,7 @@ function ReviewCard({
       <div className="flex flex-wrap items-center gap-2">
         <StatusText label={item.statusLabel} />
         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-950 ring-1 ring-amber-200">
-          {item.internName}
+          <InternName name={item.internName} src={item.avatarUrl} />
         </span>
       </div>
       <h3 className="mt-2 text-lg font-black text-slate-950">{item.title}</h3>
@@ -388,7 +389,9 @@ export default function ManagerInternDashboard({
                 key={card.id}
                 className="rounded-2xl border border-amber-100/80 bg-[#FAF6EE] px-3 py-3"
               >
-                <p className="font-black text-slate-950">{card.name}</p>
+                <p className="font-black text-slate-950">
+                  <InternName name={card.name} src={card.avatarUrl} />
+                </p>
                 <p className="text-sm font-semibold text-slate-600">
                   Next deadline: {card.nextDeadline}
                 </p>
@@ -426,7 +429,7 @@ export default function ManagerInternDashboard({
             {openQuestions.map((question) => (
               <article key={question.id} className={CARD_SHELL}>
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-800">
-                  {question.internName} ·{" "}
+                  <InternName name={question.internName} src={question.avatarUrl} /> ·{" "}
                   {question.urgency === "high" ? "Blocking" : "Question"} ·{" "}
                   {question.status}
                 </p>
@@ -481,7 +484,7 @@ export default function ManagerInternDashboard({
                 >
                   <input type="hidden" name="internId" value={intern.id} />
                   <p className="font-black text-slate-950 sm:col-span-2">
-                    {intern.fullName}
+                    <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} />
                   </p>
                   <label className="block text-sm font-semibold">
                     Credits
@@ -633,7 +636,7 @@ export default function ManagerInternDashboard({
                 <form key={`${intern.id}-zero`} action={approveWeekZero} className="mt-3">
                   <input type="hidden" name="internId" value={intern.id} />
                   <button className="min-h-11 text-sm font-black text-emerald-800 underline">
-                    Approve Start Here for {intern.preferredName || intern.fullName}
+                    Approve Start Here for <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} />
                   </button>
                 </form>
               ))}

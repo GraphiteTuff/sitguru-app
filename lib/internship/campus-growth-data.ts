@@ -61,6 +61,7 @@ export type CampusMission = {
 export type CampusCard = {
   internId: string;
   internName: string;
+  avatarUrl: string;
   campusName: string;
   semester: string;
   status: string;
@@ -176,6 +177,7 @@ export async function loadCampusGrowth(input: {
     return {
       internId: intern.id,
       internName: intern.preferredName || intern.fullName,
+      avatarUrl: intern.avatarUrl || "",
       campusName: schoolName.get(intern.universityId) || "Campus not on file",
       semester: intern.semester || "",
       status: text(profile?.status) || (intern.status === "active" ? "Active" : intern.status || "Active"),

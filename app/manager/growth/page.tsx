@@ -91,6 +91,7 @@ export default async function ManagerGrowthWorkspacePage() {
               hoursSubmitted: card.summary.submittedHours || 0,
               hoursApproved: card.summary.approvedHours || 0,
               managerDeskHref: `/intern/manage?intern=${card.id}`,
+              avatarUrl: card.avatarUrl || "",
             }))
       }
       initiatives={desk.initiatives}

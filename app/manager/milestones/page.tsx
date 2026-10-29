@@ -20,6 +20,7 @@ export default async function ManagerMilestonesPage() {
     id: card.id,
     title: card.milestone || `${card.name} progress`,
     intern: card.name,
+    avatarUrl: card.avatarUrl || "",
     category: card.phase || "Growth",
     due: card.nextDeadline || "Soon",
     status:

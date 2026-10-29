@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
+import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import {
   CAMPUS_CHANNELS,
@@ -53,7 +54,9 @@ export default function InternCampusGrowthHome({
         banner="intern"
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
-      <p className="text-sm font-semibold text-slate-600">{card.campusName} · {card.internName} · Social Media & Community Growth Intern{card.semester ? ` · ${card.semester}` : ""}</p>
+      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600">
+        {card.campusName} · <InternName name={card.internName} src={card.avatarUrl} /> · Social Media & Community Growth Intern{card.semester ? ` · ${card.semester}` : ""}
+      </p>
       <p className="rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm font-semibold leading-6 text-[#0F2744]">{CAMPUS_GROWTH_PRINCIPLE}</p>
       {notice ? <p className={`rounded-2xl px-4 py-3 text-sm font-bold ${error ? "bg-rose-50 text-rose-800" : "bg-[#ECFDF5] text-[#047857]"}`}>{notice}</p> : null}
 

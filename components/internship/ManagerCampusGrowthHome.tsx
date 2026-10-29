@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
+import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import {
   CAMPUS_COACHING_PROMPTS,
@@ -65,7 +66,9 @@ export default function ManagerCampusGrowthHome({
             <article key={card.internId} id={card.internId} className={`${DESK_UI.card} p-4`}>
               <p className="text-xs font-black uppercase tracking-wide text-[#2563EB]">{card.status}</p>
               <h2 className="mt-1 text-xl font-black text-[#0F2744]">{card.campusName}</h2>
-              <p className="text-sm font-semibold text-slate-600">{card.internName} · Social Media & Community Growth Intern</p>
+              <p className="text-sm font-semibold text-slate-600">
+                <InternName name={card.internName} src={card.avatarUrl} /> · Social Media & Community Growth Intern
+              </p>
               <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                 {[
                   ["Campus Opportunities", card.opportunities],
@@ -154,7 +157,9 @@ export default function ManagerCampusGrowthHome({
 
       {cards.map((card) => (
         <section key={card.internId} id={`mission-${card.internId}`} className={`${DESK_UI.card} p-4`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Campus mission for {card.internName}</h2>
+          <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
+            Campus mission for <InternName name={card.internName} src={card.avatarUrl} />
+          </h2>
           <p className="text-sm font-semibold text-slate-500">{card.campusName}. This uses the existing assignment, Planner, SharePoint, and Teams path.</p>
           <form action={createCampusMission} className="mt-3 grid gap-2">
             <input type="hidden" name="internId" value={card.internId} />
