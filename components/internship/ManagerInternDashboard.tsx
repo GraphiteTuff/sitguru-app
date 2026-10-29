@@ -307,7 +307,7 @@ export default function ManagerInternDashboard({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/manager" className={`${internPrimaryBtnClass} rounded-full`}>
-              Manager Portal
+              My Manager Portal
             </Link>
             <Link href="/intern" className={`${internGhostBtnClass} rounded-full`}>
               Intern portal

@@ -82,7 +82,7 @@ export default function ManagerPortalShell({
       <div className="mx-auto flex min-h-dvh max-w-[1600px]">
         <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
           <div className="border-b border-slate-100 px-5 py-5">
-            <Link href={MANAGER_PORTAL_BRAND.homePath} className="block" aria-label="SitGuru Manager Portal">
+            <Link href={MANAGER_PORTAL_BRAND.homePath} className="block" aria-label="SitGuru My Manager Portal">
               <Image
                 src={DESK_LOGO}
                 alt="SitGuru. Trusted Pet Care Simplified."
@@ -94,7 +94,7 @@ export default function ManagerPortalShell({
             </Link>
           </div>
 
-          <nav aria-label="Manager Portal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
+          <nav aria-label="My Manager Portal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
             {MANAGER_PORTAL_SIDEBAR.map((item) => {
               const Icon = ICONS[item.label as keyof typeof ICONS] || LayoutDashboard;
               const active = navActive(pathname, item);

@@ -167,7 +167,7 @@ export function SiteAccountMenu({
           : currentRole === "manager"
             ? "Intern Team Desk"
           : currentRole === "growth"
-            ? "Manager Portal"
+            ? "My Manager Portal"
           : currentRole === "parent"
             ? "SitGuru Pet Parent"
             : currentRole === "admin"

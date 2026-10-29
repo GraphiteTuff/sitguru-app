@@ -27,7 +27,7 @@ export default function ManagerPortalHeader() {
         <Link
           href={MANAGER_PORTAL_BRAND.homePath}
           className="min-w-0"
-          aria-label="Open Manager Portal"
+          aria-label="Open My Manager Portal"
         >
           <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-amber-800">
             {MANAGER_PORTAL_BRAND.kicker}
@@ -39,7 +39,7 @@ export default function ManagerPortalHeader() {
         </Link>
 
         <nav
-          aria-label="Manager Portal"
+          aria-label="My Manager Portal"
           className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {MANAGER_PORTAL_NAV.map((item) => {

@@ -4,7 +4,7 @@ import { MANAGER_ROUTES } from "@/lib/admin/growth/manager-routes";
 
 export const MANAGER_PORTAL_BRAND = {
   kicker: "Social Media & Community Growth Manager",
-  title: "Manager Portal",
+  title: "My Manager Portal",
   deskTitle: "Manager's Desk",
   growthTitle: "Growth Home",
   homePath: MANAGER_ROUTES.home,

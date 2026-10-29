@@ -180,7 +180,7 @@ export default function InternTeamDesk({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-slate-500">
-            <Link href="/manager" className="hover:text-[#2563EB]">Manager Portal</Link>
+            <Link href="/manager" className="hover:text-[#2563EB]">My Manager Portal</Link>
             <span className="px-1.5">›</span>
             Intern Team Desk
           </p>
