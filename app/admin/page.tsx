@@ -160,6 +160,7 @@ export default async function AdminOperationsDashboard() {
     gurus,
     bookableGurus,
     pendingGurus,
+    pendingStaffRoleRequests,
     activeAmbassadors,
     unreadMessages,
     upcomingBookings,
@@ -193,6 +194,7 @@ export default async function AdminOperationsDashboard() {
         ],
       },
     ]),
+    safeCount("staff_role_requests", [{ column: "status", operator: "eq", value: "pending" }]),
     safeCount("ambassadors", [
       { column: "status", operator: "eq", value: "active" },
     ]),
@@ -242,6 +244,11 @@ export default async function AdminOperationsDashboard() {
   ]);
 
   const attentionItems = [
+    {
+      label: "Staff Access Requests",
+      value: pendingStaffRoleRequests,
+      href: "/admin/hr/staff-requests",
+    },
     {
       label: "Pending Gurus",
       value: pendingGurus,
