@@ -33,7 +33,7 @@ import {
   MANAGER_PORTAL_SIDEBAR,
 } from "@/lib/admin/growth/manager-portal";
 import DeskChatDock from "@/components/messaging/DeskChatDock";
-import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
+import { DESK_BANNER, deskRoleLines, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
 
 const GROWTH_MANAGER_BASE = "/manager";
 
@@ -154,11 +154,15 @@ export default function ManagerPortalShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
             <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 shrink-0 xl:hidden">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#2563EB]">
-                  {MANAGER_PORTAL_BRAND.kicker}
+              <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 flex-1 xl:hidden">
+                <p className="text-[10px] font-black uppercase leading-[1.15] tracking-[0.08em] text-[#2563EB]">
+                  {deskRoleLines(MANAGER_PORTAL_BRAND.kicker).map((line) => (
+                    <span key={line} className="block">
+                      {line}
+                    </span>
+                  ))}
                 </p>
-                <p className="truncate text-sm font-black text-[#0F2744]">
+                <p className="truncate text-sm font-black leading-tight text-[#0F2744]">
                   {MANAGER_PORTAL_BRAND.title}
                 </p>
               </Link>

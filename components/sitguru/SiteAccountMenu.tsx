@@ -265,13 +265,13 @@ export function SiteAccountMenu({
         <Avatar sizeClass={compact && variant !== "desk" ? "h-9 w-9" : variant === "desk" ? "h-12 w-12" : "h-11 w-11"} />
         {variant === "desk" ? (
           <>
-            <span className="hidden shrink-0 text-left sm:block">
-              <span className="block whitespace-nowrap text-sm font-bold leading-tight text-[#0F2744]">
+            <span className="hidden max-w-[9.5rem] shrink text-left sm:block">
+              <span className="block truncate text-sm font-bold leading-tight text-[#0F2744]">
                 {loadedAccount.name}
               </span>
               <span className="mt-0.5 block text-[11px] font-medium leading-[1.15] text-slate-500">
                 {deskRoleLines(deskRoleTitle).map((line) => (
-                  <span key={line} className="block whitespace-nowrap">
+                  <span key={line} className="block">
                     {line}
                   </span>
                 ))}

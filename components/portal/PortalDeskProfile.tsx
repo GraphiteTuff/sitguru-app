@@ -61,13 +61,13 @@ export function PortalDeskProfileStatic({
             <span className="relative z-[1] m-auto text-sm font-black text-[#0F2744]">{initials}</span>
           )}
         </span>
-        <span className="hidden shrink-0 text-left sm:block">
-          <span className="block whitespace-nowrap text-sm font-bold leading-tight text-[#0F2744]">
+        <span className="hidden max-w-[9.5rem] shrink text-left sm:block">
+          <span className="block truncate text-sm font-bold leading-tight text-[#0F2744]">
             {name}
           </span>
           <span className="mt-0.5 block text-[11px] font-medium leading-[1.15] text-slate-500">
             {deskRoleLines(title).map((line) => (
-              <span key={line} className="block whitespace-nowrap">
+              <span key={line} className="block">
                 {line}
               </span>
             ))}
@@ -90,7 +90,7 @@ export function PortalDeskProfileLive({
   notificationsHref: string;
 }) {
   return (
-    <div className="ml-auto flex items-center gap-2 sm:gap-3">
+    <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
       <Link
         href={notificationsHref}
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[#0F2744] hover:bg-[#EEF2F6]"
