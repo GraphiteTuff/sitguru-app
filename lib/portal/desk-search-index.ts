@@ -24,6 +24,11 @@ const MANAGER: DeskSearchHit[] = [
   { href: "/manager/training", title: "Training", detail: "Modules and guides", keywords: "training learn modules" },
   { href: "/manager/resources", title: "Resources", detail: "Templates, links, and files", keywords: "resources files templates sharepoint" },
   { href: "/manager/help", title: "Help", detail: "Guides for the manager desk", keywords: "help support faq" },
+  { href: "/manager/weekly-work", title: "My Weekly Work", detail: "Initiatives and weekly learning", keywords: "weekly work initiative goals" },
+  { href: "/manager/campaigns-content", title: "Campaigns & Content", detail: "Organic campaigns and captions", keywords: "campaign content utm" },
+  { href: "/manager/outreach", title: "Community Outreach", detail: "Partners and follow-ups", keywords: "outreach partner shelter" },
+  { href: "/manager/surveys", title: "Polls & Surveys", detail: "Community questions", keywords: "poll survey" },
+  { href: "/manager/conversions", title: "Growth & Conversions", detail: "Registrations and bookings", keywords: "conversion booking registration" },
   { href: "/manager/settings", title: "Settings", detail: "Account, notifications, and password", keywords: "settings profile password account" },
   { href: "/manager/onboarding", title: "Onboarding", detail: "Your SitGuru checklist", keywords: "onboarding checklist documents" },
 ];

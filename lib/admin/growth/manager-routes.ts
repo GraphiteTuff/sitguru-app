@@ -22,6 +22,11 @@ export const MANAGER_ROUTES = {
   help: "/manager/help",
   settings: "/manager/settings",
   campaigns: "/manager/campaigns",
+  weeklyWork: "/manager/weekly-work",
+  campaignsContent: "/manager/campaigns-content",
+  outreach: "/manager/outreach",
+  surveys: "/manager/surveys",
+  conversions: "/manager/conversions",
 } as const;
 
 export const MANAGER_MENU_WIRED = [

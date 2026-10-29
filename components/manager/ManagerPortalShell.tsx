@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
 import {
   BarChart3,
   CalendarCheck2,
@@ -17,8 +18,10 @@ import {
   Home,
   LayoutDashboard,
   LineChart,
+  Megaphone,
   MessageCircle,
   PawPrint,
+  PieChart,
   Settings,
   Sparkles,
   Users,
@@ -38,6 +41,7 @@ import { DESK_BANNER, deskRoleLines, DESK_LOGO, DESK_UI } from "@/lib/portal/des
 const GROWTH_MANAGER_BASE = "/manager";
 
 const ICONS = {
+  Overview: Home,
   Home,
   "Growth Home": Sparkles,
   "Campus Growth": GraduationCap,
@@ -46,6 +50,11 @@ const ICONS = {
   "My Payments": CreditCard,
   "My Team": Users,
   "Intern Team": Users,
+  "My Weekly Work": ClipboardList,
+  "Campaigns & Content": Megaphone,
+  "Community Outreach": Users,
+  "Polls & Surveys": PieChart,
+  "Growth & Conversions": LineChart,
   Assignments: ClipboardList,
   "Check-Ins": CalendarCheck2,
   Milestones: Flag,
@@ -62,7 +71,6 @@ const ICONS = {
 } as const;
 
 function navActive(pathname: string, item: (typeof MANAGER_PORTAL_SIDEBAR)[number]) {
-  if (item.match === "none") return false;
   if (item.match === "exact") return pathname === item.href || pathname === `${item.href}/`;
   if (item.match === "growth-home") return isManagerGrowthHomePath(pathname);
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -95,27 +103,35 @@ export default function ManagerPortalShell({
           </div>
 
           <nav aria-label="My Manager Portal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
-            {MANAGER_PORTAL_SIDEBAR.map((item) => {
+            {MANAGER_PORTAL_SIDEBAR.map((item, index) => {
               const Icon = ICONS[item.label as keyof typeof ICONS] || LayoutDashboard;
               const active = navActive(pathname, item);
+              const previous = index > 0 ? MANAGER_PORTAL_SIDEBAR[index - 1] : null;
+              const showGroup = item.group !== previous?.group;
               return (
-                <Link
-                  key={item.href + item.label}
-                  href={item.href}
-                  className={
-                    active
-                      ? `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
-                      : `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
-                  }
-                >
-                  <Icon size={17} className="shrink-0 opacity-90" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.label === "Messaging" && unreadMessages > 0 ? (
-                    <span className="rounded-full bg-[#F05A4A] px-2 py-0.5 text-[10px] font-black !text-white">
-                      {unreadMessages > 9 ? "9+" : unreadMessages}
-                    </span>
+                <Fragment key={item.href + item.label}>
+                  {showGroup ? (
+                    <p className="px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      {item.group}
+                    </p>
                   ) : null}
-                </Link>
+                  <Link
+                    href={item.href}
+                    className={
+                      active
+                        ? `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
+                        : `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
+                    }
+                  >
+                    <Icon size={17} className="shrink-0 opacity-90" />
+                    <span className="flex-1">{item.label}</span>
+                    {item.label === "Messaging" && unreadMessages > 0 ? (
+                      <span className="rounded-full bg-[#F05A4A] px-2 py-0.5 text-[10px] font-black !text-white">
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
+                      </span>
+                    ) : null}
+                  </Link>
+                </Fragment>
               );
             })}
           </nav>
@@ -192,7 +208,7 @@ export default function ManagerPortalShell({
             ]}
             more={[
               ...MANAGER_PORTAL_SIDEBAR.filter(
-                (item) => item.label !== "Home" && item.label !== "Manager's Desk" && item.label !== "My Team" && item.label !== "Check-Ins" && item.label !== "Messaging",
+                (item) => item.label !== "Overview" && item.label !== "My Team" && item.label !== "Check-Ins" && item.label !== "Messaging",
               ).map((item) => ({ label: item.label, href: item.href })),
               { label: "Settings", href: MANAGER_PORTAL_BRAND.settingsPath },
             ]}
