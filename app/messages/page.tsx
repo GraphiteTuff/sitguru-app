@@ -3,12 +3,16 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Header from "@/components/Header";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   searchParams?: Promise<{
     filter?: string;
+    role?: string;
+    returnTo?: string;
+    q?: string;
   }>;
 };
 
@@ -45,6 +49,7 @@ type ProfileRow = {
   last_name?: string | null;
   email?: string | null;
   profile_photo_url?: string | null;
+  photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
   role?: string | null;
@@ -118,11 +123,11 @@ function getProfileName(profile?: ProfileRow | null) {
 }
 
 function getProfilePhotoUrl(profile?: ProfileRow | null) {
-  if (!profile) return null;
+  return resolvePetParentAvatarUrl(profile) || null;
+}
 
-  return (
-    profile.profile_photo_url || profile.avatar_url || profile.image_url || null
-  );
+function firstName(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean)[0] || name;
 }
 
 function getInitials(name: string) {
@@ -142,17 +147,17 @@ function getMessagePreview(message?: MessageRow | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "No recent activity";
-
+  if (!value) return "";
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "No recent activity";
-
-  return parsed.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(parsed.getTime())) return "";
+  const day = parsed.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  if (day === today) {
+    return parsed.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+  }
+  if (day === yesterday) return "Yesterday";
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
 }
 
 function isAfterDate(dateA?: string | null, dateB?: string | null) {
@@ -169,10 +174,12 @@ function isAfterDate(dateA?: string | null, dateB?: string | null) {
 }
 
 function getThreadKind({
+  viewerId,
   otherParticipants,
   conversation,
   profilesById,
 }: {
+  viewerId: string;
   otherParticipants: ConversationParticipantRow[];
   conversation: ConversationRow;
   profilesById: Map<string, ProfileRow>;
@@ -188,13 +195,14 @@ function getThreadKind({
   });
 
   const hasAdmin = participantRoles.includes("admin");
-  const hasGuru =
-    participantRoles.includes("guru") || Boolean(conversation.guru_id);
-  const hasCustomer =
-    participantRoles.includes("customer") || Boolean(conversation.customer_id);
+  const otherIsGuru = participantRoles.includes("guru") || (
+    Boolean(conversation.guru_id) && conversation.guru_id !== viewerId
+  );
+  const otherIsCustomer = participantRoles.includes("customer") || (
+    Boolean(conversation.customer_id) && conversation.customer_id !== viewerId
+  );
 
   const subjectText = String(conversation.subject || "").trim().toLowerCase();
-
   const looksLikeAdmin =
     subjectText.includes("admin") ||
     subjectText.includes("support") ||
@@ -205,17 +213,16 @@ function getThreadKind({
     subjectText.includes("background");
 
   if (hasAdmin || looksLikeAdmin) return "admin";
-  if (hasGuru) return "guru";
-  if (hasCustomer) return "customer";
-
+  if (otherIsCustomer) return "customer";
+  if (otherIsGuru) return "guru";
   return "mixed";
 }
 
-function getThreadKindLabel(kind: InboxConversation["threadKind"]) {
-  if (kind === "admin") return "Admin Support";
-  if (kind === "guru") return "Guru Conversation";
-  if (kind === "customer") return "Customer Conversation";
-  return "Shared Thread";
+function getThreadKindLabel(kind: InboxConversation["threadKind"], viewerIsGuru: boolean) {
+  if (kind === "admin") return "SitGuru";
+  if (kind === "customer") return viewerIsGuru ? "Pet Parent" : "Pet Parent";
+  if (kind === "guru") return "Guru";
+  return "Conversation";
 }
 
 function getThreadKindClasses(kind: InboxConversation["threadKind"]) {
@@ -258,7 +265,7 @@ function getStatusClasses(status?: string | null) {
 
 function getBookingLabel(conversation: ConversationRow) {
   if (!conversation.booking_id) return null;
-  return `Booking #${String(conversation.booking_id)}`;
+  return "About a booking";
 }
 
 function getConversationSubject(conversation: ConversationRow, kind: string) {
@@ -295,19 +302,16 @@ function Avatar({
   name: string;
   imageUrl?: string | null;
 }) {
-  if (imageUrl) {
-    return (
-      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-emerald-100 bg-white shadow-sm">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-emerald-100 bg-emerald-50 text-lg font-black text-emerald-700 shadow-sm">
-      {getInitials(name)}
-    </div>
+    <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-emerald-100">
+      <span className="absolute inset-0 bg-white" />
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt="" className="relative z-[1] h-full w-full object-cover object-center" />
+      ) : (
+        <span className="relative z-[1] text-sm font-black text-[#0D5C3A]">{getInitials(name)}</span>
+      )}
+    </span>
   );
 }
 
@@ -340,17 +344,37 @@ function getDashboardHref(role?: string | null) {
   return "/customer/dashboard";
 }
 
+function safeReturnPath(value: string | undefined, role: string) {
+  const path = String(value || "").trim();
+  if (role === "guru" && (path === "/guru/dashboard" || path.startsWith("/guru/dashboard/"))) return path;
+  if (path === "/customer/dashboard" || path.startsWith("/customer/dashboard/")) return path;
+  if (path === "/ambassador/dashboard" || path.startsWith("/ambassador/dashboard/")) return path;
+  return getDashboardHref(role);
+}
+
+function inboxHref(role: string, returnTo: string, filter = "all", query = "") {
+  const params = new URLSearchParams();
+  if (role === "guru" || role === "customer" || role === "ambassador") params.set("role", role);
+  if (returnTo) params.set("returnTo", returnTo);
+  if (filter && filter !== "all") params.set("filter", filter);
+  if (query) params.set("q", query);
+  const search = params.toString();
+  return search ? `/messages?${search}` : "/messages";
+}
+
 function getActiveFilterClasses(isActive: boolean) {
   if (isActive) {
-    return "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/20";
+    return "border-[#0D5C3A] bg-[#0D5C3A] !text-white";
   }
 
-  return "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700";
+  return "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50";
 }
 
 export default async function MessagesPage({ searchParams }: PageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const activeFilter = String(resolvedSearchParams?.filter || "all").toLowerCase();
+  const requestedRole = normalizeRoleValue(resolvedSearchParams.role || "");
+  const activeFilter = String(resolvedSearchParams.filter || "all").toLowerCase();
+  const searchText = String(resolvedSearchParams.q || "").trim().toLowerCase();
 
   const supabase = await createClient();
 
@@ -360,29 +384,27 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    redirect("/customer/login");
+    const next = inboxHref(requestedRole || "customer", safeReturnPath(resolvedSearchParams.returnTo, requestedRole || "customer"));
+    redirect(requestedRole === "guru" ? `/guru/login?next=${encodeURIComponent(next)}` : `/customer/login?next=${encodeURIComponent(next)}`);
   }
 
   const currentProfileRows = await safeRows<ProfileRow>(
     supabaseAdmin
       .from("profiles")
       .select(
-        "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+        "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, photo_url, avatar_url, role, account_type"
       )
       .eq("id", user.id),
     "current profile"
   );
 
   const currentProfile = currentProfileRows[0] || null;
-  const currentUserRole = normalizeRoleValue(
-    currentProfile?.role || currentProfile?.account_type || ""
-  );
-
-  if (currentUserRole === "admin") {
-    redirect("/admin/messages");
-  }
-
-  const dashboardHref = getDashboardHref(currentUserRole);
+  const currentUserRole = requestedRole === "guru" || requestedRole === "customer" || requestedRole === "ambassador"
+    ? requestedRole
+    : normalizeRoleValue(currentProfile?.role || currentProfile?.account_type || "");
+  const viewerIsGuru = currentUserRole === "guru";
+  if (!viewerIsGuru && currentUserRole === "admin") redirect("/admin/messages");
+  const dashboardHref = safeReturnPath(resolvedSearchParams.returnTo, currentUserRole);
 
   const myParticipantRows = await safeRows<ConversationParticipantRow>(
     supabaseAdmin
@@ -487,7 +509,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         supabaseAdmin
           .from("profiles")
           .select(
-            "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+            "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, photo_url, avatar_url, role, account_type"
           )
           .in("id", profileIds),
         "profiles"
@@ -554,6 +576,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
       );
 
       const kind = getThreadKind({
+        viewerId: user.id,
         otherParticipants,
         conversation,
         profilesById,
@@ -562,8 +585,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
       const firstOtherProfile =
         otherUserIds.length > 0 ? profilesById.get(otherUserIds[0]) || null : null;
 
-      const otherUserName =
-        kind === "admin" ? "SitGuru Admin" : getProfileName(firstOtherProfile);
+        otherUserName: firstName(kind === "admin" ? "SitGuru" : getProfileName(firstOtherProfile)),
 
       const otherUserRole =
         kind === "admin"
@@ -612,7 +634,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         status: String(conversation.status || "open"),
         lastActivity,
         unread,
-        href: `/messages/${conversation.id}`,
+        href: `${inboxHref(currentUserRole, dashboardHref).replace("/messages", `/messages/${conversation.id}`)}`,
         threadKind: kind,
         bookingLabel: getBookingLabel(conversation),
         topicLabel,
@@ -621,15 +643,15 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   );
 
   const filteredConversations = inboxConversations.filter((conversation) => {
-    if (activeFilter === "unread") return conversation.unread;
-    if (activeFilter === "guru") return conversation.threadKind === "guru";
-    if (activeFilter === "admin") return conversation.threadKind === "admin";
-    if (activeFilter === "customer") return conversation.threadKind === "customer";
-
-    return true;
+    if (activeFilter === "unread" && !conversation.unread) return false;
+    if ((activeFilter === "parents" || activeFilter === "customer") && conversation.threadKind !== "customer") return false;
+    if (activeFilter === "guru" && conversation.threadKind !== "guru") return false;
+    if (activeFilter === "admin" && conversation.threadKind !== "admin") return false;
+    if (!searchText) return true;
+    const haystack = `${conversation.otherUserName} ${conversation.preview} ${conversation.subject}`.toLowerCase();
+    return haystack.includes(searchText);
   });
 
-  const totalConversations = inboxConversations.length;
   const unreadCount = inboxConversations.filter(
     (conversation) => conversation.unread
   ).length;
@@ -640,24 +662,19 @@ export default async function MessagesPage({ searchParams }: PageProps) {
 
   const adminMessageHref = adminThread?.href || "/messages/admin";
 
-  const filterLinks =
-    currentUserRole === "guru"
-      ? [
-          { label: "All", value: "all", href: "/messages?role=guru" },
-          {
-            label: "Pet Parents",
-            value: "guru",
-            href: "/messages?filter=guru&role=guru",
-          },
-          { label: "Admin", value: "admin", href: "/messages?filter=admin&role=guru" },
-          { label: "Unread", value: "unread", href: "/messages?filter=unread&role=guru" },
-        ]
-      : [
-          { label: "All", value: "all", href: "/messages" },
-          { label: "Guru", value: "guru", href: "/messages?filter=guru" },
-          { label: "Admin", value: "admin", href: "/messages?filter=admin" },
-          { label: "Unread", value: "unread", href: "/messages?filter=unread" },
-        ];
+  const filterLinks = viewerIsGuru
+    ? [
+        { label: "All", value: "all", href: inboxHref(currentUserRole, dashboardHref) },
+        { label: "Pet Parents", value: "parents", href: inboxHref(currentUserRole, dashboardHref, "parents") },
+        { label: "SitGuru", value: "admin", href: inboxHref(currentUserRole, dashboardHref, "admin") },
+        { label: "Unread", value: "unread", href: inboxHref(currentUserRole, dashboardHref, "unread") },
+      ]
+    : [
+        { label: "All", value: "all", href: inboxHref(currentUserRole, dashboardHref) },
+        { label: "Gurus", value: "guru", href: inboxHref(currentUserRole, dashboardHref, "guru") },
+        { label: "SitGuru", value: "admin", href: inboxHref(currentUserRole, dashboardHref, "admin") },
+        { label: "Unread", value: "unread", href: inboxHref(currentUserRole, dashboardHref, "unread") },
+      ];
 
   return (
     <main
@@ -673,28 +690,39 @@ export default async function MessagesPage({ searchParams }: PageProps) {
       <section className="mx-auto max-w-3xl px-3 py-3 sm:px-6 sm:py-6">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <Link
-              href={dashboardHref}
-              className="text-sm font-black text-emerald-700"
-            >
-              ← Dashboard
+            <Link href={dashboardHref} className="text-sm font-bold text-[#0D5C3A]">
+              ← {viewerIsGuru ? "Guru dashboard" : "Dashboard"}
             </Link>
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
               Messages
             </h1>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              {unreadCount} unread · {totalConversations} conversations
+              {viewerIsGuru
+                ? "Pet parents and SitGuru, by first name."
+                : "Care chats, by first name."}{" "}
+              {unreadCount} unread
             </p>
           </div>
           <Link
             href={adminMessageHref}
-            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white"
+            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
           >
-            Admin
+            SitGuru
           </Link>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <form action="/messages" className="mt-4">
+          <input type="hidden" name="role" value={currentUserRole || ""} />
+          <input type="hidden" name="returnTo" value={dashboardHref} />
+          {activeFilter !== "all" ? <input type="hidden" name="filter" value={activeFilter} /> : null}
+          <input
+            name="q"
+            defaultValue={resolvedSearchParams.q || ""}
+            placeholder={viewerIsGuru ? "Search pet parents" : "Search messages"}
+            className="min-h-12 w-full rounded-full border border-emerald-100 bg-white px-4 text-sm font-semibold text-slate-950 outline-none focus:border-[#0D5C3A]"
+          />
+        </form>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {filterLinks.map((filter) => (
             <Link
               key={filter.value}
@@ -737,7 +765,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
                     </span>
                   </div>
                   <p className="truncate text-xs font-bold text-emerald-700">
-                    {getThreadKindLabel(conversation.threadKind)}
+                    {getThreadKindLabel(conversation.threadKind, viewerIsGuru)}
                     {conversation.bookingLabel ? ` · ${conversation.bookingLabel}` : ""}
                   </p>
                   <p
@@ -757,22 +785,26 @@ export default async function MessagesPage({ searchParams }: PageProps) {
             ))
           ) : (
             <div className="px-6 py-12 text-center">
-              <h2 className="text-xl font-black text-slate-950">No conversations yet</h2>
+              <h2 className="text-xl font-black text-slate-950">
+                {viewerIsGuru ? "No pet parent messages yet" : "No conversations yet"}
+              </h2>
               <p className="mt-2 text-sm font-semibold text-slate-600">
-                Message SitGuru Admin, or find a Guru to start care chat.
+                {viewerIsGuru
+                  ? "When a pet parent writes about care, the chat shows up here with their first name and photo."
+                  : "Message SitGuru, or find a Guru to start a care chat."}
               </p>
               <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
                 <Link
                   href={adminMessageHref}
-                  className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white"
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white"
                 >
-                  Message Admin
+                  Message SitGuru
                 </Link>
                 <Link
-                  href="/search"
-                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-700"
+                  href={viewerIsGuru ? dashboardHref : "/search"}
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-[#0D5C3A]"
                 >
-                  Find a Guru
+                  {viewerIsGuru ? "Back to dashboard" : "Find a Guru"}
                 </Link>
               </div>
             </div>
