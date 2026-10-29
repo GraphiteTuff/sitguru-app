@@ -4,6 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Header from "@/components/Header";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
+import { resolveAuthorizedRolesFromProfile } from "@/lib/dashboard/role-switch";
+import {
+  messageConversationHref,
+  messageInboxHref,
+  messageSupportHref,
+  normalizeMessagePortal,
+  resolveAuthorizedMessagePortal,
+} from "@/lib/messaging/portal-context";
 
 export const dynamic = "force-dynamic";
 
@@ -353,13 +361,7 @@ function safeReturnPath(value: string | undefined, role: string) {
 }
 
 function inboxHref(role: string, returnTo: string, filter = "all", query = "") {
-  const params = new URLSearchParams();
-  if (role === "guru" || role === "customer" || role === "ambassador") params.set("role", role);
-  if (returnTo) params.set("returnTo", returnTo);
-  if (filter && filter !== "all") params.set("filter", filter);
-  if (query) params.set("q", query);
-  const search = params.toString();
-  return search ? `/messages?${search}` : "/messages";
+  return messageInboxHref(role, returnTo, filter, query);
 }
 
 function getActiveFilterClasses(isActive: boolean) {
@@ -399,9 +401,26 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   );
 
   const currentProfile = currentProfileRows[0] || null;
-  const currentUserRole = requestedRole === "guru" || requestedRole === "customer" || requestedRole === "ambassador"
-    ? requestedRole
-    : normalizeRoleValue(currentProfile?.role || currentProfile?.account_type || "");
+  const [roleRowsResult, guruRowsResult] = await Promise.all([
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    supabaseAdmin.from("gurus").select("id").eq("user_id", user.id).limit(1),
+  ]);
+  const authorizedRoles = resolveAuthorizedRolesFromProfile({
+    profile: (currentProfile || null) as Record<string, unknown> | null,
+    roleRows: ((roleRowsResult.data || []) as Array<{ role?: string | null }>).map((row) => row.role),
+    email: user.email,
+    hasGuruRecord: Boolean(guruRowsResult.data?.length),
+  });
+  const currentUserRole = resolveAuthorizedMessagePortal({
+    requestedRole,
+    returnTo: resolvedSearchParams.returnTo,
+    authorizedRoles,
+    fallbackRole: currentProfile?.role || currentProfile?.account_type,
+  });
+  const requestedPortal = normalizeMessagePortal(requestedRole);
+  if (requestedPortal && requestedPortal !== currentUserRole) {
+    redirect(inboxHref(currentUserRole, safeReturnPath(resolvedSearchParams.returnTo, currentUserRole), activeFilter, searchText));
+  }
   const viewerIsGuru = currentUserRole === "guru";
   if (!viewerIsGuru && currentUserRole === "admin") redirect("/admin/messages");
   const dashboardHref = safeReturnPath(resolvedSearchParams.returnTo, currentUserRole);
@@ -634,7 +653,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         status: String(conversation.status || "open"),
         lastActivity,
         unread,
-        href: `${inboxHref(currentUserRole, dashboardHref).replace("/messages", `/messages/${conversation.id}`)}`,
+        href: messageConversationHref(conversation.id, currentUserRole, dashboardHref),
         threadKind: kind,
         bookingLabel: getBookingLabel(conversation),
         topicLabel,
@@ -660,7 +679,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
     (conversation) => conversation.threadKind === "admin"
   );
 
-  const adminMessageHref = adminThread?.href || "/messages/admin";
+  const adminMessageHref = adminThread?.href || messageSupportHref(currentUserRole, dashboardHref);
 
   const filterLinks = viewerIsGuru
     ? [

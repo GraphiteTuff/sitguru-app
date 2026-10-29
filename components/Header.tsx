@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
@@ -23,6 +23,7 @@ import {
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { headerModeForSharedMessages } from "@/lib/messaging/portal-context";
 import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
@@ -256,13 +257,31 @@ function getHeaderMode({
   pathname,
   isLoggedIn,
   storedRole,
+  requestedRole,
+  returnTo,
+  authorizedRoles,
 }: {
   pathname: string | null;
   isLoggedIn: boolean;
   storedRole: string;
+  requestedRole?: string | null;
+  returnTo?: string | null;
+  authorizedRoles?: readonly DashboardSwitchRole[] | null;
 }): HeaderMode {
   const path = pathname || "";
   if (!isLoggedIn) return "public";
+  const sharedMessageMode = headerModeForSharedMessages({
+    pathname: path,
+    isLoggedIn,
+    storedRole,
+    requestedRole,
+    returnTo,
+    authorizedRoles,
+  });
+  if (sharedMessageMode === "guru") return "guru";
+  if (sharedMessageMode === "ambassador") return "ambassador";
+  if (sharedMessageMode === "admin") return "admin";
+  if (sharedMessageMode === "customer") return "customer";
   if (path.startsWith("/admin/growth")) return "growth";
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/intern")) return "intern";
@@ -278,7 +297,6 @@ function getHeaderMode({
     path.startsWith("/customer") ||
     path.startsWith("/pets") ||
     path.startsWith("/bookings") ||
-    path.startsWith("/messages") ||
     path.startsWith("/profile") ||
     path.startsWith("/rewards") ||
     path.startsWith("/referrals") ||
@@ -373,7 +391,7 @@ function getActiveAliases(href: string) {
   if (href === "/guru/dashboard/referrals")
     return ["/guru/dashboard/referrals", "/guru/referrals"];
   if (href === "/guru/dashboard/messages")
-    return ["/guru/dashboard/messages", "/guru/messages"];
+    return ["/guru/dashboard/messages", "/guru/messages", "/messages"];
   if (href === "/guru/dashboard/bookings")
     return ["/guru/dashboard/bookings", "/guru/bookings"];
   if (href === "/guru/dashboard/profile")
@@ -447,6 +465,7 @@ function headerModeToSwitchRole(
 
 export default function Header({ user = null }: HeaderProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [loadedUser, setLoadedUser] = useState<HeaderUser | null>(user);
   const [loadingUser, setLoadingUser] = useState(!user);
@@ -669,7 +688,14 @@ export default function Header({ user = null }: HeaderProps) {
   const activeUser = loadedUser;
   const isLoggedIn = Boolean(activeUser);
   const storedRole = normalizeStoredRole(activeUser?.role);
-  const headerMode = getHeaderMode({ pathname, isLoggedIn, storedRole });
+  const headerMode = getHeaderMode({
+    pathname,
+    isLoggedIn,
+    storedRole,
+    requestedRole: searchParams.get("role") || searchParams.get("as") || searchParams.get("contextRole"),
+    returnTo: searchParams.get("returnTo"),
+    authorizedRoles: activeUser?.authorizedRoles,
+  });
 
   const isCustomer = headerMode === "customer";
   const isGuru = headerMode === "guru";

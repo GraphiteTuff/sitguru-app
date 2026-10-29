@@ -17,6 +17,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { messageContinuationHref } from "@/lib/messaging/portal-context";
 
 const topicOptions = [
   "Booking Question",
@@ -171,7 +172,9 @@ function NewMessagePageContent() {
     recipientName,
   ]);
 
-  const backHref = guruSlug ? `/guru/${guruSlug}` : "/messages";
+  const preservedReturn = searchParams.get("returnTo");
+  const inboxHref = messageContinuationHref("/messages", roleContext, preservedReturn);
+  const backHref = guruSlug ? `/guru/${guruSlug}` : inboxHref;
   const backLabel = guruSlug ? "Back to Guru Profile" : "Back to Messages";
 
   const isDisabled = isSubmitting || !message.trim();
@@ -228,11 +231,11 @@ function NewMessagePageContent() {
       const nextConversationId = data?.conversationId || conversationId || "";
 
       if (nextConversationId) {
-        router.push(`/messages/${nextConversationId}`);
+        router.push(messageContinuationHref(`/messages/${nextConversationId}`, roleContext, preservedReturn));
         return;
       }
 
-      router.push("/messages");
+      router.push(inboxHref);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -272,7 +275,7 @@ function NewMessagePageContent() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/messages"
+              href={inboxHref}
               className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
             >
               Messages
@@ -662,7 +665,7 @@ function NewMessagePageContent() {
                   </button>
 
                   <Link
-                    href="/messages"
+                    href={inboxHref}
                     className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-900 transition hover:bg-slate-50"
                   >
                     Back to Messages

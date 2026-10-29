@@ -4,6 +4,12 @@ import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Header from "@/components/Header";
+import { resolveAuthorizedRolesFromProfile } from "@/lib/dashboard/role-switch";
+import {
+  messageInboxHref,
+  normalizeMessagePortal,
+  resolveAuthorizedMessagePortal,
+} from "@/lib/messaging/portal-context";
 import MessageThreadComposer from "@/components/MessageThreadComposer";
 import MessageAutoRefresh from "@/components/MessageAutoRefresh";
 import MessageRealtimeRefresh from "@/components/MessageRealtimeRefresh";
@@ -751,6 +757,38 @@ export default async function MessageConversationPage({
     redirect(`/login?${loginParams.toString()}`);
   }
 
+  const [selfProfileResult, selfRoleResult, selfGuruResult] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("role, account_type")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    supabaseAdmin.from("gurus").select("id").eq("user_id", user.id).limit(1),
+  ]);
+  const viewerPortal = resolveAuthorizedMessagePortal({
+    requestedRole: requestedRoleContext,
+    returnTo: getFirstParam(queryParams.returnTo),
+    authorizedRoles: resolveAuthorizedRolesFromProfile({
+      profile: (selfProfileResult.data || null) as Record<string, unknown> | null,
+      roleRows: ((selfRoleResult.data || []) as Array<{ role?: string | null }>).map((row) => row.role),
+      email: user.email,
+      hasGuruRecord: Boolean(selfGuruResult.data?.length),
+    }),
+    fallbackRole:
+      (selfProfileResult.data as { role?: string | null; account_type?: string | null } | null)?.role ||
+      (selfProfileResult.data as { account_type?: string | null } | null)?.account_type,
+  });
+  const requestedPortal = normalizeMessagePortal(requestedRoleContext);
+  if (requestedPortal && requestedPortal !== viewerPortal) {
+    redirect(
+      `/messages/${encodeURIComponent(conversationId)}?${new URLSearchParams({
+        role: viewerPortal,
+        returnTo: getSafeReturnPath(queryParams.returnTo, viewerPortal),
+      }).toString()}`,
+    );
+  }
+
   const { data: conversation, error: conversationError } = await supabaseAdmin
     .from("conversations")
     .select(
@@ -802,7 +840,7 @@ export default async function MessageConversationPage({
   );
 
   if (!allowedUserIds.has(user.id)) {
-    redirect(getDashboardHref(requestedRoleContext || "customer"));
+    redirect(getDashboardHref(viewerPortal));
   }
 
   const profileIds = Array.from(
@@ -863,17 +901,7 @@ export default async function MessageConversationPage({
   });
 
   const currentUserProfile = profileMap.get(user.id) || null;
-  const currentUserRole = normalizeRole(
-    requestedRoleContext ||
-      participantRoleMap.get(user.id) ||
-      currentUserProfile?.role ||
-      currentUserProfile?.account_type ||
-      (user.id === conversation.customer_id
-        ? "customer"
-        : user.id === conversation.guru_id
-          ? "guru"
-          : ""),
-  );
+  const currentUserRole = viewerPortal;
 
   const returnTo = getSafeReturnPath(
     queryParams.returnTo,
@@ -888,13 +916,9 @@ export default async function MessageConversationPage({
   });
 
   const inboxHref =
-    currentUserRole === "guru"
-      ? "/messages?role=guru&returnTo=/guru/dashboard"
-      : currentUserRole === "ambassador"
-        ? "/ambassador/dashboard/messages?role=ambassador"
-        : currentUserRole === "admin"
-          ? "/admin/messages"
-          : "/customer/dashboard/messages?role=customer";
+    currentUserRole === "admin"
+      ? "/admin/messages"
+      : messageInboxHref(currentUserRole, returnTo);
 
   const otherParticipantId =
     Array.from(allowedUserIds).find((participantId) => participantId !== user.id) ||

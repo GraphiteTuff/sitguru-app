@@ -1,7 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { isSharedMessagePath, normalizeMessagePortal } from "@/lib/messaging/portal-context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
@@ -23,6 +24,11 @@ import {
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const sharedMessagePortal = isSharedMessagePath(pathname)
+    ? normalizeMessagePortal(searchParams.get("role") || searchParams.get("as") || searchParams.get("contextRole"))
+    : null;
+  const petParentMessageChrome = !sharedMessagePortal || sharedMessagePortal === "customer";
 
   const isHomePage = pathname === "/";
 
@@ -120,7 +126,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     (pathname.startsWith("/customer/") && pathname !== "/customer/login");
 
   const isCustomerMessagesPage =
-    pathname === "/messages" || pathname.startsWith("/messages/");
+    isSharedMessagePath(pathname) && petParentMessageChrome;
 
   const isCustomerPetsPage =
     pathname === "/pets" || pathname.startsWith("/pets/");
@@ -169,7 +175,9 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     bot.shouldRender &&
     (bot.variant === "scout" || bot.variant === "taco");
 
-  const shouldShowCustomerBottomNav = isPetParentBottomNavPath(pathname);
+  const shouldShowCustomerBottomNav =
+    isPetParentBottomNavPath(pathname) &&
+    (!isSharedMessagePath(pathname) || petParentMessageChrome);
   // /customer/* already pads via customer/layout — pad sibling routes only.
   const needsBottomNavSpacer =
     shouldShowCustomerBottomNav &&

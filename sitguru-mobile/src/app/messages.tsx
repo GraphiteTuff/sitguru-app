@@ -812,6 +812,31 @@ function mapConversationRow(
   };
 }
 
+function mobileRoleIsAuthorized(
+  role: "pet_parent" | "guru" | "ambassador",
+  roles: string[],
+  profile: RecordRow,
+) {
+  const raw = [
+    ...roles,
+    getFirstString(profile, ["role", "account_type", "active_role", "selected_role"]),
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (role === "guru") return raw.some((value) => value === "both" || value.includes("guru"));
+  if (role === "ambassador") return raw.some((value) => value.includes("ambassador"));
+  return (
+    raw.length === 0 ||
+    raw.some(
+      (value) =>
+        value === "both" ||
+        value.includes("parent") ||
+        value.includes("customer"),
+    )
+  );
+}
+
 function resolveActiveRole({
   profile,
   roles,
@@ -829,7 +854,9 @@ function resolveActiveRole({
     getSingleParam(routeRole) || getSingleParam(routeFrom),
   );
 
-  if (explicitRouteRole) return explicitRouteRole;
+  if (explicitRouteRole && mobileRoleIsAuthorized(explicitRouteRole, roles, profile)) {
+    return explicitRouteRole;
+  }
 
   const savedRole = normalizeRoleValue(
     getFirstString(profile, [
