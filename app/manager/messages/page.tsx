@@ -28,6 +28,7 @@ export default async function ManagerMessagesPage({
       showAdminRecord={access.actor.isSuperUser}
       returnTo="/manager/messages"
       notice={error || notice || null}
+      noticeError={Boolean(error)}
     />
   );
 }

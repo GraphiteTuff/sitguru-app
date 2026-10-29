@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
-import { canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
+import { canAccessConversation, canModerate, canSend, scanSensitive } from "@/lib/messaging/staff-policy";
+import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,12 +24,16 @@ function messagesHome(formData?: FormData) {
   if (raw === "/manager/messages" || raw.startsWith("/manager/messages?")) {
     return "/manager/messages";
   }
+  if (raw === "/intern/messages" || raw.startsWith("/intern/messages?")) {
+    return "/intern/messages";
+  }
   return "/admin/growth/messages";
 }
 
 function refreshMessages(path: string) {
   revalidatePath("/admin/growth/messages");
   revalidatePath("/manager/messages");
+  revalidatePath("/intern/messages");
   revalidatePath(path);
 }
 
@@ -39,18 +44,26 @@ async function actor() {
     data: { user },
   } = await supabase.auth.getUser();
   const userId = admin?.id || user?.id || "";
-  const kind = internshipActorKind({ role: admin?.role, isSuperUser: admin?.isSuperUser });
+  const intern = userId ? await findInternByAccount({ userId, email: user?.email }) : null;
+  const kind = internshipActorKind({
+    role: admin?.role,
+    isSuperUser: admin?.isSuperUser,
+    isIntern: Boolean(intern),
+  });
   const founder = canEditRequirements(kind);
   const growth = Boolean(admin && (isGrowthOnlyRole(admin.role) || founder));
-  return { userId, founder, growth, role: founder ? "founder" as const : growth ? "growth" as const : "none" as const };
+  const role = founder ? "founder" as const : growth ? "growth" as const : intern ? "intern" as const : "none" as const;
+  return { userId, founder, growth, intern, role };
 }
 
 export async function postStaffMessage(formData: FormData) {
   const who = await actor();
   const home = messagesHome(formData);
-  if (who.role === "none" || !who.userId) bounce(home, "error", "Sign in with a growth or founder login.");
+  if (who.role === "none" || !who.userId) bounce(home, "error", "Sign in to send a SitGuru message.");
   const body = field(formData, "body");
-  const visibility = field(formData, "visibility") === "internal_note" ? "internal_note" : "participant";
+  const visibility = who.role === "intern"
+    ? "participant"
+    : field(formData, "visibility") === "internal_note" ? "internal_note" : "participant";
   let media: { url: string; mimeType?: string; name?: string }[] = [];
   try {
     const parsed = JSON.parse(field(formData, "media") || "[]");
@@ -75,14 +88,34 @@ export async function postStaffMessage(formData: FormData) {
   const preview = (body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment")).slice(0, 140);
 
   let conversationId = field(formData, "conversationId");
+  if (conversationId && who.role === "intern") {
+    const { data: existing } = await supabaseAdmin
+      .from("conversations")
+      .select("id,conversation_type,assigned_user_id,started_by_user_id")
+      .eq("id", conversationId)
+      .maybeSingle();
+    const allowed = existing && canAccessConversation({
+      actor: "intern",
+      actorId: who.userId,
+      type: String(existing.conversation_type || "internal_direct") as "internal_direct",
+      participantIds: [who.userId],
+      assignedUserId: String(existing.assigned_user_id || ""),
+    });
+    const started = String(existing?.started_by_user_id || "") === who.userId;
+    if (!allowed && !started) bounce(home, "error", "That conversation is not yours.");
+    const send = canSend({ actor: "intern", level: "initiate_approved", initiating: false, assigned: true });
+    if (!send.ok) bounce(home, "error", send.error);
+  }
   if (!conversationId) {
+    const managerId = who.intern?.managerUserId || null;
     const { data, error } = await supabaseAdmin
       .from("conversations")
       .insert({
-        subject: field(formData, "subject") || "Internal note",
+        subject: field(formData, "subject") || (who.role === "intern" ? "Note for my manager" : "Internal note"),
         conversation_type: "internal_direct",
         workflow_status: "open",
         started_by_user_id: who.userId,
+        assigned_user_id: who.role === "intern" ? managerId : null,
         last_message_preview: preview,
         last_message_at: new Date().toISOString(),
         retention_class: "standard_internal",
@@ -91,11 +124,10 @@ export async function postStaffMessage(formData: FormData) {
       .single();
     if (error || !data) bounce(home, "error", "The conversation could not be started.");
     conversationId = String(data.id);
-    await supabaseAdmin.from("conversation_participants").insert({
-      conversation_id: conversationId,
-      user_id: who.userId,
-      role: who.role,
-    });
+    await supabaseAdmin.from("conversation_participants").insert([
+      { conversation_id: conversationId, user_id: who.userId, role: who.role },
+      ...(managerId && who.role === "intern" ? [{ conversation_id: conversationId, user_id: managerId, role: "growth" }] : []),
+    ]);
   }
 
   const { error } = await supabaseAdmin.from("messages").insert({
@@ -112,6 +144,11 @@ export async function postStaffMessage(formData: FormData) {
     created_at: new Date().toISOString(),
   });
   if (error) bounce(home, "error", "The message could not be saved.");
+  await supabaseAdmin.from("conversations").update({
+    last_message_preview: preview,
+    last_message_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", conversationId);
   refreshMessages(home);
   bounce(home, "ok", visibility === "internal_note" ? "Internal note saved." : "Message sent.");
 }
