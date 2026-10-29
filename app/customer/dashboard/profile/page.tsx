@@ -20,6 +20,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import Header from "@/components/Header";
+import CustomerProfileView, { type ProfilePet, type ProfileRole } from "@/components/customer/CustomerProfileView";
 import { supabase } from "@/lib/supabase";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
@@ -42,6 +43,7 @@ type CustomerProfile = {
   push_notifications: boolean;
   text_notifications: boolean;
   avatar_url: string | null;
+  account_role: string | null;
 };
 
 type RawProfileRow = Record<string, unknown>;
@@ -228,6 +230,9 @@ function buildCustomerProfile(
     push_notifications: readBoolean(row?.push_notifications),
     text_notifications: readBoolean(row?.text_notifications),
     avatar_url: avatarUrl,
+    account_role:
+      readFirstString(row, ["role", "account_type", "signup_role"]) ||
+      readMetadataString(metadata, ["role", "account_type", "signup_role"]),
   };
 }
 
@@ -271,6 +276,31 @@ async function fetchPetCount(userId: string) {
   return 0;
 }
 
+async function fetchHouseholdPets(userId: string): Promise<ProfilePet[]> {
+  const columns = ["owner_id", "user_id", "customer_id", "pet_parent_id"];
+  for (const column of columns) {
+    const { data, error } = await supabase
+      .from("pets")
+      .select("id,name,species,pet_type,breed,age,photo_url")
+      .eq(column, userId)
+      .limit(6);
+    if (error || !data) continue;
+    return data.map((pet) => ({
+      id: String(pet.id),
+      name: String(pet.name || "Pet"),
+      detail: [pet.breed || pet.species || pet.pet_type, pet.age ? `${pet.age}` : ""].filter(Boolean).join(" · ") || "Pet",
+      photo: String(pet.photo_url || ""),
+    }));
+  }
+  return [];
+}
+
+async function fetchRoleNames(userId: string) {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error || !data) return [];
+  return data.map((row) => String(row.role || "").toLowerCase()).filter(Boolean);
+}
+
 async function fetchBookingStats(userId: string) {
   const { data, error } = await supabase
     .from("bookings")
@@ -297,6 +327,44 @@ async function fetchBookingStats(userId: string) {
       ),
     ).length,
   };
+}
+
+function buildProfileRoles(roleNames: string[]): ProfileRole[] {
+  const blob = roleNames.join(" ").toLowerCase();
+  const has = (...needles: string[]) => needles.some((needle) => blob.includes(needle));
+  const manager = has("social_community_manager", "growth_manager", "intern_manager", "marketing_admin");
+  const intern = has("intern") && !manager;
+  const guru = has("guru");
+  return [
+    {
+      id: "parent",
+      title: "Pet Parent",
+      detail: "Book and manage care. Preferences on this page stay with this role.",
+      active: true,
+      href: "/customer/dashboard",
+    },
+    {
+      id: "guru",
+      title: "Guru",
+      detail: "Professional pet care. Guru details stay on the Guru profile.",
+      active: guru,
+      href: guru ? "/guru/dashboard" : "/guru/application",
+    },
+    {
+      id: "intern",
+      title: "Intern",
+      detail: "Opens only after an internship is approved.",
+      active: intern,
+      href: intern ? "/intern" : "/account/staff-access",
+    },
+    {
+      id: "manager",
+      title: "Manager",
+      detail: "Opens only for an approved manager role.",
+      active: manager,
+      href: manager ? "/manager" : "/account/staff-access",
+    },
+  ];
 }
 
 function getCustomerDisplayName(profile: CustomerProfile | null) {
@@ -467,6 +535,8 @@ export default function CustomerProfileSetupPage() {
   });
   const [errorMessage, setErrorMessage] = useState("");
   const [avatarImageFailed, setAvatarImageFailed] = useState(false);
+  const [pets, setPets] = useState<ProfilePet[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -483,14 +553,18 @@ export default function CustomerProfileSetupPage() {
     }
 
     try {
-      const [profileData, petsTotal, bookingsTotal] = await Promise.all([
+      const [profileData, petsTotal, household, roleRows, bookingsTotal] = await Promise.all([
         fetchCustomerProfile(user),
         fetchPetCount(user.id),
+        fetchHouseholdPets(user.id),
+        fetchRoleNames(user.id),
         fetchBookingStats(user.id),
       ]);
 
       setProfile(profileData);
       setPetCount(petsTotal);
+      setPets(household);
+      setRoles(roleRows);
       setBookingStats(bookingsTotal);
     } catch (error) {
       setErrorMessage(
@@ -698,355 +772,25 @@ export default function CustomerProfileSetupPage() {
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <div className="h-2 bg-emerald-500" />
-
-          <div className="p-5 sm:p-6 lg:p-8">
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-              <div className="grid gap-6 lg:grid-cols-[1.05fr_1.35fr] lg:items-center">
-                <div className="flex items-center gap-5">
-                  <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-white text-3xl font-black text-emerald-700">
-                    {showAvatarImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatarSrc}
-                        alt={`${displayName} profile`}
-                        className="absolute inset-0 h-full w-full object-cover object-center"
-                        onError={() => setAvatarImageFailed(true)}
-                      />
-                    ) : (
-                      <span aria-label={`${displayName} initials`}>
-                        {avatarInitials}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h1 className="truncate text-4xl font-black tracking-[-0.05em] text-slate-950 md:text-5xl">
-                        {displayName}
-                      </h1>
-                      <span className="h-3.5 w-3.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
-                    </div>
-
-                    <p className="mt-2 text-sm font-bold text-slate-600">
-                      {profile?.email || "Email not added"}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
-                        🐾 Pet Parent
-                      </span>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-black ${
-                          isBookingReady
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
-                        {isBookingReady ? "Booking Ready" : "Setup Needed"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3 lg:border-l lg:border-emerald-100 lg:pl-8">
-                  <div className="rounded-[1.5rem] bg-emerald-50 p-5 text-center">
-                    <Heart className="mx-auto h-7 w-7 text-emerald-700" />
-                    <p className="mt-3 text-3xl font-black text-slate-950">0</p>
-                    <p className="mt-1 text-sm font-black text-slate-600">
-                      Saved Gurus
-                    </p>
-                  </div>
-
-                  <Link
-                    href={routes.bookings}
-                    className="rounded-[1.5rem] bg-emerald-50 p-5 text-center transition hover:bg-emerald-100"
-                  >
-                    <CalendarDays className="mx-auto h-7 w-7 text-emerald-700" />
-                    <p className="mt-3 text-3xl font-black text-slate-950">
-                      {bookingStats.total}
-                    </p>
-                    <p className="mt-1 text-sm font-black text-slate-600">
-                      Bookings
-                    </p>
-                  </Link>
-
-                  <div className="rounded-[1.5rem] bg-emerald-50 p-5 text-center">
-                    <Star className="mx-auto h-7 w-7 text-emerald-700" />
-                    <p className="mt-3 text-3xl font-black text-slate-950">
-                      {bookingStats.completed}
-                    </p>
-                    <p className="mt-1 text-sm font-black text-slate-600">
-                      Completed
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <section
-              className="public-dark-section mt-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0D5C3A_0%,#047857_42%,#10b981_100%)] text-white shadow-[0_22px_60px_rgba(5,150,105,0.24)]"
-              data-brand-green
-            >
-              <div className="grid gap-6 p-6 md:p-8 lg:grid-cols-[1fr_190px] lg:items-center">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.26em] text-emerald-100">
-                    Pet Parent Setup Hub
-                  </p>
-
-                  <h2 className="mt-3 text-4xl font-black tracking-[-0.055em] !text-white md:text-5xl">
-                    Book with 3 things, then help your Guru
-                  </h2>
-
-                  <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-emerald-50">
-                    Name, care ZIP, and one pet are enough to find care and
-                    send a booking. Extra steps are recommended so your Guru
-                    knows routines, safety contacts, and how to reach you.
-                  </p>
-
-                  {nextIncompleteStep && !isBookingReady ? (
-                    <Link
-                      href={nextIncompleteStep.actionHref}
-                      className="mt-5 inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-white px-5 text-base font-black text-emerald-800 transition hover:bg-emerald-50"
-                    >
-                      Next: {nextIncompleteStep.title}
-                    </Link>
-                  ) : null}
-                </div>
-
-                <div className="rounded-[1.75rem] border border-white/20 bg-white/15 p-5 text-center shadow-sm backdrop-blur">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-50">
-                    Booking Ready
-                  </p>
-                  <p className="mt-2 text-5xl font-black !text-white">
-                    {readiness.bookingReadyCompleted}/3
-                  </p>
-                  <p className="mt-1 text-sm font-black text-emerald-50">
-                    {readiness.bookingReadyPercent}% ready to book
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-6 pb-7 md:px-8">
-                <div className="h-3 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="h-full rounded-full bg-white transition-all"
-                    style={{ width: `${readiness.bookingReadyPercent}%` }}
-                  />
-                </div>
-                {!isBookingReady ? (
-                  <p className="mt-3 text-sm font-semibold text-emerald-50">
-                    Recommended extras unlock after you are booking ready — they
-                    do not block care requests.
-                  </p>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Booking Readiness
-                  </p>
-                  <h3 className="mt-2 text-2xl font-black text-slate-950">
-                    {isBookingReady
-                      ? "You are ready to book trusted care"
-                      : "Add name, ZIP, and one pet to book"}
-                  </h3>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
-                    {isBookingReady
-                      ? readiness.guruReady
-                        ? "Your booking details and Guru-ready notes are in place."
-                        : "You can book now. Care notes and an emergency contact help your Guru know your pet."
-                      : "Find Gurus anytime. Booking is fastest once your name, care ZIP, and one Pet Passport are saved."}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href={routes.search}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700"
-                  >
-                    Find Gurus
-                  </Link>
-
-                  <Link
-                    href={routes.pets}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
-                  >
-                    Manage Pet Passports
-                  </Link>
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {(isBookingReady ? requiredSteps : setupSteps).map((step) => (
-                <SetupCard key={step.number} step={step} />
-              ))}
-            </section>
-
-            {isBookingReady ? (
-              <section className="mt-6">
-                <details className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm open:pb-6">
-                  <summary className="cursor-pointer list-none text-left [&::-webkit-details-marker]:hidden">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                          Optional polish
-                        </p>
-                        <h3 className="mt-1 text-2xl font-black text-slate-950">
-                          Care notes, emergency contact & notifications
-                        </h3>
-                        <p className="mt-1 text-sm font-semibold text-slate-600">
-                          Recommended — not required to book.{" "}
-                          {completedRecommended}/3 complete.
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800">
-                        Show extras
-                      </span>
-                    </div>
-                  </summary>
-                  <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {recommendedSteps.map((step) => (
-                      <SetupCard key={step.number} step={step} />
-                    ))}
-                  </div>
-                </details>
-              </section>
-            ) : null}
-
-            <section className="mt-8 rounded-[2rem] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#f0fdf4_100%)] p-5 shadow-sm md:p-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-700">
-                    Optional Next Steps
-                  </p>
-                  <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">
-                    Explore more with SitGuru
-                  </h2>
-                  <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                    These actions are not required to book. Use them to find
-                    trusted Gurus, view PawPerks, invite more Pet Parents, or
-                    start earning as a Guru.
-                  </p>
-                </div>
-
-                <div className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                  PawPerks is automatic
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <OptionalActionCard
-                  icon={<Search className="h-6 w-6" />}
-                  eyebrow="Find care"
-                  title="Find & Save Gurus"
-                  body="Search local Gurus, compare fit, save favorites, and come back to trusted care providers again."
-                  href={routes.search}
-                  action="Find a Guru"
-                />
-
-                <OptionalActionCard
-                  icon={<Gift className="h-6 w-6" />}
-                  eyebrow="PawPerks"
-                  title="View PawPerks"
-                  body="All Pet Parents are automatically enrolled. View rewards, referral credit, and community growth options."
-                  href={routes.pawPerks}
-                  action="View PawPerks"
-                />
-
-                <OptionalActionCard
-                  icon={<Megaphone className="h-6 w-6" />}
-                  eyebrow="Grow SitGuru"
-                  title="Invite Pet Parents"
-                  body="Share SitGuru with friends, family, neighbors, coworkers, and local pet lovers who need trusted care."
-                  href={routes.referrals}
-                  action="Invite Pet Parents"
-                />
-
-                <OptionalActionCard
-                  icon={<UserPlus className="h-6 w-6" />}
-                  eyebrow="Earn with SitGuru"
-                  title="Become a Guru"
-                  body="Interested in earning? Start your Guru application and offer pet care services through SitGuru."
-                  href={routes.guruApplication}
-                  action="Become a Guru"
-                />
-              </div>
-            </section>
-
-            <section className="mt-6 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
-                <User className="h-7 w-7 text-emerald-700" />
-                <h3 className="mt-4 text-xl font-black text-slate-950">
-                  Your contact details
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  {profile?.phone || "Phone not added yet"}
-                </p>
-              </div>
-
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
-                <MapPin className="h-7 w-7 text-emerald-700" />
-                <h3 className="mt-4 text-xl font-black text-slate-950">
-                  Your service location
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  {formatAddressLine(profile)}
-                </p>
-              </div>
-
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
-                <ShieldCheck className="h-7 w-7 text-emerald-700" />
-                <h3 className="mt-4 text-xl font-black text-slate-950">
-                  Safety and alerts
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  {setupBooleans.emergencyContactComplete
-                    ? "Emergency contact is ready."
-                    : "Emergency contact is recommended for Guru confidence."}
-                </p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                  {setupBooleans.notificationsComplete
-                    ? "Notifications are enabled."
-                    : "Notifications are optional — add them so you do not miss booking messages."}
-                </p>
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Setup Summary
-                  </p>
-                  <h3 className="mt-2 text-2xl font-black text-slate-950">
-                    {isBookingReady
-                      ? "You can book. Extra details help your Guru."
-                      : "Name, ZIP, and one pet are enough to book."}
-                  </h3>
-                  <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                    Saved Gurus, PawPerks, invites, University, and becoming a
-                    Guru are optional. They do not block booking.
-                  </p>
-                </div>
-
-                <Link
-                  href={routes.dashboard}
-                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800"
-                >
-                  Back to Dashboard
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </section>
-          </div>
-        </section>
+        <CustomerProfileView
+          name={displayName}
+          email={profile?.email || "Email not added"}
+          phone={profile?.phone || "Phone not added"}
+          place={formatAddressLine(profile)}
+          avatarSrc={showAvatarImage ? avatarSrc : ""}
+          completion={Math.round((setupSteps.filter((step) => step.status === "complete").length / Math.max(setupSteps.length, 1)) * 100)}
+          pets={pets}
+          roles={buildProfileRoles([...(roles || []), profile?.account_role || ""])}
+          careNotes={profile?.care_preferences || ""}
+          emergency={profile?.emergency_contact_name || profile?.emergency_contact || "Not added yet"}
+          notifications={{
+            booking: Boolean(profile?.email_notifications),
+            messages: Boolean(profile?.text_notifications || profile?.push_notifications),
+            offers: Boolean(profile?.email_notifications),
+          }}
+          nextHref={nextIncompleteStep?.actionHref || routes.basicInfo}
+          bookingReady={isBookingReady}
+        />
       </section>
     </main>
   );

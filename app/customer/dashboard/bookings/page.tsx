@@ -2,14 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   CalendarDays,
-  ChevronLeft,
   Clock3,
-  HeartHandshake,
   PawPrint,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import Header from "@/components/Header";
+import CustomerBookingsBoard, { type BookingCardModel } from "@/components/customer/CustomerBookingsBoard";
 import { createClient } from "@/lib/supabase/server";
 
 type DbRow = Record<string, unknown>;
@@ -633,6 +631,36 @@ function BookingOverviewCard({
   );
 }
 
+function bookingBucket(booking: DbRow): BookingCardModel["bucket"] {
+  const status = firstString(booking, ["status", "booking_status"], "pending").toLowerCase();
+  if (["cancelled", "canceled", "refunded", "failed"].includes(status)) return "cancelled";
+  if (["completed", "complete", "finished"].includes(status)) return "past";
+  if (["pending", "requested", "checkout_started", "unpaid", "awaiting", "new"].includes(status)) return "pending";
+  const when = getBookingSortValue(booking);
+  if (when && when < Date.now() - 24 * 60 * 60 * 1000) return "past";
+  return "upcoming";
+}
+
+function toBookingCard(booking: DbRow, pets: DbRow[], guruAvatars: Map<string, string>): BookingCardModel {
+  const date = getBookingDate(booking);
+  const guruName = firstString(booking, ["guru_name", "sitter_name", "provider_name"], "Your Guru");
+  const petName = firstString(booking, ["pet_name"], "Your pet");
+  return {
+    id: String(booking.id),
+    service: firstString(booking, ["service_type", "service"], "Pet care"),
+    petName,
+    petPhoto: getPetAvatarForBooking(booking, pets) || "",
+    guruName: guruName.split(/\s+/)[0] || guruName,
+    guruPhoto: getGuruAvatarForBooking(booking, guruAvatars) || "",
+    when: `${formatDate(date)} · ${firstString(booking, ["time_window"], formatTime(date))}`,
+    place: getLocation(booking),
+    statusLabel: formatStatus(firstString(booking, ["status", "booking_status"], "pending")),
+    bucket: bookingBucket(booking),
+    detailHref: getBookingHref(booking),
+    reportHref: getPawReportHref(booking),
+  };
+}
+
 export default async function CustomerBookingsOverviewPage() {
   const supabase = await createClient();
 
@@ -650,121 +678,13 @@ export default async function CustomerBookingsOverviewPage() {
     fetchGuruAvatarsForBookings(supabase, bookings),
   ]);
 
-  const upcomingBookings = bookings.filter((booking) => {
-    const date = getBookingSortValue(booking);
-    const status = firstString(booking, ["status"], "").toLowerCase();
-    const payment = firstString(booking, ["payment_status"], "").toLowerCase();
-
-    return (
-      date >= Date.now() - 24 * 60 * 60 * 1000 &&
-      !["cancelled", "canceled", "completed"].includes(status) &&
-      !["refunded", "failed"].includes(payment)
-    );
-  });
-
-  const nextBooking = upcomingBookings[0] || bookings[0] || null;
+  const cards = bookings.map((booking) => toBookingCard(booking, pets, guruAvatars));
 
   return (
-    <main
-      className="min-h-screen bg-[#eef7f2] pb-16 font-light text-slate-950"
-      style={{
-        fontFamily:
-          '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
-    >
+    <main className="min-h-screen bg-[#f7fcfa] pb-24 text-slate-950">
       <Header />
-
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href="/customer/dashboard"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
-
-          <Link
-            href="/search"
-            className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
-          >
-            Book More Care
-          </Link>
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-[#22c7a8] via-[#78d8d0] to-[#c6ecff] px-6 py-8 sm:px-8 lg:px-10">
-            <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/70">
-              Trust, care, and PawReport overview
-            </p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Your SitGuru bookings and PawReports, organized for peace of mind
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-800/80">
-              Review upcoming care, payment status, support actions, booking details, and SitGuru PawReport™ updates in one warm customer-friendly place.
-            </p>
-          </div>
-
-          <div className="grid gap-4 p-5 sm:grid-cols-3">
-            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Total bookings</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">{bookings.length}</p>
-            </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Next booking</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">{nextBooking ? formatDate(getBookingDate(nextBooking)) : "None"}</p>
-            </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">PawReports</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">Included</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-600">
-                Why you can feel confident
-              </p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                Every booking includes a SitGuru PawReport™
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Pet Parents can view photos, potty updates, food and water confirmations, care notes, and the completed PawReport from each booking.
-              </p>
-            </div>
-            <HeartHandshake className="h-10 w-10 text-emerald-600" />
-          </div>
-        </div>
-
-        {bookings.length === 0 ? (
-          <div className="mt-6 rounded-[2rem] border border-dashed border-emerald-200 bg-white p-8 text-center shadow-sm">
-            <Sparkles className="mx-auto h-10 w-10 text-emerald-600" />
-            <h2 className="mt-4 text-2xl font-black text-slate-950">No bookings yet</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Once you book care, this page will become your trust, care, and PawReport overview.
-            </p>
-            <Link
-              href="/search"
-              className="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
-            >
-              Find a Guru
-            </Link>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-4">
-            {bookings.map((booking) => (
-              <BookingOverviewCard
-                key={String(booking.id)}
-                booking={booking}
-                pets={pets}
-                guruAvatars={guruAvatars}
-              />
-            ))}
-          </div>
-        )}
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <CustomerBookingsBoard cards={cards} />
       </section>
     </main>
   );
