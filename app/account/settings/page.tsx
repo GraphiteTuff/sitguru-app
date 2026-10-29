@@ -61,6 +61,11 @@ export default function AccountSettingsPage() {
             </p>
           </section>
 
+          <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">Staff access</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Invited to join the SitGuru team? Request your staff role and track CEO approval here.</p>
+            <Link href="/account/staff-access" className="mt-4 inline-flex rounded-xl bg-[#0D5C3A] px-4 py-3 text-sm font-black text-white">Request or check staff access</Link>
+          </section>
           <AdvancedAccountOptionsCard />
         </div>
       </div>
