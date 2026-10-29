@@ -31,6 +31,7 @@ describe("Growth Microsoft work routing", () => {
     assert.equal(routeAssignmentCategory("Analytics").channelLabel, "Analytics and Results");
     assert.equal(routeAssignmentCategory("Research / Results").channelLabel, "Analytics and Results");
     assert.equal(routeAssignmentCategory("Final Project").channelLabel, "Intern Projects");
+    assert.equal(routeAssignmentCategory("Campus Growth").channelLabel, "Growth and Strategy");
   });
 
   it("maps Planner percent to operational status, never manager approval", () => {

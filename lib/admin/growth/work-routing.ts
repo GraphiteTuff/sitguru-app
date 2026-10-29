@@ -49,6 +49,7 @@ const CATEGORY_ROUTES: Record<string, AssignmentWorkRoute> = {
   campaign: route("growth-strategy", false),
   growth: route("growth-strategy", false),
   "growth experiment": route("growth-strategy", false),
+  "campus growth": route("growth-strategy", false),
   planning: route("growth-strategy", false),
   "community outreach": route("partnerships-community", false),
   partnership: route("partnerships-community", false),

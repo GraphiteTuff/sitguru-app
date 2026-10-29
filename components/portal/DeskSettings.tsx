@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
-import { saveDeskPreferences, saveDeskProfile, saveInternSchoolLogo } from "@/lib/portal/desk-settings-actions";
+import { removeDeskAvatar, saveDeskAvatar, saveDeskPreferences, saveDeskProfile, saveInternSchoolLogo } from "@/lib/portal/desk-settings-actions";
 import { sitguruTeamsHref } from "@/lib/admin/growth/teams-access";
 import { supabase } from "@/lib/supabase";
 import { DESK_UI } from "@/lib/portal/desk-ui";
@@ -40,6 +40,7 @@ export default function DeskSettings({
   teamsConnected,
   prefs,
   notice,
+  noticeIsError = false,
   schoolLogoUrl = "",
 }: {
   audience: "manager" | "intern";
@@ -52,12 +53,24 @@ export default function DeskSettings({
   teamsConnected: boolean;
   prefs: DeskSettingsPrefs;
   notice?: string | null;
+  noticeIsError?: boolean;
   schoolLogoUrl?: string;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Account");
   const [passwordNote, setPasswordNote] = useState("");
+  const [photoPreview, setPhotoPreview] = useState(avatarUrl);
   const back = audience === "manager" ? "/manager/settings" : "/intern/settings";
   const home = audience === "manager" ? "/manager" : "/intern";
+
+  useEffect(() => {
+    setPhotoPreview(avatarUrl);
+  }, [avatarUrl]);
+
+  useEffect(() => {
+    if (notice && /photo/i.test(notice)) {
+      window.dispatchEvent(new Event("sitguru-profile-updated"));
+    }
+  }, [notice]);
 
   async function changePassword(formData: FormData) {
     const password = String(formData.get("password") || "");
@@ -91,7 +104,11 @@ export default function DeskSettings({
         banner={audience === "intern" ? "intern" : "manager"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
-      {notice ? <p className="rounded-2xl bg-[#ECFDF5] px-4 py-3 text-sm font-bold text-[#047857]">{notice}</p> : null}
+      {notice ? (
+        <p className={`rounded-2xl px-4 py-3 text-sm font-bold ${noticeIsError ? "bg-rose-50 text-rose-800" : "bg-[#ECFDF5] text-[#047857]"}`}>
+          {notice}
+        </p>
+      ) : null}
       <div className="flex gap-2 overflow-x-auto pb-1 text-sm font-bold">
         {TABS.map((item) => (
           <button key={item} type="button" onClick={() => setTab(item)} className={`whitespace-nowrap rounded-full px-3 py-2 ${tab === item ? "bg-[#2563EB] !text-white" : "bg-white text-slate-600"}`}>
@@ -102,27 +119,63 @@ export default function DeskSettings({
 
       {tab === "Account" ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
-          <form action={saveDeskProfile} className={`${DESK_UI.card} p-4`}>
-            <input type="hidden" name="returnTo" value={back} />
+          <div className={`${DESK_UI.card} p-4`}>
             <h2 className="text-lg font-black text-[#0F2744]">Profile Information</h2>
-            <div className="mt-4 flex gap-4">
-              <span className="relative inline-flex h-16 w-16 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-                <span className="absolute inset-0 bg-white" />
+            <div className="mt-4 flex flex-col gap-4 sm:flex-row">
+              <div className="w-full shrink-0 sm:w-44">
+                <span className="relative inline-flex h-24 w-24 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+                  <span className="absolute inset-0 bg-white" />
+                  {photoPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoPreview} alt={`${fullName} profile photo`} className="relative z-[1] h-full w-full object-cover object-center" />
+                  ) : <span className="relative z-[1] m-auto text-lg font-black text-[#1D4ED8]">{fullName.slice(0, 1) || "S"}</span>}
+                </span>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">Add, replace, or remove this photo anytime.</p>
+                <form action={saveDeskAvatar} className="mt-2 grid gap-2">
+                  <input type="hidden" name="returnTo" value={back} />
+                  <label className="text-xs font-bold text-slate-500">
+                    {avatarUrl ? "Replace photo" : "Add photo"}
+                    <input
+                      name="avatar"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      required
+                      className="mt-1 block w-full text-xs font-semibold text-slate-700"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        setPhotoPreview(URL.createObjectURL(file));
+                      }}
+                    />
+                  </label>
+                  <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Save photo</button>
+                </form>
                 {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="" className="relative z-[1] h-full w-full object-cover object-center" />
-                ) : <span className="relative z-[1] m-auto font-black text-[#1D4ED8]">{fullName.slice(0, 1)}</span>}
-              </span>
-              <div className="grid flex-1 gap-3 sm:grid-cols-2">
+                  <form
+                    action={removeDeskAvatar}
+                    className="mt-2"
+                    onSubmit={(event) => {
+                      if (!window.confirm("Remove your profile photo?")) event.preventDefault();
+                    }}
+                  >
+                    <input type="hidden" name="returnTo" value={back} />
+                    <button type="submit" className="text-sm font-bold text-rose-700">Remove photo</button>
+                  </form>
+                ) : null}
+              </div>
+              <form action={saveDeskProfile} className="grid flex-1 gap-3 sm:grid-cols-2">
+                <input type="hidden" name="returnTo" value={back} />
                 <label className="text-xs font-bold text-slate-500">Full Name<input name="fullName" defaultValue={fullName} className="mt-1 min-h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-[#0F2744]" /></label>
                 <label className="text-xs font-bold text-slate-500">Email<input value={email} readOnly className="mt-1 min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" /></label>
                 <label className="text-xs font-bold text-slate-500">Role<input value={role} readOnly className="mt-1 min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" /></label>
                 <label className="text-xs font-bold text-slate-500">University<input value={university || "Not on file"} readOnly className="mt-1 min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" /></label>
                 <label className="text-xs font-bold text-slate-500 sm:col-span-2">Bio<textarea name="bio" defaultValue={bio} maxLength={300} rows={3} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></label>
-              </div>
+                <div className="sm:col-span-2">
+                  <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Save Profile</button>
+                </div>
+              </form>
             </div>
-            <button className="mt-4 rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Save Profile</button>
-          </form>
+          </div>
           {audience === "intern" ? (
             <form action={saveInternSchoolLogo} className={`${DESK_UI.card} p-4`}>
               <h2 className="text-lg font-black text-[#0F2744]">School logo</h2>

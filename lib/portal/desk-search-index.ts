@@ -8,6 +8,7 @@ export type DeskSearchHit = {
 const MANAGER: DeskSearchHit[] = [
   { href: "/manager", title: "Manager's Desk", detail: "Home, team pace, and review queue", keywords: "home desk interns overview" },
   { href: "/manager/growth", title: "Growth Home", detail: "Campaigns and growth workspace", keywords: "growth workspace campaigns" },
+  { href: "/manager/campus-growth", title: "Campus Growth", detail: "Campus missions, leads, and results", keywords: "campus university qr petperks" },
   { href: "/manager/team", title: "My Team", detail: "Assigned interns", keywords: "interns team people roster" },
   { href: "/manager/assignments", title: "Assignments", detail: "Intern work and deadlines", keywords: "assignments tasks work due" },
   { href: "/manager/check-ins", title: "Check-Ins", detail: "Weekly check-ins to review", keywords: "check in checkins weekly review" },
@@ -40,6 +41,7 @@ const INTERN: DeskSearchHit[] = [
   { href: "/intern/metrics", title: "Metrics", detail: "Visits and signups", keywords: "metrics analytics" },
   { href: "/intern/growth", title: "Business Growth Report", detail: "Your growth report", keywords: "report growth" },
   { href: "/intern/toolkit", title: "Intern Toolkit", detail: "Brand and tracking tools", keywords: "toolkit tools" },
+  { href: "/intern/campus-growth", title: "Campus Growth", detail: "Campus opportunities, QR codes, and leads", keywords: "campus university qr petperks event" },
   { href: "/intern/training", title: "Training", detail: "Modules and lessons", keywords: "training learn" },
   { href: "/intern/resources", title: "Resources", detail: "Templates and guides", keywords: "resources files templates" },
   { href: "/intern/help", title: "Help", detail: "How the portal works", keywords: "help support faq" },

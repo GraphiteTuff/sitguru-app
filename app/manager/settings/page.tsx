@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 import { MANAGER_PORTAL_BRAND } from "@/lib/admin/growth/manager-portal";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,8 @@ export default async function ManagerSettingsPage({
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
-  const notice = (Array.isArray(params.error) ? params.error[0] : params.error) || (Array.isArray(params.ok) ? params.ok[0] : params.ok) || "";
+  const error = (Array.isArray(params.error) ? params.error[0] : params.error) || "";
+  const ok = (Array.isArray(params.ok) ? params.ok[0] : params.ok) || "";
   const supabase = await createClient();
   const {
     data: { user },
@@ -56,10 +58,11 @@ export default async function ManagerSettingsPage({
       role={MANAGER_PORTAL_BRAND.kicker}
       university=""
       bio=""
-      avatarUrl={String(profile?.avatar_url || profile?.profile_photo_url || "")}
+      avatarUrl={resolvePetParentAvatarUrl(profile)}
       teamsConnected={isSitGuruWorkEmail(access.actor.email)}
       prefs={prefs(saved)}
-      notice={notice || null}
+      notice={error || ok || null}
+      noticeIsError={Boolean(error)}
     />
   );
 }

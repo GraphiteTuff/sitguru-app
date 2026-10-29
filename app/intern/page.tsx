@@ -26,6 +26,7 @@ import {
   linkInternUserId,
 } from "@/lib/internship/queries";
 import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
+import { activateInternAccess } from "@/lib/internship/intern-access-actions";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
 import Link from "next/link";
 import { internLegacySectionRedirect } from "@/lib/internship/intern-routes";
@@ -166,8 +167,7 @@ export default async function InternPortalPage({
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold !text-white/90">
-              Your intern workspace is ready as soon as SitGuru assigns this
-              login. Until then, hop back to Pet Parent or Guru.
+              Your intern workspace opens after SitGuru approves your access request.
             </p>
           </section>
           <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
@@ -179,17 +179,17 @@ export default async function InternPortalPage({
                 Pet Parent dashboard
               </Link>
               <Link
-                href="/guru/dashboard"
+                href="/intern/request"
                 className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
               >
-                Guru dashboard
+                Request internship access
               </Link>
             </div>
           </section>
         </main>
       );
     }
-    redirect("/intern/login?error=This account is not assigned to the SitGuru Internship Program.");
+    redirect("/intern/request");
   }
 
   if (!preview && !intern.userId) {
@@ -199,6 +199,7 @@ export default async function InternPortalPage({
   if (!preview) {
     const ack = await getInternOnboarding(intern.id);
     if (!internOnboardingComplete(ack)) redirect(INTERNSHIP_ONBOARDING_PATH);
+    await activateInternAccess(intern.userId || user.id);
   }
 
   const workspace = await getInternWorkspace(intern.id);

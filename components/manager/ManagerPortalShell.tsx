@@ -39,6 +39,7 @@ const GROWTH_MANAGER_BASE = "/manager";
 const ICONS = {
   Home,
   "Growth Home": Sparkles,
+  "Campus Growth": GraduationCap,
   "Manager's Desk": LayoutDashboard,
   "My Time": Clock3,
   "My Payments": CreditCard,

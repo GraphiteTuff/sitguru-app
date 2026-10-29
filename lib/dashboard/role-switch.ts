@@ -153,7 +153,7 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     return uniqueOrderedRoles(roles);
   }
 
-  if (raw === "intern" || raw === "internship" || raw === "internship_intern") {
+  if (raw === "intern" || raw === "internship" || raw === "internship_intern" || raw === "social_media_community_growth_intern") {
     return ["intern"];
   }
 

@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { uploadInternshipAsset } from "@/lib/internship/storage";
+import { petParentAvatarWritePayload } from "@/lib/pet-parent-avatar";
+import { deskAvatarExtension, deskAvatarFileError } from "@/lib/portal/desk-avatar";
 
 function safeReturn(value: FormDataEntryValue | null) {
   return value === "/intern/settings" ? "/intern/settings" : "/manager/settings";
@@ -99,4 +101,157 @@ export async function saveInternSchoolLogo(formData: FormData) {
   if (error) redirect(`/intern/settings?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/intern", "layout");
   redirect("/intern/settings?ok=School logo saved. It now shows under Settings.");
+}
+
+const AVATAR_BUCKETS = ["profile-photos", "avatars"] as const;
+const AVATAR_COLUMNS = ["profile_photo_url", "photo_url", "avatar_url", "image_url"] as const;
+
+function photoFile(value: FormDataEntryValue | null) {
+  if (!value || typeof value === "string") return null;
+  return value;
+}
+
+async function signedInUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return { supabase, user };
+}
+
+async function writeProfilePhoto(userId: string, url: string) {
+  const payload = petParentAvatarWritePayload(url);
+  const { data, error } = await supabaseAdmin.from("profiles").update(payload).eq("id", userId).select("id");
+  if (!error && data?.length) return "";
+  if (error) {
+    let wrote = false;
+    for (const column of AVATAR_COLUMNS) {
+      const { error: columnError } = await supabaseAdmin.from("profiles").update({ [column]: url }).eq("id", userId);
+      if (!columnError) wrote = true;
+    }
+    if (wrote) return "";
+    return error.message;
+  }
+  const { error: insertError } = await supabaseAdmin.from("profiles").insert({ id: userId, ...payload });
+  return insertError?.message || "";
+}
+
+async function clearProfilePhoto(userId: string) {
+  const payload = petParentAvatarWritePayload("");
+  const { error } = await supabaseAdmin.from("profiles").update(payload).eq("id", userId);
+  if (!error) return;
+  for (const column of AVATAR_COLUMNS) {
+    await supabaseAdmin.from("profiles").update({ [column]: "" }).eq("id", userId);
+  }
+}
+
+async function uploadDeskPhoto(file: File, userId: string) {
+  const problem = deskAvatarFileError(file);
+  if (problem) return { error: problem, url: "", bucket: "", path: "" };
+  const ext = deskAvatarExtension(file);
+  const path = `${userId}/desk-avatar-${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const contentType = file.type && file.type !== "image/jpg" ? file.type : "image/jpeg";
+  let last = "Could not upload the profile photo.";
+  for (const bucket of AVATAR_BUCKETS) {
+    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, buffer, {
+      contentType: ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : contentType,
+      upsert: false,
+    });
+    if (!error) {
+      const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+      return { error: "", url: data.publicUrl, bucket, path };
+    }
+    last = error.message || last;
+  }
+  return { error: last, url: "", bucket: "", path: "" };
+}
+
+async function deleteStoredPhoto(bucket: string, path: string) {
+  if (!bucket || !path || path.includes("..")) return;
+  await supabaseAdmin.storage.from(bucket).remove([path]);
+}
+
+function refreshDesks() {
+  revalidatePath("/intern", "layout");
+  revalidatePath("/manager", "layout");
+  revalidatePath("/intern/settings");
+  revalidatePath("/manager/settings");
+}
+
+export async function saveDeskAvatar(formData: FormData) {
+  const { supabase, user } = await signedInUser();
+  const back = safeReturn(formData.get("returnTo"));
+  if (!user) redirect("/login");
+  const file = photoFile(formData.get("avatar"));
+  if (!file) redirect(`${back}?error=${encodeURIComponent("Choose a profile photo.")}`);
+  const uploaded = await uploadDeskPhoto(file, user.id);
+  if (uploaded.error || !uploaded.url) {
+    redirect(`${back}?error=${encodeURIComponent(uploaded.error || "Could not upload the profile photo.")}`);
+  }
+  const writeError = await writeProfilePhoto(user.id, uploaded.url);
+  if (writeError) redirect(`${back}?error=${encodeURIComponent(writeError)}`);
+
+  const intern = await findInternByAccount({ userId: user.id, email: user.email });
+  const previousPath = String(intern?.avatarStoragePath || "");
+  const previousBucket = String(user.user_metadata?.desk_avatar_bucket || "");
+  const previousObject = String(user.user_metadata?.desk_avatar_path || "");
+  if (intern?.id) {
+    await supabaseAdmin.from("internship_interns").update({
+      avatar_url: uploaded.url,
+      avatar_storage_path: `${uploaded.bucket}/${uploaded.path}`,
+      updated_at: new Date().toISOString(),
+    }).eq("id", intern.id);
+  }
+  await supabase.auth.updateUser({
+    data: {
+      ...petParentAvatarWritePayload(uploaded.url),
+      desk_avatar_bucket: uploaded.bucket,
+      desk_avatar_path: uploaded.path,
+    },
+  });
+  if (previousBucket && previousObject) await deleteStoredPhoto(previousBucket, previousObject);
+  if (previousPath.startsWith("profile-photos/") || previousPath.startsWith("avatars/")) {
+    const [storedBucket, ...rest] = previousPath.split("/");
+    await deleteStoredPhoto(storedBucket, rest.join("/"));
+  } else if (previousPath.startsWith("interns/")) {
+    await deleteStoredPhoto("internship-assets", previousPath);
+  }
+  refreshDesks();
+  redirect(`${back}?ok=${encodeURIComponent("Profile photo saved.")}`);
+}
+
+export async function removeDeskAvatar(formData: FormData) {
+  const { supabase, user } = await signedInUser();
+  const back = safeReturn(formData.get("returnTo"));
+  if (!user) redirect("/login");
+  await clearProfilePhoto(user.id);
+  const intern = await findInternByAccount({ userId: user.id, email: user.email });
+  const previousPath = String(intern?.avatarStoragePath || "");
+  if (intern?.id) {
+    await supabaseAdmin.from("internship_interns").update({
+      avatar_url: "",
+      avatar_storage_path: "",
+      updated_at: new Date().toISOString(),
+    }).eq("id", intern.id);
+  }
+  const bucket = String(user.user_metadata?.desk_avatar_bucket || "");
+  const path = String(user.user_metadata?.desk_avatar_path || "");
+  await supabase.auth.updateUser({
+    data: {
+      ...petParentAvatarWritePayload(""),
+      picture: "",
+      desk_avatar_bucket: "",
+      desk_avatar_path: "",
+    },
+  });
+  if (bucket && path) await deleteStoredPhoto(bucket, path);
+  if (previousPath.startsWith("profile-photos/") || previousPath.startsWith("avatars/")) {
+    const [storedBucket, ...rest] = previousPath.split("/");
+    await deleteStoredPhoto(storedBucket, rest.join("/"));
+  } else if (previousPath) {
+    await deleteStoredPhoto("internship-assets", previousPath);
+  }
+  refreshDesks();
+  redirect(`${back}?ok=${encodeURIComponent("Profile photo removed.")}`);
 }

@@ -72,6 +72,12 @@ export const INTERN_PORTAL_SIDEBAR = [
     match: "prefix" as const,
   },
   {
+    id: "campus",
+    href: INTERN_ROUTES.campusGrowth,
+    label: "Campus Growth",
+    match: "prefix" as const,
+  },
+  {
     id: "training",
     href: INTERN_ROUTES.training,
     label: "Training",
@@ -103,6 +109,7 @@ export const INTERN_PORTAL_MOBILE_MORE = [
   { href: INTERN_ROUTES.metrics, label: "Metrics" },
   { href: INTERN_ROUTES.growth, label: "Growth Report" },
   { href: INTERN_ROUTES.toolkit, label: "Toolkit" },
+  { href: INTERN_ROUTES.campusGrowth, label: "Campus Growth" },
   { href: INTERN_ROUTES.training, label: "Training" },
   { href: INTERN_ROUTES.resources, label: "Resources" },
   { href: INTERN_ROUTES.help, label: "Help" },

@@ -1640,6 +1640,45 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     ],
     shots: [],
   }),
+  article("campus-growth", {
+    title: "How Campus Growth works",
+    summary: "Research your campus, follow its rules, and measure what SitGuru learns. You stay an intern.",
+    purpose: "Campus Growth turns your university and nearby community into a measured SitGuru market. The goal is research, an approved plan, careful execution, and a recommendation. It is not permission to spam campus or to become an Ambassador.",
+    contributes: "Approved opportunities, tracking visits, leads, and lessons feed your manager's Campus Growth desk and can support your final project when you and your manager choose that work.",
+    category: "Weekly work",
+    tags: ["campus", "qr", "rules"],
+    keywords: ["campus", "university", "qr", "petperks", "future guru", "leads", "event"],
+    steps: [
+      "Open Campus Growth and confirm the university on your internship record.",
+      "Add one opportunity and note any university rule you have not confirmed.",
+      "Submit the idea to your manager. Do not execute it while it says Ava Review Required.",
+      "Use a campus tracking link or QR only after the tactic is Approved.",
+      "Add leads and record what you learned. Your manager coordinates follow-up.",
+    ],
+    tips: [
+      "Another university's permission does not apply to your campus.",
+      "Campus links do not pay Ambassador or PetPerks rewards.",
+    ],
+    shots: [],
+  }),
+  article("campus-growth-manager", {
+    title: "Leading Campus Growth",
+    summary: "Coach the intern, approve tactics, and decide what to repeat.",
+    purpose: "Managers lead Campus Growth strategy. Interns research and execute approved work. Formal partnerships, contracts, and company commitments still go to the CEO.",
+    contributes: "Campus missions use the existing assignment, Planner, SharePoint, and Teams path. Results stay on the Campus Growth desk and the Business Growth Report.",
+    category: "Weekly work",
+    tags: ["manager", "campus", "approval"],
+    keywords: ["campus mission", "approval", "university rules", "review results"],
+    steps: [
+      "Open Manager Portal, then Campus Growth.",
+      "Create a Campus Mission as a draft if the intern should not see it yet.",
+      "Publish when the goal, due date, and description are ready.",
+      "Review opportunities before the intern executes them.",
+      "Record campus rules only for that university.",
+    ],
+    tips: ["Do not approve every post. Escalate formal agreements and paid sponsorships."],
+    shots: [],
+  }),
 ];
 
 export function internHelpArticle(slug: string | null | undefined) {

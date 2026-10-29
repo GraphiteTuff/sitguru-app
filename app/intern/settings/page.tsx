@@ -36,7 +36,8 @@ export default async function InternSettingsPage({
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
-  const notice = (Array.isArray(params.error) ? params.error[0] : params.error) || (Array.isArray(params.ok) ? params.ok[0] : params.ok) || "";
+  const error = (Array.isArray(params.error) ? params.error[0] : params.error) || "";
+  const ok = (Array.isArray(params.ok) ? params.ok[0] : params.ok) || "";
   const data = await loadInternSectionWorkspace();
   const intern = data?.workspace.intern;
   const school = intern?.universityId ? await getUniversity(intern.universityId) : null;
@@ -57,7 +58,8 @@ export default async function InternSettingsPage({
       avatarUrl={intern?.avatarUrl || ""}
       teamsConnected={isSitGuruWorkEmail(intern?.email || access.actor.email)}
       prefs={prefs(saved)}
-      notice={notice || null}
+      notice={error || ok || null}
+      noticeIsError={Boolean(error)}
       schoolLogoUrl={school?.logoUrl || ""}
     />
   );

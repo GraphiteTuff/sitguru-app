@@ -123,10 +123,15 @@ export function SiteAccountMenu({
     } = supabase.auth.onAuthStateChange(() => {
       window.setTimeout(() => loadAccount(), 0);
     });
+    function refreshPhoto() {
+      window.setTimeout(() => loadAccount(), 0);
+    }
+    window.addEventListener("sitguru-profile-updated", refreshPhoto);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener("sitguru-profile-updated", refreshPhoto);
     };
   }, [pathname]);
 

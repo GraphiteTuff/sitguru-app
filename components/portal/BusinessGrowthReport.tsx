@@ -8,10 +8,23 @@ export default function BusinessGrowthReport({
   stats,
   campaigns,
   audience,
+  campus,
 }: {
   stats: GrowthHomeStats;
   campaigns: GrowthCampaign[];
   audience: "manager" | "intern";
+  campus?: {
+    campuses: number;
+    campaigns: number;
+    visits: number;
+    scans: number;
+    leads: number;
+    petParents: number;
+    guruApplications: number;
+    events: number;
+    topCampus: string;
+    topCampaign: string;
+  } | null;
 }) {
   const base = audience === "manager" ? "/manager" : "/intern";
   const cards = [
@@ -75,6 +88,29 @@ export default function BusinessGrowthReport({
           </ul>
         </article>
       </section>
+      {campus ? (
+        <section className={`${DESK_UI.card} p-4`}>
+          <h2 className="text-lg font-black text-[#0F2744]">Campus Growth</h2>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-sm">
+            {[
+              ["Campuses active", campus.campuses],
+              ["Campaigns", campus.campaigns],
+              ["Tracked visits", campus.visits],
+              ["QR scans", campus.scans],
+              ["Leads", campus.leads],
+              ["Pet Parent registrations", campus.petParents],
+              ["Guru applications", campus.guruApplications],
+              ["Events", campus.events],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="rounded-xl bg-[#F8FAFC] px-3 py-2">
+                <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+                <dd className="font-black text-[#0F2744]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm font-semibold text-slate-600">Top campus: {campus.topCampus || "None yet"}. Top campaign: {campus.topCampaign || "None yet"}.</p>
+        </section>
+      ) : null}
       <section className="grid gap-4 lg:grid-cols-3">
         <article className={`${DESK_UI.card} p-4`}>
           <h2 className="text-lg font-black text-[#0F2744]">Recent Milestones</h2>

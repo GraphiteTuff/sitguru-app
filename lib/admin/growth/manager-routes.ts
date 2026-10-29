@@ -3,6 +3,7 @@
 export const MANAGER_ROUTES = {
   home: "/manager",
   growth: "/manager/growth",
+  campusGrowth: "/manager/campus-growth",
   desk: "/manager",
   myTime: "/manager/my-time",
   payments: "/manager/payments",
@@ -26,6 +27,7 @@ export const MANAGER_ROUTES = {
 export const MANAGER_MENU_WIRED = [
   { key: "home", label: "Home", href: MANAGER_ROUTES.home },
   { key: "growth", label: "Growth Home", href: MANAGER_ROUTES.growth },
+  { key: "campusGrowth", label: "Campus Growth", href: MANAGER_ROUTES.campusGrowth },
   { key: "desk", label: "Manager's Desk", href: MANAGER_ROUTES.desk },
   { key: "myTime", label: "My Time", href: MANAGER_ROUTES.myTime },
   { key: "payments", label: "My Payments", href: MANAGER_ROUTES.payments },

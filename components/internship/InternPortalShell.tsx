@@ -49,6 +49,7 @@ const ICONS = {
   Metrics: BarChart3,
   "Business Growth Report": Sparkles,
   "Intern Toolkit": Wrench,
+  "Campus Growth": GraduationCap,
   Training: GraduationCap,
   Resources: FolderOpen,
   Help: CircleHelp,

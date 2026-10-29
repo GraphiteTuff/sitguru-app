@@ -10,6 +10,7 @@ export const ASSIGNMENT_CATEGORIES = [
   "Planning",
   "Growth",
   "Ambassador Program",
+  "Campus Growth",
   "Other",
 ] as const;
 

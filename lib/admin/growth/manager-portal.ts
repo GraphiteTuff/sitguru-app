@@ -37,6 +37,7 @@ export const MANAGER_PORTAL_BRAND = {
 export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.home, label: "Home", match: "none" as const },
   { href: MANAGER_ROUTES.growth, label: "Growth Home", match: "growth-home" as const },
+  { href: MANAGER_ROUTES.campusGrowth, label: "Campus Growth", match: "prefix" as const },
   { href: MANAGER_ROUTES.desk, label: "Manager's Desk", match: "exact" as const },
   { href: MANAGER_ROUTES.myTime, label: "My Time", match: "prefix" as const },
   { href: MANAGER_ROUTES.payments, label: "My Payments", match: "prefix" as const },
