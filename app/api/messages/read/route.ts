@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       conversationId,
       lastReadAt: result.lastReadAt,
+      marked: result.marked,
     });
   } catch (error) {
     const message =

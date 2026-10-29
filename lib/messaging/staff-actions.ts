@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
-import { canAccessConversation, canModerate, canSend, scanSensitive } from "@/lib/messaging/staff-policy";
+import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -53,41 +53,60 @@ async function actor() {
   const founder = canEditRequirements(kind);
   const growth = Boolean(admin && (isGrowthOnlyRole(admin.role) || founder));
   const role = founder ? "founder" as const : growth ? "growth" as const : intern ? "intern" as const : "none" as const;
-  return { userId, founder, growth, intern, role };
+  return { userId, founder, growth, intern, role, kind };
 }
 
-export async function postStaffMessage(formData: FormData) {
+export async function saveStaffMessage(input: {
+  conversationId?: string;
+  subject?: string;
+  body?: string;
+  visibility?: string;
+  media?: { url: string; mimeType?: string; name?: string }[];
+  recipientId?: string;
+  audience?: string;
+}) {
   const who = await actor();
-  const home = messagesHome(formData);
-  if (who.role === "none" || !who.userId) bounce(home, "error", "Sign in to send a SitGuru message.");
-  const body = field(formData, "body");
-  const visibility = who.role === "intern"
-    ? "participant"
-    : field(formData, "visibility") === "internal_note" ? "internal_note" : "participant";
-  let media: { url: string; mimeType?: string; name?: string }[] = [];
-  try {
-    const parsed = JSON.parse(field(formData, "media") || "[]");
-    if (Array.isArray(parsed)) {
-      media = parsed.filter((item) => String(item?.url || "").startsWith("https://"));
-    }
-  } catch {
-    media = [];
-  }
-  if (body.length < 1 && !media.length) bounce(home, "error", "Write a message or attach a file.");
+  if (who.role === "none" || !who.userId) return { ok: false as const, error: "Sign in to send a SitGuru message." };
+  const body = String(input.body || "").trim();
+  const media = (input.media || []).filter((item) => String(item.url || "").startsWith("https://"));
+  if (body.length < 1 && !media.length) return { ok: false as const, error: "Write a message or attach a file." };
   const sensitive = scanSensitive(body);
-  if (sensitive.flag) bounce(home, "error", sensitive.message);
+  if (sensitive.flag) return { ok: false as const, error: sensitive.message };
+  const visibility = who.role === "intern" ? "participant" : input.visibility === "internal_note" ? "internal_note" : "participant";
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("first_name, full_name, avatar_url")
+    .select("first_name, full_name, avatar_url, profile_photo_url")
     .eq("id", who.userId)
     .maybeSingle();
-  const firstName =
-    String(profile?.first_name || profile?.full_name || "")
-      .trim()
-      .split(/\s+/)[0] || "SitGuru";
+  const firstName = String(profile?.first_name || profile?.full_name || "").trim().split(/\s+/)[0] || "SitGuru";
+  const avatarUrl = String(profile?.avatar_url || profile?.profile_photo_url || "");
   const preview = (body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment")).slice(0, 140);
+  let conversationId = String(input.conversationId || "");
+  let peerName = "";
+  let peerAvatar = "";
+  const recipientId = String(input.recipientId || "");
 
-  let conversationId = field(formData, "conversationId");
+  if (recipientId && recipientId !== who.userId) {
+    if (who.role === "intern" && recipientId !== who.intern?.managerUserId) {
+      return { ok: false as const, error: "You can message your manager from here." };
+    }
+    const { data: mine } = await supabaseAdmin.from("conversation_participants").select("conversation_id").eq("user_id", who.userId).limit(100);
+    const mineIds = (mine || []).map((row) => String(row.conversation_id || "")).filter(Boolean);
+    if (mineIds.length) {
+      const { data: shared } = await supabaseAdmin
+        .from("conversation_participants")
+        .select("conversation_id")
+        .eq("user_id", recipientId)
+        .in("conversation_id", mineIds)
+        .limit(1)
+        .maybeSingle();
+      if (shared?.conversation_id) conversationId = String(shared.conversation_id);
+    }
+    const { data: peer } = await supabaseAdmin.from("profiles").select("first_name, full_name, avatar_url, profile_photo_url").eq("id", recipientId).maybeSingle();
+    peerName = String(peer?.first_name || peer?.full_name || "").trim().split(/\s+/)[0] || "SitGuru";
+    peerAvatar = String(peer?.avatar_url || peer?.profile_photo_url || "");
+  }
+
   if (conversationId && who.role === "intern") {
     const { data: existing } = await supabaseAdmin
       .from("conversations")
@@ -102,55 +121,91 @@ export async function postStaffMessage(formData: FormData) {
       assignedUserId: String(existing.assigned_user_id || ""),
     });
     const started = String(existing?.started_by_user_id || "") === who.userId;
-    if (!allowed && !started) bounce(home, "error", "That conversation is not yours.");
-    const send = canSend({ actor: "intern", level: "initiate_approved", initiating: false, assigned: true });
-    if (!send.ok) bounce(home, "error", send.error);
+    if (!allowed && !started) return { ok: false as const, error: "That conversation is not yours." };
   }
+
   if (!conversationId) {
-    const managerId = who.intern?.managerUserId || null;
+    const managerId = who.role === "intern" ? who.intern?.managerUserId || null : recipientId || null;
+    const audience = String(input.audience || "");
     const { data, error } = await supabaseAdmin
       .from("conversations")
       .insert({
-        subject: field(formData, "subject") || (who.role === "intern" ? "Note for my manager" : "Internal note"),
-        conversation_type: "internal_direct",
+        subject: String(input.subject || "").trim() || peerName || (who.role === "intern" ? "Note for my manager" : "SitGuru chat"),
+        conversation_type: audience === "intern" || who.role === "intern" ? "internal_direct" : "community_direct",
         workflow_status: "open",
         started_by_user_id: who.userId,
-        assigned_user_id: who.role === "intern" ? managerId : null,
+        assigned_user_id: managerId,
         last_message_preview: preview,
         last_message_at: new Date().toISOString(),
         retention_class: "standard_internal",
       })
       .select("id")
       .single();
-    if (error || !data) bounce(home, "error", "The conversation could not be started.");
+    if (error || !data) return { ok: false as const, error: "The conversation could not be started." };
     conversationId = String(data.id);
     await supabaseAdmin.from("conversation_participants").insert([
       { conversation_id: conversationId, user_id: who.userId, role: who.role },
-      ...(managerId && who.role === "intern" ? [{ conversation_id: conversationId, user_id: managerId, role: "growth" }] : []),
+      ...(managerId ? [{ conversation_id: conversationId, user_id: managerId, role: audience || "growth" }] : []),
     ]);
   }
 
-  const { error } = await supabaseAdmin.from("messages").insert({
+  const now = new Date().toISOString();
+  const textBody = body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment");
+  const { data: saved, error } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
     sender_id: who.userId,
-    recipient_id: who.userId,
-    content: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
-    body: body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
+    recipient_id: recipientId || who.userId,
+    content: textBody,
+    body: textBody,
     visibility,
     media_urls: media.map((item) => item.url),
     media_mime_types: media.map((item) => item.mimeType || "application/octet-stream"),
     sender_name_snapshot: firstName,
     status: "unread",
-    created_at: new Date().toISOString(),
-  });
-  if (error) bounce(home, "error", "The message could not be saved.");
+    created_at: now,
+  }).select("id").single();
+  if (error || !saved?.id) return { ok: false as const, error: "The message could not be saved." };
   await supabaseAdmin.from("conversations").update({
     last_message_preview: preview,
-    last_message_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    last_message_at: now,
+    updated_at: now,
   }).eq("id", conversationId);
-  refreshMessages(home);
-  bounce(home, "ok", visibility === "internal_note" ? "Internal note saved." : "Message sent.");
+  refreshMessages("/manager/messages");
+  return {
+    ok: true as const,
+    conversationId,
+    peerName,
+    peerAvatar,
+    message: {
+      id: String(saved.id),
+      author: firstName,
+      avatarUrl,
+      body: textBody,
+      createdAt: now,
+      internal: visibility === "internal_note",
+      attachments: media.map((item) => ({ url: item.url, mimeType: item.mimeType || "", name: item.name || "Attachment" })),
+    },
+  };
+}
+
+export async function postStaffMessage(formData: FormData) {
+  const home = messagesHome(formData);
+  let media: { url: string; mimeType?: string; name?: string }[] = [];
+  try {
+    const parsed = JSON.parse(field(formData, "media") || "[]");
+    if (Array.isArray(parsed)) media = parsed;
+  } catch {
+    media = [];
+  }
+  const saved = await saveStaffMessage({
+    conversationId: field(formData, "conversationId"),
+    subject: field(formData, "subject"),
+    body: field(formData, "body"),
+    visibility: field(formData, "visibility"),
+    media,
+  });
+  if (!saved.ok) bounce(home, "error", saved.error);
+  bounce(home, "ok", "Message sent.");
 }
 
 export async function resolveMessageReport(formData: FormData) {

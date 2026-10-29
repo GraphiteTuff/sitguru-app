@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   FileText,
@@ -18,7 +19,7 @@ import {
   Video,
 } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
-import { postStaffMessage, reportMessage } from "@/lib/messaging/staff-actions";
+import { reportMessage } from "@/lib/messaging/staff-actions";
 import { sitguruTeamsHref } from "@/lib/admin/growth/teams-access";
 import { DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
 
@@ -42,6 +43,8 @@ type Conversation = {
   statusLabel: string;
   preview: string;
   updatedAt?: string;
+  unreadCount?: number;
+  recipientId?: string;
   messages: Message[];
 };
 
@@ -71,8 +74,7 @@ function whenLabel(value?: string) {
 }
 
 function unread(conversation: Conversation) {
-  const status = conversation.statusLabel.toLowerCase();
-  return status !== "resolved" && status !== "closed";
+  return (conversation.unreadCount || 0) > 0;
 }
 
 export default function ManagerMessagesHome({
@@ -92,26 +94,37 @@ export default function ManagerMessagesHome({
   noticeError?: boolean;
   audience?: "manager" | "intern";
 }) {
+  const router = useRouter();
+  const marked = useRef(new Set<string>());
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const [threads, setThreads] = useState(conversations);
   const [selectedId, setSelectedId] = useState(conversations[0]?.id || "");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [fileLabel, setFileLabel] = useState("");
   const [media, setMedia] = useState<Attachment[]>([]);
+  const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
   const [showMobileThread, setShowMobileThread] = useState(false);
-  const selected = conversations.find((item) => item.id === selectedId) || null;
-  const people = useMemo(() => {
+  const [people, setPeople] = useState<{ id: string; firstName: string; avatarUrl: string; detail: string }[]>([]);
+  const [audiencePick, setAudiencePick] = useState("intern");
+  const [personQuery, setPersonQuery] = useState("");
+  useEffect(() => { setThreads(conversations); }, [conversations]);
+  const selected = threads.find((item) => item.id === selectedId) || null;
+  const teamCount = useMemo(() => {
     const names = new Set<string>();
-    conversations.forEach((conversation) => {
-      names.add(conversation.subject);
+    threads.forEach((conversation) => {
+      names.add(conversation.peerName || conversation.subject);
       conversation.messages.forEach((message) => names.add(message.author));
     });
     return names.size;
-  }, [conversations]);
-  const unreadCount = conversations.filter(unread).length;
-  const announcements = conversations.filter((item) => /announce|broadcast/i.test(`${item.typeLabel} ${item.fullSubject}`)).length;
-  const visible = conversations.filter((item) => {
-    const haystack = `${item.subject} ${item.fullSubject} ${item.preview}`.toLowerCase();
+  }, [threads]);
+  const unreadCount = threads.filter(unread).length;
+  const announcements = threads.filter((item) => /announce|broadcast/i.test(`${item.typeLabel} ${item.fullSubject}`)).length;
+  const visible = threads.filter((item) => {
+    const haystack = `${item.subject} ${item.peerName || ""} ${item.fullSubject} ${item.preview}`.toLowerCase();
     if (query && !haystack.includes(query.trim().toLowerCase())) return false;
     if (filter === "unread") return unread(item);
     if (filter === "announcements") return /announce|broadcast/i.test(`${item.typeLabel} ${item.fullSubject}`);
@@ -119,7 +132,146 @@ export default function ManagerMessagesHome({
   });
   const files = selected?.messages.reduce((sum, message) => sum + message.attachments.length, 0) || 0;
   const base = audience === "intern" ? "/intern" : "/manager";
+  useEffect(() => {
+    if (!selectedId || marked.current.has(selectedId)) return;
+    marked.current.add(selectedId);
+    void fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ conversationId: selectedId }),
+    })
+      .then((response) => response.json())
+      .then((payload: { marked?: number }) => {
+        if ((payload.marked || 0) > 0) {
+          setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, unreadCount: 0 } : item));
+          router.refresh();
+        }
+      })
+      .catch(() => undefined);
+  }, [router, selectedId]);
+
   const mine = (author: string) => author.toLowerCase() === me.firstName.toLowerCase();
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [selected?.messages.length, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || selectedId.startsWith("new-")) return;
+    const timer = window.setInterval(() => {
+      void fetch(`/api/messaging/thread?id=${encodeURIComponent(selectedId)}`, { credentials: "same-origin" })
+        .then((response) => response.json())
+        .then((payload: { messages?: Message[] }) => {
+          if (!payload.messages?.length) return;
+          setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, messages: payload.messages || item.messages } : item));
+        })
+        .catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (audience !== "manager" || selectedId) return;
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/messaging/people?audience=${audiencePick}&q=${encodeURIComponent(personQuery)}`, { credentials: "same-origin" })
+        .then((response) => response.json())
+        .then((payload: { people?: { id: string; firstName: string; avatarUrl: string; detail: string }[] }) => setPeople(payload.people || []))
+        .catch(() => setPeople([]));
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [audience, audiencePick, personQuery, selectedId]);
+
+  async function sendLive(event?: FormEvent) {
+    event?.preventDefault();
+    const text = draft.trim();
+    if (sending || (!text && !media.length)) return;
+    setSending(true);
+    setError("");
+    const optimisticId = `local-${Date.now()}`;
+    const optimistic: Message = {
+      id: optimisticId,
+      internal: false,
+      author: me.firstName,
+      avatarUrl: me.avatarUrl,
+      body: text || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment"),
+      createdAt: new Date().toISOString(),
+      attachments: media,
+    };
+    if (selectedId) {
+      setThreads((current) => current.map((item) => item.id === selectedId ? {
+        ...item,
+        preview: optimistic.body,
+        updatedAt: optimistic.createdAt,
+        messages: [...item.messages, optimistic],
+      } : item));
+    }
+    setDraft("");
+    const sentMedia = media;
+    setMedia([]);
+    setFileLabel("");
+    composerRef.current?.focus();
+    const response = await fetch("/api/messaging/staff-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        conversationId: selectedId.startsWith("new-") ? "" : selectedId,
+        body: text,
+        media: sentMedia,
+        recipientId: selected?.recipientId,
+        audience: audiencePick,
+      }),
+    });
+    const payload = await response.json() as { ok?: boolean; error?: string; conversationId?: string; message?: Message; peerName?: string; peerAvatar?: string };
+    setSending(false);
+    if (!response.ok || !payload.ok || !payload.message || !payload.conversationId) {
+      setError(payload.error || "The message could not be sent.");
+      setDraft(text);
+      return;
+    }
+    setThreads((current) => {
+      const id = payload.conversationId || selectedId;
+      const existing = current.find((item) => item.id === selectedId || item.id === id);
+      const nextMessages = (existing?.messages || []).filter((item) => item.id !== optimisticId).concat(payload.message!);
+      const next = {
+        id,
+        subject: payload.peerName || existing?.subject || "Chat",
+        peerName: payload.peerName || existing?.peerName,
+        peerAvatar: payload.peerAvatar || existing?.peerAvatar,
+        fullSubject: existing?.fullSubject || payload.peerName || "SitGuru chat",
+        typeLabel: existing?.typeLabel || "chat",
+        statusLabel: existing?.statusLabel || "open",
+        preview: payload.message!.body,
+        updatedAt: payload.message!.createdAt,
+        unreadCount: 0,
+        messages: nextMessages,
+      };
+      return [next, ...current.filter((item) => item.id !== selectedId && item.id !== id)];
+    });
+    if (payload.conversationId) setSelectedId(payload.conversationId);
+    composerRef.current?.focus();
+  }
+
+  function startWith(person: { id: string; firstName: string; avatarUrl: string; detail: string }) {
+    const id = `new-${person.id}`;
+    setShowMobileThread(true);
+    setThreads((current) => [{
+      id,
+      subject: person.firstName,
+      peerName: person.firstName,
+      peerAvatar: person.avatarUrl,
+      fullSubject: person.firstName,
+      typeLabel: person.detail,
+      statusLabel: "open",
+      preview: "",
+      unreadCount: 0,
+      recipientId: person.id,
+      messages: [],
+    }, ...current.filter((item) => item.id !== id)]);
+    setSelectedId(id);
+    composerRef.current?.focus();
+  }
 
   async function attach(file: File, conversationId: string) {
     setError("");
@@ -164,7 +316,7 @@ export default function ManagerMessagesHome({
       <section className="grid gap-3 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <MiniStat icon={<MessageCircle size={18} />} tone="text-[#2563EB] bg-[#EFF6FF]" value={conversations.length} label="Total Conversations" />
         <MiniStat icon={<Mail size={18} />} tone="text-[#15803D] bg-[#F0FDF4]" value={unreadCount} label="Unread Messages" />
-        <MiniStat icon={<Users size={18} />} tone="text-[#7C3AED] bg-[#F5F3FF]" value={people} label="Team Members" />
+        <MiniStat icon={<Users size={18} />} tone="text-[#7C3AED] bg-[#F5F3FF]" value={teamCount} label="Team Members" />
         <MiniStat icon={<Send size={18} />} tone="text-[#C2410C] bg-[#FFF7ED]" value={announcements} label="Announcements" />
         <button
           type="button"
@@ -228,7 +380,7 @@ export default function ManagerMessagesHome({
           </div>
         </aside>
 
-        <div className={`${showMobileThread || !conversations.length ? "flex" : "hidden"} min-h-[560px] flex-col lg:flex`}>
+        <div className={`${showMobileThread || !threads.length ? "flex" : "hidden"} min-h-[420px] flex-col lg:flex`}>
           <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
             <button type="button" className="lg:hidden" onClick={() => setShowMobileThread(false)} aria-label="Back to conversations">
               ←
@@ -265,26 +417,40 @@ export default function ManagerMessagesHome({
                 </article>
               );
             })}
-            {!selected?.messages.length ? (
+            {!selected && audience === "manager" ? (
+              <div className="m-auto w-full max-w-md">
+                <p className="text-center text-sm font-semibold text-slate-500">Start a chat. First names and photos stay with the message.</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {["intern", "parent", "guru", "ambassador"].map((item) => (
+                    <button key={item} type="button" onClick={() => setAudiencePick(item)} className={`rounded-full px-3 py-1.5 text-xs font-bold ${audiencePick === item ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
+                      {item === "parent" ? "Pet Parents" : item === "intern" ? "Interns" : item === "guru" ? "Gurus" : "Ambassadors"}
+                    </button>
+                  ))}
+                </div>
+                <input value={personQuery} onChange={(event) => setPersonQuery(event.target.value)} placeholder="Search by first name" className="mt-3 min-h-11 w-full rounded-full bg-[#F1F5F9] px-4 text-sm" />
+                <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                  {people.map((person) => (
+                    <li key={person.id}>
+                      <button type="button" onClick={() => void startWith(person)} className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-[#F8FAFC]">
+                        <Face name={person.firstName} src={person.avatarUrl} />
+                        <span>
+                          <span className="block text-sm font-bold text-[#0F2744]">{person.firstName}</span>
+                          <span className="text-xs text-slate-500">{person.detail}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : !selected?.messages.length ? (
               <p className="m-auto max-w-sm text-center text-sm font-medium text-slate-500">
-                Write a note in SitGuru. Use first names. This is not sent to a Pet Parent, Guru, or Ambassador.
+                Write a note in SitGuru. Use first names.
               </p>
             ) : null}
+            <div ref={endRef} />
           </div>
           {fileLabel ? <p className="px-4 text-xs font-bold text-[#166534]">Attached {fileLabel}</p> : null}
-          <form action={postStaffMessage} className="border-t border-slate-100 p-3">
-            <input type="hidden" name="conversationId" value={selected?.id || ""} />
-            <input type="hidden" name="visibility" value={audience === "intern" ? "participant" : "internal_note"} />
-            <input type="hidden" name="type" value="internal_direct" />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <input type="hidden" name="media" value={JSON.stringify(media)} />
-            {!selected ? (
-              <input
-                name="subject"
-                placeholder={audience === "intern" ? "Message your manager" : "Who or what is this about?"}
-                className="mb-2 min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold"
-              />
-            ) : null}
+          <form onSubmit={(event) => void sendLive(event)} className="border-t border-slate-100 p-3">
             <div className="flex items-end gap-2">
               <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-slate-500 hover:bg-slate-100">
                 <Paperclip size={18} />
@@ -301,13 +467,21 @@ export default function ManagerMessagesHome({
                 />
               </label>
               <textarea
-                name="body"
+                ref={composerRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendLive();
+                  }
+                }}
                 rows={1}
                 autoFocus
-                placeholder="Type a message..."
+                placeholder="Message"
                 className="min-h-11 flex-1 resize-none rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium"
               />
-              <button className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2563EB] !text-white" aria-label="Send">
+              <button disabled={sending} className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#2563EB] !text-white disabled:opacity-50" aria-label="Send">
                 <Send size={16} />
               </button>
             </div>

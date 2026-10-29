@@ -1,4 +1,3 @@
-// app/api/messaging/send/route.ts
 /**
  * Messaging send — authenticated Vercel AI SDK stream (Claude).
  */

@@ -185,7 +185,7 @@ export default function InternPortalShell({
 
                 <PortalDeskProfileLive
                   title={profileTitle}
-                  notifications={unreadMessages || 3}
+                  notifications={unreadMessages}
                   notificationsHref="/intern/messages"
                 />
               </div>

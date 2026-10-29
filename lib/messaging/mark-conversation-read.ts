@@ -25,6 +25,45 @@ function isUnreadIncomingMessage(row: MessageReadRow, readerId: string) {
   return row.is_read === false || !row.read_at || status === "unread" || status === "new";
 }
 
+/** Bell count: only messages still marked unread, not every old row missing a timestamp. */
+export function messageNeedsAttention(row: MessageReadRow, readerId: string) {
+  if (row.is_deleted) return false;
+  if (asString(row.sender_id) === readerId) return false;
+  if (row.is_read === true) return false;
+  const status = asString(row.status).toLowerCase();
+  if (status === "read" || status === "archived") return false;
+  return row.is_read === false || status === "unread" || status === "new";
+}
+
+export function messageIsUnreadFor(row: MessageReadRow, readerId: string) {
+  return isUnreadIncomingMessage(row, readerId);
+}
+
+export async function countDeskUnread(userId: string) {
+  const readerId = asString(userId);
+  if (!readerId) return 0;
+  const [memberships, started, assigned] = await Promise.all([
+    supabaseAdmin.from("conversation_participants").select("conversation_id").eq("user_id", readerId).limit(80),
+    supabaseAdmin.from("conversations").select("id").eq("started_by_user_id", readerId).limit(40),
+    supabaseAdmin.from("conversations").select("id").eq("assigned_user_id", readerId).limit(40),
+  ]);
+  const ids = [
+    ...new Set([
+      ...((memberships.data || []) as { conversation_id?: string | null }[]).map((row) => asString(row.conversation_id)),
+      ...((started.data || []) as { id?: string | null }[]).map((row) => asString(row.id)),
+      ...((assigned.data || []) as { id?: string | null }[]).map((row) => asString(row.id)),
+    ].filter(Boolean)),
+  ];
+  if (!ids.length) return 0;
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .select("id,sender_id,is_read,read_at,status,is_deleted")
+    .in("conversation_id", ids)
+    .limit(300);
+  if (error) return 0;
+  return ((data || []) as MessageReadRow[]).filter((row) => messageNeedsAttention(row, readerId)).length;
+}
+
 export async function markConversationReadForUser(
   conversationId: string,
   userId: string,

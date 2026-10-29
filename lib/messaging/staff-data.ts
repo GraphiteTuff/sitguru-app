@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
-import { canAccessConversation, visibleMessage, type StaffActor } from "@/lib/messaging/staff-policy";
+import { messageNeedsAttention } from "@/lib/messaging/mark-conversation-read";
 
 function text(value: unknown) {
   return String(value || "").trim();
@@ -45,7 +45,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
   const { data: messages } = ids.length
     ? await supabaseAdmin
         .from("messages")
-        .select("id,conversation_id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at")
+        .select("id,conversation_id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at,is_read,read_at,status")
         .in("conversation_id", ids)
         .order("created_at", { ascending: true })
         .limit(200)
@@ -99,6 +99,17 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
         statusLabel: text(row.workflow_status) || "open",
         preview: text(row.last_message_preview),
         updatedAt: text(row.updated_at),
+        unreadCount: ((messages || []) as Record<string, unknown>[])
+          .filter((message) => text(message.conversation_id) === id)
+          .filter((message) => messageNeedsAttention({
+            id: text(message.id),
+            sender_id: text(message.sender_id),
+            is_read: message.is_read === true,
+            read_at: text(message.read_at) || null,
+            status: text(message.status),
+            is_deleted: Boolean(message.deleted_at),
+          }, userId))
+          .length,
         messages: ((messages || []) as Record<string, unknown>[])
           .filter((message) => text(message.conversation_id) === id)
           .filter((message) =>
@@ -156,6 +167,7 @@ type InboxConversation = {
   statusLabel: string;
   preview: string;
   updatedAt?: string;
+  unreadCount?: number;
   messages: {
     id: string;
     internal: boolean;

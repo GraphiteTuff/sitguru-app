@@ -32,7 +32,7 @@ import {
   MANAGER_PORTAL_BRAND,
   MANAGER_PORTAL_SIDEBAR,
 } from "@/lib/admin/growth/manager-portal";
-import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
+import DeskChatDock from "@/components/messaging/DeskChatDock";
 
 const GROWTH_MANAGER_BASE = "/manager";
 
@@ -169,13 +169,14 @@ export default function ManagerPortalShell({
 
               <PortalDeskProfileLive
                 title={MANAGER_PORTAL_BRAND.kicker}
-                notifications={unreadMessages || 5}
+                notifications={unreadMessages}
                 notificationsHref={MANAGER_PORTAL_BRAND.messagesPath}
               />
             </div>
           </header>
 
           <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
+          <DeskChatDock />
           <WebappBottomNav
             label="Manager navigation"
             items={[
