@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       createdAt: text(row.created_at),
       internal: text(row.visibility) === "internal_note",
       own: text(row.sender_id) === userId,
+      attachments: [] as { url: string; mimeType: string; name: string }[],
     };
   });
   return NextResponse.json({ messages });

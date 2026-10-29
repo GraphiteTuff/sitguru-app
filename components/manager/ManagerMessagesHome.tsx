@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   FileText,
@@ -94,7 +93,6 @@ export default function ManagerMessagesHome({
   noticeError?: boolean;
   audience?: "manager" | "intern";
 }) {
-  const router = useRouter();
   const marked = useRef(new Set<string>());
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -113,11 +111,12 @@ export default function ManagerMessagesHome({
   const [personQuery, setPersonQuery] = useState("");
   useEffect(() => { setThreads(conversations); }, [conversations]);
   const selected = threads.find((item) => item.id === selectedId) || null;
+  const messageFiles = (message: Message) => message.attachments || [];
   const teamCount = useMemo(() => {
     const names = new Set<string>();
     threads.forEach((conversation) => {
       names.add(conversation.peerName || conversation.subject);
-      conversation.messages.forEach((message) => names.add(message.author));
+      (conversation.messages || []).forEach((message) => names.add(message.author));
     });
     return names.size;
   }, [threads]);
@@ -130,10 +129,10 @@ export default function ManagerMessagesHome({
     if (filter === "announcements") return /announce|broadcast/i.test(`${item.typeLabel} ${item.fullSubject}`);
     return true;
   });
-  const files = selected?.messages.reduce((sum, message) => sum + message.attachments.length, 0) || 0;
+  const files = (selected?.messages || []).reduce((sum, message) => sum + messageFiles(message).length, 0);
   const base = audience === "intern" ? "/intern" : "/manager";
   useEffect(() => {
-    if (!selectedId || marked.current.has(selectedId)) return;
+    if (!selectedId || selectedId.startsWith("new-") || marked.current.has(selectedId)) return;
     marked.current.add(selectedId);
     void fetch("/api/messages/read", {
       method: "POST",
@@ -145,11 +144,10 @@ export default function ManagerMessagesHome({
       .then((payload: { marked?: number }) => {
         if ((payload.marked || 0) > 0) {
           setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, unreadCount: 0 } : item));
-          router.refresh();
         }
       })
       .catch(() => undefined);
-  }, [router, selectedId]);
+  }, [selectedId]);
 
   const mine = (author: string) => author.toLowerCase() === me.firstName.toLowerCase();
 
@@ -164,7 +162,12 @@ export default function ManagerMessagesHome({
         .then((response) => response.json())
         .then((payload: { messages?: Message[] }) => {
           if (!payload.messages?.length) return;
-          setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, messages: payload.messages || item.messages } : item));
+          const messages = payload.messages.map((message) => ({
+            ...message,
+            attachments: message.attachments || [],
+            internal: Boolean(message.internal),
+          }));
+          setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, messages } : item));
         })
         .catch(() => undefined);
     }, 2500);
@@ -406,7 +409,7 @@ export default function ManagerMessagesHome({
                     {own ? null : <p className="mb-1 text-xs font-bold text-[#0F2744]">{message.author}</p>}
                     <div className={`rounded-2xl px-3 py-2 text-left text-sm font-medium ${own ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
                       <p className="whitespace-pre-wrap">{message.body}</p>
-                      {message.attachments.map((file) => (
+                      {messageFiles(message).map((file) => (
                         <a key={file.url} href={file.url} className={`mt-1 block text-xs font-bold underline ${own ? "!text-white" : "text-[#2563EB]"}`}>
                           {file.name}
                         </a>

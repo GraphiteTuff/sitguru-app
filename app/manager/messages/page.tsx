@@ -19,7 +19,12 @@ export default async function ManagerMessagesPage({
   const admin = await getAdminIdentity();
   const kind = internshipActorKind({ role: admin?.role, isSuperUser: admin?.isSuperUser });
   const seeAll = kind === "supervisor" || Boolean(admin?.isSuperUser);
-  const inbox = await loadStaffInbox(access.actor.id, seeAll);
+  let inbox = { me: { firstName: "You", avatarUrl: "" }, conversations: [] as Awaited<ReturnType<typeof loadStaffInbox>>["conversations"] };
+  try {
+    inbox = await loadStaffInbox(access.actor.id, seeAll);
+  } catch (loadError) {
+    console.error("Manager messages could not be loaded", loadError);
+  }
 
   return (
     <ManagerMessagesHome
