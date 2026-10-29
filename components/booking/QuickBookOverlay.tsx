@@ -92,7 +92,13 @@ export function buildExpressBookUrl(
   bookHref: string,
   petId?: string | null,
   zip?: string | null,
+  extra?: { service?: string | null; date?: string | null },
 ) {
+  const service = String(extra?.service || "").trim();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(extra?.date || "").trim())
+    ? String(extra?.date).trim()
+    : "";
+
   try {
     const url = new URL(bookHref, "https://www.sitguru.com");
     url.searchParams.set("express", "1");
@@ -101,6 +107,8 @@ export function buildExpressBookUrl(
       .replace(/\D/g, "")
       .slice(0, 5);
     if (cleanZip.length === 5) url.searchParams.set("zip", cleanZip);
+    if (service) url.searchParams.set("service", service);
+    if (date) url.searchParams.set("date", date);
     return `${url.pathname}${url.search}`;
   } catch {
     const joiner = bookHref.includes("?") ? "&" : "?";
@@ -109,6 +117,8 @@ export function buildExpressBookUrl(
       .slice(0, 5);
     return `${bookHref}${joiner}express=1${petId ? `&pet_id=${encodeURIComponent(petId)}` : ""}${
       zipPart.length === 5 ? `&zip=${encodeURIComponent(zipPart)}` : ""
+    }${service ? `&service=${encodeURIComponent(service)}` : ""}${
+      date ? `&date=${encodeURIComponent(date)}` : ""
     }`;
   }
 }

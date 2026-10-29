@@ -18,16 +18,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
   Clock3,
-  CreditCard,
   HeartHandshake,
-  Home,
   LockKeyhole,
   MessageCircle,
-  PawPrint,
   Receipt,
-  Search,
   ShieldCheck,
   Sparkles,
   Star,
@@ -43,7 +38,9 @@ import FinishPaymentButton, {
 import CustomerStickyCta from "@/components/customer/CustomerStickyCta";
 import FirstVisitCoach from "@/components/customer/FirstVisitCoach";
 import UniversityExpress from "@/components/dashboard/UniversityExpress";
-import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
+import CustomerCareCommandCenter, {
+  CustomerDashboardRail,
+} from "@/components/customer/CustomerCareCommandCenter";
 import { normalizeCanonicalPet } from "@/lib/pets/canonical";
 import {
   findPetForBooking as findLinkedPetForBooking,
@@ -3559,35 +3556,60 @@ export default function CustomerDashboardPage() {
           findCareHref={routes.findGuru}
         />
 
-        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
-          {isZeroBookingHome ? (
-            <section className="mb-4 overflow-hidden rounded-[2rem] border border-sky-100 bg-[linear-gradient(135deg,#0D5C3A_0%,#0F766E_48%,#0284C7_100%)] p-5 text-white shadow-sm public-dark-section sm:p-7" data-brand-green>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-100">
-                Pet Parent Portal
-              </p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
-                Ready to book trusted care?
-              </h2>
-              <p className="mt-2 max-w-2xl text-base font-semibold text-emerald-50">
-                Find a Guru near you, add a pet passport anytime, and finish
-                checkout with debit, credit, or digital wallets.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link
-                  href={routes.findGuru}
-                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-white px-6 text-base font-black text-[#0D5C3A] transition hover:bg-sky-50"
-                >
-                  Find Care near you
-                </Link>
-                <Link
-                  href={pets.length ? routes.pets : routes.addPet}
-                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-6 text-base font-black text-white transition hover:bg-white/20"
-                >
-                  {pets.length ? "Manage pets" : "Add a pet"}
-                </Link>
-              </div>
-            </section>
-          ) : (
+        <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-5 md:py-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:px-8">
+          <CustomerDashboardRail />
+          <div className="min-w-0 space-y-4">
+          <CustomerCareCommandCenter
+            firstName={firstName}
+            upcomingCount={upcomingBookings.length}
+            pawPerksLabel={formatMoney(pawPerksState.redeemedCashCredits)}
+            visit={
+              stats.nextBooking
+                ? {
+                    service: stats.nextBooking.service_type || "Pet care",
+                    petName: getBookingDisplayPet(stats.nextBooking, pets).name || "Your pet",
+                    petPhoto: getBookingDisplayPet(stats.nextBooking, pets).photoUrl || "",
+                    guruName: (stats.nextBooking.guru_name || "Your Guru").trim().split(/\s+/)[0] || "Your Guru",
+                    guruPhoto: stats.nextBooking.guru_avatar_url || "",
+                    when: [
+                      formatShortDate(getBookingDisplayDate(stats.nextBooking)),
+                      stats.nextBooking.time_window || formatTime(getBookingDisplayDate(stats.nextBooking)),
+                    ].filter(Boolean).join(" · "),
+                    place: getBookingLocation(stats.nextBooking) || "Care address on the booking",
+                    detailHref: getBookingDetailHref(stats.nextBooking.id),
+                    reportHref: getBookingPawReportHref(stats.nextBooking.id),
+                  }
+                : null
+            }
+            pets={pets.map((pet) => ({
+              id: pet.id,
+              name: pet.name || "Pet",
+              detail: [pet.species, pet.breed].filter(Boolean).join(" · ") || "Pet",
+              photo: pet.photo_url || "",
+            }))}
+            gurus={nearbyGurus.slice(0, 3).map((guru) => ({
+              id: guru.id,
+              name: guru.name.trim().split(/\s+/)[0] || "Guru",
+              photo: guru.image_url || "",
+              services: guru.services.slice(0, 2).join(" · ") || guru.role,
+              rating: guru.rating,
+              reviews: guru.review_count,
+              distance: guru.distance_miles > 0 ? `${guru.distance_miles.toFixed(1)} mi` : guru.location || "Nearby",
+              profileHref: guru.href,
+              bookHref: getGuruBookHref(guru, careZip),
+            }))}
+            updates={dashboardUpdates.map((update) => ({
+              label: update.label,
+              detail: update.detail,
+              href: update.href,
+            }))}
+            careZip={careZip}
+            careLocationLabel={careLocationLabel}
+            guruMessage={nearbyGuruMessage}
+            loadingGurus={loadingNearbyGurus}
+            onZipReady={refreshNearbyGurusForZip}
+          />
+          {!isZeroBookingHome ? (
             <UniversityExpress
               variant="banner"
               progressPercent={universityProgress.progressPercent}
@@ -3606,94 +3628,7 @@ export default function CustomerDashboardPage() {
               safeBookingHref={routes.findGuru}
               academyHref={routes.university}
             />
-          )}
-
-          <UniversalRoleDashboard
-            role="parent"
-            userName={firstName}
-            avatarUrl={showCustomerProfilePhoto ? customerAvatarSrc : null}
-            avatarFallback={customerInitials}
-            tags={[
-              "Pet Parent",
-              petParentReadiness.readyToBook
-                ? "Booking ready"
-                : `${profileCompletion}% ready to book`,
-              getCustomerLocationLabel(customerProfile) || "Add care location",
-            ]}
-            metaExtra={
-              <div className="grid grid-cols-3 gap-2">
-                <Link
-                  href={routes.pets}
-                  className="rounded-2xl bg-sky-50 p-3 text-center ring-1 ring-sky-100 transition hover:bg-sky-100"
-                >
-                  <p className="text-xl font-black text-slate-950">
-                    {pets.length}
-                  </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
-                    Pets
-                  </p>
-                </Link>
-                <Link
-                  href={routes.bookings}
-                  className="rounded-2xl bg-amber-50 p-3 text-center ring-1 ring-amber-100 transition hover:bg-amber-100"
-                >
-                  <p className="text-xl font-black text-slate-950">
-                    {upcomingBookings.length}
-                  </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
-                    Upcoming
-                  </p>
-                </Link>
-                <Link
-                  href={routes.pawPerks}
-                  className="rounded-2xl bg-violet-50 p-3 text-center ring-1 ring-violet-100 transition hover:bg-violet-100"
-                >
-                  <p className="text-xl font-black text-slate-950">
-                    {formatMoney(pawPerksState.redeemedCashCredits)}
-                  </p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet-700">
-                    PawPerks
-                  </p>
-                </Link>
-              </div>
-            }
-            actions={[
-              { label: "My Pets", href: routes.pets, icon: PawPrint },
-              { label: "Find a Guru", href: routes.findGuru, icon: Search },
-              {
-                label: "Active Care",
-                href: routes.bookings,
-                icon: Home,
-              },
-              {
-                label: "PawReports",
-                href: routes.bookings,
-                icon: ClipboardList,
-              },
-              {
-                label: "Messages",
-                href: routes.messages,
-                icon: MessageCircle,
-              },
-              {
-                label: "Payments",
-                href: routes.payments,
-                icon: CreditCard,
-              },
-            ]}
-          />
-          <NearbyGurusCarousel
-            gurus={nearbyGurus}
-            careZip={careZip}
-            careLocationLabel={careLocationLabel}
-            careZipInput={careZipInput}
-            loading={loadingNearbyGurus}
-            message={nearbyGuruMessage}
-            onCareZipInputChange={(value) =>
-              setCareZipInput(cleanZipCode(value))
-            }
-            onCareZipSubmit={handleCareZipSubmit}
-          />
+          ) : null}
 
           <section className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
             <article className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-sm">
@@ -4469,6 +4404,7 @@ export default function CustomerDashboardPage() {
               </div>
             )}
           </section>
+          </div>
         </div>
       </main>
     </>
