@@ -813,9 +813,17 @@ export default function PetParentDashboardScreen() {
                 showTrust={showConvertTrust}
                 onPress={() => {
                   if (selectedService && idleBrowse) {
+                    const savedZip = getFirstString(profileRecord, [
+                      'zip_code',
+                      'zip',
+                      'service_zip',
+                    ]).replace(/\D/g, '').slice(0, 5);
                     router.push({
                       pathname: '/find-care',
-                      params: { service: selectedService.serviceType },
+                      params: {
+                        service: selectedService.serviceType,
+                        ...(savedZip.length === 5 ? { zip: savedZip } : {}),
+                      },
                     });
                     return;
                   }
@@ -861,10 +869,10 @@ export default function PetParentDashboardScreen() {
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={styles.dashboardTitle}>
-                  {firstName === 'there' ? 'Hey there' : `Hey, ${firstName}`}
+                  {firstName === 'there' ? 'Hi there! 👋' : `Hi, ${firstName}! 👋`}
                 </Text>
                 <Text style={styles.welcomeText}>
-                  Your pets, bookings, and Gurus in one place.
+                  Ready to book trusted pet care?
                 </Text>
 
                 <SitGuruRoleStatus role="pet_parent" />

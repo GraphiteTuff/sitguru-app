@@ -2818,7 +2818,16 @@ export default function CustomerDashboardPage() {
   const unpaidBooking = useMemo(
     () =>
       bookings.find((booking) =>
-        isUnpaidBookingPayment(booking.payment_status),
+        ["unpaid", "checkout_started", "pending_payment"].includes(
+          String(booking.payment_status || "").toLowerCase(),
+        ),
+      ) || null,
+    [bookings],
+  );
+  const repeatBooking = useMemo(
+    () =>
+      bookings.find((booking) =>
+        ["completed", "complete"].includes(String(booking.status || "").toLowerCase()),
       ) || null,
     [bookings],
   );
@@ -3556,7 +3565,7 @@ export default function CustomerDashboardPage() {
           findCareHref={routes.findGuru}
         />
 
-        <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-5 md:py-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:px-8">
+        <div className="mx-auto grid max-w-[90rem] gap-4 px-3 py-4 sm:px-5 md:py-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:px-8">
           <CustomerDashboardRail />
           <div className="min-w-0 space-y-4">
           <CustomerCareCommandCenter
@@ -3578,6 +3587,10 @@ export default function CustomerDashboardPage() {
                     place: getBookingLocation(stats.nextBooking) || "Care address on the booking",
                     detailHref: getBookingDetailHref(stats.nextBooking.id),
                     reportHref: getBookingPawReportHref(stats.nextBooking.id),
+                    payHref:
+                      unpaidBooking?.id === stats.nextBooking.id
+                        ? getBookingDetailHref(stats.nextBooking.id)
+                        : "",
                   }
                 : null
             }
@@ -3595,14 +3608,38 @@ export default function CustomerDashboardPage() {
               rating: guru.rating,
               reviews: guru.review_count,
               distance: guru.distance_miles > 0 ? `${guru.distance_miles.toFixed(1)} mi` : guru.location || "Nearby",
+              verified: guru.is_verified,
+              rateLabel: guru.rate && guru.rate > 0 ? `$${Math.round(guru.rate)}/hr` : "",
               profileHref: guru.href,
               bookHref: getGuruBookHref(guru, careZip),
             }))}
-            updates={dashboardUpdates.map((update) => ({
-              label: update.label,
-              detail: update.detail,
-              href: update.href,
-            }))}
+            repeatCare={
+              repeatBooking
+                ? {
+                    name: (repeatBooking.guru_name || "your Guru").trim().split(/\s+/)[0] || "your Guru",
+                    service: repeatBooking.service_type || "Pet care",
+                    href: (() => {
+                      const match = nearbyGurus.find((guru) => guru.id === repeatBooking.guru_id);
+                      if (match?.slug) {
+                        return buildPetParentBookUrl({
+                          slug: match.slug,
+                          petId: repeatBooking.pet_id,
+                          zip: careZip,
+                          service: repeatBooking.service_type,
+                          express: true,
+                          rebook: true,
+                        });
+                      }
+                      const params = new URLSearchParams();
+                      if (repeatBooking.guru_id) params.set("guru", repeatBooking.guru_id);
+                      if (repeatBooking.service_type) params.set("service", repeatBooking.service_type);
+                      if (careZip) params.set("zip", careZip);
+                      const search = params.toString();
+                      return search ? `/search?${search}` : "/search";
+                    })(),
+                  }
+                : null
+            }
             careZip={careZip}
             careLocationLabel={careLocationLabel}
             guruMessage={nearbyGuruMessage}
