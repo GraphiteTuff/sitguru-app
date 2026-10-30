@@ -356,7 +356,10 @@ export default function CustomerCareCommandCenter({
                   }}
                   placeholder="ZIP code"
                   aria-label="Search ZIP code"
-                  className="w-full bg-transparent text-base font-semibold text-slate-800 outline-none"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  style={{ fontSize: 16 }}
+                  className="w-full bg-transparent text-[16px] font-semibold text-slate-800 outline-none"
                 />
               </span>
               <span className="mt-1 block min-h-4 text-[11px] font-semibold normal-case tracking-normal text-slate-400">

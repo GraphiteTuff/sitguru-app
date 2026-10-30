@@ -2602,7 +2602,8 @@ function SearchPageContent() {
                   onChange={(event) => handleZipChange(event.target.value)}
                   placeholder="18951"
                   autoComplete="postal-code"
-                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                  style={{ fontSize: 16 }}
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[16px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
