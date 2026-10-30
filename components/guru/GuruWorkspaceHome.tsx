@@ -10,6 +10,7 @@ import {
   Megaphone,
   MessageCircle,
   PawPrint,
+  Star,
   UserRound,
 } from "lucide-react";
 
@@ -30,6 +31,8 @@ const RAIL = [
   { href: "/guru/dashboard/availability", label: "Availability", icon: Clock3 },
   { href: "/guru/dashboard/profile", label: "My profile", icon: UserRound },
   { href: "/guru/dashboard/promote", label: "Promote", icon: Megaphone },
+  { href: "/guru/dashboard/bookings", label: "PawReports", icon: PawPrint },
+  { href: "/guru/dashboard/reviews", label: "Reviews", icon: Star },
   { href: "/guru/dashboard/earnings", label: "Earnings", icon: CircleDollarSign },
   { href: "/guru/dashboard/university", label: "Guru Academy", icon: GraduationCap },
   { href: "/guru/success-center", label: "Help & Support", icon: HelpCircle },
