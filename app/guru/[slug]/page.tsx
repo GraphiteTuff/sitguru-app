@@ -2832,11 +2832,6 @@ function GuruAvatar({
           </div>
         )}
 
-        {isAcademyGraduate ? (
-          <div className="absolute -left-3 top-3 z-10 hidden sm:block">
-            <AcademyGraduateBadge academyType="guru" variant="mini" />
-          </div>
-        ) : null}
       </div>
 
       {isAcademyGraduate ? (
@@ -2853,12 +2848,10 @@ function GuruAvatar({
 function PublicGuruHeroImage({
   name,
   imageUrl,
-  isAcademyGraduate = false,
   compact = false,
 }: {
   name: string;
   imageUrl?: string | null;
-  isAcademyGraduate?: boolean;
   compact?: boolean;
 }) {
   const frame = compact
@@ -2873,21 +2866,6 @@ function PublicGuruHeroImage({
           alt={name}
           className="sg-face-photo h-full w-full"
         />
-
-        {isAcademyGraduate ? (
-          <>
-            <div className="absolute left-4 top-4 z-10 hidden sm:block">
-              <AcademyGraduateBadge
-                academyType="guru"
-                variant="photo-overlay"
-              />
-            </div>
-
-            <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
-              <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
-            </div>
-          </>
-        ) : null}
       </div>
     );
   }
@@ -2895,21 +2873,6 @@ function PublicGuruHeroImage({
   return (
     <div className="relative flex h-[360px] w-full items-center justify-center rounded-[2rem] border border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-7xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
       {getInitials(name)}
-
-      {isAcademyGraduate ? (
-        <>
-          <div className="absolute left-4 top-4 z-10 hidden sm:block">
-            <AcademyGraduateBadge
-              academyType="guru"
-              variant="photo-overlay"
-            />
-          </div>
-
-          <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
-            <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
-          </div>
-        </>
-      ) : null}
     </div>
   );
 }
@@ -3722,7 +3685,6 @@ function PublicGuruProfilePage({
               <PublicGuruHeroImage
                 name={name}
                 imageUrl={imageUrl}
-                isAcademyGraduate={isAcademyGraduate}
                 compact
               />
               <div>

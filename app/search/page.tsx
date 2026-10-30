@@ -1292,25 +1292,15 @@ function getProviderMapMarkerRows(
 function GuruResultPhoto({
   photoUrl,
   guruName,
-  isAcademyCertified,
 }: {
   photoUrl: string;
   guruName: string;
-  isAcademyCertified: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   return (
     <div className="relative h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
-      {isAcademyCertified ? (
-        <AcademyGraduateBadge
-          academyType="guru"
-          variant="photo-overlay"
-          className="absolute left-5 top-5 z-10 h-[74px] w-[74px] md:h-[86px] md:w-[86px]"
-        />
-      ) : null}
-
       {showPhoto ? (
         <img
           src={photoUrl}
@@ -2878,7 +2868,6 @@ function SearchPageContent() {
                         <GuruResultPhoto
                           photoUrl={photoUrl}
                           guruName={guruName}
-                          isAcademyCertified={isAcademyCertified}
                         />
 
                         <div className="flex min-w-0 flex-1 flex-col p-5 md:h-full md:min-h-0 lg:p-6">

@@ -122,9 +122,6 @@ type ServiceRateState = {
   notes: string;
 };
 
-const CERTIFIED_GURU_BADGE_PATH =
-  "/images/badges/sitguru-certified-guru-badge.png";
-
 const RATE_UNIT_OPTIONS: { value: RateUnit; label: string }[] = [
   { value: "hour", label: "Per hour" },
   { value: "visit", label: "Per visit" },
@@ -1849,19 +1846,6 @@ function GuruDashboardProfilePageContent() {
                   )}
                 </div>
 
-                {isGuruAcademyGraduate ? (
-                  <div className="absolute -left-3 top-2 z-20 flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white bg-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
-                    <Image
-                      src={CERTIFIED_GURU_BADGE_PATH}
-                      alt="Certified Guru badge"
-                      width={48}
-                      height={48}
-                      className="h-12 w-12 object-contain"
-                      unoptimized
-                    />
-                  </div>
-                ) : null}
-
                 <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
                   🐾
                 </div>
@@ -2154,18 +2138,6 @@ function GuruDashboardProfilePageContent() {
                                   className="object-cover"
                                   unoptimized
                                 />
-                                {isGuruAcademyGraduate ? (
-                                  <div className="absolute left-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-xl border-2 border-white bg-white shadow-sm">
-                                    <Image
-                                      src={CERTIFIED_GURU_BADGE_PATH}
-                                      alt="Certified Guru badge"
-                                      width={28}
-                                      height={28}
-                                      className="h-7 w-7 object-contain"
-                                      unoptimized
-                                    />
-                                  </div>
-                                ) : null}
                               </div>
                               <div>
                                 <p className="text-sm font-extrabold !text-slate-950">
@@ -2173,8 +2145,7 @@ function GuruDashboardProfilePageContent() {
                                 </p>
                                 {isGuruAcademyGraduate ? (
                                   <p className="mt-1 text-sm font-extrabold !text-emerald-800">
-                                    Guru Academy Graduate badge will display on
-                                    profile photos.
+                                    Guru Academy Graduate
                                   </p>
                                 ) : null}
                                 <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
@@ -2849,19 +2820,6 @@ function GuruDashboardProfilePageContent() {
                         <UserCircle2 className="h-9 w-9 text-emerald-600" />
                       </div>
                     )}
-
-                    {isGuruAcademyGraduate ? (
-                      <div className="absolute left-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg border-2 border-white bg-white shadow-sm">
-                        <Image
-                          src={CERTIFIED_GURU_BADGE_PATH}
-                          alt="Certified Guru badge"
-                          width={22}
-                          height={22}
-                          className="h-[22px] w-[22px] object-contain"
-                          unoptimized
-                        />
-                      </div>
-                    ) : null}
                   </div>
 
                   <div>
