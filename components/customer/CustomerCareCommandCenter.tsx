@@ -60,8 +60,6 @@ const RAIL = [
   { href: "/help", label: "Help & Support", icon: HelpCircle },
 ] as const;
 
-const HERO_IMAGE = "/images/hero/sitguru-dog-walking-hero.jpg";
-
 export type CommandPet = {
   id: string;
   name: string;
@@ -104,6 +102,8 @@ export type CommandRepeat = {
 
 type CommandCenterProps = {
   firstName: string;
+  avatarUrl: string;
+  avatarInitials: string;
   upcomingCount: number;
   pawPerksLabel: string;
   visit: CommandVisit | null;
@@ -165,6 +165,8 @@ export function CustomerDashboardRail() {
 
 export default function CustomerCareCommandCenter({
   firstName,
+  avatarUrl,
+  avatarInitials,
   upcomingCount,
   pawPerksLabel,
   visit,
@@ -289,8 +291,18 @@ export default function CustomerCareCommandCenter({
             </h1>
             <p className="mt-1 text-sm font-semibold text-slate-600">Ready to book trusted pet care?</p>
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={HERO_IMAGE} alt="" className="hidden h-24 w-36 rounded-2xl object-cover object-center sm:block lg:h-32 lg:w-52" />
+          <Link
+            href="/customer/dashboard/profile"
+            aria-label="Open your profile"
+            className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-white text-2xl font-black text-[#0D5C3A] shadow-sm ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl"
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="absolute inset-0 h-full w-full bg-white object-cover object-center" />
+            ) : (
+              avatarInitials || greetingName.slice(0, 1) || "SG"
+            )}
+          </Link>
         </div>
         <form onSubmit={findCare} className="mx-4 mb-4 rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:mx-6 sm:mb-6 sm:p-5">
           <h2 className="text-lg font-black text-slate-950">What kind of care does your pet need?</h2>

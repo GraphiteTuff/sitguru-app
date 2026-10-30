@@ -3570,6 +3570,8 @@ export default function CustomerDashboardPage() {
           <div className="min-w-0 space-y-4">
           <CustomerCareCommandCenter
             firstName={firstName}
+            avatarUrl={showCustomerProfilePhoto ? customerAvatarSrc : ""}
+            avatarInitials={customerInitials}
             upcomingCount={upcomingBookings.length}
             pawPerksLabel={formatMoney(pawPerksState.redeemedCashCredits)}
             visit={
