@@ -93,7 +93,7 @@ export default function GuruWorkspaceHome({
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-[linear-gradient(90deg,#f3fbf6,#ffffff_55%,#e7f6ee)] p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <Face src={photoUrl} name={name} className="h-16 w-16 rounded-full sm:h-20 sm:w-20" />
+              <Face src={photoUrl} name={name} className="h-20 w-20 rounded-full sm:h-28 sm:w-28" />
               <div>
                 <h1 className="text-3xl font-black tracking-tight text-slate-950">{hello}, {name}!</h1>
                 <p className="mt-1 text-sm font-semibold text-slate-600">Connect with Pet Parents. Grow your care business.</p>
