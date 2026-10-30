@@ -34,9 +34,9 @@ export default function PublicPlanCare({
   }, [bookHref, selected?.label, stay]);
 
   return (
-    <aside className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
-      <h2 className="text-lg font-black text-slate-950">Plan care with {firstName}</h2>
-      <p className="mt-1 text-xs font-semibold text-slate-500">Choose a service. {firstName} confirms the request before you are charged.</p>
+    <aside className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+      <h2 className="text-2xl font-black text-slate-950">Plan care with {firstName}</h2>
+      <p className="mt-1 text-sm font-semibold text-slate-500">Choose a service. {firstName} confirms the request before you are charged.</p>
       <div className="mt-3 grid gap-2">
         {choices.slice(0, 6).map((item) => (
           <button
@@ -80,10 +80,11 @@ export default function PublicPlanCare({
       {disabled ? (
         <p className="mt-4 rounded-2xl bg-amber-50 px-3 py-3 text-sm font-bold text-amber-900">Bookings open once this profile is ready.</p>
       ) : (
-        <Link href={href} className="mt-4 flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-bold !text-white">
+        <Link href={href} className="mt-4 flex min-h-12 items-center justify-center rounded-full bg-[#0D5C3A] text-sm font-black !text-white">
           Request to book
         </Link>
       )}
+      <p className="mt-3 text-center text-xs font-semibold text-slate-500">Dates are chosen on the next step. You are not charged yet.</p>
     </aside>
   );
 }

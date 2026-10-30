@@ -2855,7 +2855,7 @@ function PublicGuruHeroImage({
   compact?: boolean;
 }) {
   const frame = compact
-    ? "relative h-72 w-full overflow-hidden rounded-[1.6rem] border border-emerald-100 bg-white sm:h-80"
+    ? "relative h-80 w-full overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-emerald-50 sm:h-[420px]"
     : "relative h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]";
   if (imageUrl) {
     return (
@@ -3594,6 +3594,26 @@ function PhotoGallery({ name, photos }: { name: string; photos: string[] }) {
   );
 }
 
+function serviceCareIcon(label: string) {
+  const value = label.toLowerCase();
+  if (value.includes("walk")) return "🐕";
+  if (value.includes("drop")) return "🏠";
+  if (value.includes("board")) return "🛏️";
+  if (value.includes("day")) return "☀️";
+  if (value.includes("train")) return "🎓";
+  if (value.includes("overnight") || value.includes("house") || value.includes("sitting")) return "🌙";
+  return "🐾";
+}
+
+function hasClearedBackgroundCheck(profile: GuruProfile | null) {
+  const status = [profile?.background_check_status, profile?.checkr_status]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join(" ");
+  return ["clear", "complete", "approved", "passed"].some((token) =>
+    status.includes(token),
+  );
+}
+
 function PublicGuruProfilePage({
   guruProfile,
   serviceRates,
@@ -3615,9 +3635,9 @@ function PublicGuruProfilePage({
   const firstName = getFirstName(name);
   const imageUrl = getGuruImage(guruProfile);
   const location = getGuruLocation(guruProfile);
-  const areaPhrase = getPublicAreaPhrase(guruProfile);
+  const city = String(guruProfile.service_city || guruProfile.city || "").trim();
+  const state = String(guruProfile.service_state || guruProfile.state || "").trim();
   const services = normalizeServices(guruProfile.services);
-  const baseRate = getBaseRate(guruProfile);
   const visibleReviews = getVisibleReviews(reviews);
   const reviewAverage = getAverageReviewRating(reviews);
   const storedReviewCount = getReviewCount(guruProfile);
@@ -3630,6 +3650,9 @@ function PublicGuruProfilePage({
       : 0;
   const experienceYears = getExperienceYears(guruProfile);
   const serviceRadius = getGuruRadius(guruProfile);
+  const backgroundClear = hasClearedBackgroundCheck(guruProfile);
+  const publicSlug = String(guruProfile.slug || "").trim();
+  const profileUrl = `https://www.sitguru.com/guru/${identifier}`;
   const bookHref = getBookHref(guruProfile, identifier);
   const messageHref = getMessageHref(guruProfile, identifier);
   const bookable = isBookable(guruProfile);
@@ -3640,17 +3663,24 @@ function PublicGuruProfilePage({
   const visibleServiceRates = serviceRates.filter(
     (rate) => rate.is_enabled !== false,
   );
-  const trustLabel = bookable
-    ? guruProfile.is_verified
-      ? "Verified with SitGuru"
-      : "Ready to care"
-    : "New to SitGuru";
-  const rateDisplay =
-    baseRate ||
-    (hasEnabledPricedServiceRates(visibleServiceRates)
-      ? "By service"
-      : "Coming soon");
   const friendlyBio = getFriendlyPublicBio(guruProfile);
+  const careOptions = visibleServiceRates.length
+    ? visibleServiceRates.map((rate) => {
+        const formatted = formatServiceRate(rate);
+        const priced = formatted.primary.startsWith("$");
+        return {
+          key: String(rate.id || `${rate.guru_id}-${rate.service_key}`),
+          label: String(rate.service_label || rate.service_key || "Pet care"),
+          price: priced ? `From ${formatted.primary}` : "",
+          detail: priced ? formatted.detail.replace(/^\//, "") : "",
+        };
+      })
+    : services.map((service) => ({
+        key: service,
+        label: service,
+        price: "",
+        detail: "",
+      }));
 
   return (
     <main
@@ -3672,53 +3702,60 @@ function PublicGuruProfilePage({
             <Link href="/guru/dashboard" className="underline">Back to your Guru dashboard</Link>
           </p>
         ) : null}
-        <Link
-          href="/search"
-          className="mb-6 inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black !text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-        >
-          ← Meet more local Gurus
-        </Link>
+        <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-500">
+          <Link href="/search" className="text-[#0D5C3A]">Find Gurus</Link>
+          {state ? <span aria-hidden="true">/</span> : null}
+          {state ? <span>{state}</span> : null}
+          {city ? <span aria-hidden="true">/</span> : null}
+          {city ? <span>{city}</span> : null}
+          <span aria-hidden="true">/</span>
+          <span className="text-slate-900">{name}</span>
+        </nav>
 
-        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
-            <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
-              <PublicGuruHeroImage
-                name={name}
-                imageUrl={imageUrl}
-                compact
-              />
+        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+            <div className="grid gap-5 md:grid-cols-[minmax(240px,340px)_minmax(0,1fr)]">
+              <div className="relative">
+                <PublicGuruHeroImage name={name} imageUrl={imageUrl} compact />
+                {gallery.length ? (
+                  <a href="#guru-photos" className="absolute bottom-4 left-4 rounded-full bg-white/95 px-3 py-2 text-xs font-black text-slate-900 shadow">
+                    View photos ({gallery.length})
+                  </a>
+                ) : null}
+              </div>
               <div>
                 <div className="flex flex-wrap gap-2">
                   {guruProfile.is_verified ? (
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">Verified Guru</span>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#0D5C3A]">Verified Guru</span>
+                  ) : null}
+                  {backgroundClear ? (
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#0D5C3A]">Background check</span>
                   ) : null}
                   {isAcademyGraduate ? (
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">SitGuru Certified</span>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#0D5C3A]">SitGuru Certified</span>
                   ) : null}
-                  <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{trustLabel}</span>
+                  {!guruProfile.is_verified && !backgroundClear && !isAcademyGraduate ? (
+                    <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">{bookable ? "Ready to care" : "New on SitGuru"}</span>
+                  ) : null}
                 </div>
-                <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Meet {name}</h1>
+                <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{name}</h1>
                 <p className="mt-2 text-lg font-semibold text-slate-600">Caring for pets like family.</p>
                 <p className="mt-2 text-sm font-bold text-[#0D5C3A]">
                   {location}
                   {serviceRadius ? ` · Serving within ${serviceRadius} miles` : ""}
-                  {rating > 0 ? ` · ${rating.toFixed(1)} (${reviewCount} reviews)` : " · New on SitGuru"}
+                  {experienceYears > 0 ? ` · ${experienceYears}+ years` : ""}
+                  {rating > 0 ? ` · ${rating.toFixed(1)} from ${reviewCount} ${reviewCount === 1 ? "review" : "reviews"}` : " · New on SitGuru"}
                 </p>
-                <p className="mt-4 text-base font-semibold leading-7 text-slate-700">{friendlyBio}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {services.slice(0, 6).map((service) => (
-                    <span key={service} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">{service}</span>
-                  ))}
-                </div>
+                <p className="mt-4 whitespace-pre-line text-base font-semibold leading-7 text-slate-700">{friendlyBio}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {disableMessaging ? (
-                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-bold text-slate-500">Messaging opens soon</span>
+                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-black text-slate-500">Messaging opens soon</span>
                   ) : ownerPreview ? (
-                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-bold text-slate-500">You cannot message yourself</span>
+                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-black text-slate-500">You cannot message yourself</span>
                   ) : (
-                    <Link href={messageHref} className="inline-flex min-h-12 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-bold !text-white">Message {firstName}</Link>
+                    <Link href={messageHref} className="inline-flex min-h-12 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black !text-white">Message {firstName}</Link>
                   )}
-                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://www.sitguru.com/guru/${identifier}`)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center rounded-full border border-emerald-200 px-5 text-sm font-bold text-[#0D5C3A]">Share profile</a>
+                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center rounded-full border border-emerald-200 px-5 text-sm font-black text-[#0D5C3A]">Share profile</a>
                 </div>
               </div>
             </div>
@@ -3727,236 +3764,97 @@ function PublicGuruProfilePage({
             firstName={firstName}
             disabled={disableBooking}
             bookHref={bookHref}
-            services={(visibleServiceRates.length ? visibleServiceRates : []).map((rate) => ({
-              label: String(rate.service_label || rate.service_key || "Pet care"),
-              price: rate.rate_amount ? `From $${Number(rate.rate_amount)}` : "",
-            })).concat(visibleServiceRates.length ? [] : services.map((service) => ({ label: service, price: "" })))}
+            services={careOptions.map((option) => ({ label: option.label, price: option.price }))}
           />
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
-              About {firstName}
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-              Meet {firstName}
-            </h2>
-
-            <p className="mt-4 whitespace-pre-line text-base font-bold leading-8 !text-slate-700">
-              {friendlyBio}
-            </p>
+        <section className="mt-6 grid items-start gap-4 lg:grid-cols-3">
+          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm lg:col-span-2">
+            <div className="flex items-end justify-between gap-3">
+              <h2 className="text-2xl font-black text-slate-950">Services & rates</h2>
+              <p className="text-sm font-semibold text-slate-500">{firstName} confirms care before it starts.</p>
+            </div>
+            {careOptions.length ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {careOptions.map((option) => (
+                  <article key={option.key} className="rounded-3xl border border-emerald-100 bg-[#F7FFFB] p-4">
+                    <span className="text-2xl" aria-hidden="true">{serviceCareIcon(option.label)}</span>
+                    <h3 className="mt-3 text-lg font-black text-slate-950">{option.label}</h3>
+                    {option.detail ? <p className="mt-1 text-sm font-semibold text-slate-500">{option.detail}</p> : null}
+                    {option.price ? <p className="mt-3 text-base font-black text-[#0D5C3A]">{option.price}</p> : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-4 text-sm font-bold text-amber-900">{firstName} is still adding care options.</p>
+            )}
           </div>
 
-          <aside className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
-              How {firstName} can help
+          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">About {firstName}</h2>
+            <p className="mt-3 whitespace-pre-line text-sm font-semibold leading-7 text-slate-700">{friendlyBio}</p>
+            <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-[#0D5C3A]">
+              {firstName} confirms the care details on SitGuru before a visit begins.
             </p>
-
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-              Care made for your pet
-            </h2>
-
-            <div className="mt-5 grid gap-3">
-              {services.length ? (
-                services.map((service) => (
-                  <span
-                    key={service}
-                    className="rounded-full bg-emerald-50 px-4 py-3 text-sm font-black !text-emerald-800 ring-1 ring-emerald-100"
-                  >
-                    🐾 {service}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded-[1.25rem] bg-amber-50 px-4 py-4 text-sm font-black leading-6 !text-amber-900 ring-1 ring-amber-100">
-                  {firstName} is still adding care options.
-                </span>
-              )}
-            </div>
-          </aside>
+          </div>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className="mt-4 grid items-start gap-4 lg:grid-cols-3">
           <ServiceAreaCard
             name={firstName}
             location={location}
             radius={serviceRadius}
             center={getServiceCenter(guruProfile)}
           />
-          <PhotoGallery name={firstName} photos={gallery} />
-        </section>
-
-        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
-                Services & rates
-              </p>
-
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                Choose the care that fits
-              </h2>
-            </div>
-
-            <p className="text-sm font-bold !text-slate-600">
-              {firstName} confirms the care details before a booking begins.
+          <div id="guru-photos">
+            <PhotoGallery name={firstName} photos={gallery} />
+          </div>
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">PawReport</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Updates from the visit</h2>
+            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+              After a booking with {firstName}, the PawReport for that visit can include photos and notes for the Pet Parent.
             </p>
           </div>
-
-          {visibleServiceRates.length ? (
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {visibleServiceRates.map((rate) => {
-                const formatted = formatServiceRate(rate);
-
-                return (
-                  <div
-                    key={String(
-                      rate.id || `${rate.guru_id}-${rate.service_key}`,
-                    )}
-                    className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
-                  >
-                    <p className="text-lg font-black !text-slate-900">
-                      {rate.service_label || "Personalized pet care"}
-                    </p>
-
-                    <p className="mt-2 text-3xl font-black !text-emerald-700">
-                      {formatted.primary}
-                      <span className="ml-1 text-sm font-bold !text-slate-600">
-                        {formatted.detail}
-                      </span>
-                    </p>
-
-                    {rate.notes ? (
-                      <p className="mt-3 text-sm font-bold leading-6 !text-slate-600">
-                        {rate.notes}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
-              <h3 className="text-xl font-black !text-slate-900">
-                My rates are almost ready 💚
-              </h3>
-
-              <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
-                Rates will show here once {firstName} finishes them.
-              </p>
-            </div>
-          )}
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+        <section className="mt-4 rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
-                Happy tails & kind words
-              </p>
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                What pet families are saying
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-bold leading-6 !text-slate-700">
-                Every review here comes from a real SitGuru care experience.
-              </p>
+              <h2 className="text-2xl font-black text-slate-950">Reviews from Pet Parents</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Only reviews from real SitGuru visits are shown.</p>
             </div>
-
-            <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
-              <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
-                Pet Parent love
-              </p>
-              <p className="mt-1 text-3xl font-black !text-slate-950">
-                {rating > 0 ? rating.toFixed(1) : "New"}
-              </p>
-              <p className="text-xs font-bold !text-slate-600">
-                {reviewCount} {reviewCount === 1 ? "kind word" : "kind words"}
-              </p>
-            </div>
+            {rating > 0 ? (
+              <p className="text-sm font-black text-[#0D5C3A]">{rating.toFixed(1)} · {reviewCount} {reviewCount === 1 ? "review" : "reviews"}</p>
+            ) : null}
           </div>
-
           {visibleReviews.length ? (
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {visibleReviews.slice(0, 6).map((review) => {
-                const reviewRating = Math.max(
-                  1,
-                  Math.min(5, Math.round(readNumber(review.rating, 0))),
-                );
-
+                const reviewRating = Math.max(1, Math.min(5, Math.round(readNumber(review.rating, 0))));
                 return (
-                  <article
-                    key={String(review.id || review.booking_id || Math.random())}
-                    className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-black !text-amber-600 ring-1 ring-amber-100">
-                        {"★".repeat(reviewRating)}
-                      </span>
-                      <span className="text-xs font-bold !text-slate-500">
-                        {formatReviewDate(review.created_at)}
-                      </span>
-                    </div>
-                    <p className="mt-4 line-clamp-5 text-sm font-bold leading-6 !text-slate-700">
-                      {review.review_text ||
-                        "A Pet Parent shared a lovely SitGuru care experience."}
-                    </p>
-                    {review.would_rebook ? (
-                      <p className="mt-4 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800 ring-1 ring-emerald-100">
-                        Would happily book again 🐾
-                      </p>
-                    ) : null}
+                  <article key={String(review.id || review.booking_id || review.created_at)} className="rounded-3xl border border-emerald-100 bg-[#F7FFFB] p-4">
+                    <p className="text-sm font-black text-amber-500" aria-label={`${reviewRating} out of 5`}>{"★".repeat(reviewRating)}</p>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">{review.review_text || "A Pet Parent shared a SitGuru visit."}</p>
+                    <p className="mt-3 text-xs font-bold text-slate-500">{formatReviewDate(review.created_at)}</p>
                   </article>
                 );
               })}
             </div>
           ) : (
-            <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
-              <h3 className="text-xl font-black !text-slate-900">
-                {firstName} is new on SitGuru
-              </h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
-                Reviews from real Pet Parent visits will show up here.
-              </p>
-            </div>
+            <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-4 text-sm font-bold text-[#0D5C3A]">Reviews from real visits will show here.</p>
           )}
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-5 lg:grid-cols-[1fr_260px_260px] lg:items-center">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
-                One more paw-some thing
-              </p>
-
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                {bookable
-                  ? `Ready to plan care with ${firstName}?`
-                  : `Meet ${firstName}`}
-              </h2>
-
-              <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                {bookable
-                  ? `Look over the services, then send a SitGuru care request when you are ready.`
-                  : `${firstName} is finishing a few details before bookings open. You can meet other SitGuru caregivers nearby in the meantime.`}
-              </p>
-            </div>
-
-            <PublicBookButton
-              disabled={disableBooking}
-              href={bookHref}
-              activeLabel={`Book with ${firstName}`}
-              disabledLabel="Bookings opening soon 🐾"
-              className="flex min-h-[58px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] hover:bg-[#0b1436]"
-            />
-
-            <Link
-              href="/search"
-              className="flex min-h-[58px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-6 py-4 text-base font-black !text-emerald-800 shadow-sm hover:bg-emerald-50"
-            >
-              Meet more local Gurus
-            </Link>
+        <section className="mt-4 flex flex-col gap-4 rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">Share {firstName}&apos;s profile</h2>
+            <p className="mt-1 break-all text-sm font-semibold text-slate-600">{profileUrl}</p>
           </div>
+          {publicSlug ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`/api/guru/profile-qr?slug=${encodeURIComponent(publicSlug)}`} alt={`QR code for ${name}'s SitGuru profile`} className="h-24 w-24 rounded-2xl border border-emerald-100 bg-white" />
+          ) : null}
         </section>
       </section>
     </main>
