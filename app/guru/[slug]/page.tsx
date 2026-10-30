@@ -913,6 +913,15 @@ function getExperienceYears(profile: GuruProfile | null) {
   return readNumber(profile?.experience_years, 0);
 }
 
+function getServiceCenter(profile: GuruProfile | null) {
+  const lat = Number(profile?.service_latitude);
+  const lng = Number(profile?.service_longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng };
+}
+
 function getGuruRadius(profile: GuruProfile | null) {
   if (!profile) return null;
 
@@ -1373,6 +1382,45 @@ async function findGuruUploadedPhotoFromMediaTables(guruProfile: GuruProfile) {
   }
 
   return null;
+}
+
+async function listGuruGallery(guruProfile: GuruProfile) {
+  const urls = new Set<string>();
+  const primary = getGuruImage(guruProfile);
+  if (primary) urls.add(primary);
+
+  const guruIds = Array.from(
+    new Set(
+      [guruProfile.id, guruProfile.user_id, guruProfile.profile_id]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const mediaTables = ["guru_media", "guru_photos", "guru_profile_photos", "profile_media"];
+  const idColumns = ["guru_id", "user_id", "profile_id"];
+
+  for (const table of mediaTables) {
+    for (const column of idColumns) {
+      if (urls.size >= 9 || !guruIds.length) return Array.from(urls);
+      try {
+        const { data, error } = await supabaseAdmin
+          .from(table)
+          .select("*")
+          .in(column, guruIds)
+          .limit(12);
+        if (error || !Array.isArray(data)) continue;
+        for (const row of data as Record<string, any>[]) {
+          const imageUrl = getImageUrlFromRecord(row);
+          if (imageUrl) urls.add(imageUrl);
+        }
+      } catch {
+        // Optional media tables may not exist.
+      }
+    }
+  }
+
+  return Array.from(urls).slice(0, 9);
 }
 
 function mergeAccountProfileLocation(
@@ -3524,12 +3572,72 @@ function PublicBookButton({
   );
 }
 
+function ServiceAreaCard({
+  name,
+  location,
+  radius,
+  center,
+}: {
+  name: string;
+  location: string;
+  radius: number | null;
+  center: { lat: number; lng: number } | null;
+}) {
+  const areaLabel = location === "My local community" ? "their local community" : location;
+  const radiusLabel = radius ? `${radius} mile radius` : "local service area";
+
+  if (!center) {
+    return (
+      <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-black text-slate-950">Service area</h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          {name} cares around {areaLabel}. {radius ? `The listed reach is ${radiusLabel}.` : "A map appears when a public service location is saved."}
+        </p>
+      </div>
+    );
+  }
+
+  const delta = Math.max((radius || 15) / 69, 0.12);
+  const bbox = `${center.lng - delta},${center.lat - delta},${center.lng + delta},${center.lat + delta}`;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${center.lat}%2C${center.lng}`;
+
+  return (
+    <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+      <h2 className="text-2xl font-black text-slate-950">Service area</h2>
+      <p className="mt-1 text-sm font-semibold text-slate-600">{areaLabel} · {radiusLabel}</p>
+      <iframe title={`Service area for ${name}`} src={src} className="mt-4 h-64 w-full rounded-2xl border border-emerald-50" loading="lazy" />
+      <p className="mt-2 text-xs font-semibold text-slate-500">This map shows the public care area, not a home address.</p>
+    </div>
+  );
+}
+
+function PhotoGallery({ name, photos }: { name: string; photos: string[] }) {
+  return (
+    <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+      <h2 className="text-2xl font-black text-slate-950">Photo gallery</h2>
+      {photos.length ? (
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {photos.map((photo) => (
+            <li key={photo} className="relative aspect-square overflow-hidden rounded-2xl bg-emerald-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo} alt="" className="absolute inset-0 h-full w-full bg-white object-cover object-center" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Photos will show here when {name} adds them.</p>
+      )}
+    </div>
+  );
+}
+
 function PublicGuruProfilePage({
   guruProfile,
   serviceRates,
   identifier,
   universityProgress,
   reviews,
+  gallery,
   ownerPreview = false,
 }: {
   guruProfile: GuruProfile;
@@ -3537,6 +3645,7 @@ function PublicGuruProfilePage({
   identifier: string;
   universityProgress: GuruUniversityProgress;
   reviews: BookingReviewRow[];
+  gallery: string[];
   ownerPreview?: boolean;
 }) {
   const name = getGuruName(guruProfile);
@@ -3699,11 +3808,21 @@ function PublicGuruProfilePage({
                 ))
               ) : (
                 <span className="rounded-[1.25rem] bg-amber-50 px-4 py-4 text-sm font-black leading-6 !text-amber-900 ring-1 ring-amber-100">
-                  I’m putting together my care options now—more tail-wagging details are coming soon!
+                  {firstName} is still adding care options.
                 </span>
               )}
             </div>
           </aside>
+        </section>
+
+        <section className="mt-8 grid gap-6 lg:grid-cols-2">
+          <ServiceAreaCard
+            name={firstName}
+            location={location}
+            radius={serviceRadius}
+            center={getServiceCenter(guruProfile)}
+          />
+          <PhotoGallery name={firstName} photos={gallery} />
         </section>
 
         <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
@@ -4372,7 +4491,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
     notFound();
   }
 
-  const [serviceRates, universityProgress, reviews] = await Promise.all([
+  const [serviceRates, universityProgress, reviews, gallery] = await Promise.all([
     getGuruServiceRates(publicGuruProfile),
     publicGuruProfile.user_id
       ? getGuruUniversityProgress(publicGuruProfile.user_id)
@@ -4392,6 +4511,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
           academyButtonLabel: "Start Guru Academy",
         } satisfies GuruUniversityProgress),
     getPublicGuruReviews(publicGuruProfile),
+    listGuruGallery(publicGuruProfile),
   ]);
 
   return (
@@ -4401,6 +4521,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
       identifier={identifier}
       universityProgress={universityProgress}
       reviews={reviews}
+      gallery={gallery}
       ownerPreview={isViewingOwnGuruProfile || isAdminViewer}
     />
   );
