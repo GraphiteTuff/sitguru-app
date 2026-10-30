@@ -1769,6 +1769,14 @@ function SearchPageContent() {
   const bookingDate = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "")
     ? String(searchParams.get("date"))
     : "";
+  const bookingEnd = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("end") || "")
+    ? String(searchParams.get("end"))
+    : "";
+  const bookingDates = String(searchParams.get("dates") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+    .join(",");
   const selectedGuruId =
     searchParams.get("guru") || searchParams.get("guruId") || "";
   const selectedGuruSlug = searchParams.get("slug") || "";
@@ -2853,7 +2861,7 @@ function SearchPageContent() {
                                 getBookGuruHref(guru),
                                 quickPetId,
                                 zipFilter,
-                                { service: serviceFilter, date: bookingDate },
+                                { service: serviceFilter, date: bookingDate, end: bookingEnd, dates: bookingDates },
                               ),
                               guruName: guruFirstName,
                             });
@@ -3053,7 +3061,7 @@ function SearchPageContent() {
                                   getBookGuruHref(guru),
                                   quickPetId,
                                   zipFilter,
-                                  { service: serviceFilter, date: bookingDate },
+                                  { service: serviceFilter, date: bookingDate, end: bookingEnd, dates: bookingDates },
                                 )}
                                 prefetch={true}
                                 onClick={() => {

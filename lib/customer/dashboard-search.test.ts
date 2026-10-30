@@ -40,16 +40,42 @@ describe("pet parent dashboard search", () => {
     assert.equal(href.includes("date="), false);
   });
 
-  it("changes the service and chosen date", () => {
+  it("keeps several walking dates", () => {
     const href = buildDashboardSearchHref({
-      service: "Drop-In Visits",
-      location: "18951",
+      service: "Dog Walking",
+      location: "19103",
       timing: "dates",
-      chosenDate: "2026-11-02",
+      dates: ["2026-11-07", "2026-11-03", "2026-11-05"],
       now,
     });
-    assert.match(href, /service=Drop-In\+Visits/);
-    assert.match(href, /date=2026-11-02/);
+    assert.match(href, /zip=19103/);
+    assert.match(href, /date=2026-11-03/);
+    assert.match(href, /dates=2026-11-03%2C2026-11-05%2C2026-11-07/);
+  });
+
+  it("sends boarding as a check-in and check-out range", () => {
+    const href = buildDashboardSearchHref({
+      service: "Boarding",
+      location: "19103",
+      timing: "dates",
+      rangeStart: "2026-11-05",
+      rangeEnd: "2026-11-08",
+      now,
+    });
+    assert.match(href, /date=2026-11-05/);
+    assert.match(href, /end=2026-11-08/);
+    assert.equal(href.includes("dates="), false);
+  });
+
+  it("searches a new ZIP without requiring the saved one", () => {
+    const href = buildDashboardSearchHref({
+      service: "Dog Walking",
+      location: "19103",
+      timing: "flexible",
+      now,
+    });
+    assert.match(href, /zip=19103/);
+    assert.equal(href.includes("18951"), false);
   });
 
   it("keeps the Guru, service, and ZIP on Book Now", () => {

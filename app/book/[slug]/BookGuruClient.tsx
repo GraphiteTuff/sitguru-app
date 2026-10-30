@@ -1327,6 +1327,13 @@ export default function BookGuruClient({
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
   const queryDate = String(searchParams.get("date") || "").trim();
+  const queryEnd = /^\d{4}-\d{2}-\d{2}$/.test(String(searchParams.get("end") || "").trim())
+    ? String(searchParams.get("end")).trim()
+    : "";
+  const queryDates = String(searchParams.get("dates") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
 
   const resolvedCalendarUsername = calendarUsername || calUsername || "";
   const resolvedCalendarEventTypeSlug =
@@ -1377,10 +1384,11 @@ export default function BookGuruClient({
   const [bookingType, setBookingType] = useState("Request Booking");
   const [selectedService, setSelectedService] =
     useState<ServiceKey>("drop_in_visit");
-  const [bookingDate, setBookingDate] = useState(queryDate);
-  const [bookingEndDate, setBookingEndDate] = useState("");
+  const [bookingDate, setBookingDate] = useState(queryDates[0] || queryDate);
+  const [bookingEndDate, setBookingEndDate] = useState(queryEnd);
+  const [pickedDates, setPickedDates] = useState<string[]>(queryDates);
   const [dateSelectionMode, setDateSelectionMode] =
-    useState<DateSelectionMode>("single");
+    useState<DateSelectionMode>(queryEnd ? "range" : "single");
   const [hoverDate, setHoverDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("Flexible");
   const [customPreferredTime, setCustomPreferredTime] = useState("");
@@ -1442,10 +1450,12 @@ export default function BookGuruClient({
     () =>
       dateSelectionMode === "range"
         ? getDatesInRange(bookingDate, bookingEndDate)
-        : bookingDate
-          ? [bookingDate]
-          : [],
-    [bookingDate, bookingEndDate, dateSelectionMode],
+        : pickedDates.length > 1
+          ? pickedDates
+          : bookingDate
+            ? [bookingDate]
+            : [],
+    [bookingDate, bookingEndDate, dateSelectionMode, pickedDates],
   );
 
   const serviceUnitPrice = useMemo(
@@ -1456,9 +1466,11 @@ export default function BookGuruClient({
   );
 
   const billableCareDays = useMemo(() => {
-    if (dateSelectionMode !== "range") return 1;
-    return Math.max(1, selectedDates.length);
-  }, [dateSelectionMode, selectedDates.length]);
+    if (dateSelectionMode === "range" || pickedDates.length > 1) {
+      return Math.max(1, selectedDates.length);
+    }
+    return 1;
+  }, [dateSelectionMode, pickedDates.length, selectedDates.length]);
 
   const servicePrice = useMemo(() => {
     if (selectedGuruServiceIsCustomQuote) return 0;
@@ -2325,6 +2337,7 @@ export default function BookGuruClient({
 
     if (dateSelectionMode === "single") {
       setBookingEndDate("");
+      setPickedDates([]);
       return;
     }
 
@@ -2372,6 +2385,7 @@ export default function BookGuruClient({
     if (dateSelectionMode === "single") {
       setBookingDate(cell.iso);
       setBookingEndDate("");
+      setPickedDates([]);
       setHoverDate("");
       return;
     }

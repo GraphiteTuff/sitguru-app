@@ -3559,7 +3559,7 @@ export default function CustomerDashboardPage() {
         </Suspense>
 
         <CustomerStickyCta
-          unpaidBookingId={unpaidBooking?.id || null}
+          unpaidBookingId={null}
           setupHref={stickySetup?.href}
           setupLabel={stickySetup?.label}
           findCareHref={routes.findGuru}
@@ -3644,6 +3644,19 @@ export default function CustomerDashboardPage() {
             careLocationLabel={careLocationLabel}
             guruMessage={nearbyGuruMessage}
             loadingGurus={loadingNearbyGurus}
+            paymentAlert={
+              unpaidBooking
+                ? {
+                    service: unpaidBooking.service_type || "Pet care",
+                    when: formatShortDate(getBookingDisplayDate(unpaidBooking)),
+                    amount: formatMoney(
+                      unpaidBooking.total_customer_paid || unpaidBooking.subtotal_amount,
+                      true,
+                    ),
+                    href: getBookingDetailHref(unpaidBooking.id),
+                  }
+                : null
+            }
             onZipReady={refreshNearbyGurusForZip}
           />
           {!isZeroBookingHome ? (

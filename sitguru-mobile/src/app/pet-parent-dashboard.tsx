@@ -28,6 +28,7 @@ import {
   Image,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -234,11 +235,20 @@ export default function PetParentDashboardScreen() {
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
+  const [searchZip, setSearchZip] = useState('');
+  const [zipEdited, setZipEdited] = useState(false);
   const [needsVisitReview, setNeedsVisitReview] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const profileRecord = (profile ?? {}) as RecordRow;
+  useEffect(() => {
+    if (zipEdited || searchZip) return;
+    const saved = getFirstString(profileRecord, ['zip_code', 'zip', 'service_zip'])
+      .replace(/\D/g, '')
+      .slice(0, 5);
+    if (saved) setSearchZip(saved);
+  }, [profileRecord, searchZip, zipEdited]);
   const profileName =
     getFirstString(profileRecord, ['full_name', 'display_name']) ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -813,16 +823,12 @@ export default function PetParentDashboardScreen() {
                 showTrust={showConvertTrust}
                 onPress={() => {
                   if (selectedService && idleBrowse) {
-                    const savedZip = getFirstString(profileRecord, [
-                      'zip_code',
-                      'zip',
-                      'service_zip',
-                    ]).replace(/\D/g, '').slice(0, 5);
+                    const zip = searchZip.replace(/\D/g, '').slice(0, 5);
                     router.push({
                       pathname: '/find-care',
                       params: {
                         service: selectedService.serviceType,
-                        ...(savedZip.length === 5 ? { zip: savedZip } : {}),
+                        ...(zip.length === 5 ? { zip } : {}),
                       },
                     });
                     return;
@@ -941,6 +947,29 @@ export default function PetParentDashboardScreen() {
               selectedKey={selectedServiceKey}
               onSelect={(service) => {
                 setSelectedServiceKey(service.key);
+              }}
+            />
+            <TextInput
+              value={searchZip}
+              onChangeText={(value) => {
+                setZipEdited(true);
+                setSearchZip(value.replace(/\D/g, '').slice(0, 5));
+              }}
+              keyboardType="number-pad"
+              maxLength={5}
+              placeholder="Search ZIP"
+              accessibilityLabel="Search ZIP code"
+              placeholderTextColor="#94a3b8"
+              style={{
+                minHeight: 48,
+                marginTop: 12,
+                borderWidth: 1,
+                borderColor: '#d1fae5',
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                fontSize: 16,
+                color: '#0f172a',
+                backgroundColor: '#ffffff',
               }}
             />
 
