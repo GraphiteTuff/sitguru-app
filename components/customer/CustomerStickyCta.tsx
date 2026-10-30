@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import FinishPaymentButton from "@/components/customer/FinishPaymentButton";
 
@@ -20,6 +21,12 @@ export default function CustomerStickyCta({
   setupLabel,
   findCareHref = "/search",
 }: CustomerStickyCtaProps) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--sg-sticky-cta-lift", "4.75rem");
+    return () => root.style.removeProperty("--sg-sticky-cta-lift");
+  }, []);
+
   if (unpaidBookingId) {
     return (
       <div className="pointer-events-auto fixed inset-x-3 bottom-[5.35rem] z-[55] md:bottom-6 md:left-auto md:right-6 md:w-[min(420px,calc(100vw-3rem))]">
