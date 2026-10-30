@@ -616,7 +616,7 @@ function DatePlanner({
           {cells.map((iso, index) => {
             if (!iso) return <span key={`empty-${index}`} />;
             const selected = range
-              ? iso === rangeStart || iso === rangeEnd || (rangeStart && rangeEnd && iso > rangeStart && iso < rangeEnd)
+              ? iso === rangeStart || iso === rangeEnd || Boolean(rangeStart && rangeEnd && iso > rangeStart && iso < rangeEnd)
               : dates.includes(iso);
             return (
               <button
