@@ -16,6 +16,7 @@ import {
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
 import { loadGuruProfileForUser } from "@/lib/gurus/load-guru-profile-for-user";
+import GuruWorkspaceHome, { type GuruVisitCard } from "@/components/guru/GuruWorkspaceHome";
 
 export const dynamic = "force-dynamic";
 
@@ -592,6 +593,34 @@ async function getGuruBookings(
   }
 
   return [] as BookingRow[];
+}
+
+async function countGuruUnreadMessages(userId: string) {
+  const { data: participants, error } = await supabaseAdmin
+    .from("conversation_participants")
+    .select("conversation_id,last_read_at")
+    .eq("user_id", userId)
+    .limit(80);
+  if (error || !participants) return null;
+  const rows = participants as Array<{ conversation_id?: string | null; last_read_at?: string | null }>;
+  const ids = rows
+    .map((row) => String(row.conversation_id || ""))
+    .filter(Boolean);
+  if (!ids.length) return 0;
+  const { data: threads, error: threadError } = await supabaseAdmin
+    .from("conversations")
+    .select("id,last_message_at")
+    .in("id", ids);
+  if (threadError || !threads) return null;
+  const readAt = new Map(
+    rows.map((row) => [String(row.conversation_id || ""), String(row.last_read_at || "")]),
+  );
+  return (threads as Array<{ id?: string | null; last_message_at?: string | null }>).filter((thread) => {
+    const activity = String(thread.last_message_at || "");
+    if (!activity) return false;
+    const seen = readAt.get(String(thread.id || "")) || "";
+    return !seen || new Date(activity).getTime() > new Date(seen).getTime();
+  }).length;
 }
 
 async function getGuruConversations(
@@ -1981,9 +2010,43 @@ export default async function GuruDashboardPage() {
     bookable,
   });
 
+  const requestStatuses = new Set(["pending", "requested", "new", "awaiting", "submitted", "inquiry"]);
+  const toVisit = (booking: BookingRow): GuruVisitCard => {
+    const id = String(booking.id || "");
+    return {
+      id,
+      petName: getPetName(booking),
+      service: getBookingService(booking),
+      when: getBookingDate(booking),
+      place: "",
+      detailHref: `/guru/dashboard/bookings/${encodeURIComponent(id)}`,
+      reportHref: `/guru/dashboard/bookings/${encodeURIComponent(id)}/visit-updates`,
+    };
+  };
+  const requestCards = upcomingBookings
+    .filter((booking) => requestStatuses.has(getBookingStatus(booking).toLowerCase()))
+    .map(toVisit);
+  const upcomingCards = upcomingBookings
+    .filter((booking) => !requestStatuses.has(getBookingStatus(booking).toLowerCase()))
+    .map(toVisit);
+  const publicHref = guruProfile.slug ? `/guru/${encodeURIComponent(String(guruProfile.slug))}` : "/guru/dashboard/profile";
+
   return (
     <main className="min-h-[100svh] bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_48%,#EEF6FF_100%)] px-3 py-4 !text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
+        <GuruWorkspaceHome
+          firstName={welcomeName}
+          photoUrl={imageUrl || ""}
+          location={location}
+          acceptingBookings={bookable}
+          requests={requestCards}
+          upcoming={upcomingCards}
+          messageCount={conversations.length}
+          unreadCount={await countGuruUnreadMessages(user.id)}
+          profilePercent={profileCompletion}
+          services={normalizeServices(guruProfile.services)}
+          publicHref={publicHref}
+        />
         <UniversalRoleDashboard
           role="guru"
           userName={welcomeName}

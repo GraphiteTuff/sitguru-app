@@ -969,7 +969,7 @@ export default function GuruDashboardScreen() {
                           styles.welcomeText
                         }
                       >
-                        Requests, today{"'"}s care, and earnings.
+                        Connect with Pet Parents. Grow your care business.
                       </Text>
 
 
