@@ -24,7 +24,9 @@ export default function CustomerStickyCta({
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--sg-sticky-cta-lift", "4.75rem");
-    return () => root.style.removeProperty("--sg-sticky-cta-lift");
+    return () => {
+      root.style.removeProperty("--sg-sticky-cta-lift");
+    };
   }, []);
 
   if (unpaidBookingId) {
