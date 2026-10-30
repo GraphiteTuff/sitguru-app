@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import GuruProfileLiveRefresh from "@/components/gurus/GuruProfileLiveRefresh";
+import PublicPlanCare from "@/components/guru/PublicPlanCare";
 import {
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
@@ -2805,14 +2806,19 @@ function PublicGuruHeroImage({
   name,
   imageUrl,
   isAcademyGraduate = false,
+  compact = false,
 }: {
   name: string;
   imageUrl?: string | null;
   isAcademyGraduate?: boolean;
+  compact?: boolean;
 }) {
+  const frame = compact
+    ? "relative h-72 w-full overflow-hidden rounded-[1.6rem] border border-emerald-100 bg-white sm:h-80"
+    : "relative h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]";
   if (imageUrl) {
     return (
-      <div className="relative h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
+      <div className={frame}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
@@ -3601,117 +3607,59 @@ function PublicGuruProfilePage({
           ← Meet more local Gurus
         </Link>
 
-        <section className="overflow-hidden rounded-[2rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)] sm:rounded-[2.3rem]">
-          <div className="grid gap-7 p-5 sm:p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10">
-            <PublicGuruHeroImage
-              name={name}
-              imageUrl={imageUrl}
-              isAcademyGraduate={isAcademyGraduate}
-            />
-
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] !text-[#07132f] sm:tracking-[0.3em]">
-                {location === "My local community"
-                  ? "Caring for pets nearby"
-                  : `Caring for pets around ${location}`}
-              </p>
-
-              <h1 className="mt-4 text-4xl font-extrabold leading-[1] tracking-[-0.05em] !text-[#07132f] sm:text-6xl lg:text-7xl">
-                Meet {firstName}
-              </h1>
-
-              <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 !text-slate-700 sm:text-xl sm:leading-9">
-                {bookable
-                  ? `${firstName} offers warm, dependable pet care around ${areaPhrase}. Take a look at the services, then request care when it feels like a good fit.`
-                  : `${firstName} is getting ready to offer pet care around ${areaPhrase}. Bookings will open once the profile is finished.`}
-              </p>
-
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
-                  <GuruPawCrest className="h-6 w-6" />
-                  {trustLabel}
+        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+            <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
+              <PublicGuruHeroImage
+                name={name}
+                imageUrl={imageUrl}
+                isAcademyGraduate={isAcademyGraduate}
+                compact
+              />
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  {guruProfile.is_verified ? (
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">Verified Guru</span>
+                  ) : null}
+                  {isAcademyGraduate ? (
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">SitGuru Certified</span>
+                  ) : null}
+                  <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{trustLabel}</span>
                 </div>
-
-                {isAcademyGraduate ? (
-                  <AcademyGraduateBadge academyType="guru" variant="chip" />
-                ) : null}
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  📍 Proudly serving {location}
+                <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Meet {name}</h1>
+                <p className="mt-2 text-lg font-semibold text-slate-600">Caring for pets like family.</p>
+                <p className="mt-2 text-sm font-bold text-[#0D5C3A]">
+                  {location}
+                  {serviceRadius ? ` · Serving within ${serviceRadius} miles` : ""}
+                  {rating > 0 ? ` · ${rating.toFixed(1)} (${reviewCount} reviews)` : " · New on SitGuru"}
+                </p>
+                <p className="mt-4 text-base font-semibold leading-7 text-slate-700">{friendlyBio}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {services.slice(0, 6).map((service) => (
+                    <span key={service} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#0D5C3A]">{service}</span>
+                  ))}
                 </div>
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  🗺️ {serviceRadius
-                    ? `Happy to travel within ${serviceRadius} miles`
-                    : "My local care area is coming together"}
-                </div>
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  {bookable ? "✨ Ready to care" : "🐾 Bookings opening soon"}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {disableMessaging ? (
+                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-bold text-slate-500">Messaging opens soon</span>
+                  ) : ownerPreview ? (
+                    <span className="inline-flex min-h-12 items-center rounded-full bg-slate-100 px-5 text-sm font-bold text-slate-500">You cannot message yourself</span>
+                  ) : (
+                    <Link href={messageHref} className="inline-flex min-h-12 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-bold !text-white">Message {firstName}</Link>
+                  )}
+                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://www.sitguru.com/guru/${identifier}`)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center rounded-full border border-emerald-200 px-5 text-sm font-bold text-[#0D5C3A]">Share profile</a>
                 </div>
               </div>
-
-              <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
-                <PublicBookButton
-                  disabled={disableBooking}
-                  href={bookHref}
-                  activeLabel={`Book with ${firstName}`}
-                  disabledLabel="Bookings opening soon 🐾"
-                  className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436] sm:w-auto"
-                />
-
-                {disableMessaging ? (
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="min-h-[56px] w-full cursor-default rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-600 opacity-80 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 sm:w-auto"
-                  >
-                    Say hi soon 💬
-                  </button>
-                ) : (
-                  <Link
-                    href={messageHref}
-                    className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white sm:w-auto"
-                  >
-                    Message {firstName}
-                  </Link>
-                )}
-
-                <Link
-                  href="/signup"
-                  className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800 sm:w-auto"
-                >
-                  Join SitGuru Free
-                </Link>
-              </div>
-
-              <p className="mt-4 max-w-2xl text-sm font-bold leading-6 !text-slate-700">
-                {bookable
-                  ? `Sign in when you are ready to book or message ${firstName}.`
-                  : `${firstName} is finishing this profile before bookings and messages open.`}
-              </p>
             </div>
           </div>
-        </section>
-
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard
-            label="Pet Parent love"
-            value={rating > 0 ? rating.toFixed(1) : "New here"}
-            icon="⭐"
-          />
-          <StatCard label="Kind words" value={reviewCount} icon="💬" />
-          <StatCard
-            label="Experience"
-            value={experienceYears > 0 ? `${experienceYears}+ years` : "More soon"}
-            icon="🐕"
-          />
-          <StatCard label="Care rates" value={rateDisplay} icon="💚" />
-          <StatCard
-            label="Care area"
-            value={serviceRadius ? `${serviceRadius} mi` : "Local area"}
-            icon="📍"
+          <PublicPlanCare
+            firstName={firstName}
+            disabled={disableBooking}
+            bookHref={bookHref}
+            services={(visibleServiceRates.length ? visibleServiceRates : []).map((rate) => ({
+              label: String(rate.service_label || rate.service_key || "Pet care"),
+              price: rate.rate_amount ? `From $${Number(rate.rate_amount)}` : "",
+            })).concat(visibleServiceRates.length ? [] : services.map((service) => ({ label: service, price: "" })))}
           />
         </section>
 
@@ -3762,16 +3710,16 @@ function PublicGuruProfilePage({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
-                My care rates
+                Services & rates
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                Simple, clear pricing
+                Choose the care that fits
               </h2>
             </div>
 
             <p className="text-sm font-bold !text-slate-600">
-              I’ll confirm every care detail with you before your booking begins.
+              {firstName} confirms the care details before a booking begins.
             </p>
           </div>
 

@@ -1330,6 +1330,7 @@ export default function BookGuruClient({
   const queryEnd = /^\d{4}-\d{2}-\d{2}$/.test(String(searchParams.get("end") || "").trim())
     ? String(searchParams.get("end")).trim()
     : "";
+  const stayMode = String(searchParams.get("stay") || "").trim().toLowerCase();
   const queryDates = String(searchParams.get("dates") || "")
     .split(",")
     .map((value) => value.trim())
@@ -1388,7 +1389,11 @@ export default function BookGuruClient({
   const [bookingEndDate, setBookingEndDate] = useState(queryEnd);
   const [pickedDates, setPickedDates] = useState<string[]>(queryDates);
   const [dateSelectionMode, setDateSelectionMode] =
-    useState<DateSelectionMode>(queryEnd ? "range" : "single");
+    useState<DateSelectionMode>(
+      queryEnd || stayMode === "overnight" || stayMode === "range" || stayMode === "multi"
+        ? "range"
+        : "single",
+    );
   const [hoverDate, setHoverDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("Flexible");
   const [customPreferredTime, setCustomPreferredTime] = useState("");
