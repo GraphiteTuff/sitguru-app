@@ -75,7 +75,7 @@ export default function ManagerPortalHeader() {
           >
             Admin Growth
           </Link>
-          <SiteAccountMenu />
+          <SiteAccountMenu inlineSwitcher />
         </div>
       </div>
     </header>

@@ -277,6 +277,9 @@ function LoginPageContent() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [socialError, setSocialError] = useState("");
+  const [portalChoice, setPortalChoice] = useState<
+    "" | "pet_parent" | "ambassador" | "manager"
+  >(nextPath.startsWith("/manager") ? "manager" : "");
 
   const errorMessage = decodeMessage(
     searchParams.get("error") ||
@@ -422,7 +425,7 @@ function LoginPageContent() {
           <p className="mt-4 text-base font-semibold leading-7 text-slate-700">
             {requestedAudience === "intern"
               ? "Sign in with the email SitGuru assigned. You will land in the intern portal for this week’s work, hours, and check-in."
-              : "Log in once and move between Pet Parent, Guru, and Ambassador tools without hunting for separate pages."}
+              : "Log in once and move between Pet Parent, Ambassador, and Manager Portal tools without hunting for separate pages."}
           </p>
 
           <div className="mt-6 grid gap-3">
@@ -433,8 +436,8 @@ function LoginPageContent() {
                 ]
               : [
                   ["Pet Parent", "Book care and manage pets."],
-                  ["Guru", "Manage services, bookings, and messages."],
                   ["Ambassador", "Track referrals, training, and outreach."],
+                  ["Manager Portal", "Growth work, assigned interns, and the team desk."],
                 ]
             ).map(([title, description]) => (
               <div
@@ -566,16 +569,68 @@ function LoginPageContent() {
             </div>
           ) : (
             <form action={login} className="mt-5 space-y-4">
-              <input type="hidden" name="next" value={nextPath} />
+              {requestedAudience === "one" ? (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-black text-slate-900">Open as</legend>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        ["pet_parent", "Pet Parent"],
+                        ["ambassador", "Ambassador"],
+                        ["manager", "Manager Portal"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setPortalChoice(id)}
+                        className={`min-h-11 rounded-2xl px-3 text-sm font-black ${
+                          portalChoice === id
+                            ? "bg-[#0D5C3A] !text-white"
+                            : "border border-slate-200 bg-white text-slate-800"
+                        }`}
+                        aria-pressed={portalChoice === id}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              <input
+                type="hidden"
+                name="next"
+                value={
+                  portalChoice === "manager"
+                    ? "/manager"
+                    : portalChoice === "ambassador"
+                      ? "/ambassador/dashboard"
+                      : portalChoice === "pet_parent"
+                        ? "/customer/dashboard"
+                        : nextPath
+                }
+              />
               <input
                 type="hidden"
                 name="role"
-                value={requestedAudience === "one" ? "" : requestedAudience}
+                value={
+                  requestedAudience !== "one"
+                    ? requestedAudience
+                    : portalChoice === "manager"
+                      ? ""
+                      : portalChoice
+                }
               />
               <input
                 type="hidden"
                 name="preferred"
-                value={requestedAudience === "one" ? "" : requestedAudience}
+                value={
+                  requestedAudience !== "one"
+                    ? requestedAudience
+                    : portalChoice === "manager"
+                      ? ""
+                      : portalChoice
+                }
               />
               <input type="hidden" name="mode" value="email" />
               <input

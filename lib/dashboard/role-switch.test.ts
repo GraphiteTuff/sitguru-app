@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  defaultWorkspaceForLoginRoles,
   getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
@@ -43,6 +44,37 @@ describe("founder personal marketplace roles", () => {
       "growth",
       "admin",
     ]);
+  });
+
+  it("opens Ava on the Manager Portal and keeps Pet Parent and Ambassador on the switcher", () => {
+    const roles = resolveAuthorizedRolesFromProfile({
+      email: "ava@sitguru.com",
+      profile: {
+        role: "ambassador",
+        account_type: "ambassador",
+        signup_role: "social_community_manager",
+      },
+      roleRows: ["ambassador", "customer", "social_community_manager"],
+    });
+    assert.deepEqual(roles, ["parent", "ambassador", "manager", "growth"]);
+    assert.equal(
+      defaultWorkspaceForLoginRoles([
+        "ambassador",
+        "customer",
+        "social_community_manager",
+      ]),
+      "/manager",
+    );
+    const switches = getAvailableDashboardSwitches({
+      currentRole: "growth",
+      authorizedRoles: roles,
+    });
+    assert.deepEqual(
+      switches.map((item) => item.shortLabel),
+      ["Pet Parent", "Ambassador"],
+    );
+    assert.equal(switches.some((item) => item.path === "/admin"), false);
+    assert.equal(switches.some((item) => item.shortLabel === "Intern"), false);
   });
 
   it("shows Manager Portal once and keeps Intern Team out of the switcher", () => {

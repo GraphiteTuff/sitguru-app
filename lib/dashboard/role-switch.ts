@@ -214,6 +214,22 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
   return [];
 }
 
+export function isGrowthManagerLoginRole(role: string | null | undefined) {
+  const raw = normalizeToken(role);
+  return (
+    raw === "social_community_manager" ||
+    raw === "social_growth_manager" ||
+    raw === "growth_manager"
+  );
+}
+
+/** Growth managers land in the Manager Portal. Marketplace roles stay on the switcher. */
+export function defaultWorkspaceForLoginRoles(
+  roles: readonly (string | null | undefined)[],
+) {
+  return roles.some((role) => isGrowthManagerLoginRole(role)) ? "/manager" : null;
+}
+
 function uniqueOrderedRoles(roles: DashboardSwitchRole[]) {
   const set = new Set(roles);
   return ROLE_ORDER.filter((role) => set.has(role));

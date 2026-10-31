@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/guru-access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { canUseMarketplaceRoleWorkspaces } from "@/lib/dashboard/founder-workspaces";
+import { defaultWorkspaceForLoginRoles } from "@/lib/dashboard/role-switch";
 import { findInternByAccount, linkInternUserId } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -314,7 +315,7 @@ export default async function LoginRoutePage({
       .eq("user_id", user.id),
     supabaseAdmin
       .from("profiles")
-      .select("role, account_type")
+      .select("role, account_type, signup_role")
       .eq("id", user.id)
       .maybeSingle(),
     supabaseAdmin
@@ -375,6 +376,8 @@ export default async function LoginRoutePage({
 
   if (profileRole) roleValues.add(profileRole);
   if (profileAccountType) roleValues.add(profileAccountType);
+  const signupRole = cleanText(profileResult.data?.signup_role);
+  if (signupRole) roleValues.add(signupRole);
 
   const roles = Array.from(roleValues);
   const ambassador =
@@ -607,6 +610,11 @@ export default async function LoginRoutePage({
 
   if (hasAdminAccess) {
     redirect("/admin");
+  }
+
+  const growthHome = defaultWorkspaceForLoginRoles(roles);
+  if (!preferred && growthHome) {
+    redirect(safeNextPath || growthHome);
   }
 
   if (marketplaceFounder) {

@@ -9,8 +9,10 @@ import { supabase } from "@/lib/supabase";
 import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
+  getAuthorizedDashboardTargets,
   resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
+  switchPortalRoles,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
@@ -37,11 +39,14 @@ export function SiteAccountMenu({
   compact = false,
   variant = "default",
   deskTitle,
+  inlineSwitcher = false,
 }: {
   compact?: boolean;
   /** Desk portals: circular avatar + name + job title under it. */
   variant?: "default" | "desk";
   deskTitle?: string;
+  /** Show Pet Parent, Ambassador, and Manager Portal beside the account button. */
+  inlineSwitcher?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -248,8 +253,36 @@ export function SiteAccountMenu({
         ? "SitGuru Intern"
         : roleLabel);
 
+  const portalTargets = inlineSwitcher
+    ? getAuthorizedDashboardTargets({
+        authorizedRoles: switchPortalRoles(loadedAccount.authorizedRoles),
+        includeAdmin: false,
+      }).filter((target) => target.id !== "intern" && target.id !== "guru")
+    : [];
+
   return (
-    <div ref={menuRef} className="relative shrink-0">
+    <div ref={menuRef} className="relative flex shrink-0 items-center gap-2">
+      {portalTargets.length > 1 ? (
+        <nav aria-label="Switch portal" className="hidden items-center gap-1 md:flex">
+          {portalTargets.map((target) => {
+            const active = target.id === currentRole;
+            return (
+              <Link
+                key={target.id}
+                href={target.path}
+                aria-current={active ? "page" : undefined}
+                className={
+                  active
+                    ? "whitespace-nowrap rounded-full bg-[#0D5C3A] px-3 py-2 text-xs font-black !text-white"
+                    : "whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700"
+                }
+              >
+                {target.shortLabel}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
