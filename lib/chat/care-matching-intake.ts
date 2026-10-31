@@ -191,9 +191,9 @@ function resolveNextStep(intake: {
     if (!intake.hasTime) return "time";
     return "ready";
   }
-  // ZIP **or** city+state is enough to move on — never force ZIP only.
+  // City + state, a state, or a ZIP is enough to search. Time of day can
+  // narrow the next turn; it must not block "sitter near Ocean City NJ".
   if (!intake.hasLocation) return "location";
-  if (!intake.hasTime) return "time";
   return "ready";
 }
 
