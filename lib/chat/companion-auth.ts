@@ -111,12 +111,23 @@ export function isCompanionCtaAllowed(
   }
 }
 
+/** Remove raw SitGuru paths and URLs from spoken chat. Buttons stay as markers. */
+export function stripCompanionRouteTalk(text: string) {
+  return String(text || "")
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/(?:www\.)?sitguru\.com)?\/[^)]+\)/gi, "$1")
+    .replace(/https?:\/\/(?:www\.)?sitguru\.com[^\s)]*/gi, "")
+    .replace(/(?:^|[\s(*_])\/[a-z][a-z0-9_\-]*(?:\/[a-z0-9_\-]+)*(?:\?[^\s)*]*)?/gi, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.!?])/g, "$1")
+    .trim();
+}
+
 /** Strip signup markers the viewer should never see. */
 export function stripDisallowedCompanionCtas(
   text: string,
   viewer?: CompanionViewerContext | null,
 ): string {
-  let out = String(text || "");
+  let out = stripCompanionRouteTalk(text);
 
   if (!allowsParentSignupCta(viewer)) {
     out = out

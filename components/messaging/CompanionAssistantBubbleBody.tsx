@@ -13,6 +13,7 @@ import { EmailSubscribePack } from "@/components/messaging/EmailSubscribePack";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
+import { stripCompanionRouteTalk } from "@/lib/chat/companion-auth";
 import {
   parseHomepageChatContent,
   type HomepageCtaContext,
@@ -96,7 +97,7 @@ export function CompanionAssistantBubbleBody({
 
   try {
     const parsed = parseHomepageChatContent(content, ctaContext);
-    text = parsed.text;
+    text = stripCompanionRouteTalk(parsed.text);
     ctas = parsed.ctas;
     guruCards = parsed.guruCards;
   } catch {

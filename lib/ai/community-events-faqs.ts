@@ -81,12 +81,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What pet events are coming up?",
     answer:
-      "Tell me a city or the event name and I’ll check the live list for you. You can also browse **/events**. [[cta:community_parent]]",
+      "Tell me a city or the event name and I’ll check the live list for you. You can also browse Pet Events. [[cta:community_parent]]",
   },
   {
     question: "What's happening near me?",
     answer:
-      "What’s your city? I’ll look through the live list, or you can poke around **/events** yourself. [[cta:community_parent]]",
+      "What’s your city? I’ll look through the live list, or you can browse Pet Events yourself. [[cta:community_parent]]",
   },
   {
     question: "How does I'm Going work?",
@@ -151,37 +151,37 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I find events near me?",
     answer:
-      "Open **/events**, search by city or keyword, or ask me what's coming up — I'll pull from the live upcoming list! Homepage **Happening Near You** also surfaces local energy. [[cta:community_parent]]",
+      "Search Pet Events by city, or ask me what's coming up and I'll use the live list. **Happening Near You** on the homepage shows local ones too. [[cta:community_parent]]",
   },
   {
     question: "How do I find pet-friendly places near me?",
     answer:
-      "On **/events**, flip over to **Pet-Friendly Places**, then pick Eat, Stay, Play, or Pet Services. [[cta:community_parent]]",
+      "Open Pet Events and switch to **Pet-Friendly Places**, then pick Eat, Stay, Play, or Pet Services. [[cta:community_parent]]",
   },
   {
     question: "Where can I take my dog to eat?",
     answer:
-      "Try **/events?view=places&lane=eat**. Those are places Google says are okay for dogs. [[cta:community_parent]]",
+      "In **Pet-Friendly Places**, choose **Eat & Drink** and search near your town. Those are spots marked okay for dogs. [[cta:community_parent]]",
   },
   {
     question: "Where are pet friendly hotels?",
     answer:
-      "Hotels that take pets are under Stay: **/events?view=places&lane=stay**. [[cta:community_parent]]",
+      "Hotels that take pets are under **Stay** in **Pet-Friendly Places**. [[cta:community_parent]]",
   },
   {
     question: "Where are dog parks near me?",
     answer:
-      "Dog parks are here: **/events?view=places&lane=play&category=dog_park**. A regular park that allows dogs isn’t always a dog park. [[cta:community_parent]]",
+      "Dog parks are under **Play** in **Pet-Friendly Places**. A regular park that allows dogs isn’t always a dog park. [[cta:community_parent]]",
   },
   {
     question: "Where is the nearest emergency vet?",
     answer:
-      "The closest ER options are at **/events?view=places&lane=services&category=vet_er**. If it’s an emergency, call them and go. [[cta:community_parent]]",
+      "Emergency vets are under **Pet Services** in **Pet-Friendly Places**. If it’s an emergency, call them and go. [[cta:community_parent]]",
   },
   {
     question: "How do I find a veterinarian near me?",
     answer:
-      "Community → Pet-Friendly Places → **Pet Services**: veterinarians, hospitals, ER, pet stores, and boarding on the same map. Start at **/events?view=places&lane=services**. [[cta:community_parent]]",
+      "Open **Pet-Friendly Places**, then **Pet Services**, for veterinarians, hospitals, ER, pet stores, and boarding on the same map. [[cta:community_parent]]",
   },
   {
     question: "What is the SitGuru pet friendliness rating?",
@@ -229,17 +229,17 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     question:
       "How do Pet Event Planners and Managers publish Partner Events on SitGuru?",
     answer:
-      "Start at **/events/host**, write the draft, then hit **Submit for review**. Once it’s a Partner Event, it leads the feed.",
+      "Open **Host an event**, write the draft, then hit **Submit for review**. Once it’s a Partner Event, it leads the feed.",
   },
   {
     question: "How do I set up a new pet event?",
     answer:
-      "Head to **/events/host**, start a draft, and send it in for review when it looks right.",
+      "Open **Host an event**, start a draft, and send it in for review when it looks right.",
   },
   {
     question: "How do I host an event on SitGuru?",
     answer:
-      "Go to **/events/host**, send in your draft, then share it and watch the **Yes / Maybe / No** counts.",
+      "Open **Host an event**, send in your draft, then share it and watch the **Yes / Maybe / No** counts.",
   },
   {
     question: "How do I edit and manage a Partner Event after it is published?",
@@ -284,12 +284,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "Where is the Pet Event Manager?",
     answer:
-      "You can jump straight to `/partners/dashboard/community/events`, or start from **/events/host** and I’ll point you there.",
+      "Open **Pet Event Manager**, or start from **Host an event** and I’ll point you there.",
   },
   {
     question: "Do I need Partner access to host events?",
     answer:
-      "Yes. Apply from **/events/host**, and once you’re a Partner you can use Pet Event Manager.",
+      "Yes. Start from **Host an event**, and once you’re a Partner you can use **Pet Event Manager**.",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.delilah,
@@ -455,10 +455,10 @@ export function buildCommunityEventsFaqSnapshot(
   return [
     base,
     "",
-    "# HOST / PLANNER PATHS",
-    "Host hub: /events/host",
-    "Partner apply: /partners/apply?intent=community_events",
-    "Pet Event Manager: /partners/dashboard/community/events",
+    "# HOST / PLANNER SCREENS",
+    "Host an event: say Host an event. Do not paste a path.",
+    "Partner apply: say apply as a Partner. Do not paste a path.",
+    "Pet Event Manager: say Pet Event Manager. Do not paste a path.",
     "",
     "# COMMUNITY SIGNUP PATHS (for CTA markers)",
     `Pet Parent signup: ${signupParent}`,

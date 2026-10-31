@@ -45,13 +45,6 @@ function eventKindLabel(event: CommunityEventWithPartner) {
     : "SitGuru Partner Event";
 }
 
-function eventPath(event: CommunityEventWithPartner) {
-  if (isGoogleDiscoveryEvent(event)) {
-    return event.event_url || "/events";
-  }
-  return `/events/${event.slug}`;
-}
-
 function formatEventDetailLines(event: CommunityEventWithPartner): string[] {
   const { dateLabel, timeLabel } = formatEventDateRange(
     event.start_at,
@@ -95,7 +88,7 @@ function formatEventDetailLines(event: CommunityEventWithPartner): string[] {
     event.event_url && isGoogleDiscoveryEvent(event)
       ? `- External listing: ${event.event_url}`
       : null,
-    `- SitGuru path: ${eventPath(event)}`,
+    `- Open it from Pet Events by the event name. Do not paste a link or path.`,
     `- Event id: ${event.id}`,
   ].filter(Boolean) as string[];
 
