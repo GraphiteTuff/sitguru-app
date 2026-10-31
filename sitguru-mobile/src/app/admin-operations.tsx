@@ -8,7 +8,7 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
-type Action = { label: string; href?: Href; alert?: string };
+type Action = { label: string; href?: Href; url?: string; alert?: string };
 type CardProps = { title: string; eyebrow?: string; children: ReactNode };
 
 const summaryCards = [
@@ -43,6 +43,10 @@ function previewAlert(label: string) {
 }
 
 function go(action: Action) {
+  if (action.url) {
+    void Linking.openURL(action.url);
+    return;
+  }
   if (action.href) {
     router.push(action.href);
     return;
@@ -253,6 +257,19 @@ export default function AdminOperationsScreen() {
                 { label: 'Guru Pricing', href: '/guru-pricing' },
                 { label: 'Review payout' },
                 { label: 'Flag payment issue' },
+              ]}
+            />
+          </Card>
+
+          <Card title="Human Resources" eyebrow="People, access, and training">
+            <Text style={styles.emptyText}>
+              Opens the live Human Resources page. It uses the same admin account and fits a phone screen.
+            </Text>
+            <ActionRow
+              actions={[
+                { label: 'Human Resources', url: 'https://www.sitguru.com/admin/hr' },
+                { label: 'Internship Program', url: 'https://www.sitguru.com/admin/internship' },
+                { label: 'Intern portal', href: '/intern-portal' },
               ]}
             />
           </Card>

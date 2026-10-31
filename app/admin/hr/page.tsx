@@ -1,7 +1,6 @@
 import { AdminWorkplaceDenied } from "@/components/admin/growth/GrowthPageFrame";
-import SpringProgramDashboard from "@/components/admin/hr/SpringProgramDashboard";
+import HumanResourcesDashboard from "@/components/admin/hr/HumanResourcesDashboard";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,17 +16,9 @@ export default async function AdminHrPage({
 
   if (!actor?.canAccessAdmin) {
     return (
-      <AdminWorkplaceDenied
-        detail="Sign in with an authorized SitGuru admin or HR account to open Hiring & People."
-      />
+      <AdminWorkplaceDenied detail="Sign in with an authorized SitGuru admin or HR account to open Human Resources." />
     );
   }
 
-  return (
-    <SpringProgramDashboard
-      canAdminister={canAdministerInternshipOnboarding(actor)}
-      notice={notice}
-      noticeError={noticeError}
-    />
-  );
+  return <HumanResourcesDashboard notice={notice} noticeError={noticeError} />;
 }

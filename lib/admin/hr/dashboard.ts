@@ -712,10 +712,10 @@ export async function getHrDashboardData(): Promise<HrDashboardData> {
 
   return {
     metrics,
-    recentAmbassadorLeads: activeAmbassadorRecords.slice(0, 8),
+    recentAmbassadorLeads: activeAmbassadorRecords.slice(0, 24),
     recentGuruApplicants: guruRecords
       .filter((r) => !r.archived)
-      .slice(0, 8),
+      .slice(0, 24),
     pendingBackgroundChecks: [
       ...needsReviewBackgroundCheckRecords,
       ...pendingBackgroundCheckRecords,
