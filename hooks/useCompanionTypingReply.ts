@@ -70,10 +70,21 @@ export function useCompanionTypingReply<T extends ChatLikeMessage>({
     return () => clearTimeout(timer);
   }, [isLoading]);
 
+  const cancelPendingReply = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    busyRef.current = false;
+    setLocalTyping(false);
+  }, []);
+
   const sendLocalReply = useCallback(
     (userContent: string, assistantContent: string) => {
-      if (busyRef.current || isLoading || localTyping) return false;
-
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       busyRef.current = true;
       const stamp = Date.now();
       setMessages((previous) => [
@@ -103,11 +114,12 @@ export function useCompanionTypingReply<T extends ChatLikeMessage>({
 
       return true;
     },
-    [idPrefix, isLoading, localTyping, setMessages],
+    [idPrefix, setMessages],
   );
 
   return {
     sendLocalReply,
+    cancelPendingReply,
     /** Show the bouncing typing bubble (local delay or live stream). */
     isTyping: localTyping || isLoading,
     /** Hide streamed assistant text until the minimum typing beat finishes. */

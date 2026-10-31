@@ -282,6 +282,7 @@ export default function RogueFloatingAssistant() {
     handleInputChange,
     handleSubmit,
     append,
+    stop,
     isLoading,
     error,
     setMessages,
@@ -329,6 +330,7 @@ export default function RogueFloatingAssistant() {
     setPreset(chip.id);
     setPeriod(chip.period);
     setOpen(true);
+    if (isLoading) stop();
     await append(
       {
         role: "user",
@@ -346,7 +348,8 @@ export default function RogueFloatingAssistant() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) return;
+    if (isLoading) stop();
     handleSubmit(event, {
       body: {
         preset: preset || undefined,
@@ -488,7 +491,6 @@ export default function RogueFloatingAssistant() {
               <button
                 key={chip.id}
                 type="button"
-                disabled={isLoading}
                 onClick={() => void runChip(chip)}
                 className={CHIP_CLASS}
               >
@@ -576,12 +578,10 @@ export default function RogueFloatingAssistant() {
               value={input}
               onChange={handleInputChange}
               placeholder="Ask Rogue about payouts, growth, audits…"
-              disabled={isLoading}
               aria-label="Message Rogue"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  if (isLoading) return;
                   const form = e.currentTarget.form;
                   if (form) form.requestSubmit();
                 }
@@ -589,10 +589,10 @@ export default function RogueFloatingAssistant() {
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={!input.trim()}
               aria-label="Send to Rogue"
             >
-              {isLoading ? "…" : "Send"}
+              Send
             </button>
           </form>
 

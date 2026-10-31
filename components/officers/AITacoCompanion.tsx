@@ -323,6 +323,7 @@ export default function AITacoCompanion({
     handleInputChange,
     handleSubmit,
     append,
+    stop,
     isLoading,
     error,
     setMessages,
@@ -342,7 +343,7 @@ export default function AITacoCompanion({
     sendLocalReply,
     isTyping,
     hideStreamingContent,
-    isBusy,
+    cancelPendingReply,
   } = useCompanionTypingReply<Message>({
     setMessages,
     isLoading,
@@ -389,6 +390,8 @@ export default function AITacoCompanion({
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
+    if (isLoading) stop();
+    cancelPendingReply();
 
     if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
       sendLocalReply(chip.prompt, benefitsChip.response);
@@ -424,7 +427,9 @@ export default function AITacoCompanion({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim()) return;
+    if (isLoading) stop();
+    cancelPendingReply();
     handleSubmit(event, { body: { ...requestBody } });
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -627,7 +632,6 @@ export default function AITacoCompanion({
                 <button
                   key={chip.id}
                   type="button"
-                  disabled={isBusy}
                   onClick={() => void runChip(chip)}
                   className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -650,7 +654,7 @@ export default function AITacoCompanion({
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    if (!isBusy && input.trim()) {
+                    if (input.trim()) {
                       event.currentTarget.form?.requestSubmit();
                     }
                   }
@@ -658,7 +662,7 @@ export default function AITacoCompanion({
               />
               <button
                 type="submit"
-                disabled={isBusy || !input.trim()}
+                disabled={!input.trim()}
                 className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Send

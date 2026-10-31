@@ -393,6 +393,7 @@ export default function OfficerFloatingAssistant({
     handleInputChange,
     handleSubmit,
     append,
+    stop,
     isLoading,
     error,
     setMessages,
@@ -412,7 +413,7 @@ export default function OfficerFloatingAssistant({
     sendLocalReply,
     isTyping,
     hideStreamingContent,
-    isBusy,
+    cancelPendingReply,
   } = useCompanionTypingReply<Message>({
     setMessages,
     isLoading,
@@ -470,6 +471,8 @@ export default function OfficerFloatingAssistant({
   async function runChip(chip: OfficerQuickChip) {
     setPreset(chip.id);
     setOpen(true);
+    if (isLoading) stop();
+    cancelPendingReply();
 
     if (chip.localResponse) {
       sendLocalReply(chip.prompt, chip.localResponse as string);
@@ -494,7 +497,9 @@ export default function OfficerFloatingAssistant({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim()) return;
+    if (isLoading) stop();
+    cancelPendingReply();
     handleSubmit(event, {
       body: {
         ...requestBody,
@@ -644,7 +649,6 @@ export default function OfficerFloatingAssistant({
               <button
                 key={chip.id}
                 type="button"
-                disabled={isBusy}
                 onClick={() => void runChip(chip)}
                 className={theme.chipClass}
               >
@@ -766,7 +770,7 @@ export default function OfficerFloatingAssistant({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  if (isBusy) return;
+                  if (!input.trim()) return;
                   const form = e.currentTarget.form;
                   if (form) form.requestSubmit();
                 }
@@ -774,10 +778,10 @@ export default function OfficerFloatingAssistant({
             />
             <button
               type="submit"
-              disabled={isBusy || !input.trim()}
+              disabled={!input.trim()}
               aria-label={`Send to ${displayName}`}
             >
-              {isBusy ? "…" : "Send"}
+              Send
             </button>
           </form>
 

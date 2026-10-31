@@ -222,7 +222,8 @@ export function useCompanionChat(
   const sendMessage = useCallback(
     (text: string) => {
       const clean = text.trim();
-      if (!clean || streaming) return;
+      if (!clean) return;
+      abortRef.current?.abort();
 
       const userMessage: CompanionChatMessage = {
         id: createId('user'),
@@ -389,12 +390,14 @@ export function useCompanionChat(
             state: 'error',
           }));
         } finally {
-          if (abortRef.current === controller) abortRef.current = null;
-          if (mountedRef.current) setStreaming(false);
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            if (mountedRef.current) setStreaming(false);
+          }
         }
       })();
     },
-    [companion, firstName, roles, streaming],
+    [companion, firstName, roles],
   );
 
   return {

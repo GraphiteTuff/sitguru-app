@@ -259,6 +259,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     handleInputChange,
     handleSubmit,
     append,
+    stop,
     isLoading,
     error,
     setMessages,
@@ -278,7 +279,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     sendLocalReply,
     isTyping,
     hideStreamingContent,
-    isBusy,
+    cancelPendingReply,
   } = useCompanionTypingReply<Message>({
     setMessages,
     isLoading,
@@ -334,6 +335,8 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
+    if (isLoading) stop();
+    cancelPendingReply();
 
     if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
       sendLocalReply(chip.prompt, benefitsChip.response);
@@ -369,7 +372,9 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim()) return;
+    if (isLoading) stop();
+    cancelPendingReply();
     handleSubmit(event, { body: { ...requestBody } });
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -538,7 +543,6 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                 <button
                   key={chip.id}
                   type="button"
-                  disabled={isBusy}
                   onClick={() => void runChip(chip)}
                   className="shrink-0 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -561,7 +565,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    if (!isBusy && input.trim()) {
+                    if (input.trim()) {
                       event.currentTarget.form?.requestSubmit();
                     }
                   }
@@ -569,7 +573,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
               />
               <button
                 type="submit"
-                disabled={isBusy || !input.trim()}
+                disabled={!input.trim()}
                 className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Send

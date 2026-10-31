@@ -66,6 +66,7 @@ import {
   hasMatchingIntakeMarker,
   joinRecentUserTexts,
   buildCareMatchingAsk,
+  parseCareMatchingIntake,
 } from "@/lib/chat/care-matching-intake";
 import { looksLikeUsLocationReply } from "@/lib/gurus/guru-chat-snapshot";
 import {
@@ -373,6 +374,7 @@ export default function HomepageChatBubble() {
     handleInputChange,
     handleSubmit,
     append,
+    stop,
     isLoading,
   } = useChat({
     api: "/api/chat/send",
@@ -417,6 +419,7 @@ export default function HomepageChatBubble() {
     isTyping,
     hideStreamingContent,
     isBusy,
+    cancelPendingReply,
   } = useCompanionTypingReply<Message>({
     setMessages,
     isLoading,
@@ -927,8 +930,14 @@ export default function HomepageChatBubble() {
     focusComposer(40);
   }
 
+  function takeTurn() {
+    if (isLoading) stop();
+    cancelPendingReply();
+  }
+
   async function sendChip(content: string) {
-    if (!content.trim() || isBusy) return;
+    if (!content.trim()) return;
+    takeTurn();
 
     if (
       content === benefitsChip.prompt ||
@@ -978,7 +987,8 @@ export default function HomepageChatBubble() {
   function onComposerSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isBusy) return;
+    if (!text) return;
+    takeTurn();
 
     if (
       text === benefitsChip.prompt ||
@@ -1061,6 +1071,18 @@ export default function HomepageChatBubble() {
   if (!mounted) return null;
 
   const streaming = isBusy;
+  const connectionLabel = useMemo(() => {
+    const intake = parseCareMatchingIntake(joinRecentUserTexts(messages));
+    if (!intake.isCareSeeking || !intake.hasLocation) return "";
+    const place =
+      intake.city && intake.state
+        ? `${intake.city}, ${intake.state}`
+        : intake.zip || intake.state || "";
+    const service = intake.service || "Pet care";
+    return place
+      ? `${service} · ${place}. Book on a Guru card. SitGuru confirms payment before anyone is charged.`
+      : "";
+  }, [messages]);
 
   return (
     <div
@@ -1195,7 +1217,6 @@ export default function HomepageChatBubble() {
                 <button
                   key={`${chip.group}-${chip.label}`}
                   type="button"
-                  disabled={streaming}
                   onClick={() => void sendChip(chip.content)}
                   className={INTENT_CHIP_CLASS}
                 >
@@ -1213,7 +1234,6 @@ export default function HomepageChatBubble() {
                 <button
                   key={`${chip.tone}-${chip.label}`}
                   type="button"
-                  disabled={streaming}
                   onClick={() => void sendChip(chip.content)}
                   className={INTENT_CHIP_CLASS}
                 >
@@ -1223,6 +1243,11 @@ export default function HomepageChatBubble() {
             </div>
           ) : null}
 
+          {connectionLabel ? (
+            <p className="shrink-0 border-t border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-950">
+              {connectionLabel}
+            </p>
+          ) : null}
           <form
             className="homepage-chat-panel__composer shrink-0"
             onSubmit={onComposerSubmit}
@@ -1236,13 +1261,12 @@ export default function HomepageChatBubble() {
                   ? "Type the name you go by…"
                   : isCommunityPage
                     ? "Ask about events, I'm Going, or joining as Pet Parent / Guru / Ambassador…"
-                    : "Ask about care, Gurus, or joining the pack…"
+                    : "Ask for a sitter, or send the next detail anytime…"
               }
               onChange={handleInputChange}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  if (streaming) return;
                   const form = e.currentTarget.form;
                   if (form) form.requestSubmit();
                 }
@@ -1250,7 +1274,7 @@ export default function HomepageChatBubble() {
             />
             <button
               type="submit"
-              disabled={streaming || !input.trim()}
+              disabled={!input.trim()}
               aria-label="Send message"
             >
               Send
