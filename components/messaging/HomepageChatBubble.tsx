@@ -1071,9 +1071,6 @@ export default function HomepageChatBubble() {
     focusComposer(40);
   }
 
-  if (!mounted) return null;
-
-  const streaming = isBusy;
   const connectionLabel = useMemo(() => {
     const intake = parseCareMatchingIntake(joinRecentUserTexts(messages));
     if (!intake.isCareSeeking || !intake.hasLocation) return "";
@@ -1086,6 +1083,10 @@ export default function HomepageChatBubble() {
       ? `${service} · ${place}. Book on a Guru card. SitGuru confirms payment before anyone is charged.`
       : "";
   }, [messages]);
+
+  if (!mounted) return null;
+
+  const streaming = isBusy;
 
   return (
     <div
