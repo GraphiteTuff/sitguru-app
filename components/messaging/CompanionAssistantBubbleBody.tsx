@@ -151,4 +151,4 @@ export function CompanionAssistantBubbleBody({
 
 /** Rogue-sized floating panel chrome shared across companions. */
 export const COMPANION_ROGUE_PANEL_CLASS =
-  "homepage-chat-panel fixed inset-0 z-[10000] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100vh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl";
+  "homepage-chat-panel fixed inset-0 z-[10000] flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:max-h-[calc(100dvh-3rem)] sm:w-[min(420px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl lg:w-[min(460px,calc(100vw-3rem))]";

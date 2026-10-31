@@ -1071,15 +1071,15 @@ function createStyles(isDark: boolean) {
     headerTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 14,
+      fontSize: 16,
       letterSpacing: -0.2,
-      lineHeight: 18,
+      lineHeight: 20,
     },
     headerSubtitle: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
-      lineHeight: 12,
+      fontSize: 12,
+      lineHeight: 16,
       marginTop: 1,
     },
     headerActions: {
@@ -1205,8 +1205,8 @@ function createStyles(isDark: boolean) {
     userBubbleText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.medium,
-      fontSize: 11,
-      lineHeight: 16,
+      fontSize: 16,
+      lineHeight: 22,
     },
     assistantRow: {
       alignItems: 'flex-start',
@@ -1242,9 +1242,10 @@ function createStyles(isDark: boolean) {
     },
     assistantBubbleText: {
       color: palette.text,
+      flexShrink: 1,
       fontFamily: AppFonts.medium,
-      fontSize: 11,
-      lineHeight: 17,
+      fontSize: 16,
+      lineHeight: 22,
     },
     assistantBubbleTextError: {
       color: isDark ? '#F3B5AA' : '#9D3123',
@@ -1314,8 +1315,8 @@ function createStyles(isDark: boolean) {
     guruName: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: 15,
+      lineHeight: 20,
     },
     guruMetaRow: {
       alignItems: 'center',
@@ -1327,8 +1328,8 @@ function createStyles(isDark: boolean) {
       color: palette.muted,
       flexShrink: 1,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
-      lineHeight: 12,
+      fontSize: 12,
+      lineHeight: 16,
     },
     guruServices: {
       color: palette.text,
@@ -1460,7 +1461,7 @@ function createStyles(isDark: boolean) {
     suggestionChipText: {
       color: palette.text,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 13,
     },
     composer: {
       alignItems: 'flex-end',
@@ -1480,10 +1481,10 @@ function createStyles(isDark: boolean) {
     composerInput: {
       color: palette.text,
       fontFamily: AppFonts.medium,
-      fontSize: 11,
-      maxHeight: 92,
-      minHeight: 40,
-      paddingHorizontal: 6,
+      fontSize: 16,
+      maxHeight: 120,
+      minHeight: 44,
+      paddingHorizontal: 8,
       paddingVertical: 10,
       textAlignVertical: 'top',
     },

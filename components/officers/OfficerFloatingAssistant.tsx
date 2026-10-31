@@ -582,7 +582,7 @@ export default function OfficerFloatingAssistant({
 
       {open ? (
         <div
-          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
+          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
           role="dialog"
           aria-label={`${fullTitle} assistant`}
         >

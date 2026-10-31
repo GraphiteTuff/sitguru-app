@@ -10,7 +10,10 @@ import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
 import { usePathname } from "next/navigation";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
-import { CompanionAssistantBubbleBody } from "@/components/messaging/CompanionAssistantBubbleBody";
+import {
+  CompanionAssistantBubbleBody,
+  COMPANION_ROGUE_PANEL_CLASS,
+} from "@/components/messaging/CompanionAssistantBubbleBody";
 import { type HomepageCtaContext } from "@/lib/chat/homepage-cta";
 import {
   COMMUNITY_EVENT_FAQ_CHIPS,
@@ -1107,7 +1110,7 @@ export default function HomepageChatBubble() {
 
       {open ? (
         <div
-          className="homepage-chat-panel fixed inset-0 z-[10000] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100vh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl"
+          className={COMPANION_ROGUE_PANEL_CLASS}
           role="dialog"
           aria-label="Rogue, Your Chief Treat Officer chat"
         >
@@ -1244,7 +1247,7 @@ export default function HomepageChatBubble() {
           ) : null}
 
           {connectionLabel ? (
-            <p className="shrink-0 border-t border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-950">
+            <p className="shrink-0 break-words border-t border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold leading-5 text-emerald-950">
               {connectionLabel}
             </p>
           ) : null}
