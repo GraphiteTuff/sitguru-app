@@ -162,7 +162,7 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     raw === "social_growth_manager" ||
     raw === "growth_manager"
   ) {
-    return ["manager", "growth"];
+    return ["parent", "ambassador", "manager", "growth"];
   }
 
   if (

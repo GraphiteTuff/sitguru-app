@@ -50,14 +50,16 @@ describe("founder personal marketplace roles", () => {
       email: "growth.manager@sitguru.com",
       roleRows: ["social_community_manager"],
     });
-    assert.deepEqual(roles, ["manager", "growth"]);
+    assert.deepEqual(roles, ["parent", "ambassador", "manager", "growth"]);
     const switches = getAvailableDashboardSwitches({
       currentRole: "parent",
       authorizedRoles: roles,
     });
-    assert.equal(switches.length, 1);
-    assert.equal(switches[0]?.shortLabel, "Manager Portal");
-    assert.equal(switches[0]?.path, "/manager");
+    assert.ok(switches.some((item) => item.shortLabel === "Ambassador"));
+    assert.ok(switches.some((item) => item.shortLabel === "Manager Portal" && item.path === "/manager"));
+    assert.equal(switches.some((item) => item.shortLabel === "Pet Parent"), false);
+    assert.equal(switches.some((item) => item.path === "/admin"), false);
+    assert.equal(switches.some((item) => item.shortLabel === "Guru"), false);
     assert.equal(resolveDashboardRoleFromPath("/intern/manage"), "manager");
     assert.equal(resolveDashboardRoleFromPath("/manager"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/growth"), "growth");
