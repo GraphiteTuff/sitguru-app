@@ -109,22 +109,14 @@ function formatEventDetailLines(event: CommunityEventWithPartner): string[] {
 export async function compileDelilahEventsSnapshot(
   opts: DelilahEventsSnapshotOpts = {},
 ): Promise<{ markdownContext: string; count: number }> {
-  const limit = Math.min(Math.max(opts.limit ?? 24, 6), 40);
+  const limit = Math.min(Math.max(opts.limit ?? 24, 12), 40);
 
   const scraped = await fetchDiscoveredHomepageEvents({
-    limit: 48,
-    state: opts.state,
-    homepageEligibleOnly: true,
+    limit: 80,
+    homepageEligibleOnly: false,
   }).catch(() => ({ events: [] as CommunityEventWithPartner[], lastSyncedAt: null }));
 
-  let pool = scraped.events || [];
-  if (pool.length < 4) {
-    const wider = await fetchDiscoveredHomepageEvents({
-      limit: 48,
-      homepageEligibleOnly: true,
-    }).catch(() => ({ events: [] as CommunityEventWithPartner[], lastSyncedAt: null }));
-    pool = wider.events?.length ? wider.events : pool;
-  }
+  const pool = (scraped.events || []).filter((event) => event.pet_friendly !== false);
 
   const origin =
     opts.city && opts.state
@@ -159,7 +151,7 @@ export async function compileDelilahEventsSnapshot(
       if (a.miles != null && b.miles != null) return a.miles - b.miles;
       return new Date(a.event.start_at).getTime() - new Date(b.event.start_at).getTime();
     })
-    .slice(0, Math.min(6, limit));
+    .slice(0, limit);
 
   const upcoming = ranked.map((row) => row.event);
   const milesById = new Map(ranked.map((row) => [row.event.id, row.miles]));
@@ -174,21 +166,21 @@ export async function compileDelilahEventsSnapshot(
   }
 
   const lines: string[] = [
-    "# HOMEPAGE EVENT SCRAPER — NEAREST UPCOMING PET EVENTS",
-    `_Same discovered events as the SitGuru homepage banner. Recommend the nearest upcoming ones. Never invent venues, times, or prices outside this digest._`,
+    "# HOMEPAGE EVENT SCRAPER — ALL NEAREST PET-FRIENDLY PLACES AND DATES",
+    `_Every pet-friendly listing below is from the homepage event scraper, not only Bucks or Montgomery County. Include each place, date, and time. Never invent venues, times, or prices._`,
     `- Guest city: ${opts.city || "not given yet"}`,
     `- Guest state: ${opts.state || "not given yet"}`,
-    `- Rank: ${nearbyScope === "nearest" ? "nearest to the guest, then soonest" : "soonest upcoming, until they name a city"}`,
+    `- Rank: ${nearbyScope === "nearest" ? "nearest to the guest, then soonest date" : "soonest upcoming, any county, until they name a city"}`,
     `- Upcoming listed: ${upcoming.length}`,
     "",
     "RECOMMEND:",
     opts.city || opts.state
-      ? "- Recommend the closest 1–3 events in this digest. Say the title, when, where, and miles when a distance is listed. Invite them to open the SitGuru path and RSVP. If none are close, say the scraper has nothing nearer and invite them to host."
-      : "- They have not named a city yet. Ask for city and state before you recommend. These rows are only the soonest scraped events, not confirmed as near them.",
-    "- If this digest is empty, say the homepage scraper has no upcoming events to recommend and point them to /events and /events/host. Do not invent a listing.",
+      ? "- List every event in this digest, nearest first. For each one say the place, city, date, time, and miles when a distance is listed. Invite them to open the SitGuru path and RSVP. Do not narrow the answer to Bucks County or Montgomery County unless those rows are actually the nearest."
+      : "- They have not named a city yet. Ask for city and state before you call a list nearby. These rows are scraped pet-friendly events from every county in the feed.",
+    "- If this digest is empty, say the scraper has no upcoming pet-friendly events to recommend and point them to /events and /events/host. Do not invent a listing.",
     "",
     "RULES:",
-    "- These rows come from the homepage event scraper. Do not substitute a different county list.",
+    "- Use the full scraper feed. Bucks and Montgomery are only included when they are actually near the guest.",
     "- If an event is missing here, say to browse /events or check back soon — do not invent it.",
     "- For discovery listings, send guests to the external listing URL when they need tickets or host rules.",
     "",

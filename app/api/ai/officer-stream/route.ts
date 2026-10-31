@@ -526,7 +526,7 @@ export async function POST(req: Request) {
         city: focus.city,
         state: focus.state,
         focus,
-        limit: 24,
+        limit: 30,
       }).catch(() => null);
       snapshotMarkdown = live?.markdownContext
         ? `${faqLayer}\n\n${live.markdownContext}`
