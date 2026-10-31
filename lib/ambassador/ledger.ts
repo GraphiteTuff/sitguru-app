@@ -563,12 +563,12 @@ export async function loadNetworkKpis(): Promise<AmbassadorNetworkKpis> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [{ count: activeLocalReps }, { data: todayRefs }, { data: pending }, { data: regions }] =
+  const [{ data: ambassadorRows }, { data: todayRefs }, { data: pending }] =
     await Promise.all([
       supabaseAdmin
-        .from("ambassador_profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
+        .from("ambassadors")
+        .select("id,status,city,state")
+        .limit(500),
       supabaseAdmin
         .from("ambassador_referrals")
         .select("referral_id")
@@ -577,11 +577,10 @@ export async function loadNetworkKpis(): Promise<AmbassadorNetworkKpis> {
         .from("ambassador_referrals")
         .select("commission_earned,payout_status")
         .in("payout_status", ["PENDING_AUDIT", "APPROVED"]),
-      supabaseAdmin
-        .from("ambassador_profiles")
-        .select("id,region")
-        .eq("is_active", true),
     ]);
+  const regions = (ambassadorRows || []).filter(
+    (row) => !isRetiredAmbassadorStatus((row as { status?: string }).status),
+  );
 
   const pendingPayoutPool = (pending || []).reduce(
     (sum, row) => sum + asNumber((row as { commission_earned?: number }).commission_earned),
@@ -603,9 +602,10 @@ export async function loadNetworkKpis(): Promise<AmbassadorNetworkKpis> {
   }
 
   const regionScores = new Map<string, number>();
-  for (const row of regions || []) {
-    const region =
-      String((row as { region?: string }).region || "").trim() || "Unassigned";
+  for (const row of regions) {
+    const city = String((row as { city?: string }).city || "").trim();
+    const state = String((row as { state?: string }).state || "").trim();
+    const region = [city, state].filter(Boolean).join(", ") || "Unassigned";
     const id = String((row as { id?: string }).id || "");
     const score = clicksByAmbassador.get(id) || 1;
     regionScores.set(region, (regionScores.get(region) || 0) + score);
@@ -621,7 +621,7 @@ export async function loadNetworkKpis(): Promise<AmbassadorNetworkKpis> {
   }
 
   return {
-    activeLocalReps: activeLocalReps || 0,
+    activeLocalReps: regions.length,
     totalReferralsToday: (todayRefs || []).length,
     pendingPayoutPool,
     topPerformingRegion,
@@ -631,13 +631,17 @@ export async function loadNetworkKpis(): Promise<AmbassadorNetworkKpis> {
 export async function loadAmbassadorPerformanceRows(): Promise<
   AmbassadorPerformanceRow[]
 > {
-  const { data: profiles, error } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("*")
-    .order("created_at", { ascending: false })
+  const { data: ambassadorRows, error } = await supabaseAdmin
+    .from("ambassadors")
+    .select("id,user_id,full_name,display_name,email,referral_code,status,city,state,dashboard_enabled")
+    .order("full_name", { ascending: true })
     .limit(500);
 
-  if (error || !profiles?.length) return [];
+  const profiles = (ambassadorRows || [])
+    .map((row) => mapToLedgerProfile(row as Record<string, unknown>))
+    .filter((row): row is AmbassadorProfileRow => Boolean(row));
+
+  if (error || !profiles.length) return [];
 
   const ids = profiles.map((p) => String((p as { id: string }).id));
 

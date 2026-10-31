@@ -2750,7 +2750,9 @@ function filterAmbassadorsForRegistry(
       .toLowerCase();
 
     const matchesQuery = !query || searchableText.includes(query);
-    const matchesStatus = !filters.status || status === filters.status;
+    const matchesStatus = filters.status
+      ? status === filters.status
+      : status !== "archived";
     const matchesType = !filters.type || typeLabel === filters.type;
     const matchesTraining = getTrainingFilterMatch(ambassador, filters.training);
     const matchesPhoto = getPhotoFilterMatch(ambassador, filters.photo);

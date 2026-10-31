@@ -154,7 +154,7 @@ const navSections = [
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
       { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
       {
-        label: "Ambassador Ledger",
+        label: "Performance Ledger",
         href: adminRoutes.ambassadorLedger,
         icon: LineChart,
       },

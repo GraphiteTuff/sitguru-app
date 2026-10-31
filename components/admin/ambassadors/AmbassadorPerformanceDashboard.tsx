@@ -135,8 +135,8 @@ export default function AmbassadorPerformanceDashboard() {
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
             Brand Ambassador · Performance ledger
           </p>
-          <h1 className="mt-1 text-3xl font-black tracking-[-0.04em]">
-            Network control panel
+          <h1 className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">
+            Performance Ledger
           </h1>
           <p className="mt-1 max-w-2xl text-sm font-semibold text-slate-600">
             Audit referral traffic, conversions, and payout states for local
@@ -144,10 +144,10 @@ export default function AmbassadorPerformanceDashboard() {
           </p>
         </div>
         <Link
-          href="/admin/ambassadors/roster"
+          href="/admin/ambassadors"
           className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-900 shadow-sm hover:bg-emerald-50"
         >
-          Full roster CRM
+          Ambassador roster
           <ArrowUpRight className="h-4 w-4" />
         </Link>
       </header>
@@ -228,8 +228,7 @@ export default function AmbassadorPerformanceDashboard() {
                       colSpan={6}
                       className="px-4 py-10 text-center text-sm font-semibold text-slate-500"
                     >
-                      No ambassador ledger profiles yet. Apply the migration and
-                      seed from the ambassadors table.
+                      No active ambassadors are on the ledger yet.
                     </td>
                   </tr>
                 ) : (

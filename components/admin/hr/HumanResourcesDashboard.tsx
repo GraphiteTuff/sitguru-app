@@ -162,7 +162,7 @@ export default async function HumanResourcesDashboard({
   notice?: string;
   noticeError?: string;
 }) {
-  const [hr, hires, interns, accessRequests, events, audits, universities, partners, partnerCount, trainingTotal, trainingCompleted, trainingProgress, steps, progress, mailboxes, readiness] = await Promise.all([
+  const [hr, hires, interns, accessRequests, events, audits, universities, partners, partnerCount, trainingTotal, trainingCompleted, trainingProgress, steps, progress, mailboxes, readiness, activeAmbassadors] = await Promise.all([
     getHrDashboardData(),
     listGrowthHires(),
     listInterns(),
@@ -179,6 +179,7 @@ export default async function HumanResourcesDashboard({
     supabaseAdmin.from("ambassador_training_progress").select("training_step_id,status,ambassador_id").limit(4000),
     supabaseAdmin.from("microsoft_user_links").select("user_id,status,entra_object_id").limit(1000),
     supabaseAdmin.from("internship_interns").select("id,microsoft_readiness,user_id"),
+    supabaseAdmin.from("ambassadors").select("id,full_name,email,status,city,state,user_id").eq("status", "active").order("full_name").limit(24),
   ]);
 
   const activeHires = hires.filter((hire) => hire.status === "active" && hire.userId);
@@ -189,7 +190,7 @@ export default async function HumanResourcesDashboard({
       ...activeHires.map((hire) => hire.email),
       ...visibleInterns.flatMap((intern) => [intern.email, intern.studentEmail]),
       ...hr.recentGuruApplicants.map((person) => person.email),
-      ...hr.recentAmbassadorLeads.map((person) => person.email),
+      ...(activeAmbassadors.data || []).map((person) => text(person.email)),
       ...(partners.data || []).map((partner) => text(partner.email)),
     ]
       .map((email) => email.trim().toLowerCase())
@@ -200,7 +201,7 @@ export default async function HumanResourcesDashboard({
       ...hireIds,
       ...visibleInterns.map((intern) => intern.userId || ""),
       ...hr.recentGuruApplicants.map((person) => text(person.raw.user_id)),
-      ...hr.recentAmbassadorLeads.map((person) => text(person.raw.user_id)),
+      ...(activeAmbassadors.data || []).map((person) => text(person.user_id)),
       ...(partners.data || []).map((partner) => text(partner.owner_user_id)),
     ].filter(Boolean),
   )].slice(0, 200);
@@ -356,20 +357,20 @@ export default async function HumanResourcesDashboard({
       microsoft: "n/a",
       href: person.href || "/admin/gurus",
     })),
-    ...hr.recentAmbassadorLeads.map((person) => ({
-      id: person.id,
-      name: person.name,
-      avatarUrl: avatarFor({ userId: text(person.raw.user_id), email: person.email, raw: person.raw }),
+    ...(activeAmbassadors.error ? [] : activeAmbassadors.data || []).map((person) => ({
+      id: text(person.id),
+      name: text(person.full_name) || text(person.email) || "Ambassador",
+      avatarUrl: avatarFor({ userId: text(person.user_id), email: text(person.email) }),
       group: "ambassador" as const,
       groupLabel: "Ambassadors",
       role: "Ambassador",
-      organization: person.program || "Community",
-      status: person.status,
-      statusTone: statusTone(person.status),
-      onboarding: "In progress",
-      training: "Not started",
+      organization: [text(person.city), text(person.state)].filter(Boolean).join(", ") || "SitGuru",
+      status: "Active",
+      statusTone: "emerald" as const,
+      onboarding: "Active login",
+      training: trainingLabel(text(trainingByEmail.get(text(person.email).toLowerCase())?.training_status), null),
       microsoft: "n/a",
-      href: person.href || "/admin/ambassadors",
+      href: "/admin/ambassadors",
     })),
     ...(partners.error ? [] : partners.data || []).map((partner) => ({
       id: text(partner.id),

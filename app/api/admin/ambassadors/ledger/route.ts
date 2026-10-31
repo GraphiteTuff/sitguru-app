@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import {
   batchUpdateReferralStatus,
@@ -16,26 +16,9 @@ import type { AmbassadorPayoutStatus } from "@/lib/ambassador/ledger-types";
 export const dynamic = "force-dynamic";
 
 async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const };
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = String(
-    (profile as { role?: string } | null)?.role || "",
-  ).toLowerCase();
-  if (role !== "admin" && role !== "super_admin") {
-    return { ok: false as const, status: 403 as const };
-  }
-
-  return { ok: true as const, userId: user.id };
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) return { ok: false as const, status: 401 as const };
+  return { ok: true as const, userId: actor.id };
 }
 
 export async function GET() {
