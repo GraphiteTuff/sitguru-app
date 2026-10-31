@@ -9,7 +9,8 @@ import {
   SPRING_2027_SUPERVISOR_EMAIL,
 } from "@/lib/internship/onboarding-authority";
 import { listInterns } from "@/lib/internship/queries";
-import { internshipStaffOptionLabel, listSelectableInternshipStaff } from "@/lib/internship/staff";
+import { internshipStaffOptionLabel } from "@/lib/internship/staff-eligibility";
+import { listSelectableInternshipStaff } from "@/lib/internship/staff";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export default async function InternshipAssignScreen({
