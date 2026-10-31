@@ -145,7 +145,8 @@ export default async function TeamInternshipManagement({
     return {
       key: person.key,
       name: person.fullName,
-      program: plan?.academicProgram || "Program pending",
+      roleTitle: "Social Media & Community Growth Intern",
+      academicProgram: plan?.academicProgram || "Program pending",
       university: person.universityLabel,
       creditLine: person.creditLabel,
       hoursLine: person.hoursLabel,
@@ -153,7 +154,8 @@ export default async function TeamInternshipManagement({
       status: person.recordId ? person.statusLabel : person.accountLabel,
       statusTone: statusTone(person.recordId ? person.statusLabel : person.accountLabel),
       microsoft: person.recordId ? microsoftLabel(text(raw?.microsoft_readiness)) : "Not created",
-      portal: person.workspaceAction === "active" ? "Active" : person.recordId ? "Inactive" : "No record",
+      onboarding: "Not started",
+      managerName: managerName,
       recordId: person.recordId,
       canCreate: person.canCreatePendingRecord,
     };
