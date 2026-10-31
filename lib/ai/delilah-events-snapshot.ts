@@ -4,18 +4,14 @@
  */
 
 import type { CommunityEventCompanionContext } from "@/lib/ai/community-events-faqs";
-import { buildCuratedBucksMontgomeryEventsMarkdown } from "@/lib/community/homepage-demo-events";
-import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
+import { lookupCityLocation } from "@/lib/location/zip-lookup";
 import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
 import {
   formatEventDateRange,
   formatEventLocationInline,
 } from "@/lib/community/format";
-import {
-  fetchPublicEventBySlug,
-  fetchPublicEvents,
-} from "@/lib/community/queries";
+import { fetchPublicEventBySlug } from "@/lib/community/queries";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export type DelilahEventsSnapshotOpts = {
@@ -25,6 +21,23 @@ export type DelilahEventsSnapshotOpts = {
   /** Prefer highlighting this event (detail page / chat seed). */
   focus?: CommunityEventCompanionContext;
 };
+
+function milesBetween(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+) {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const dLat = toRad(toLat - fromLat);
+  const dLng = toRad(toLng - fromLng);
+  const lat1 = toRad(fromLat);
+  const lat2 = toRad(toLat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 3958.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 
 function eventKindLabel(event: CommunityEventWithPartner) {
   return isGoogleDiscoveryEvent(event)
@@ -98,51 +111,59 @@ export async function compileDelilahEventsSnapshot(
 ): Promise<{ markdownContext: string; count: number }> {
   const limit = Math.min(Math.max(opts.limit ?? 24, 6), 40);
 
-  const [partnerEvents, discovered] = await Promise.all([
-    fetchPublicEvents({
-      limit: Math.max(limit, 40),
-      city: opts.city,
-      state: opts.state,
-    }).catch(() => [] as CommunityEventWithPartner[]),
-    fetchDiscoveredHomepageEvents({
-      limit: Math.max(Math.floor(limit / 2), 12),
-      city: opts.city,
-      state: opts.state,
+  const scraped = await fetchDiscoveredHomepageEvents({
+    limit: 48,
+    state: opts.state,
+    homepageEligibleOnly: true,
+  }).catch(() => ({ events: [] as CommunityEventWithPartner[], lastSyncedAt: null }));
+
+  let pool = scraped.events || [];
+  if (pool.length < 4) {
+    const wider = await fetchDiscoveredHomepageEvents({
+      limit: 48,
       homepageEligibleOnly: true,
-    }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
-  ]);
-
-  let nearbyScope: "city" | "state" | "all" = opts.city ? "city" : opts.state ? "state" : "all";
-  let upcoming = mergeUniqueCommunityEvents(
-    partnerEvents,
-    discovered.events || [],
-    limit,
-  );
-
-  if (!upcoming.length && opts.city && opts.state) {
-    const [statePartners, stateDiscovered] = await Promise.all([
-      fetchPublicEvents({
-        limit: Math.max(limit, 40),
-        state: opts.state,
-      }).catch(() => [] as CommunityEventWithPartner[]),
-      fetchDiscoveredHomepageEvents({
-        limit: Math.max(Math.floor(limit / 2), 12),
-        state: opts.state,
-        homepageEligibleOnly: true,
-      }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
-    ]);
-    upcoming = mergeUniqueCommunityEvents(
-      statePartners,
-      stateDiscovered.events || [],
-      limit,
-    );
-    nearbyScope = upcoming.length ? "state" : "city";
+    }).catch(() => ({ events: [] as CommunityEventWithPartner[], lastSyncedAt: null }));
+    pool = wider.events?.length ? wider.events : pool;
   }
 
-  upcoming = [...upcoming].sort(
-    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-  );
-  if (nearbyScope === "all") upcoming = upcoming.slice(0, 6);
+  const origin =
+    opts.city && opts.state
+      ? await lookupCityLocation(opts.city, opts.state).catch(() => null)
+      : null;
+
+  const ranked = pool
+    .map((event) => {
+      const lat = event.latitude;
+      const lng = event.longitude;
+      const miles =
+        origin?.latitude != null &&
+        origin.longitude != null &&
+        lat != null &&
+        lng != null
+          ? milesBetween(origin.latitude, origin.longitude, lat, lng)
+          : null;
+      const sameCity = Boolean(
+        opts.city && event.city?.toLowerCase() === opts.city.toLowerCase(),
+      );
+      const sameState = Boolean(
+        opts.state && event.state?.toUpperCase() === opts.state.toUpperCase(),
+      );
+      return { event, miles, sameCity, sameState };
+    })
+    .sort((a, b) => {
+      if (a.miles != null && b.miles != null && Math.abs(a.miles - b.miles) > 5) {
+        return a.miles - b.miles;
+      }
+      if (a.sameCity !== b.sameCity) return a.sameCity ? -1 : 1;
+      if (a.sameState !== b.sameState) return a.sameState ? -1 : 1;
+      if (a.miles != null && b.miles != null) return a.miles - b.miles;
+      return new Date(a.event.start_at).getTime() - new Date(b.event.start_at).getTime();
+    })
+    .slice(0, Math.min(6, limit));
+
+  const upcoming = ranked.map((row) => row.event);
+  const milesById = new Map(ranked.map((row) => [row.event.id, row.miles]));
+  const nearbyScope: "nearest" | "upcoming" = origin ? "nearest" : "upcoming";
 
   let focusEvent: CommunityEventWithPartner | null = null;
   const focusSlug = opts.focus?.slug?.trim();
@@ -153,21 +174,21 @@ export async function compileDelilahEventsSnapshot(
   }
 
   const lines: string[] = [
-    "# LIVE CURRENT & UPCOMING PET EVENTS (authoritative listing digest)",
-    `_Generated for Delilah. Recommend these when guests ask what's on or what's near them. Never invent venues, times, or prices outside this digest + FAQ._`,
+    "# HOMEPAGE EVENT SCRAPER — NEAREST UPCOMING PET EVENTS",
+    `_Same discovered events as the SitGuru homepage banner. Recommend the nearest upcoming ones. Never invent venues, times, or prices outside this digest._`,
     `- Guest city: ${opts.city || "not given yet"}`,
     `- Guest state: ${opts.state || "not given yet"}`,
-    `- Match scope: ${nearbyScope === "city" ? "this city" : nearbyScope === "state" ? "same state, because this city has no listing yet" : "upcoming SitGuru events"}`,
+    `- Rank: ${nearbyScope === "nearest" ? "nearest to the guest, then soonest" : "soonest upcoming, until they name a city"}`,
     `- Upcoming listed: ${upcoming.length}`,
     "",
     "RECOMMEND:",
     opts.city || opts.state
-      ? "- Name 1–3 events from this digest that fit their area. Invite them to RSVP Yes / Maybe / No and bring a pet. If the city has none, say so and offer same-state events or hosting."
-      : "- They have not named a city yet. Ask for city and state, then recommend. You may mention that SitGuru Pet Events are local.",
-    "- If this digest is empty, encourage them to host a Partner Event at /events/host and browse /events. Do not invent a listing.",
+      ? "- Recommend the closest 1–3 events in this digest. Say the title, when, where, and miles when a distance is listed. Invite them to open the SitGuru path and RSVP. If none are close, say the scraper has nothing nearer and invite them to host."
+      : "- They have not named a city yet. Ask for city and state before you recommend. These rows are only the soonest scraped events, not confirmed as near them.",
+    "- If this digest is empty, say the homepage scraper has no upcoming events to recommend and point them to /events and /events/host. Do not invent a listing.",
     "",
     "RULES:",
-    "- Partner Events always lead; discoveries fill gaps.",
+    "- These rows come from the homepage event scraper. Do not substitute a different county list.",
     "- If an event is missing here, say to browse /events or check back soon — do not invent it.",
     "- For discovery listings, send guests to the external listing URL when they need tickets or host rules.",
     "",
@@ -193,22 +214,19 @@ export async function compileDelilahEventsSnapshot(
     lines.push("");
   }
 
-  lines.push("# UPCOMING LISTINGS (chronological)");
+  lines.push("# NEAREST UPCOMING SCRAPED EVENTS");
   if (!upcoming.length) {
-    lines.push("_No upcoming published Pet Events in this snapshot right now._");
+    lines.push("_The homepage event scraper has no upcoming events in this snapshot._");
   } else {
     for (const event of upcoming) {
-      lines.push(...formatEventDetailLines(event));
+      const detail = formatEventDetailLines(event);
+      const miles = milesById.get(event.id);
+      if (miles != null) {
+        detail.splice(3, 0, `- About ${Math.round(miles)} miles from the guest`);
+      }
+      lines.push(...detail);
       lines.push("");
     }
-  }
-
-  const guestState = (opts.state || "").toUpperCase();
-  const showBucksMontgomery =
-    !guestState || guestState === "PA" || guestState === "PENNSYLVANIA";
-  if (showBucksMontgomery) {
-    lines.push("");
-    lines.push(buildCuratedBucksMontgomeryEventsMarkdown());
   }
 
   return {
