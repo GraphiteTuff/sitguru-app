@@ -5,7 +5,7 @@
  * Named channel → postgres_changes (optionally filtered) → removeChannel on unmount.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
@@ -46,6 +46,7 @@ export function useRealtimeSubscription<
   const onChangeRef = useRef(onChange);
   const onStatusRef = useRef(onStatus);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const instanceId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   useEffect(() => {
     onPayloadRef.current = onPayload;
@@ -75,19 +76,24 @@ export function useRealtimeSubscription<
 
     if (filter) config.filter = filter;
 
-    channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        config,
-        (payload: RealtimePostgresChangesPayload<T>) => {
-          onPayloadRef.current?.(payload);
-          scheduleChange();
-        },
-      )
-      .subscribe((status) => {
-        onStatusRef.current?.(status);
-      });
+    try {
+      channel = supabase
+        .channel(`${channelName}:${instanceId}`)
+        .on(
+          "postgres_changes",
+          config,
+          (payload: RealtimePostgresChangesPayload<T>) => {
+            onPayloadRef.current?.(payload);
+            scheduleChange();
+          },
+        )
+        .subscribe((status) => {
+          onStatusRef.current?.(status);
+        });
+    } catch (error) {
+      console.error("[realtime] subscribe skipped", error);
+      return;
+    }
 
     return () => {
       if (timerRef.current) {
@@ -98,6 +104,7 @@ export function useRealtimeSubscription<
     };
   }, [
     channelName,
+    instanceId,
     table,
     schema,
     event,

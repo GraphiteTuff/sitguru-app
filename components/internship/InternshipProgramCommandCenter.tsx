@@ -11,7 +11,6 @@ import {
   type RosterInternRecord,
 } from "@/lib/internship/team-roster";
 import SpringInternTable, { type InternTableRow } from "@/components/admin/hr/SpringInternTable";
-import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 import type { InternshipMilestone, InternshipProject, InternshipUniversity } from "@/lib/internship/types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -102,7 +101,12 @@ export default async function InternshipProgramCommandCenter({
   notice?: string;
   noticeError?: string;
 }) {
-  const [interns, academic, uniRows, accounts] = await Promise.all([
+  let interns: Awaited<ReturnType<typeof listInterns>> = [];
+  let academic: { data: Record<string, unknown>[] | null } = { data: [] };
+  let uniRows: { data: { id?: string; name?: string }[] | null } = { data: [] };
+  let accounts: { data: { id?: string; email?: string; full_name?: string }[] | null } = { data: [] };
+  try {
+  const loaded = await Promise.all([
     listInterns(cohortId || undefined),
     supabaseAdmin
       .from("internship_interns")
@@ -117,6 +121,16 @@ export default async function InternshipProgramCommandCenter({
         "full_name.ilike.%Manibo%,full_name.ilike.%Uhl%,full_name.ilike.%Dhital%,email.ilike.%manibo%,email.ilike.%uh15%,email.ilike.%dhital%",
       ),
   ]);
+  interns = loaded[0];
+  academic = { data: (loaded[1].data || []) as Record<string, unknown>[] };
+  uniRows = { data: loaded[2].data || [] };
+  accounts = { data: loaded[3].data || [] };
+  } catch (error) {
+    console.error(
+      "[internship] command center",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   const academicById = new Map((academic.data || []).map((row) => [text(row.id), row]));
   const universityName = new Map((uniRows.data || []).map((row) => [text(row.id), text(row.name)]));
@@ -182,7 +196,7 @@ export default async function InternshipProgramCommandCenter({
   const ryan = roster.find((person) => person.canCreatePendingRecord);
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-4 px-4 pb-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl space-y-4 px-4 pb-8 sm:px-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-500">Admin HQ / Internship Program</p>
@@ -296,13 +310,21 @@ export default async function InternshipProgramCommandCenter({
           <p className="mt-1 text-sm font-semibold text-slate-500">
             Employer calendar for the cohort. Empty until milestones are scheduled.
           </p>
-          <div className="mt-4">
+          <ul className="mt-4 space-y-2">
             {milestones.length ? (
-              <InternshipTimelineBoard milestones={milestones.slice(0, 6)} compact />
+              milestones.slice(0, 6).map((row) => (
+                <li key={row.id} className="rounded-2xl border border-slate-100 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    {row.phase || "Milestone"}
+                    {row.dueOn ? ` · ${row.dueOn}` : ""}
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">{row.title || "Untitled milestone"}</p>
+                </li>
+              ))
             ) : (
-              <p className="text-sm font-semibold text-slate-500">No milestones are scheduled yet.</p>
+              <li className="text-sm font-semibold text-slate-500">No milestones are scheduled yet.</li>
             )}
-          </div>
+          </ul>
         </section>
 
         <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -360,6 +382,6 @@ export default async function InternshipProgramCommandCenter({
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }
