@@ -20,6 +20,14 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+function emailHtml(value: string) {
+  const safe = String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+  return `<p style="font-family:Arial,sans-serif;color:#0f172a">${safe.replaceAll("\n", "<br/>")}</p>`;
+}
+
 function ids(formData: FormData) {
   return formData
     .getAll("internId")
@@ -174,10 +182,12 @@ export async function activateInternHandoff(formData: FormData) {
     let mailed = !manager.email;
     if (manager.email) {
       try {
+        const managerText = `${intern.fullName} is active and assigned to you. Open the Manager Portal to see your intern team. Private university and HR files are not included.`;
         await sendSitGuruEmail({
           to: manager.email,
           subject: `${intern.fullName} is on your SitGuru intern team`,
-          text: `${intern.fullName} is active and assigned to you. Open the Manager Portal to see your intern team. Private university and HR files are not included.`,
+          text: managerText,
+          html: emailHtml(managerText),
         });
         mailed = true;
       } catch (mailError) {
@@ -198,10 +208,12 @@ export async function activateInternHandoff(formData: FormData) {
   if (welcomeTo && shouldSendOnce(await noticeExists(intern.id, welcomeKind), true)) {
     let mailed = false;
     try {
+      const welcomeText = `Hi ${intern.preferredName || intern.fullName}, your SitGuru intern portal is open at https://www.sitguru.com/intern.`;
       await sendSitGuruEmail({
         to: welcomeTo,
         subject: "Your SitGuru intern portal is open",
-        text: `Hi ${intern.preferredName || intern.fullName}, your SitGuru intern portal is open at https://www.sitguru.com/intern.`,
+        text: welcomeText,
+        html: emailHtml(welcomeText),
       });
       mailed = true;
     } catch (mailError) {
@@ -254,10 +266,12 @@ export async function escalateInternToSuperAdmin(formData: FormData) {
   });
   const supervisor = intern.supervisorUserId ? await loadInternshipStaffGate(intern.supervisorUserId) : null;
   if (supervisor?.email) {
+    const escalationText = `The assigned manager asked Super Admin to review an administrative issue for ${intern.fullName}.\n\n${note.slice(0, 500)}\n\nNo university or HR documents are attached.`;
     await sendSitGuruEmail({
       to: supervisor.email,
       subject: `Intern desk escalation — ${intern.fullName}`,
-      text: `The assigned manager asked Super Admin to review an administrative issue for ${intern.fullName}.\n\n${note.slice(0, 500)}\n\nNo university or HR documents are attached.`,
+      text: escalationText,
+      html: emailHtml(escalationText),
     });
   }
   revalidatePath("/manager/team");
