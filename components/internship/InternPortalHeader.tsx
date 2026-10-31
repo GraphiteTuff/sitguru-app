@@ -12,7 +12,7 @@ import {
   internGhostBtnClass,
   internPrimaryBtnClass,
 } from "@/lib/internship/intern-ui";
-import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
+import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/constants";
 
 export default function InternPortalHeader({
   assigned = false,

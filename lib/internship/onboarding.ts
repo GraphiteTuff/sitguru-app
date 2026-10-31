@@ -1,12 +1,17 @@
 import { createHash } from "node:crypto";
-import { INTERNSHIP_PORTAL_PATH } from "@/lib/internship/constants";
+import {
+  INTERNSHIP_ONBOARDING_PATH,
+  INTERNSHIP_ONBOARDING_PRINT_PATH,
+} from "@/lib/internship/constants";
 import { INTERN_CONFIDENTIALITY_NOTICE } from "@/lib/internship/intern-agreement";
 import type { InternshipOnboarding } from "@/lib/internship/types";
 
 export { INTERN_CONFIDENTIALITY_NOTICE } from "@/lib/internship/intern-agreement";
+export {
+  INTERNSHIP_ONBOARDING_PATH,
+  INTERNSHIP_ONBOARDING_PRINT_PATH,
+} from "@/lib/internship/constants";
 
-export const INTERNSHIP_ONBOARDING_PATH = `${INTERNSHIP_PORTAL_PATH}/onboarding`;
-export const INTERNSHIP_ONBOARDING_PRINT_PATH = `${INTERNSHIP_ONBOARDING_PATH}/print`;
 export const INTERN_ONBOARDING_POLICY_VERSION = "2027-spring-v3";
 export const INTERN_ONBOARDING_FULLY_EXECUTED = "fully_executed";
 export const INTERNSHIP_CONFIDENTIAL_BUCKET = "internship-confidential";

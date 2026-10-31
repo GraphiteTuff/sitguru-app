@@ -1,10 +1,14 @@
+"use client";
+
 import { saveMilestoneStatus } from "@/lib/internship/actions";
 import { milestoneStatus } from "@/lib/internship/timeline";
 import type { InternshipMilestone } from "@/lib/internship/types";
 
 function formatDue(value: string) {
-  const date = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
+  const raw = String(value || "").trim();
+  if (!raw) return "Date TBD";
+  const date = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return raw;
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -87,7 +91,7 @@ function MilestoneGroup({
                         : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {row.status.replaceAll("_", " ")}
+                  {String(row.status || "scheduled").replaceAll("_", " ")}
                 </span>
               </div>
               {compact ? null : (

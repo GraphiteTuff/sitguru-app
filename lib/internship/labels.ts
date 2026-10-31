@@ -93,6 +93,7 @@ export function internStatusLabel(status: string) {
     applicant: "Candidate",
     candidate: "Candidate",
     pending_university_approval: "Pending university approval",
+    prospective: "Prospective",
     accepted: "Approved",
     approved: "Approved",
     onboarding: "Onboarding",
@@ -101,7 +102,7 @@ export function internStatusLabel(status: string) {
     withdrawn: "Archived",
     archived: "Archived",
   };
-  return map[status] || status.replaceAll("_", " ");
+  return map[status] || String(status || "").replaceAll("_", " ") || "Unknown";
 }
 
 export function academicLevelLabel(level: string) {

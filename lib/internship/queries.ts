@@ -271,80 +271,133 @@ export function freezeAcademicProfile(input: {
   };
 }
 
-export async function getCohortDashboard(cohortId: string) {
-  const [
-    universities,
-    internRows,
-    projectRows,
-    cohortUniversityRows,
-    fundingRows,
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("internship_universities")
-      .select("*")
-      .eq("archived", false)
-      .order("name"),
-    supabaseAdmin
-      .from("internship_interns")
-      .select("*")
-      .eq("cohort_id", cohortId),
-    supabaseAdmin
-      .from("internship_projects")
-      .select("*")
-      .eq("cohort_id", cohortId)
-      .eq("status", "active"),
-    supabaseAdmin
-      .from("internship_cohort_universities")
-      .select("university_id, target_program, participation_status")
-      .eq("cohort_id", cohortId),
-    supabaseAdmin.from("internship_funding_opportunities").select("id, status"),
-  ]);
-
-  const internList = rows(internRows.data).map(mapIntern);
-  const activeInterns = internList.filter((row) =>
-    ["accepted", "active", "completed"].includes(row.status),
-  );
-  const internUniversityIds = new Set(activeInterns.map((row) => row.universityId));
-  const targetUniversityIds = new Set(
-    rows(cohortUniversityRows.data).map((row) => String(row.university_id || "")),
-  );
-  const universityIds =
-    internUniversityIds.size > 0 ? internUniversityIds : targetUniversityIds;
-
-  const stats: CohortDashboardStats = {
-    universities: universityIds.size,
-    interns: internList.filter((row) => row.status !== "withdrawn").length,
-    requiredHours: internList.reduce(
-      (sum, row) => sum + (row.requiredHours || 0),
-      0,
-    ),
-    projects: rows(projectRows.data).length,
-  };
-
-  const universityList = rows(universities.data).map(mapUniversity);
-
+export function emptyCohortDashboard() {
   return {
-    stats,
-    universities: universityList,
-    interns: internList,
-    projects: rows(projectRows.data).map(mapProject),
-    cohortUniversities: rows(cohortUniversityRows.data).map((row) => ({
-      universityId: String(row.university_id || ""),
-      targetProgram: String(row.target_program || ""),
-      participationStatus: String(row.participation_status || "target"),
-    })),
+    stats: {
+      universities: 0,
+      interns: 0,
+      requiredHours: 0,
+      projects: 0,
+    } satisfies CohortDashboardStats,
+    universities: [] as ReturnType<typeof mapUniversity>[],
+    interns: [] as InternshipIntern[],
+    projects: [] as ReturnType<typeof mapProject>[],
+    cohortUniversities: [] as {
+      universityId: string;
+      targetProgram: string;
+      participationStatus: string;
+    }[],
     programAnalytics: {
-      universitiesRepresented: universityList.length,
-      universityPartners: universityList.filter((row) => row.isUniversityPartner)
-        .length,
-      creditBearing: internList.filter((row) => row.pathType === "credit_bearing")
-        .length,
-      nonCredit: internList.filter((row) => row.pathType === "non_credit").length,
-      totalCredits: internList.reduce((sum, row) => sum + (row.credits || 0), 0),
-      fundingAwards: rows(fundingRows.data).filter((row) => row.status === "available")
-        .length,
+      universitiesRepresented: 0,
+      universityPartners: 0,
+      creditBearing: 0,
+      nonCredit: 0,
+      totalCredits: 0,
+      fundingAwards: 0,
     },
   };
+}
+
+export async function getCohortDashboard(cohortId: string) {
+  if (!cohortId) return emptyCohortDashboard();
+
+  try {
+    const [
+      universityRows,
+      internRows,
+      projectRows,
+      cohortUniversityRows,
+      fundingRows,
+    ] = await Promise.all([
+      safeRows(
+        "universities",
+        supabaseAdmin
+          .from("internship_universities")
+          .select("*")
+          .eq("archived", false)
+          .order("name"),
+      ),
+      safeRows(
+        "cohort interns",
+        supabaseAdmin.from("internship_interns").select("*").eq("cohort_id", cohortId),
+      ),
+      safeRows(
+        "projects",
+        supabaseAdmin
+          .from("internship_projects")
+          .select("*")
+          .eq("cohort_id", cohortId)
+          .eq("status", "active"),
+      ),
+      safeRows(
+        "cohort universities",
+        supabaseAdmin
+          .from("internship_cohort_universities")
+          .select("university_id, target_program, participation_status")
+          .eq("cohort_id", cohortId),
+      ),
+      safeRows(
+        "funding",
+        supabaseAdmin.from("internship_funding_opportunities").select("id, status"),
+      ),
+    ]);
+
+    const internList = internRows.map(mapIntern);
+    const activeInterns = internList.filter((row) =>
+      ["accepted", "active", "completed", "approved"].includes(row.status),
+    );
+    const internUniversityIds = new Set(
+      activeInterns.map((row) => row.universityId).filter(Boolean),
+    );
+    const targetUniversityIds = new Set(
+      cohortUniversityRows.map((row) => String(row.university_id || "")).filter(Boolean),
+    );
+    const universityIds =
+      internUniversityIds.size > 0 ? internUniversityIds : targetUniversityIds;
+
+    const stats: CohortDashboardStats = {
+      universities: universityIds.size,
+      interns: internList.filter((row) => row.status !== "withdrawn").length,
+      requiredHours: internList.reduce(
+        (sum, row) => sum + (Number(row.requiredHours) || 0),
+        0,
+      ),
+      projects: projectRows.length,
+    };
+
+    const universityList = universityRows.map(mapUniversity);
+
+    return {
+      stats,
+      universities: universityList,
+      interns: internList,
+      projects: projectRows.map(mapProject),
+      cohortUniversities: cohortUniversityRows.map((row) => ({
+        universityId: String(row.university_id || ""),
+        targetProgram: String(row.target_program || ""),
+        participationStatus: String(row.participation_status || "target"),
+      })),
+      programAnalytics: {
+        universitiesRepresented: universityList.length,
+        universityPartners: universityList.filter((row) => row.isUniversityPartner)
+          .length,
+        creditBearing: internList.filter((row) => row.pathType === "credit_bearing")
+          .length,
+        nonCredit: internList.filter((row) => row.pathType === "non_credit").length,
+        totalCredits: internList.reduce(
+          (sum, row) => sum + (Number(row.credits) || 0),
+          0,
+        ),
+        fundingAwards: fundingRows.filter((row) => row.status === "available").length,
+      },
+    };
+  } catch (error) {
+    console.error(
+      "[internship] cohort dashboard",
+      error instanceof Error ? error.message : error,
+    );
+    return emptyCohortDashboard();
+  }
 }
 
 export async function listInterns(cohortId?: string) {
@@ -409,13 +462,14 @@ export async function findInternByAccount(input: {
 export async function getInternWorkspace(
   internId: string,
 ): Promise<InternshipWorkspaceData | null> {
+  try {
   const intern = await findInternById(internId);
   if (!intern) return null;
 
   const [
     university,
-    campus,
-    cohort,
+    campusRows,
+    cohortRows,
     projects,
     tasks,
     content,
@@ -429,91 +483,129 @@ export async function getInternWorkspace(
     milestones,
     commentRows,
     attachmentRows,
-    onboardingRow,
+    onboardingRows,
     timeLogs,
     questions,
     startChecks,
     reviewEvents,
     scheduleExceptions,
   ] = await Promise.all([
-    getUniversity(intern.universityId),
+    intern.universityId ? getUniversity(intern.universityId) : Promise.resolve(null),
     intern.campusId
-      ? supabaseAdmin
-          .from("internship_university_campuses")
-          .select("*")
-          .eq("id", intern.campusId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabaseAdmin
-      .from("internship_cohorts")
-      .select("*")
-      .eq("id", intern.cohortId)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("internship_projects")
-      .select("*")
-      .eq("cohort_id", intern.cohortId)
-      .order("name"),
-    supabaseAdmin
-      .from("internship_tasks")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("due_on", { ascending: true }),
-    supabaseAdmin
-      .from("internship_content")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_campaigns")
-      .select("*")
-      .or(`intern_id.eq.${internId},primary_owner_intern_id.eq.${internId}`)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_metrics")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_scorecards")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("period_end", { ascending: false }),
-    supabaseAdmin
-      .from("internship_weekly_reviews")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("week_of", { ascending: false }),
-    supabaseAdmin
-      .from("internship_smart_goals")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_experiments")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_access_grants")
-      .select("*")
-      .eq("intern_id", internId),
-    listCohortMilestones(intern.cohortId),
-    supabaseAdmin
-      .from("internship_work_comments")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: true }),
-    supabaseAdmin
-      .from("internship_work_attachments")
-      .select("*")
-      .eq("intern_id", internId)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("internship_onboarding_acknowledgments")
-      .select("*")
-      .eq("intern_id", internId)
-      .maybeSingle(),
+      ? safeRows(
+          "campus",
+          supabaseAdmin
+            .from("internship_university_campuses")
+            .select("*")
+            .eq("id", intern.campusId),
+        )
+      : Promise.resolve([] as Record<string, unknown>[]),
+    intern.cohortId
+      ? safeRows(
+          "cohort",
+          supabaseAdmin.from("internship_cohorts").select("*").eq("id", intern.cohortId),
+        )
+      : Promise.resolve([] as Record<string, unknown>[]),
+    safeRows(
+      "projects",
+      supabaseAdmin
+        .from("internship_projects")
+        .select("*")
+        .eq("cohort_id", intern.cohortId || "__none__")
+        .order("name"),
+    ),
+    safeRows(
+      "tasks",
+      supabaseAdmin
+        .from("internship_tasks")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("due_on", { ascending: true }),
+    ),
+    safeRows(
+      "content",
+      supabaseAdmin
+        .from("internship_content")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "campaigns",
+      supabaseAdmin
+        .from("internship_campaigns")
+        .select("*")
+        .or(`intern_id.eq.${internId},primary_owner_intern_id.eq.${internId}`)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "metrics",
+      supabaseAdmin
+        .from("internship_metrics")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "scorecards",
+      supabaseAdmin
+        .from("internship_scorecards")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("period_end", { ascending: false }),
+    ),
+    safeRows(
+      "weekly reviews",
+      supabaseAdmin
+        .from("internship_weekly_reviews")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("week_of", { ascending: false }),
+    ),
+    safeRows(
+      "smart goals",
+      supabaseAdmin
+        .from("internship_smart_goals")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "experiments",
+      supabaseAdmin
+        .from("internship_experiments")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "access grants",
+      supabaseAdmin.from("internship_access_grants").select("*").eq("intern_id", internId),
+    ),
+    intern.cohortId ? listCohortMilestones(intern.cohortId) : Promise.resolve([]),
+    safeRows(
+      "comments",
+      supabaseAdmin
+        .from("internship_work_comments")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: true }),
+    ),
+    safeRows(
+      "attachments",
+      supabaseAdmin
+        .from("internship_work_attachments")
+        .select("*")
+        .eq("intern_id", internId)
+        .order("created_at", { ascending: false }),
+    ),
+    safeRows(
+      "onboarding",
+      supabaseAdmin
+        .from("internship_onboarding_acknowledgments")
+        .select("*")
+        .eq("intern_id", internId),
+    ),
     safeRows(
       "time logs",
       supabaseAdmin
@@ -552,6 +644,10 @@ export async function getInternWorkspace(
     ),
   ]);
 
+  const campus = { data: campusRows[0] || null };
+  const cohort = { data: cohortRows[0] || null };
+  const onboardingRow = { data: onboardingRows[0] || null };
+
   const namedIntern = await attachInternshipStaff(intern);
 
   return {
@@ -563,14 +659,14 @@ export async function getInternWorkspace(
     cohort: cohort.data
       ? mapCohort(cohort.data as Record<string, unknown>)
       : null,
-    projects: rows(projects.data).map(mapProject),
-    tasks: rows(tasks.data).map(mapTask).filter((task) => assignmentIsVisibleToIntern(task.status)),
-    content: rows(content.data).map(mapContent),
-    campaigns: rows(campaigns.data).map(mapCampaign),
-    metrics: rows(metrics.data).map(mapMetric),
-    scorecards: rows(scorecards.data).map(mapScorecard),
-    weeklyReviews: rows(reviews.data).map(mapWeeklyReview),
-    smartGoals: rows(smartGoals.data).map((row) => ({
+    projects: projects.map(mapProject),
+    tasks: tasks.map(mapTask).filter((task) => assignmentIsVisibleToIntern(task.status)),
+    content: content.map(mapContent),
+    campaigns: campaigns.map(mapCampaign),
+    metrics: metrics.map(mapMetric),
+    scorecards: scorecards.map(mapScorecard),
+    weeklyReviews: reviews.map(mapWeeklyReview),
+    smartGoals: smartGoals.map((row) => ({
       id: String(row.id || ""),
       internId: String(row.intern_id || internId),
       specific: String(row.specific || ""),
@@ -589,7 +685,7 @@ export async function getInternWorkspace(
       lockedAt: row.locked_at ? String(row.locked_at) : null,
       changeReason: String(row.change_reason || ""),
     })),
-    experiments: rows(experiments.data).map((row) => ({
+    experiments: experiments.map((row) => ({
       id: String(row.id || ""),
       internId: String(row.intern_id || internId),
       hypothesis: String(row.hypothesis || ""),
@@ -604,14 +700,14 @@ export async function getInternWorkspace(
       verifiedResult: String(row.verified_result || ""),
       includedInFinal: row.included_in_final === true,
     })),
-    accessGrants: rows(accessGrants.data).map((row) => ({
+    accessGrants: accessGrants.map((row) => ({
       toolKey: String(row.tool_key || ""),
       granted: row.granted === true,
       notes: String(row.notes || ""),
       grantStatus: String(row.grant_status || (row.granted === true ? "active" : "not_granted")),
     })),
     milestones,
-    comments: rows(commentRows.data).map((row) => ({
+    comments: commentRows.map((row) => ({
       id: String(row.id || ""),
       internId: String(row.intern_id || internId),
       itemType: row.item_type === "content" ? "content" : "task",
@@ -620,7 +716,7 @@ export async function getInternWorkspace(
       body: String(row.body || ""),
       createdAt: String(row.created_at || ""),
     })),
-    attachments: rows(attachmentRows.data).map(mapWorkAttachment),
+    attachments: attachmentRows.map(mapWorkAttachment),
     onboarding: onboardingRow.data
       ? mapOnboarding(onboardingRow.data as Record<string, unknown>)
       : null,
@@ -670,6 +766,14 @@ export async function getInternWorkspace(
       reason: String(row.reason || ""),
     })),
   };
+  } catch (error) {
+    console.error(
+      "[internship] workspace",
+      internId,
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
 }
 
 export async function getInternOnboarding(internId: string): Promise<InternshipOnboarding | null> {

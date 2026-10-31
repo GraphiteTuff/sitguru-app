@@ -131,7 +131,7 @@ export function lifecycleLabel(status: string) {
     archived: "Archived",
     declined: "Declined",
   };
-  return map[status] || status.replaceAll("_", " ");
+  return map[status] || String(status || "").replaceAll("_", " ") || "Unknown";
 }
 
 export function universityApprovalLabel(status: string) {

@@ -11,6 +11,9 @@ export const INTERNSHIP_PROGRAM_SHORT_NAME = "Internship Program";
 
 export const INTERNSHIP_PORTAL_PATH = "/intern";
 export const INTERNSHIP_ADMIN_PATH = "/admin/internship";
+/** Safe for client imports — keep out of modules that pull node:crypto. */
+export const INTERNSHIP_ONBOARDING_PATH = `${INTERNSHIP_PORTAL_PATH}/onboarding`;
+export const INTERNSHIP_ONBOARDING_PRINT_PATH = `${INTERNSHIP_ONBOARDING_PATH}/print`;
 
 export function internPortalPreviewPath(internId: string) {
   return `${INTERNSHIP_PORTAL_PATH}?view=${encodeURIComponent(internId)}`;

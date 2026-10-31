@@ -15,6 +15,7 @@ import {
   type RosterInternRecord,
 } from "@/lib/internship/team-roster";
 import SpringInternTable, { type InternTableRow } from "@/components/admin/hr/SpringInternTable";
+import { staffAccessPath } from "@/lib/admin/hr/staff-access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { GraduationCap, Mail, ShieldCheck, UserRound, Users } from "lucide-react";
 
@@ -212,7 +213,15 @@ export default async function TeamInternshipManagement({
           {canAdminister ? (
             <div className="flex flex-wrap gap-2">
               <Link href="/manager" className={primaryAction}>Open Manager Portal</Link>
-              <Link href="/admin/hr/growth-hire" className={secondaryAction}>Manage Access & Roles</Link>
+              {avaHire?.userId ? (
+                <Link href={staffAccessPath(avaHire.userId)} className={secondaryAction}>
+                  Manage Access & Roles
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-black text-amber-900">
+                  Link Ava&apos;s login before managing roles
+                </span>
+              )}
             </div>
           ) : null}
         </div>
