@@ -11,7 +11,7 @@ import {
   nextInternAccessStatus,
 } from "@/lib/internship/intern-access";
 import { internshipUniversitySlug } from "@/lib/internship/constants";
-import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
+import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
 import { getActiveCohort } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -87,10 +87,9 @@ export async function requestInternAccess(formData: FormData) {
 
 async function decide(formData: FormData, action: "ceo_approve" | "verify_university" | "deny" | "complete" | "revoke") {
   const actor = await getAdminIdentity();
-  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
   const back = decisionPath(formData);
-  if (!actor || !canEditRequirements(kind)) {
-    bounce(back, "error", "CEO approval is required for this decision.");
+  if (!actor || !canAdministerInternshipOnboarding(actor)) {
+    bounce(back, "error", "Only a Super Admin can make this internship decision.");
   }
   const id = field(formData, "requestId");
   const { data: request } = await supabaseAdmin
@@ -247,7 +246,8 @@ export async function revokeInternAccess(formData: FormData) {
 }
 
 export async function activateInternAccess(userId: string) {
-  if (!userId) return;
+  const actor = await getAdminIdentity();
+  if (!userId || !actor || !canAdministerInternshipOnboarding(actor)) return;
   await supabaseAdmin
     .from("staff_access_requests")
     .update({ status: "active", updated_at: new Date().toISOString() })

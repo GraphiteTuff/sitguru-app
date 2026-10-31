@@ -3,10 +3,15 @@ import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
 import { listGrowthTeamSummary } from "@/lib/admin/growth/team-summary";
 import { buildManagerDeskReviewQueue } from "@/lib/admin/growth/manager-desk-model";
 import ManagerTeamHome from "@/components/manager/ManagerTeamHome";
+import { escalateInternToSuperAdmin } from "@/lib/internship/onboarding-assign-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function ManagerTeamPage() {
+export default async function ManagerTeamPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
 
@@ -46,7 +51,15 @@ export default async function ManagerTeamPage() {
           avatarUrl: card.avatarUrl || "",
         }));
 
+  const params = searchParams ? await searchParams : {};
+  const note = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const ok = note(params.ok);
+  const error = note(params.error);
+
   return (
+    <div className="space-y-4">
+    {ok ? <p className="mx-auto max-w-3xl rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{ok}</p> : null}
+    {error ? <p className="mx-auto max-w-3xl rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
     <ManagerTeamHome
       team={members}
       reviewCount={checkInCount + hoursSubmissionCount + assignmentCount}
@@ -85,5 +98,27 @@ export default async function ManagerTeamPage() {
         when: "Recently",
       }))}
     />
+    <form action={escalateInternToSuperAdmin} className="mx-auto max-w-3xl rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-black text-slate-950">Escalate to Super Admin</h2>
+      <p className="mt-1 text-sm font-semibold text-slate-600">
+        Use this for an administrative issue. It does not change onboarding, university requirements, or the assigned manager.
+      </p>
+      <label className="mt-3 block text-sm font-bold text-slate-700">
+        Intern
+        <select name="internId" className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-base">
+          {members.map((member) => (
+            <option key={member.id} value={member.id}>{member.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className="mt-3 block text-sm font-bold text-slate-700">
+        Note
+        <textarea name="note" required minLength={8} className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-base" />
+      </label>
+      <button className="mt-3 inline-flex min-h-11 items-center rounded-full border border-emerald-200 px-4 text-sm font-black text-[#0D5C3A]" type="submit">
+        Send to Super Admin
+      </button>
+    </form>
+    </div>
   );
 }

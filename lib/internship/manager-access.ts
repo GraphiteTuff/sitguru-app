@@ -49,16 +49,8 @@ export function canReadPrivateInternRecord(input: {
 const PORTAL_USER_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const MANAGER_DESK_STATUSES = new Set([
-  "accepted",
-  "active",
-  "approved",
-  "onboarding",
-  "pending_university_approval",
-  "candidate",
-  "applicant",
-  "completed",
-]);
+/** Active Intern Team Desk only. Prospective, pending, and closed records stay off it. */
+const MANAGER_DESK_STATUSES = new Set(["accepted", "active", "approved"]);
 
 export function isPortalUserId(value: string | null | undefined) {
   return PORTAL_USER_ID.test(String(value || "").trim());
@@ -109,10 +101,12 @@ export function internOnThisManagerDesk(input: {
     id: string;
     isTest?: boolean;
     status: string;
+    portalEnabled?: boolean;
     managerUserId?: string | null;
   };
 }) {
   if (input.intern.isTest) return false;
+  if (input.intern.portalEnabled === false) return false;
   if (!MANAGER_DESK_STATUSES.has(input.intern.status)) return false;
   if (
     !canReadPrivateInternRecord({
@@ -140,4 +134,14 @@ export function canGiveCeoReview(actor: InternshipActorKind) {
 
 export function canEditRequirements(actor: InternshipActorKind) {
   return actor === "supervisor";
+}
+
+/** Official onboarding, offers, portal activation, and manager assignment. */
+export function canAdministerInternshipOnboarding(input: {
+  role?: string | null;
+  isSuperUser?: boolean;
+}) {
+  if (input.isSuperUser) return true;
+  const role = normalizeInternshipRole(input.role);
+  return role === "super_admin" || role === "founder" || role === "owner" || role === "super_user";
 }

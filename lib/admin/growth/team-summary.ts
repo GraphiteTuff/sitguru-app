@@ -1,3 +1,4 @@
+import { internOnThisManagerDesk } from "@/lib/internship/manager-access";
 import { listInterns } from "@/lib/internship/queries";
 import { internStatusLabel } from "@/lib/internship/labels";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -25,13 +26,13 @@ export async function listGrowthTeamSummary(input: {
   isSuperUser?: boolean;
 }): Promise<GrowthTeamMember[]> {
   const everyone = await listInterns();
-  const assigned = everyone.filter((intern) => {
-    if (intern.isTest) return false;
-    if (input.isSuperUser) {
-      return Boolean(intern.managerUserId);
-    }
-    return intern.managerUserId === input.actorUserId;
-  });
+  const assigned = everyone.filter((intern) =>
+    internOnThisManagerDesk({
+      actorKind: input.isSuperUser ? "supervisor" : "manager",
+      actorUserId: input.actorUserId,
+      intern,
+    }),
+  );
 
   if (!assigned.length) return [];
 

@@ -77,6 +77,12 @@ export default async function InternshipProgramDashboardPage() {
             Intern Portal
           </Link>
           <Link
+            href="/admin/internship/assign"
+            className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-green-950"
+          >
+            Assign manager
+          </Link>
+          <Link
             href="/admin/internship/interns"
             className="inline-flex min-h-11 items-center rounded-2xl border border-white/30 px-4 text-sm font-black !text-white"
           >

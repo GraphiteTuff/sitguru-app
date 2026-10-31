@@ -150,7 +150,8 @@ describe("internship clock", () => {
       }),
       6,
     );
-    assert.equal(managerDeskIncludes("pending_university_approval"), true);
+    assert.equal(managerDeskIncludes("pending_university_approval"), false);
+    assert.equal(managerDeskIncludes("active"), true);
     assert.equal(managerDeskIncludes("archived"), false);
   });
 

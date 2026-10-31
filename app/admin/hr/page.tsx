@@ -524,6 +524,7 @@ export default async function AdminHrPage() {
           </p>
           <div className="mt-4 grid gap-2">
             {[
+              ["/admin/hr/team-access", "Assign internship manager"],
               ["/admin/hr/staff-requests", "Staff Access Requests"],
               ["/admin/hr/access-requests", "Internship access details"],
               ["/admin/internship/interns", "Intern records and invites"],

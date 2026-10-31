@@ -380,16 +380,7 @@ export async function findInternByAccount(input: {
       .select("*")
       .eq("user_id", input.userId)
       .eq("portal_enabled", true)
-      .in("status", [
-      "accepted",
-      "active",
-      "approved",
-      "onboarding",
-      "pending_university_approval",
-      "candidate",
-      "applicant",
-      "completed",
-    ])
+      .in("status", ["accepted", "active", "approved", "completed"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -408,16 +399,7 @@ export async function findInternByAccount(input: {
     .select("*")
     .ilike("email", email)
     .eq("portal_enabled", true)
-    .in("status", [
-      "accepted",
-      "active",
-      "approved",
-      "onboarding",
-      "pending_university_approval",
-      "candidate",
-      "applicant",
-      "completed",
-    ])
+    .in("status", ["accepted", "active", "approved", "completed"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

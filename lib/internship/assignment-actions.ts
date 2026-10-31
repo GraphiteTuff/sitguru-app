@@ -7,7 +7,8 @@ import { grantGrowthHireAccess } from "@/lib/admin/growth/hire";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assignmentChangeSummary } from "@/lib/internship/assignment";
 import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
-import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
+import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
+import { assignmentNoticeAllowed } from "@/lib/internship/onboarding-authority";
 import { findInternById } from "@/lib/internship/queries";
 import { loadInternshipStaffGate } from "@/lib/internship/staff";
 
@@ -21,8 +22,9 @@ function bounce(message: string, kind: "ok" | "error" = "error"): never {
 
 export async function saveInternshipAssignment(formData: FormData) {
   const actor = await getAdminIdentity();
-  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
-  if (!actor || !canEditRequirements(kind)) bounce("Only an authorized supervisor can change internship assignments.");
+  if (!actor || !canAdministerInternshipOnboarding(actor)) {
+    bounce("Only a Super Admin can change internship onboarding or manager assignment.");
+  }
 
   const internId = text(formData, "internId");
   const intern = await findInternById(internId);
@@ -111,13 +113,19 @@ export async function saveInternshipAssignment(formData: FormData) {
     reason,
   })));
 
-  if (managerId && managerId !== intern.managerUserId) {
+  if (
+    assignmentNoticeAllowed({
+      status: nextStatus,
+      portalEnabled: intern.portalEnabled !== false && (nextStatus === "active" || nextStatus === "approved" || nextStatus === "accepted"),
+      managerChanged: Boolean(managerId && managerId !== intern.managerUserId),
+    })
+  ) {
     await supabaseAdmin.from("internship_staff_notices").insert({
       recipient_user_id: managerId,
       intern_id: internId,
-      kind: "new_team_member",
-      title: "New team member",
-      body: `${intern.fullName} is now on your intern team.`,
+      kind: "manager_assignment_active",
+      title: "Intern assigned",
+      body: `${intern.fullName} is active on your intern team.`,
     });
   }
 
@@ -143,11 +151,10 @@ export async function saveInternshipAssignment(formData: FormData) {
 
 export async function inviteInternshipManager(formData: FormData) {
   const actor = await getAdminIdentity();
-  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
   const returnTo = text(formData, "returnTo") === "interns"
     ? "/admin/internship/interns"
     : "/admin/internship/staff";
-  if (!actor || !canEditRequirements(kind)) {
+  if (!actor || !canAdministerInternshipOnboarding(actor)) {
     redirect(`/admin/login?next=${encodeURIComponent(returnTo)}`);
   }
   const name = text(formData, "name");
@@ -176,8 +183,7 @@ export async function inviteInternshipManager(formData: FormData) {
 
 export async function saveInternshipStaffEligibility(formData: FormData) {
   const actor = await getAdminIdentity();
-  const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
-  if (!actor || !canEditRequirements(kind)) {
+  if (!actor || !canAdministerInternshipOnboarding(actor)) {
     redirect("/admin/login?next=/admin/internship/staff");
   }
   const userId = text(formData, "userId");

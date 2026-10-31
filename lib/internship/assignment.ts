@@ -50,7 +50,7 @@ export function focusedInternshipWeek(input: {
 }
 
 export function managerDeskIncludes(status: string | null | undefined) {
-  return !CLOSED_ASSIGNMENTS.has(String(status || "").toLowerCase()) || String(status || "") === "completed";
+  return ["accepted", "active", "approved"].includes(String(status || "").toLowerCase());
 }
 
 export function isEligibleInternshipManagerRole(role: string | null | undefined) {

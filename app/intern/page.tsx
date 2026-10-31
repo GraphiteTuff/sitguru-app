@@ -26,7 +26,6 @@ import {
   linkInternUserId,
 } from "@/lib/internship/queries";
 import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
-import { activateInternAccess } from "@/lib/internship/intern-access-actions";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
 import Link from "next/link";
 import { internLegacySectionRedirect } from "@/lib/internship/intern-routes";
@@ -199,7 +198,6 @@ export default async function InternPortalPage({
   if (!preview) {
     const ack = await getInternOnboarding(intern.id);
     if (!internOnboardingComplete(ack)) redirect(INTERNSHIP_ONBOARDING_PATH);
-    await activateInternAccess(intern.userId || user.id);
   }
 
   const workspace = await getInternWorkspace(intern.id);
