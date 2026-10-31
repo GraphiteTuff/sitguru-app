@@ -24,7 +24,7 @@ import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import { internPressClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 import { INTERN_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
-import { deskScriptFont as script } from "@/lib/portal/script-font";
+import { deskScriptClass as script } from "@/lib/portal/script-font";
 
 function statusTone(status: string, reviewStage?: string | null) {
   const label = taskStatusLabel(status, reviewStage).toLowerCase();
@@ -118,7 +118,7 @@ export default function InternPortalHome({
               sizes="(max-width: 1280px) 100vw, 45vw"
               priority
             />
-            <p className={`${script.className} absolute left-3 top-3 max-w-[16rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm sm:left-4 sm:text-[1.7rem]`}>
+            <p className={`${script} absolute left-3 top-3 max-w-[16rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm sm:left-4 sm:text-[1.7rem]`}>
               Learn. Create.
               <br />
               Make an impact.

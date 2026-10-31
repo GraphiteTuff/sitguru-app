@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { INTERN_PORTAL_BRAND } from "@/lib/internship/intern-portal-nav";
 import { INTERN_BANNER } from "@/lib/portal/desk-ui";
-import { deskScriptFont as script } from "@/lib/portal/script-font";
+import { deskScriptClass as script } from "@/lib/portal/script-font";
 
 export default function InternHeroBanner({
   title,
@@ -44,7 +44,7 @@ export default function InternHeroBanner({
         </div>
         <div className="relative min-h-[120px] overflow-hidden lg:min-h-full">
           <Image src={imageSrc} alt="Golden retriever on a walk" fill className="object-cover object-[center_40%]" sizes="(max-width: 1024px) 100vw, 40vw" />
-          <p className={`${script.className} absolute left-3 top-3 max-w-[15rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm`}>
+          <p className={`${script} absolute left-3 top-3 max-w-[15rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm`}>
             {lines.map((line, index) => (
               <span key={line}>
                 {index === 2 ? (
