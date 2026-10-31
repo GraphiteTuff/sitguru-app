@@ -73,8 +73,15 @@ function weekAxis(now = new Date()) {
   });
 }
 
+function managerHref(path: string, viewingUserId?: string | null) {
+  if (!viewingUserId) return path;
+  const join = path.includes("?") ? "&" : "?";
+  return `${path}${join}as=${encodeURIComponent(viewingUserId)}`;
+}
+
 export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
   const queue = buildManagerDeskReviewQueue(desk.reviews, desk.questions);
+  const href = (path: string) => managerHref(path, desk.viewingUserId);
   const cards = desk.cards;
   const avatarByName = new Map(cards.map((card) => [card.name, card.avatarUrl || ""]));
   const active = cards.filter((card) => (card.roster || "active") === "active");
@@ -141,8 +148,12 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
     <div className="space-y-4 pb-28 lg:pb-8">
       <DeskPageHero
         icon={<PawPrint size={22} />}
-        title="Manager's Desk"
-        subtitle="Support, review, and grow your interns."
+        title={desk.viewingAs ? `${desk.viewingAs}'s Desk` : "Manager's Desk"}
+        subtitle={
+          desk.viewingAs
+            ? "The same manager desk, opened for this manager."
+            : "Support, review, and grow your interns."
+        }
         quote={"Support.\nDevelop.\nCreate Opportunities.\nBigger Impact.®"}
       />
 
@@ -152,7 +163,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
           icon={<Users size={18} />}
           value={String(active.length)}
           label="Active Interns"
-          href="/manager/team"
+          href={href("/manager/team")}
           link="View team →"
         />
         <article className="rounded-2xl border border-emerald-100 bg-[#F0FDF4] p-4 shadow-sm">
@@ -195,13 +206,13 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
           value={String(deadlineCount)}
           label="Upcoming Deadlines"
           detail={`${assignmentReviews.length} Assignment · ${deadlines.length} Milestone`}
-          href="/manager/calendar"
+          href={href("/manager/calendar")}
         />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <Head title="Interns Overview" href="/manager/team" />
+          <Head title="Interns Overview" href={href("/manager/team")} />
           <ul className="mt-4 space-y-3">
             {cards.slice(0, 5).map((card) => {
               const required = Number(card.summary.requiredHours || 0);
@@ -239,7 +250,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
         </article>
 
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <Head title="Review Queue" href="/manager/check-ins" icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
+          <Head title="Review Queue" href={href("/manager/check-ins")} icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
           <ul className="mt-4 space-y-2">
             {queueRows.map((item, index) => {
               const icons = [CalendarCheck2, FileText, Clock3, HelpCircle, Flag];
@@ -326,7 +337,7 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
 
       <section className="grid gap-4 xl:grid-cols-3">
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <Head title="Assignments & Deadlines" href="/manager/assignments" icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
+          <Head title="Assignments & Deadlines" href={href("/manager/assignments")} icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
           <ul className="mt-4 space-y-3">
             {assignments.map((row) => (
               <li key={row.id} className="flex items-center gap-3">
@@ -350,15 +361,15 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <Action href="/manager/check-ins" label="Review Check-ins" tone="bg-[#EFF6FF] text-[#1D4ED8]" icon={<FileText size={18} />} />
-            <Action href="/manager/check-ins" label="Approve Hours" tone="bg-[#F0FDF4] text-[#166534]" icon={<Clock3 size={18} />} />
-            <Action href="/manager/assignments" label="Create Assignment" tone="bg-[#FFF7ED] text-[#C2410C]" icon={<Plus size={18} />} />
-            <Action href="/manager/messages" label="Message Team" tone="bg-[#F5F3FF] text-[#6D28D9]" icon={<MessageCircle size={18} />} />
+            <Action href={href("/manager/check-ins")} label="Review Check-ins" tone="bg-[#EFF6FF] text-[#1D4ED8]" icon={<FileText size={18} />} />
+            <Action href={href("/manager/check-ins")} label="Approve Hours" tone="bg-[#F0FDF4] text-[#166534]" icon={<Clock3 size={18} />} />
+            <Action href={href("/manager/assignments")} label="Create Assignment" tone="bg-[#FFF7ED] text-[#C2410C]" icon={<Plus size={18} />} />
+            <Action href={href("/manager/messages")} label="Message Team" tone="bg-[#F5F3FF] text-[#6D28D9]" icon={<MessageCircle size={18} />} />
           </div>
         </article>
 
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <Head title="Recent Activity" href="/manager/team" icon={<PawPrint size={18} className="text-[#EA580C]" />} />
+          <Head title="Recent Activity" href={href("/manager/team")} icon={<PawPrint size={18} className="text-[#EA580C]" />} />
           <ul className="mt-4 space-y-3">
             {activity.map((item) => (
               <li key={item.id} className="flex items-start gap-3">

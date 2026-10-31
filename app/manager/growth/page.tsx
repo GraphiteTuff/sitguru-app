@@ -6,12 +6,18 @@ import ManagerGrowthWorkspaceHome from "@/components/manager/ManagerGrowthWorksp
 
 export const dynamic = "force-dynamic";
 
-export default async function ManagerGrowthWorkspacePage() {
+export default async function ManagerGrowthWorkspacePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
+  const params = searchParams ? await searchParams : {};
+  const requested = Array.isArray(params.as) ? params.as[0] : params.as;
 
   const [desk, team] = await Promise.all([
-    loadManagerDeskBundle(),
+    loadManagerDeskBundle(access.actor.isSuperUser ? requested : null),
     listGrowthTeamSummary({
       actorUserId: access.actor.id,
       isSuperUser: access.actor.isSuperUser,

@@ -15,8 +15,10 @@ export default async function ManagerTeamPage({
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
 
+  const params = searchParams ? await searchParams : {};
+  const requested = Array.isArray(params.as) ? params.as[0] : params.as;
   const [desk, team] = await Promise.all([
-    loadManagerDeskBundle(),
+    loadManagerDeskBundle(access.actor.isSuperUser ? requested : null),
     listGrowthTeamSummary({
       actorUserId: access.actor.id,
       isSuperUser: access.actor.isSuperUser,
@@ -51,7 +53,6 @@ export default async function ManagerTeamPage({
           avatarUrl: card.avatarUrl || "",
         }));
 
-  const params = searchParams ? await searchParams : {};
   const note = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
   const ok = note(params.ok);
   const error = note(params.error);

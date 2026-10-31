@@ -81,6 +81,17 @@ export function canPreviewInternPortal(input: {
   return canReadPrivateInternRecord(input);
 }
 
+/** Super user may open another growth manager's portal only when that login is an active manager. */
+export function superUserMayPreviewManager(input: {
+  isSuperUser: boolean;
+  requestedUserId?: string | null;
+  activeManagerIds: readonly string[];
+}) {
+  const requested = String(input.requestedUserId || "").trim();
+  if (!input.isSuperUser || !isPortalUserId(requested)) return false;
+  return input.activeManagerIds.includes(requested);
+}
+
 export function staffPreviewUserId(input: {
   actor: InternshipActorKind;
   canAccessAdmin?: boolean;

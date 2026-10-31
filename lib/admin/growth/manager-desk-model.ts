@@ -36,6 +36,8 @@ export type ManagerDeskBundle = {
   messages: ManagerDeskMessage[];
   extras: ManagerDeskExtras;
   myTimeSnap: ManagerDeskTimeSnap | null;
+  viewingAs?: string | null;
+  viewingUserId?: string | null;
 };
 
 export function buildManagerDeskReviewQueue(

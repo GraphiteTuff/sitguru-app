@@ -14,6 +14,7 @@ import {
   internOnThisManagerDesk,
   internshipActorKind,
   staffPreviewUserId,
+  superUserMayPreviewManager,
 } from "./manager-access";
 import {
   draftReportContributions,
@@ -163,6 +164,34 @@ describe("internship authorization", () => {
         requestedUserId: "11111111-1111-4111-8111-111111111111",
       }),
       "manager-a",
+    );
+  });
+
+  it("lets a super user open an active manager portal and blocks everyone else", () => {
+    const ava = "023ef25a-44a5-4732-a96e-e67430ee8798";
+    assert.equal(
+      superUserMayPreviewManager({
+        isSuperUser: true,
+        requestedUserId: ava,
+        activeManagerIds: [ava],
+      }),
+      true,
+    );
+    assert.equal(
+      superUserMayPreviewManager({
+        isSuperUser: false,
+        requestedUserId: ava,
+        activeManagerIds: [ava],
+      }),
+      false,
+    );
+    assert.equal(
+      superUserMayPreviewManager({
+        isSuperUser: true,
+        requestedUserId: "11111111-1111-4111-8111-111111111111",
+        activeManagerIds: [ava],
+      }),
+      false,
     );
   });
 

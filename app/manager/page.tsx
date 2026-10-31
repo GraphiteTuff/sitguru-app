@@ -4,10 +4,16 @@ import ManagerDeskHome from "@/components/manager/ManagerDeskHome";
 
 export const dynamic = "force-dynamic";
 
-export default async function ManagerPortalHomePage() {
+export default async function ManagerPortalHomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
-  const desk = await loadManagerDeskBundle();
+  const params = searchParams ? await searchParams : {};
+  const requested = Array.isArray(params.as) ? params.as[0] : params.as;
+  const desk = await loadManagerDeskBundle(access.actor.isSuperUser ? requested : null);
   if (!desk) {
     return (
       <div className="mx-auto max-w-lg rounded-[1.75rem] border border-rose-100 bg-white p-6 shadow-sm">

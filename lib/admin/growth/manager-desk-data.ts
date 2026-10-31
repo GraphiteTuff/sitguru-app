@@ -1,4 +1,5 @@
 import { getAdminIdentity } from "@/lib/admin/access";
+import { resolveSuperUserManagerPreview } from "@/lib/admin/growth/super-user-portals";
 import { listGrowthInitiatives } from "@/lib/admin/growth/outcomes";
 import {
   buildManagerDeskReviewQueue,
@@ -15,35 +16,46 @@ import {
 export type { ManagerDeskBundle, ManagerDeskMessage } from "@/lib/admin/growth/manager-desk-model";
 export { buildManagerDeskReviewQueue } from "@/lib/admin/growth/manager-desk-model";
 
-export async function loadManagerDeskBundle(): Promise<ManagerDeskBundle | null> {
+export async function loadManagerDeskBundle(
+  previewUserId?: string | null,
+): Promise<ManagerDeskBundle | null> {
   const actor = await getAdminIdentity();
   if (!actor) return null;
 
-  const kind = internshipActorKind({
-    role: actor.role,
-    isSuperUser: actor.isSuperUser,
-  });
+  const preview = actor.isSuperUser
+    ? await resolveSuperUserManagerPreview(previewUserId)
+    : null;
+  const kind = preview
+    ? "manager"
+    : internshipActorKind({
+        role: actor.role,
+        isSuperUser: actor.isSuperUser,
+      });
   const actorKind = kind === "supervisor" || kind === "manager" ? kind : "manager";
+  const subjectId = preview?.id || actor.id;
+  const subjectEmail = preview?.email || actor.email;
 
   const [desk, extras, initiatives, inbox] = await Promise.all([
     loadManagerDashboard({
-      actorUserId: actor.id,
+      actorUserId: subjectId,
       actorKind,
+      managerUserId: preview ? subjectId : null,
     }),
     loadManagerHomeExtras({
-      userId: actor.id,
-      email: actor.email,
-      role: actor.role,
-      isSuperUser: actor.isSuperUser,
+      userId: subjectId,
+      email: subjectEmail,
+      role: preview ? "social_community_manager" : actor.role,
+      isSuperUser: preview ? false : actor.isSuperUser,
       basePath: "/manager",
     }),
     listGrowthInitiatives(6),
-    loadStaffInbox(actor.id, Boolean(actor.isSuperUser || kind === "supervisor")),
+    loadStaffInbox(subjectId, Boolean(!preview && (actor.isSuperUser || kind === "supervisor"))),
   ]);
 
   const rawFirst =
+    preview?.name.split(/\s+/)[0] ||
     inbox.me.firstName ||
-    String(actor.email || "")
+    String(subjectEmail || "")
       .split("@")[0]
       ?.split(".")[0] ||
     "there";
@@ -51,9 +63,11 @@ export async function loadManagerDeskBundle(): Promise<ManagerDeskBundle | null>
 
   return {
     firstName,
-    fullName: firstName,
-    email: actor.email,
+    fullName: preview?.name || firstName,
+    email: subjectEmail,
     title: "Social Media & Community Growth Manager",
+    viewingAs: preview?.name || null,
+    viewingUserId: preview?.id || null,
     cards: desk.cards,
     reviews: desk.reviews,
     questions: desk.questions,
