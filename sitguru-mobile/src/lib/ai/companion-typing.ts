@@ -2,10 +2,10 @@
  * Mobile word-by-word reveal pace — mirrors web lib/chat/companion-typing.
  */
 
-export const COMPANION_MIN_TYPING_MS = 850;
-export const COMPANION_MAX_TYPING_MS = 2400;
-export const COMPANION_MS_PER_CHAR = 18;
-export const COMPANION_MS_PER_WORD = 52;
+export const COMPANION_MIN_TYPING_MS = 180;
+export const COMPANION_MAX_TYPING_MS = 700;
+export const COMPANION_MS_PER_CHAR = 6;
+export const COMPANION_MS_PER_WORD = 16;
 
 export function companionTypingDelayMs(textLength: number): number {
   const length = Math.max(0, Math.floor(textLength));

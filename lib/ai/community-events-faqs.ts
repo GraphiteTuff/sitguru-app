@@ -18,6 +18,10 @@ import {
   matchCompanionGrowthSoftIntent,
 } from "@/lib/ai/companion-growth-faqs";
 import {
+  DELILAH_PRODUCT_PART_FAQS,
+  matchProductPartFaq,
+} from "@/lib/ai/companion-product-parts";
+import {
   COMPANION_BENEFITS_RESPONSE,
   COMPANION_BENEFITS_USER_PROMPT,
 } from "@/lib/companions/companion-benefits";
@@ -390,7 +394,9 @@ export function matchDelilahSoftIntent(question: string): MarketingFaqEntry | nu
 
 export function resolveDelilahInstantFaqAnswer(question: string): string | null {
   const hit =
-    matchCommunityEventsFaq(question) || matchDelilahSoftIntent(question);
+    matchProductPartFaq(DELILAH_PRODUCT_PART_FAQS, question) ||
+    matchCommunityEventsFaq(question) ||
+    matchDelilahSoftIntent(question);
   return hit?.answer || null;
 }
 

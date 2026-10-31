@@ -17,6 +17,12 @@ import {
   buildCompanionGrowthFaqs,
   matchCompanionGrowthSoftIntent,
 } from "@/lib/ai/companion-growth-faqs";
+import {
+  matchProductPartFaq,
+  ROGUE_PRODUCT_PART_FAQS,
+  SCOUT_PRODUCT_PART_FAQS,
+  TACO_PRODUCT_PART_FAQS,
+} from "@/lib/ai/companion-product-parts";
 
 export type MarketingFaqEntry = {
   question: string;
@@ -877,6 +883,9 @@ export function matchRoguePublicSoftIntent(
   const needle = normalizeFaqQuery(question);
   if (!needle) return null;
 
+  const productPart = matchProductPartFaq(ROGUE_PRODUCT_PART_FAQS, question);
+  if (productPart) return productPart;
+
   if (/find (a )?guru|search (for )?(a )?guru|how do i find/.test(needle)) {
     return (
       ROGUE_PUBLIC_MARKETING_FAQS.find(
@@ -1015,8 +1024,12 @@ export function resolveOfficerInstantFaqAnswer(opts: {
     return TACO_WHAT_AMBASSADORS_DO_ANSWER;
   }
 
+  const productFaqs = officer === "scout" ? SCOUT_PRODUCT_PART_FAQS : TACO_PRODUCT_PART_FAQS;
+  const productPart = matchProductPartFaq(productFaqs, question);
+
   if (surface === "public") {
     const hit =
+      productPart ||
       matchMarketingFaq(
         officer === "scout" ? SCOUT_PUBLIC_MARKETING_FAQS : TACO_PUBLIC_MARKETING_FAQS,
         question,
@@ -1032,6 +1045,7 @@ export function resolveOfficerInstantFaqAnswer(opts: {
   const dashboardFaqs =
     officer === "scout" ? SCOUT_DASHBOARD_FAQS : TACO_DASHBOARD_FAQS;
   const hit =
+    productPart ||
     matchMarketingFaq(dashboardFaqs, question) ||
     matchCompanionGrowthSoftIntent(officer, question);
   return hit?.answer || null;
@@ -1043,12 +1057,12 @@ export function getOfficerFaqCatalog(opts: {
 }): readonly MarketingFaqEntry[] {
   if (opts.officer === "scout") {
     return opts.surface === "public"
-      ? SCOUT_PUBLIC_MARKETING_FAQS
-      : [...SCOUT_DASHBOARD_FAQS, ...SCOUT_PUBLIC_MARKETING_FAQS];
+      ? [...SCOUT_PUBLIC_MARKETING_FAQS, ...SCOUT_PRODUCT_PART_FAQS]
+      : [...SCOUT_DASHBOARD_FAQS, ...SCOUT_PUBLIC_MARKETING_FAQS, ...SCOUT_PRODUCT_PART_FAQS];
   }
   return opts.surface === "public"
-    ? TACO_PUBLIC_MARKETING_FAQS
-    : [...TACO_DASHBOARD_FAQS, ...TACO_PUBLIC_MARKETING_FAQS];
+    ? [...TACO_PUBLIC_MARKETING_FAQS, ...TACO_PRODUCT_PART_FAQS]
+    : [...TACO_DASHBOARD_FAQS, ...TACO_PUBLIC_MARKETING_FAQS, ...TACO_PRODUCT_PART_FAQS];
 }
 
 /** Markdown snapshot injected into public officer streams. */

@@ -77,7 +77,7 @@ MISSION:
 - Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
 
 OUTPUT RULES:
-- Casual answers: **one short conversational sentence** (two max). Reports they asked for: a one-line sniff-check, then short bullets.
+- Casual answers: two to four short sentences about the admin screen they asked about. Reports they asked for: a one-line sniff-check, then short bullets.
 - Use the shared answer craft. Do not pad.
 - When useful, name one admin route (e.g. /admin/financials/payouts).
 `.trim(),
@@ -359,6 +359,7 @@ export function buildOfficerSystemPrompt(opts: {
   preset?: string;
   surface?: OfficerSurface;
   viewer?: CompanionViewerContext | null;
+  pagePath?: string | null;
 }) {
   const profile = getOfficerPrompt(opts.officerId);
   const surface = opts.surface === "public" ? "public" : "dashboard";
@@ -385,6 +386,7 @@ export function buildOfficerSystemPrompt(opts: {
     `- Current UTC datetime: ${opts.nowIso}`,
     `- Requesting actor: ${opts.actorLabel}`,
     `- Surface: ${surface}`,
+    opts.pagePath ? `- Page: ${opts.pagePath}. Answer about this screen first.` : "",
     opts.preset ? `- Quick-tap preset: ${opts.preset}` : "",
     "",
     surface === "public"

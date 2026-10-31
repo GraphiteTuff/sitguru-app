@@ -577,6 +577,7 @@ export async function POST(req: Request) {
         preset: preset || undefined,
         surface,
         viewer,
+        pagePath,
       }),
       instantFaq ? personableFactHint(instantFaq, preferredName) : "",
     ]

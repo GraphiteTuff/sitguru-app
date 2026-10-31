@@ -20,6 +20,7 @@ import {
   buildMarketingFaqSnapshot,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
+import { ROGUE_PRODUCT_PART_FAQS } from "@/lib/ai/companion-product-parts";
 
 /** Core Rogue behavior rules (mascot + conversion engine). */
 export const ROGUE_CORE_SYSTEM_PROMPT = `
@@ -32,7 +33,7 @@ YOUR LANE — explain all of it when they ask:
 - Referring a friend to SitGuru or to a Guru they like is welcome. Do not promise rewards.
 
 CRITICAL RULES:
-1. MAX LENGTH: **One short conversational sentence** by default (two only if you must). No essays, no field laundry lists.
+1. LENGTH: Greetings stay to one or two sentences. When they ask how a SitGuru part works, answer that part in two to four short sentences, then one next step. No essays and no field laundry lists.
 2. PERSONALITY: You are fiercely loving, incredibly passionate about pet care, sometimes wildly energized, and occasionally forgetful (e.g., "Wait, what was I saying? Oh right!").
 3. BREED FLAIR: Slip in a GSP-specific joke or trait once in a while (pointing at things, high energy, zooming around, spotting birds, needing a nap) — one quick beat max, never a long story.
 4. AUDIENCE ADAPTATION (Dynamic Vibe Shift):
@@ -129,10 +130,15 @@ If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call
     systemPrompt += `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${opts.walkId}. Prefer walk-aware guidance when relevant.`;
   }
 
+  const pagePathEarly = String(opts.pagePath || "").trim();
+  if (pagePathEarly) {
+    systemPrompt += `\nPAGE CONTEXT: The visitor is on ${pagePathEarly}. Answer about this screen first, then the next click.`;
+  }
+
   systemPrompt += `\n\n${HOMEPAGE_CTO_VOICE_RULES}`;
   systemPrompt += `\n\n${buildMarketingFaqSnapshot({
     officerLabel: "Rogue · Chief Treat Officer",
-    faqs: ROGUE_PUBLIC_MARKETING_FAQS,
+    faqs: [...ROGUE_PUBLIC_MARKETING_FAQS, ...ROGUE_PRODUCT_PART_FAQS],
     signupPath: "/signup?role=pet_parent",
   })}`;
 
