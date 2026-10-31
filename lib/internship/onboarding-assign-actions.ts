@@ -279,11 +279,18 @@ export async function escalateInternToSuperAdmin(formData: FormData) {
   redirect("/manager/team?ok=" + encodeURIComponent("Escalation sent to Super Admin."));
 }
 
+function ryanReturnPath(formData: FormData) {
+  const value = text(formData, "returnTo");
+  if (value === "/admin/hr" || value === "/admin/internship/interns") return value;
+  return "/admin/internship/interns";
+}
+
 export async function saveRyanManiboCandidate(formData: FormData) {
+  const dest = ryanReturnPath(formData);
   const actor = await requireSuperAdmin();
-  if (!actor) bounce("/admin/internship/interns", "error", "Only a Super Admin can create an internship record.");
+  if (!actor) bounce(dest, "error", "Only a Super Admin can create an internship record.");
   const email = text(formData, "email").toLowerCase();
-  if (!email.includes("@")) bounce("/admin/internship/interns", "error", "Enter Ryan Manibo's verified contact email. No invitation will be sent.");
+  if (!email.includes("@")) bounce(dest, "error", "Enter Ryan Manibo's verified contact email. No invitation will be sent.");
   const { data: cohort } = await supabaseAdmin
     .from("internship_cohorts")
     .select("id")
@@ -296,7 +303,7 @@ export async function saveRyanManiboCandidate(formData: FormData) {
     .eq("name", "Penn State University")
     .limit(1)
     .maybeSingle();
-  if (!cohort?.id || !university?.id) bounce("/admin/internship/interns", "error", "Spring 2027 or Penn State was not found.");
+  if (!cohort?.id || !university?.id) bounce(dest, "error", "Spring 2027 or Penn State was not found.");
   const { data: existing } = await supabaseAdmin
     .from("internship_interns")
     .select("id")
@@ -304,14 +311,14 @@ export async function saveRyanManiboCandidate(formData: FormData) {
     .ilike("email", email)
     .limit(1)
     .maybeSingle();
-  if (existing?.id) bounce("/admin/internship/interns", "ok", "Ryan already has a Spring 2027 record for that email. No invitation was sent.");
+  if (existing?.id) bounce(dest, "ok", "Ryan already has a Spring 2027 record for that email. No invitation was sent.");
   const { data: staff } = await supabaseAdmin
     .from("profiles")
     .select("id,email")
     .in("email", ["ava@sitguru.com", "jason@sitguru.com"]);
   const managerId = (staff || []).find((row) => String(row.email).toLowerCase() === "ava@sitguru.com")?.id;
   const supervisorId = (staff || []).find((row) => String(row.email).toLowerCase() === "jason@sitguru.com")?.id;
-  if (!managerId || !supervisorId) bounce("/admin/internship/interns", "error", "Ava or Jason could not be resolved from a staff account.");
+  if (!managerId || !supervisorId) bounce(dest, "error", "Ava or Jason could not be resolved from a staff account.");
   const { error } = await supabaseAdmin.from("internship_interns").insert({
     full_name: "Ryan Manibo",
     email,
@@ -352,6 +359,8 @@ export async function saveRyanManiboCandidate(formData: FormData) {
     day_to_day_manager_name: "Ava Venezia",
     site_supervisor_name: "Jason Graff",
   });
-  if (error) bounce("/admin/internship/interns", "error", error.message);
-  bounce("/admin/internship/interns", "ok", "Ryan Manibo was saved as pending. The portal stays off and no invitation was sent.");
+  if (error) bounce(dest, "error", error.message);
+  revalidatePath("/admin/hr");
+  revalidatePath("/admin/internship/interns");
+  bounce(dest, "ok", "Ryan Manibo was saved as pending. The portal stays off and no invitation was sent.");
 }

@@ -10,6 +10,11 @@ import {
 } from "@/lib/internship/manager-access";
 import { listInterns } from "@/lib/internship/queries";
 import { listSelectableInternshipStaff } from "@/lib/internship/staff";
+import {
+  excludeFromInternPortalList,
+  internPortalActionLabel,
+  mergeStaffOnce,
+} from "@/lib/internship/team-roster";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function text(value: unknown) {
@@ -104,8 +109,20 @@ export default async function AdminPortalDirectory() {
     growthPeople(),
   ]);
   const visibleInterns = interns
-    .filter((intern) => !intern.isTest)
+    .filter((intern) => !excludeFromInternPortalList(intern))
     .sort((a, b) => (a.preferredName || a.fullName).localeCompare(b.preferredName || b.fullName));
+  const staff = mergeStaffOnce(
+    managers.map((manager) => ({
+      id: manager.id,
+      name: manager.name || manager.email,
+      email: manager.email,
+    })),
+    people.map((person) => ({
+      id: person.userId,
+      name: person.name,
+      email: person.email,
+    })),
+  );
 
   return (
     <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm">
@@ -114,7 +131,7 @@ export default async function AdminPortalDirectory() {
       </p>
       <h2 className="mt-1 text-xl font-black text-slate-950">Portals and manager desks</h2>
       <p className="mt-1 text-sm font-semibold text-slate-600">
-        Open every intern portal, every manager&apos;s intern desk, and each Growth Manager&apos;s time and onboarding. Preview stays read-only.
+        Each staff login is listed once. Pending intern records open as a preview, which does not mean the portal is active.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -129,64 +146,61 @@ export default async function AdminPortalDirectory() {
         </Link>
       </div>
 
-      <h3 className="mt-5 text-sm font-black text-slate-950">Manager desks</h3>
+      <h3 className="mt-5 text-sm font-black text-slate-950">Staff</h3>
+      <p className="mt-1 text-sm font-semibold text-slate-600">Each person is listed once.</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        {managers.length ? managers.map((manager) => (
-          <Link
-            key={manager.id}
-            href={`/intern/manage?manager=${encodeURIComponent(manager.id)}`}
-            className="rounded-2xl border border-emerald-100 bg-[#FAF6EE] px-4 py-3"
-          >
-            <p className="font-black text-slate-950">{manager.name || manager.email}</p>
-            <p className="text-sm font-semibold text-emerald-900">Open this desk</p>
-          </Link>
-        )) : (
-          <p className="text-sm font-semibold text-slate-600">No eligible intern managers yet.</p>
-        )}
-      </div>
-
-      <h3 className="mt-5 text-sm font-black text-slate-950">Growth managers</h3>
-      <div className="mt-2 grid gap-2">
-        {people.length ? people.map((person) => (
-          <article key={person.userId} className="rounded-2xl border border-emerald-100 px-4 py-3">
-            <p className="font-black text-slate-950">{person.name}</p>
+        {staff.length ? staff.map((person) => (
+          <article key={person.id} className="rounded-2xl border border-emerald-100 px-4 py-3">
+            <p className="font-black text-slate-950">{person.name || person.email}</p>
             <p className="text-sm font-semibold text-slate-600">{person.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Link href={`/admin/growth/onboarding?user=${encodeURIComponent(person.userId)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
-                Onboarding
-              </Link>
-              <Link href={`/admin/growth/time?user=${encodeURIComponent(person.userId)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
-                Time
-              </Link>
-              <Link href={`/intern/manage?manager=${encodeURIComponent(person.userId)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
-                Intern desk
-              </Link>
+              {person.managerDesk ? (
+                <Link href={`/intern/manage?manager=${encodeURIComponent(person.id)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
+                  Intern desk
+                </Link>
+              ) : null}
+              {person.growthAccess ? (
+                <>
+                  <Link href={`/admin/growth/onboarding?user=${encodeURIComponent(person.id)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
+                    Onboarding
+                  </Link>
+                  <Link href={`/admin/growth/time?user=${encodeURIComponent(person.id)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
+                    Time
+                  </Link>
+                </>
+              ) : null}
             </div>
           </article>
         )) : (
-          <p className="text-sm font-semibold text-slate-600">No active Growth Manager login yet.</p>
+          <p className="text-sm font-semibold text-slate-600">No eligible staff logins yet.</p>
         )}
       </div>
 
-      <h3 className="mt-5 text-sm font-black text-slate-950">Intern portals</h3>
+      <h3 className="mt-5 text-sm font-black text-slate-950">Intern workspaces</h3>
+      <p className="mt-1 text-sm font-semibold text-slate-600">A preview does not mean the portal is active. Pending records stay off the active desk.</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        {visibleInterns.length ? visibleInterns.map((intern) => (
+        {visibleInterns.length ? visibleInterns.map((intern) => {
+          const active = internPortalActionLabel(intern) === "Open Active Portal";
+          return (
           <article key={intern.id} className="rounded-2xl border border-emerald-100 px-4 py-3">
             <p className="font-black text-slate-950">
               <InternName name={intern.preferredName || intern.fullName} src={intern.avatarUrl} />
             </p>
             <p className="text-sm font-semibold text-slate-600">{intern.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Link href={internPortalPreviewPath(intern.id)} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white">
-                Portal
+              <Link href={internPortalPreviewPath(intern.id)} className={active
+                ? "inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black !text-white"
+                : "inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950"}>
+                {internPortalActionLabel(intern)}
               </Link>
               <Link href={`/intern/time?view=${encodeURIComponent(intern.id)}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-3 text-sm font-black text-emerald-950">
-                Time
+                View Hours
               </Link>
             </div>
           </article>
-        )) : (
-          <p className="text-sm font-semibold text-slate-600">No intern records yet.</p>
+          );
+        }) : (
+          <p className="text-sm font-semibold text-slate-600">No intern records to preview.</p>
         )}
       </div>
     </section>

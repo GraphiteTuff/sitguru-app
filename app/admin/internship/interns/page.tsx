@@ -21,6 +21,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipRequirementChecker from "@/components/internship/InternshipRequirementChecker";
 import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
+import { excludeFromInternPortalList, internPortalActionLabel } from "@/lib/internship/team-roster";
 
 export const dynamic = "force-dynamic";
 
@@ -124,21 +125,33 @@ export default async function InternshipInternsPage({
 
       <section className="grid gap-4 xl:grid-cols-12">
         <div className="space-y-2 xl:col-span-5">
-          {interns.map((intern) => (
+          {interns.map((intern) => {
+            const legacySeat = excludeFromInternPortalList(intern);
+            const portalLabel = legacySeat ? "Preview Intern Workspace" : internPortalActionLabel(intern);
+            const activePortal = portalLabel === "Open Active Portal";
+            return (
             <div key={intern.id} className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm">
               <InternAvatar name={intern.fullName} email={intern.email} src={intern.avatarUrl} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="font-black text-slate-950">{intern.fullName}</p>
                 <p className="text-xs font-semibold text-slate-500">
-                  {[intern.email, lifecycleLabel(intern.status)].filter(Boolean).join(" · ")}
+                  {[intern.email, legacySeat ? "Legacy test record" : lifecycleLabel(intern.status)].filter(Boolean).join(" · ")}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link href={internPortalPreviewPath(intern.id)} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">Intern portal</Link>
+                  <Link
+                    href={internPortalPreviewPath(intern.id)}
+                    className={activePortal
+                      ? "inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+                      : "inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"}
+                  >
+                    {portalLabel}
+                  </Link>
                   <Link href={`/admin/internship/interns/${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Employer review</Link>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="space-y-4 xl:col-span-7">

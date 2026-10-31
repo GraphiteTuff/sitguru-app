@@ -54,7 +54,7 @@ export default async function InternshipInternDetailPage({
       <Link href="/admin/internship/interns" className="text-xs font-black text-emerald-800">
         Interns
       </Link>
-      <div className="flex items-start gap-4">
+      <div id="profile" className="flex scroll-mt-24 items-start gap-4">
         <InternAvatar
           name={workspace.intern.fullName}
           email={workspace.intern.email}
@@ -103,7 +103,7 @@ export default async function InternshipInternDetailPage({
         </div>
       </div>
 
-      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+      <section id="onboarding" className="scroll-mt-24 rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">Onboarding & confidentiality</h2>
         <p className="mt-1 text-sm font-semibold text-slate-500">
           Portal tools stay locked until onboarding status is fully executed: access

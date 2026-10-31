@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { saveInternshipAssignment } from "@/lib/internship/assignment-actions";
+import { portalEnabledForInternStatus } from "@/lib/internship/onboarding-authority";
 import { lifecycleLabel, universityApprovalLabel } from "@/lib/internship/assignment";
 import InternshipStaffPicker, { type StaffChoice } from "@/components/internship/InternshipStaffPicker";
 
@@ -61,6 +63,15 @@ export default function AdminInternTeam({
   const [managerId, setManagerId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [university, setUniversity] = useState("");
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    const match = hash.match(/^#(plan|approval|intern)-(.+)$/);
+    if (!match) return;
+    const details = document.getElementById(`assignment-${match[2]}`);
+    if (details instanceof HTMLDetailsElement) details.open = true;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, []);
 
   const universities = useMemo(
     () => [...new Set(interns.map((intern) => intern.university).filter(Boolean))].sort(),
@@ -148,13 +159,18 @@ export default function AdminInternTeam({
 
       <div className="grid gap-3">
         {visible.map((intern) => (
-          <article key={intern.id} className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm">
+          <article key={intern.id} id={`intern-${intern.id}`} className="scroll-mt-24 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h2 className="text-xl font-black text-slate-950">{intern.name}</h2>
                 <p className="text-sm font-semibold text-slate-600">{intern.email}</p>
               </div>
-              <p className="text-sm font-black text-emerald-900">{lifecycleLabel(intern.internshipStatus)}</p>
+              <div className="text-right">
+                <p className="text-sm font-black text-emerald-900">{lifecycleLabel(intern.internshipStatus)}</p>
+                {isFounderPersonalMarketplaceEmail(intern.email) ? (
+                  <p className="mt-1 max-w-xs text-xs font-semibold text-amber-800">Legacy test record. Not a Spring 2027 intern.</p>
+                ) : null}
+              </div>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-sm lg:grid-cols-4">
               {[
@@ -183,13 +199,17 @@ export default function AdminInternTeam({
             </dl>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href={`/admin/internship/interns/${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">View intern</Link>
-              <Link href={`/intern?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Intern portal</Link>
+              <Link href={`/intern?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">
+                {isFounderPersonalMarketplaceEmail(intern.email) || !portalEnabledForInternStatus(intern.internshipStatus)
+                  ? "Preview Intern Workspace"
+                  : "Open Active Portal"}
+              </Link>
               <Link href={`/intern/time?view=${intern.id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Time</Link>
               {intern.managerUserId ? (
-                <Link href={`/intern/manage?manager=${intern.managerUserId}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Manager's Desk</Link>
+                <Link href={`/intern/manage?manager=${intern.managerUserId}`} className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">Manager desk</Link>
               ) : null}
             </div>
-            <details className="mt-3">
+            <details id={`assignment-${intern.id}`} className="mt-3">
               <summary className="min-h-11 cursor-pointer text-sm font-black text-emerald-900">Update assignment</summary>
               <form action={saveInternshipAssignment} className="mt-3 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="internId" value={intern.id} />
@@ -230,7 +250,7 @@ export default function AdminInternTeam({
                     ))}
                   </select>
                 </label>
-                <label className="text-sm font-semibold">University approval
+                <label id={`approval-${intern.id}`} className="scroll-mt-24 text-sm font-semibold">University approval
                   <select name="universityApproval" defaultValue={intern.universityStatus || "pending"} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base">
                     {["pending", "approved", "needs_information", "declined", "not_required"].map((item) => (
                       <option key={item} value={item}>{universityApprovalLabel(item)}</option>
@@ -243,7 +263,7 @@ export default function AdminInternTeam({
                 <label className="text-sm font-semibold">Academic year
                   <input name="academicYear" defaultValue={intern.academicYear} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
                 </label>
-                <label className="text-sm font-semibold">Credits
+                <label id={`plan-${intern.id}`} className="scroll-mt-24 text-sm font-semibold">Credits
                   <input name="credits" defaultValue={intern.credits} className="mt-1 min-h-12 w-full rounded-xl border px-3 text-base" />
                 </label>
                 <label className="text-sm font-semibold">Required hours

@@ -37,7 +37,8 @@ import { countCareerJobs } from "@/lib/careers/jobs";
 import { getActiveCohort, listCohortMilestones } from "@/lib/internship/queries";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
-import AdminPortalDirectory from "@/components/admin/AdminPortalDirectory";
+import TeamInternshipManagement from "@/components/admin/hr/TeamInternshipManagement";
+import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
 
 export const dynamic = "force-dynamic";
 
@@ -271,8 +272,15 @@ function LeadTable({
   );
 }
 
-export default async function AdminHrPage() {
+export default async function AdminHrPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await getAdminIdentity();
+  const params = searchParams ? await searchParams : {};
+  const notice = Array.isArray(params.ok) ? params.ok[0] : params.ok || "";
+  const noticeError = Array.isArray(params.error) ? params.error[0] : params.error || "";
 
   if (!actor?.canAccessAdmin) {
     return (
@@ -481,73 +489,11 @@ export default async function AdminHrPage() {
 
       <AdminWorkplaceActions actions={actions} />
 
-      <section className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <GrowthCard className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-            Contractor seat
-          </p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">
-            Social Media & Community Growth Manager
-          </h2>
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-            This login opens the Growth Workspace and the assigned intern desk.
-            It does not open HR, financials, bookings, Pet Parents, the user
-            directory, or settings.
-          </p>
-          <div className="mt-4 grid gap-2">
-            {[
-              ["/admin/hr/growth-hire", "Create or update this login"],
-              ["/admin/growth", "Open the Growth Workspace"],
-              ["/admin/growth/onboarding", "Onboarding checklist"],
-              ["/admin/growth/messages", "Growth messages"],
-              ["/intern/manage", "Open the assigned intern desk"],
-            ].map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className="inline-flex min-h-11 items-center rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-black text-slate-900 hover:border-emerald-200 hover:bg-emerald-50"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </GrowthCard>
-        <GrowthCard className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-            No Admin login
-          </p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">Interns</h2>
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-            Interns work in the Intern Portal. You manage records, assignment,
-            and formal approval here. Their manager only sees interns assigned
-            to them.
-          </p>
-          <div className="mt-4 grid gap-2">
-            {[
-              ["/admin/hr/team-access", "Assign internship manager"],
-              ["/admin/hr/staff-requests", "Staff Access Requests"],
-              ["/admin/hr/access-requests", "Internship access details"],
-              ["/admin/internship/interns", "Intern records and invites"],
-              ["/admin/internship/staff", "Who can manage or supervise"],
-              ["/admin/hr/microsoft", "Microsoft 365 connection"],
-              ["/admin/hr/onboarding", "People and onboarding"],
-              ["/admin/messages/moderation", "Message reports"],
-              ["/admin/internship", "Internship program"],
-              ["/intern", "Intern Portal"],
-            ].map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className="inline-flex min-h-11 items-center rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-black text-slate-900 hover:border-emerald-200 hover:bg-emerald-50"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </GrowthCard>
-      </section>
-
-      <AdminPortalDirectory />
+      <TeamInternshipManagement
+        canAdminister={canAdministerInternshipOnboarding(actor)}
+        notice={notice}
+        noticeError={noticeError}
+      />
 
       {internshipMilestones.length ? (
         <GrowthCard className="min-w-0">
