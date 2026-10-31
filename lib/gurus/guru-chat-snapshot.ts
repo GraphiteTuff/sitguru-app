@@ -846,6 +846,7 @@ function extractPlacePhrase(text: string): string {
   const nearHits: string[] = [];
   for (const match of text.matchAll(nearRe)) {
     const cleaned = cleanPlaceCapture(match[1] || "");
+    if (/^near\s+me$/i.test(String(match[0] || "").trim())) continue;
     if (!isUsablePlacePhrase(cleaned)) continue;
     const parsed = splitCityState(cleaned);
     const city = scrubCityNoise(parsed.city);
@@ -1010,6 +1011,9 @@ export function inferLookupParamsFromChat(
     ].filter(Boolean);
 
     for (const only of candidates) {
+      if (/^me$/i.test(only) && !/\bME\b/.test(text) && !/\bmaine\b/i.test(text)) {
+        continue;
+      }
       if (lookupCityNickname(only) && STATE_ABBR_CITY_NICKNAMES.has(stateAliasKey(only))) {
         const nick = lookupCityNickname(only);
         if (nick) {

@@ -37,6 +37,7 @@ export type CommunityEventCompanionContext = {
 /** Guest + planner chips shown in Delilah's chat dock. */
 export const COMMUNITY_EVENT_FAQ_CHIPS = [
   { label: "What's on?", question: "What pet events are coming up?" },
+  { label: "Near me", question: "What upcoming pet events are near me?" },
   { label: "Host an event", question: "How do Pet Event Planners and Managers publish Partner Events on SitGuru?" },
   { label: "Manage event", question: "How do I edit and manage a Partner Event after it is published?" },
   { label: "Track RSVPs", question: "How do I track Yes Maybe No attendance on my event?" },

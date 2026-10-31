@@ -46,7 +46,7 @@ const ACTIVE_COMPANION = "delilah" as const;
 const DELILAH_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
 const GREETING =
-  "Hi! I'm Delilah — your cheerful Pet Event Coordinator! I can share live upcoming event details around Bucks & Montgomery Counties and walk Planners & Managers through setup, management, and RSVP tracking. Tap a chip or ask me anything!";
+  "Hi! I'm Delilah — your cheerful Pet Event Coordinator! Tell me your city and state and I'll recommend upcoming Pet Events near you. I can also help you RSVP or host. Tap a chip or ask me anything!";
 
 const CHIPS = [
   {

@@ -510,6 +510,7 @@ export async function POST(req: Request) {
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
     if (officer === "delilah") {
+      const mentionedPlace = inferLookupParamsFromChat(careThread);
       const focus = {
         slug:
           asString(body?.community_event_slug) ||
@@ -517,8 +518,8 @@ export async function POST(req: Request) {
           undefined,
         eventId: asString(body?.community_event_id) || undefined,
         title: asString(body?.community_event_title) || undefined,
-        city: asString(body?.community_event_city) || undefined,
-        state: asString(body?.community_event_state) || undefined,
+        city: asString(body?.community_event_city) || mentionedPlace?.city || undefined,
+        state: asString(body?.community_event_state) || mentionedPlace?.state || undefined,
       };
       const faqLayer = buildCommunityEventsFaqSnapshot(focus);
       const live = await compileDelilahEventsSnapshot({

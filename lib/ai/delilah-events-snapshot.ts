@@ -112,11 +112,37 @@ export async function compileDelilahEventsSnapshot(
     }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
   ]);
 
-  const upcoming = mergeUniqueCommunityEvents(
+  let nearbyScope: "city" | "state" | "all" = opts.city ? "city" : opts.state ? "state" : "all";
+  let upcoming = mergeUniqueCommunityEvents(
     partnerEvents,
     discovered.events || [],
     limit,
   );
+
+  if (!upcoming.length && opts.city && opts.state) {
+    const [statePartners, stateDiscovered] = await Promise.all([
+      fetchPublicEvents({
+        limit: Math.max(limit, 40),
+        state: opts.state,
+      }).catch(() => [] as CommunityEventWithPartner[]),
+      fetchDiscoveredHomepageEvents({
+        limit: Math.max(Math.floor(limit / 2), 12),
+        state: opts.state,
+        homepageEligibleOnly: true,
+      }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
+    ]);
+    upcoming = mergeUniqueCommunityEvents(
+      statePartners,
+      stateDiscovered.events || [],
+      limit,
+    );
+    nearbyScope = upcoming.length ? "state" : "city";
+  }
+
+  upcoming = [...upcoming].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  );
+  if (nearbyScope === "all") upcoming = upcoming.slice(0, 6);
 
   let focusEvent: CommunityEventWithPartner | null = null;
   const focusSlug = opts.focus?.slug?.trim();
@@ -128,10 +154,17 @@ export async function compileDelilahEventsSnapshot(
 
   const lines: string[] = [
     "# LIVE CURRENT & UPCOMING PET EVENTS (authoritative listing digest)",
-    `_Generated for Delilah. Quote these details when guests ask what's on / what's near them / details for a named event. Never invent venues, times, or prices outside this digest + FAQ._`,
-    `- Focus city filter: ${opts.city || "any"}`,
-    `- Focus state filter: ${opts.state || "any"}`,
+    `_Generated for Delilah. Recommend these when guests ask what's on or what's near them. Never invent venues, times, or prices outside this digest + FAQ._`,
+    `- Guest city: ${opts.city || "not given yet"}`,
+    `- Guest state: ${opts.state || "not given yet"}`,
+    `- Match scope: ${nearbyScope === "city" ? "this city" : nearbyScope === "state" ? "same state, because this city has no listing yet" : "upcoming SitGuru events"}`,
     `- Upcoming listed: ${upcoming.length}`,
+    "",
+    "RECOMMEND:",
+    opts.city || opts.state
+      ? "- Name 1–3 events from this digest that fit their area. Invite them to RSVP Yes / Maybe / No and bring a pet. If the city has none, say so and offer same-state events or hosting."
+      : "- They have not named a city yet. Ask for city and state, then recommend. You may mention that SitGuru Pet Events are local.",
+    "- If this digest is empty, encourage them to host a Partner Event at /events/host and browse /events. Do not invent a listing.",
     "",
     "RULES:",
     "- Partner Events always lead; discoveries fill gaps.",
@@ -170,8 +203,13 @@ export async function compileDelilahEventsSnapshot(
     }
   }
 
-  lines.push("");
-  lines.push(buildCuratedBucksMontgomeryEventsMarkdown());
+  const guestState = (opts.state || "").toUpperCase();
+  const showBucksMontgomery =
+    !guestState || guestState === "PA" || guestState === "PENNSYLVANIA";
+  if (showBucksMontgomery) {
+    lines.push("");
+    lines.push(buildCuratedBucksMontgomeryEventsMarkdown());
+  }
 
   return {
     markdownContext: lines.join("\n").trim(),
