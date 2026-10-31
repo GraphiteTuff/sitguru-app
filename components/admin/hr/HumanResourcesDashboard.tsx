@@ -15,16 +15,44 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import WorkforceDirectory, { type DirectoryPerson } from "@/components/admin/hr/WorkforceDirectory";
+import WorkforceDirectory, { PersonPhoto, type DirectoryPerson } from "@/components/admin/hr/WorkforceDirectory";
 import { getHrDashboardData } from "@/lib/admin/hr/dashboard";
 import { staffAccessPath } from "@/lib/admin/hr/staff-access";
 import { listGrowthHires } from "@/lib/admin/growth/hire";
 import { listInterns } from "@/lib/internship/queries";
+import { INTERNSHIP_ASSETS_BUCKET } from "@/lib/internship/portal";
 import { excludeFromInternPortalList, rosterStatusLabel } from "@/lib/internship/team-roster";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function uploadedAvatar(source: Record<string, unknown> | null | undefined) {
+  if (!source) return "";
+  return resolvePetParentAvatarUrl({
+    profile_photo_url: text(source.profile_photo_url) || text(source.ambassador_photo_url),
+    photo_url: text(source.photo_url),
+    image_url: text(source.image_url),
+    avatar_url: text(source.avatar_url),
+    picture: text(source.picture) || text(source.picture_url),
+  });
+}
+
+function internAssetUrl(path: string) {
+  const clean = path.trim();
+  if (!clean) return "";
+  if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("/")) return clean;
+  const { data } = supabaseAdmin.storage.from(INTERNSHIP_ASSETS_BUCKET).getPublicUrl(clean);
+  return data.publicUrl || "";
+}
+
+function rememberPhoto(byEmail: Map<string, string>, byUser: Map<string, string>, email: string, userId: string, url: string) {
+  if (!url) return;
+  const normalized = email.toLowerCase();
+  if (normalized.includes("@") && !byEmail.has(normalized)) byEmail.set(normalized, url);
+  if (userId && !byUser.has(userId)) byUser.set(userId, url);
 }
 
 function countOf(result: { count: number | null; error: { message?: string } | null }) {
@@ -142,7 +170,7 @@ export default async function HumanResourcesDashboard({
     supabaseAdmin.from("internship_assignment_events").select("id,summary,created_at").order("created_at", { ascending: false }).limit(8),
     supabaseAdmin.from("admin_audit_logs").select("id,action,created_at,area").eq("area", "hr").order("created_at", { ascending: false }).limit(8),
     supabaseAdmin.from("internship_universities").select("id,name"),
-    supabaseAdmin.from("partners").select("id,business_name,contact_name,city,status").neq("status", "archived").order("created_at", { ascending: false }).limit(12),
+    supabaseAdmin.from("partners").select("id,business_name,contact_name,city,status,email,owner_user_id").neq("status", "archived").order("created_at", { ascending: false }).limit(12),
     supabaseAdmin.from("partners").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabaseAdmin.from("ambassadors").select("id", { count: "exact", head: true }),
     supabaseAdmin.from("ambassadors").select("id", { count: "exact", head: true }).ilike("training_status", "completed"),
@@ -155,23 +183,69 @@ export default async function HumanResourcesDashboard({
 
   const activeHires = hires.filter((hire) => hire.status === "active" && hire.userId);
   const hireIds = activeHires.map((hire) => hire.userId);
-  const [{ data: profiles }, { data: ambassadorTraining }] = await Promise.all([
-    hireIds.length
-      ? supabaseAdmin.from("profiles").select("id,full_name,avatar_url,profile_photo_url").in("id", hireIds)
-      : Promise.resolve({ data: [] as { id: string; full_name?: string | null; avatar_url?: string | null; profile_photo_url?: string | null }[] }),
+  const visibleInterns = interns.filter((intern) => !excludeFromInternPortalList(intern));
+  const photoEmails = [...new Set(
+    [
+      ...activeHires.map((hire) => hire.email),
+      ...visibleInterns.flatMap((intern) => [intern.email, intern.studentEmail]),
+      ...hr.recentGuruApplicants.map((person) => person.email),
+      ...hr.recentAmbassadorLeads.map((person) => person.email),
+      ...(partners.data || []).map((partner) => text(partner.email)),
+    ]
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => email.includes("@")),
+  )].slice(0, 200);
+  const photoUserIds = [...new Set(
+    [
+      ...hireIds,
+      ...visibleInterns.map((intern) => intern.userId || ""),
+      ...hr.recentGuruApplicants.map((person) => text(person.raw.user_id)),
+      ...hr.recentAmbassadorLeads.map((person) => text(person.raw.user_id)),
+      ...(partners.data || []).map((partner) => text(partner.owner_user_id)),
+    ].filter(Boolean),
+  )].slice(0, 200);
+  const [{ data: profilesById }, { data: profilesByEmail }, { data: guruPhotos }, { data: ambassadorPhotos }, { data: ambassadorTraining }] = await Promise.all([
+    photoUserIds.length
+      ? supabaseAdmin.from("profiles").select("id,email,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("id", photoUserIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    photoEmails.length
+      ? supabaseAdmin.from("profiles").select("id,email,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("email", photoEmails)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    photoEmails.length
+      ? supabaseAdmin.from("gurus").select("email,user_id,profile_photo_url,photo_url,avatar_url,image_url").in("email", photoEmails)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    photoEmails.length
+      ? supabaseAdmin.from("ambassadors").select("email,user_id,ambassador_photo_url,ambassador_photo_path").in("email", photoEmails)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     activeHires.length
       ? supabaseAdmin.from("ambassadors").select("email,training_status,training_percent").in("email", activeHires.map((hire) => hire.email))
       : Promise.resolve({ data: [] as { email?: string | null; training_status?: string | null; training_percent?: number | null }[] }),
   ]);
-
-  const profileById = new Map((profiles || []).map((row) => [text(row.id), row]));
+  const photoByEmail = new Map<string, string>();
+  const photoByUser = new Map<string, string>();
+  for (const row of [...(guruPhotos || []), ...(ambassadorPhotos || [])]) {
+    const record = row as Record<string, unknown>;
+    rememberPhoto(photoByEmail, photoByUser, text(record.email), text(record.user_id), uploadedAvatar(record));
+  }
+  for (const row of [...(profilesById || []), ...(profilesByEmail || [])]) {
+    const record = row as Record<string, unknown>;
+    rememberPhoto(photoByEmail, photoByUser, text(record.email), text(record.id), uploadedAvatar(record));
+  }
+  const profileById = new Map((profilesById || []).map((row) => [text((row as Record<string, unknown>).id), row as Record<string, unknown>]));
   const trainingByEmail = new Map((ambassadorTraining || []).map((row) => [text(row.email).toLowerCase(), row]));
   const ava = activeHires.find((hire) => hire.email.toLowerCase() === "ava@sitguru.com") || activeHires[0] || null;
   const avaProfile = ava ? profileById.get(ava.userId) : undefined;
   const avaName = text(avaProfile?.full_name) || (ava ? "Ava Venezia" : "No manager login");
-  const avaAvatar = text(avaProfile?.avatar_url) || text(avaProfile?.profile_photo_url);
+  const avaAvatar = ava
+    ? photoByUser.get(ava.userId) || photoByEmail.get(ava.email.toLowerCase()) || uploadedAvatar(avaProfile)
+    : "";
   const school = new Map((universities.data || []).map((row) => [text(row.id), text(row.name)]));
-  const visibleInterns = interns.filter((intern) => !excludeFromInternPortalList(intern));
+
+  function avatarFor(input: { userId?: string | null; email?: string | null; raw?: Record<string, unknown> | null; fallback?: string }) {
+    const userId = text(input.userId);
+    const email = text(input.email).toLowerCase();
+    return photoByUser.get(userId) || (email.includes("@") ? photoByEmail.get(email) : "") || uploadedAvatar(input.raw) || input.fallback || "";
+  }
   const readinessById = new Map((readiness.data || []).map((row) => [text(row.id), text(row.microsoft_readiness)]));
   const mailboxByUser = new Map(
     (mailboxes.data || [])
@@ -235,7 +309,7 @@ export default async function HumanResourcesDashboard({
       return {
         id: hire.userId,
         name: text(profile?.full_name) || (hire.email.toLowerCase() === "ava@sitguru.com" ? "Ava Venezia" : hire.email),
-        avatarUrl: text(profile?.avatar_url) || text(profile?.profile_photo_url),
+        avatarUrl: avatarFor({ userId: hire.userId, email: hire.email, raw: profile }),
         group: "staff" as const,
         groupLabel: "Staff",
         role: "Manager",
@@ -251,7 +325,11 @@ export default async function HumanResourcesDashboard({
     ...visibleInterns.map((intern) => ({
       id: intern.id,
       name: intern.preferredName || intern.fullName,
-      avatarUrl: intern.avatarUrl || "",
+      avatarUrl: avatarFor({
+        userId: intern.userId,
+        email: intern.email || intern.studentEmail,
+        fallback: intern.avatarUrl || internAssetUrl(intern.avatarStoragePath || ""),
+      }),
       group: "intern" as const,
       groupLabel: "Interns",
       role: "Intern",
@@ -266,6 +344,7 @@ export default async function HumanResourcesDashboard({
     ...hr.recentGuruApplicants.map((person) => ({
       id: person.id,
       name: person.name,
+      avatarUrl: avatarFor({ userId: text(person.raw.user_id), email: person.email, raw: person.raw }),
       group: "guru" as const,
       groupLabel: "Gurus",
       role: "Guru",
@@ -280,6 +359,7 @@ export default async function HumanResourcesDashboard({
     ...hr.recentAmbassadorLeads.map((person) => ({
       id: person.id,
       name: person.name,
+      avatarUrl: avatarFor({ userId: text(person.raw.user_id), email: person.email, raw: person.raw }),
       group: "ambassador" as const,
       groupLabel: "Ambassadors",
       role: "Ambassador",
@@ -294,6 +374,7 @@ export default async function HumanResourcesDashboard({
     ...(partners.error ? [] : partners.data || []).map((partner) => ({
       id: text(partner.id),
       name: text(partner.business_name) || text(partner.contact_name) || "Community partner",
+      avatarUrl: avatarFor({ userId: text(partner.owner_user_id), email: text(partner.email) }),
       group: "partner" as const,
       groupLabel: "Community Partners",
       role: "Community Partner",
@@ -396,15 +477,7 @@ export default async function HumanResourcesDashboard({
           {ava ? (
             <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-                  {avaAvatar ? (
-                    <img src={avaAvatar} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center bg-emerald-50 text-base font-black text-[#0D5C3A]">
-                      {avaName.split(" ").slice(0, 2).map((part) => part.charAt(0)).join("")}
-                    </span>
-                  )}
-                </span>
+                <PersonPhoto name={avaName} avatarUrl={avaAvatar} size="lg" />
                 <div className="min-w-0">
                   <p className="truncate text-lg font-black text-slate-950">{avaName}</p>
                   <p className="text-sm font-semibold text-slate-600">Social Media & Community Growth Manager</p>

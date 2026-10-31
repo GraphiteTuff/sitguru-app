@@ -51,18 +51,38 @@ function microsoftTone(value: string) {
   return "bg-slate-100 text-slate-600";
 }
 
-function Avatar({ person }: { person: DirectoryPerson }) {
+export function PersonPhoto({
+  name,
+  avatarUrl,
+  size = "sm",
+}: {
+  name: string;
+  avatarUrl?: string;
+  size?: "sm" | "lg";
+}) {
+  const [failed, setFailed] = useState(false);
+  const photo = avatarUrl && !failed ? avatarUrl : "";
+  const box = size === "lg" ? "h-14 w-14 text-base" : "h-9 w-9 text-[10px]";
   return (
-    <span className="relative inline-flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-      {person.avatarUrl ? (
-        <img src={person.avatarUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+    <span className={`relative inline-flex shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-slate-200 ${box}`}>
+      {photo ? (
+        <img
+          src={photo}
+          alt=""
+          className="absolute inset-0 h-full w-full bg-white object-cover object-center"
+          onError={() => setFailed(true)}
+        />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-emerald-50 text-[10px] font-black text-[#0D5C3A]">
-          {initials(person.name)}
+        <span className="flex h-full w-full items-center justify-center bg-emerald-50 font-black text-[#0D5C3A]">
+          {initials(name)}
         </span>
       )}
     </span>
   );
+}
+
+function Avatar({ person }: { person: DirectoryPerson }) {
+  return <PersonPhoto name={person.name} avatarUrl={person.avatarUrl} />;
 }
 
 export default function WorkforceDirectory({
@@ -125,9 +145,9 @@ export default function WorkforceDirectory({
           className="min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900"
         />
       </label>
-      <div className="mt-3 hidden overflow-x-auto md:block">
+      <div key={`table-${tab}-${query}`} className="mt-3 hidden max-h-[32rem] overflow-auto md:block">
         <table className="w-full min-w-[920px] text-left text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-white">
             <tr className="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
               <th className="pb-2 pr-3">Name</th>
               <th className="pb-2 pr-3">Role / Group</th>
@@ -166,7 +186,7 @@ export default function WorkforceDirectory({
           </tbody>
         </table>
       </div>
-      <div className="mt-3 grid gap-2 md:hidden">
+      <div key={`cards-${tab}-${query}`} className="mt-3 grid max-h-[32rem] gap-2 overflow-y-auto md:hidden">
         {visible.map((person) => (
           <Link key={`${person.group}-${person.id}`} href={person.href} className="rounded-2xl border border-slate-100 p-3">
             <span className="flex items-center gap-3">
