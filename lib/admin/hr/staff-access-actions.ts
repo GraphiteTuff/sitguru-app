@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { GROWTH_HIRE_ROLE, GROWTH_HIRE_TITLE } from "@/lib/admin/growth/hire";
 import { getPublicSiteUrl } from "@/lib/admin/growth/constants";
+import { buildManagerLoginInstructions } from "@/lib/admin/hr/manager-login-mail";
 import { staffAccessPath } from "@/lib/admin/hr/staff-access";
+import { sendSitGuruEmail } from "@/lib/email/resend";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function field(formData: FormData, key: string) {
@@ -166,6 +168,63 @@ export async function setStaffInternEligibility(formData: FormData) {
     enable
       ? "Intern management eligibility is on. This is Assigned Intern Preview only — not a student intern login."
       : "Intern management eligibility is off.",
+  );
+}
+
+export async function emailStaffLoginInstructions(formData: FormData) {
+  const actor = await requireStaffAdmin();
+  if (!actor) {
+    bounce(field(formData, "userId") || "unknown", "error", "Only a Super Admin can email login instructions.");
+  }
+
+  const userId = field(formData, "userId");
+  if (!userId) bounce(userId || "unknown", "error", "Missing staff account.");
+
+  const { data: authLookup, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const authUser = authLookup?.user;
+  const email = String(authUser?.email || "").trim().toLowerCase();
+  if (authError || !authUser || !email.includes("@")) {
+    bounce(userId, "error", "This staff member does not have a SitGuru login yet.");
+  }
+
+  const site = getPublicSiteUrl();
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${site}/reset-password` },
+  });
+  const setPasswordUrl = linkData?.properties?.action_link || "";
+  if (linkError || !setPasswordUrl) {
+    bounce(userId, "error", linkError?.message || "SitGuru could not create a set-password link.");
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const mail = buildManagerLoginInstructions({
+    fullName: String(profile?.full_name || authUser.user_metadata?.full_name || "there"),
+    email,
+    setPasswordUrl,
+    loginUrl: `${site}/login?mode=email&next=${encodeURIComponent("/manager")}`,
+    portalUrl: `${site}/manager`,
+  });
+
+  await sendSitGuruEmail({
+    to: email,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+    replyTo: "jason@sitguru.com",
+  });
+
+  await writeAudit(actor, "emailed manager portal login instructions", userId, { email });
+  revalidatePath(staffAccessPath(userId));
+  bounce(
+    userId,
+    "ok",
+    `Login instructions were emailed to ${email}. The existing password was not changed.`,
   );
 }
 

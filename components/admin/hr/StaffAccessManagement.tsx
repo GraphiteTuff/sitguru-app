@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
+  emailStaffLoginInstructions,
   resendStaffRegistrationInvite,
   setStaffInternEligibility,
   setStaffManagerPortalAccess,
@@ -271,6 +272,12 @@ export default function StaffAccessManagement({
                   {staff.canManageInterns
                     ? "Turn off Intern Preview eligibility"
                     : "Enable Intern Preview eligibility"}
+                </button>
+              </form>
+              <form action={emailStaffLoginInstructions}>
+                <input type="hidden" name="userId" value={staff.userId} />
+                <button type="submit" className={`${primary} w-full`}>
+                  Email login instructions
                 </button>
               </form>
               <form action={resendStaffRegistrationInvite}>
