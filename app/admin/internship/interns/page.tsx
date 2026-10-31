@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { saveIntern } from "@/lib/internship/actions";
 import { inviteInternshipManager } from "@/lib/internship/assignment-actions";
+import { saveRyanManiboCandidate } from "@/lib/internship/onboarding-assign-actions";
 import AdminInternTeam, { type AdminInternCard } from "@/components/internship/AdminInternTeam";
 import { internPortalPreviewPath, ACADEMIC_LEVELS } from "@/lib/internship/constants";
 import { focusedInternshipWeek, lifecycleLabel } from "@/lib/internship/assignment";
@@ -150,12 +151,20 @@ export default async function InternshipInternsPage({
           <input name="name" required placeholder="Manager first and last name" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
           <input name="email" type="email" required placeholder="Manager work email" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold" />
           <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800">
-            <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+            <input type="checkbox" name="invite" className="h-5 w-5" />
             Email the manager login
           </label>
           <button className="min-h-12 w-full rounded-2xl border border-emerald-200 text-sm font-black text-emerald-950">
             Add manager
           </button>
+        </form>
+        <form action={saveRyanManiboCandidate} className="space-y-3 rounded-[1.5rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
+          <h2 className="font-black text-slate-950">Ryan Manibo</h2>
+          <p className="text-sm font-semibold text-slate-700">
+            Lola Uhl and Lalita Dhital are already pending Spring 2027 records. Ryan still needs a verified contact email. Saving him does not send an invitation or open the portal. Planned plan: 3 credits, 150 hours, 10 hours a week, 15 weeks, university confirmation pending.
+          </p>
+          <input name="email" type="email" required placeholder="Ryan's verified contact email" className="min-h-12 w-full rounded-xl border border-amber-200 bg-white px-3 text-base font-semibold" />
+          <button className="min-h-12 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">Save Ryan as pending</button>
         </form>
         <form action={saveIntern} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
           <h2 className="font-black text-slate-950">Create internship</h2>
@@ -216,7 +225,8 @@ export default async function InternshipInternsPage({
             <option value="not_required">University approval: not required</option>
           </select>
           <select name="status" defaultValue="pending_university_approval" className="min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base font-semibold">
-            <option value="candidate">Candidate</option>
+            <option value="prospective">Prospective candidate</option>
+          <option value="candidate">Candidate</option>
             <option value="pending_university_approval">Pending university approval</option>
             <option value="approved">Approved</option>
             <option value="onboarding">Onboarding</option>
@@ -224,7 +234,7 @@ export default async function InternshipInternsPage({
           </select>
           <textarea name="notes" rows={2} placeholder="University notes" className="w-full rounded-xl border border-emerald-100 px-3 py-3 text-base font-semibold" />
           <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800">
-            <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+            <input type="checkbox" name="invite" className="h-5 w-5" />
             Email this intern a SitGuru login
           </label>
           <button disabled={!cohort} className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white disabled:opacity-50">

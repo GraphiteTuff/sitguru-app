@@ -98,7 +98,7 @@ export async function grantGrowthHireAccess(input: {
 
   if (!found.userId && input.invite) {
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${getPublicSiteUrl()}/admin/growth`,
+      redirectTo: `${getPublicSiteUrl()}/manager`,
         data: {
           full_name: input.name || GROWTH_HIRE_TITLE,
           role: GROWTH_HIRE_ROLE,

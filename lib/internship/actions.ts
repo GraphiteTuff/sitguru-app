@@ -20,6 +20,8 @@ import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
 import { getPublicSiteUrl } from "@/lib/admin/growth/constants";
 import { findDuplicateAssignment } from "@/lib/internship/assignment";
 import { assignmentStaffChangeAllowed, canSelectInternshipManager, canSelectInternshipSupervisor } from "@/lib/internship/staff-eligibility";
+import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
+import { portalEnabledForInternStatus } from "@/lib/internship/onboarding-authority";
 import { loadInternshipStaffGate } from "@/lib/internship/staff";
 import { CAPSTONE_WEEK_PLAN } from "@/lib/internship/final-project";
 import {
@@ -263,7 +265,10 @@ export async function saveUniversityContact(formData: FormData) {
 }
 
 export async function saveIntern(formData: FormData) {
-  await requireInternshipAdmin();
+  const actor = await getAdminIdentity();
+  if (!actor || !canAdministerInternshipOnboarding(actor)) {
+    bounce("/admin/internship/interns", "error", "Only a Super Admin can create an internship record.");
+  }
   const cohortId = text(formData, "cohortId");
   const selectedUniversityId = text(formData, "universityId");
   const otherUniversityName = text(formData, "otherUniversityName");
@@ -353,7 +358,7 @@ export async function saveIntern(formData: FormData) {
     academic_start_date: internFields.academicStartDate,
     academic_end_date: internFields.academicEndDate,
     status: text(formData, "status") || "pending_university_approval",
-    portal_enabled: true,
+    portal_enabled: portalEnabledForInternStatus(text(formData, "status") || "pending_university_approval"),
     academic_snapshot: snapshot,
     notes: text(formData, "notes"),
     internship_title: text(formData, "internshipTitle") || "Social Media & Community Growth Intern",
@@ -424,7 +429,6 @@ export async function saveIntern(formData: FormData) {
   if (error) bounce("/admin/internship/interns", "error", error.message);
   const internId = String((data as { id?: string } | null)?.id || "");
   if (internId) {
-    const actor = await getAdminIdentity();
     await supabaseAdmin.from("internship_assignment_events").insert({
       intern_id: internId,
       new_manager_user_id: managerId || null,
@@ -442,7 +446,7 @@ export async function saveIntern(formData: FormData) {
       next_value: String(payload.status),
       reason: "Internship assignment created",
     });
-    if (managerId) {
+    if (managerId && portalEnabledForInternStatus(String(payload.status))) {
       await supabaseAdmin.from("internship_staff_notices").insert({
         recipient_user_id: managerId,
         intern_id: internId,
@@ -451,12 +455,13 @@ export async function saveIntern(formData: FormData) {
         body: `${fullName} is on your intern team. Status: ${String(payload.status).replaceAll("_", " ")}.`,
       });
     }
+    const portalOn = portalEnabledForInternStatus(String(payload.status));
     await supabaseAdmin.from("internship_access_grants").insert(
       [
-        ["intern_dashboard", true, "Internship Growth Dashboard"],
-        ["utm_builder", true, "UTM and referral tracking"],
-        ["experiment_log", true, "Experiment log"],
-        ["brand_kit", true, "SitGuru brand standards"],
+        ["intern_dashboard", portalOn, "Internship Growth Dashboard"],
+        ["utm_builder", portalOn, "UTM and referral tracking"],
+        ["experiment_log", portalOn, "Experiment log"],
+        ["brand_kit", portalOn, "SitGuru brand standards"],
         [
           "verified_metrics",
           false,

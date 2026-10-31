@@ -154,11 +154,12 @@ export async function activateInternHandoff(formData: FormData) {
   const intern = await findInternById(text(formData, "internId"));
   if (!intern) bounce(path, "error", "That internship was not found.");
   const onboarding = await getInternOnboarding(intern.id);
-  const university = String(intern.universityVerificationStatus || intern.approvalStatus || "").toLowerCase();
   const ready = activationReady({
     hasIdentity: Boolean(intern.fullName && (intern.email || intern.userId)),
-    internshipApproved: ["approved", "active", "accepted"].includes(intern.status) || university.includes("approv"),
-    universityVerified: ["approved", "verified", "confirmed"].some((token) => university.includes(token)),
+    internshipApproved: ["approved", "ceo_approved"].includes(String(intern.approvalStatus || "").toLowerCase()),
+    universityVerified: ["verified", "confirmed", "university_verified"].includes(
+      String(intern.universityVerificationStatus || "").toLowerCase(),
+    ),
     onboardingComplete: internOnboardingComplete(onboarding),
     managerUserId: intern.managerUserId,
     supervisorUserId: intern.supervisorUserId,
@@ -276,4 +277,81 @@ export async function escalateInternToSuperAdmin(formData: FormData) {
   }
   revalidatePath("/manager/team");
   redirect("/manager/team?ok=" + encodeURIComponent("Escalation sent to Super Admin."));
+}
+
+export async function saveRyanManiboCandidate(formData: FormData) {
+  const actor = await requireSuperAdmin();
+  if (!actor) bounce("/admin/internship/interns", "error", "Only a Super Admin can create an internship record.");
+  const email = text(formData, "email").toLowerCase();
+  if (!email.includes("@")) bounce("/admin/internship/interns", "error", "Enter Ryan Manibo's verified contact email. No invitation will be sent.");
+  const { data: cohort } = await supabaseAdmin
+    .from("internship_cohorts")
+    .select("id")
+    .eq("name", SPRING_2027_COHORT_NAME)
+    .limit(1)
+    .maybeSingle();
+  const { data: university } = await supabaseAdmin
+    .from("internship_universities")
+    .select("id")
+    .eq("name", "Penn State University")
+    .limit(1)
+    .maybeSingle();
+  if (!cohort?.id || !university?.id) bounce("/admin/internship/interns", "error", "Spring 2027 or Penn State was not found.");
+  const { data: existing } = await supabaseAdmin
+    .from("internship_interns")
+    .select("id")
+    .eq("cohort_id", cohort.id)
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) bounce("/admin/internship/interns", "ok", "Ryan already has a Spring 2027 record for that email. No invitation was sent.");
+  const { data: staff } = await supabaseAdmin
+    .from("profiles")
+    .select("id,email")
+    .in("email", ["ava@sitguru.com", "jason@sitguru.com"]);
+  const managerId = (staff || []).find((row) => String(row.email).toLowerCase() === "ava@sitguru.com")?.id;
+  const supervisorId = (staff || []).find((row) => String(row.email).toLowerCase() === "jason@sitguru.com")?.id;
+  if (!managerId || !supervisorId) bounce("/admin/internship/interns", "error", "Ava or Jason could not be resolved from a staff account.");
+  const { error } = await supabaseAdmin.from("internship_interns").insert({
+    full_name: "Ryan Manibo",
+    email,
+    student_email: "",
+    phone: "",
+    cohort_id: cohort.id,
+    university_id: university.id,
+    path_type: "credit_bearing",
+    academic_program: "Advertising & Public Relations",
+    course_code: "",
+    credits: null,
+    required_hours: null,
+    requested_credits: 3,
+    planned_total_hours: 150,
+    hours_per_credit: 50,
+    planned_weekly_hours: 10,
+    internship_weeks: 15,
+    faculty_supervisor: "",
+    academic_advisor: "",
+    career_office: "",
+    academic_coordinator: "",
+    approval_status: "pending",
+    semester: "Spring 2027",
+    status: "pending_university_approval",
+    portal_enabled: false,
+    academic_snapshot: {},
+    notes: "Planned 3 credits, 150 hours, 10 hours/week, 15 weeks. University confirmation is still pending.",
+    university_notes: "Planned 3 credits, 150 hours, 10 hours/week, 15 weeks. University confirmation is still pending.",
+    requirement_status: "pending",
+    university_verification_status: "pending",
+    offer_status: "pending",
+    work_email: "",
+    microsoft_readiness: "not_created",
+    manager_user_id: managerId,
+    supervisor_user_id: supervisorId,
+    internship_title: "Social Media & Community Growth Intern",
+    academic_year: "2026-2027",
+    day_to_day_manager_name: "Ava Venezia",
+    site_supervisor_name: "Jason Graff",
+  });
+  if (error) bounce("/admin/internship/interns", "error", error.message);
+  bounce("/admin/internship/interns", "ok", "Ryan Manibo was saved as pending. The portal stays off and no invitation was sent.");
 }

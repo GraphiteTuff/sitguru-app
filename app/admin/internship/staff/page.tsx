@@ -50,7 +50,7 @@ export default async function InternshipStaffEligibilityPage({
           <input name="email" type="email" required placeholder="name@sitguru.com" className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-base" />
         </label>
         <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800 sm:col-span-2">
-          <input type="checkbox" name="invite" defaultChecked className="h-5 w-5" />
+          <input type="checkbox" name="invite" className="h-5 w-5" />
           Email a Social Media & Community Growth Manager login
         </label>
         <button className="min-h-12 rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white sm:col-span-2">

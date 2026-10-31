@@ -6,6 +6,37 @@ export const SPRING_2027_SUPERVISOR_EMAIL = "jason@sitguru.com";
 
 const ACTIVE_HANDOFF_STATUSES = new Set(["active", "approved", "accepted"]);
 
+export function portalEnabledForInternStatus(status: string) {
+  return ACTIVE_HANDOFF_STATUSES.has(String(status || "").toLowerCase());
+}
+
+export function roundInternshipHours(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+export function planInternshipHours(input: {
+  requestedCredits: number | null;
+  hoursPerCredit: number | null;
+  plannedWeeks: number | null;
+  plannedTotalHours?: number | null;
+}) {
+  const fromCredits =
+    input.requestedCredits != null && input.hoursPerCredit != null
+      ? roundInternshipHours(input.requestedCredits * input.hoursPerCredit)
+      : null;
+  const plannedTotalHours = input.plannedTotalHours ?? fromCredits;
+  const plannedWeeklyHours =
+    plannedTotalHours != null && input.plannedWeeks
+      ? roundInternshipHours(plannedTotalHours / input.plannedWeeks)
+      : null;
+  return {
+    plannedTotalHours,
+    plannedWeeklyHours,
+    verifiedRequiredHours: null as number | null,
+    verificationStatus: "pending" as const,
+  };
+}
+
 export type ResolvedStaffSeat = {
   id: string;
   email: string;
