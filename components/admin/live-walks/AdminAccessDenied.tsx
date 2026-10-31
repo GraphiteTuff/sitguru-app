@@ -10,8 +10,7 @@ export default function AdminAccessDenied() {
           Access Denied
         </h1>
         <p className="text-sm font-semibold leading-6 text-slate-600">
-          Live Walks Monitor is restricted to authenticated SitGuru admins
-          (`profiles.role = admin`). Your session is missing admin privileges.
+          Live Walks is open to a SitGuru admin account. This sign-in does not have admin access.
         </p>
       </div>
       <a

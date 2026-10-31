@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
 import AdminAccessDenied from "@/components/admin/live-walks/AdminAccessDenied";
 import AdminLiveWalksDashboard from "@/components/admin/live-walks/AdminLiveWalksDashboard";
 
@@ -11,33 +10,11 @@ export const metadata = {
 };
 
 async function assertAdminAccess() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user?.id) {
-    return { ok: false as const, reason: "unauthenticated" };
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) {
+    return { ok: false as const, reason: actor ? "forbidden" : "unauthenticated" };
   }
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role, account_status")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = String(profile?.role || "")
-    .trim()
-    .toLowerCase();
-  const status = String(profile?.account_status || "active")
-    .trim()
-    .toLowerCase();
-
-  if (role !== "admin" || (status && status !== "active")) {
-    return { ok: false as const, reason: "forbidden" };
-  }
-
-  return { ok: true as const, userId: user.id };
+  return { ok: true as const, userId: actor.id };
 }
 
 export default async function AdminLiveWalksPage() {

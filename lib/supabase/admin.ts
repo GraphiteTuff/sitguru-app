@@ -8,6 +8,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 
 export function createSupabaseAdminClient(): SupabaseClient {
   if (typeof window !== "undefined") {
@@ -96,7 +97,8 @@ export async function requireAdminUser(request: Request) {
     throw new Error("Unable to verify admin profile.");
   }
 
-  if (profile.role !== "admin") {
+  const role = String(profile.role || "").trim().toLowerCase();
+  if (role !== "admin" && role !== "super_admin" && !isHardcodedSuperUserEmail(user.email)) {
     throw new Error("Admin access required.");
   }
 
