@@ -142,6 +142,10 @@ function seasonalScaleFor(width: number, height: number) {
 function applyClipAudio(player: VideoPlayer, audible: boolean) {
   player.muted = !audible;
   player.volume = audible ? 1 : 0;
+  player.allowsExternalPlayback = false;
+  player.showNowPlayingNotification = false;
+  player.staysActiveInBackground = false;
+  player.audioMixingMode = audible ? "auto" : "mixWithOthers";
 }
 
 function ActiveHeroClip({
@@ -167,9 +171,7 @@ function ActiveHeroClip({
 }) {
   const player = useVideoPlayer(source, (nextPlayer) => {
     nextPlayer.loop = false;
-    nextPlayer.staysActiveInBackground = false;
-    nextPlayer.showNowPlayingNotification = false;
-    applyClipAudio(nextPlayer, audible);
+    applyClipAudio(nextPlayer, false);
     nextPlayer.playbackRate = playbackRate;
     if (!paused) {
       nextPlayer.play();

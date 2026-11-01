@@ -604,9 +604,15 @@ function setHeroAudioSession(audible: boolean) {
   if (!session) return;
 
   try {
+    // Silent homepage video stays ambient so iPhone does not hand it to CarPlay.
     session.type = audible ? "playback" : "ambient";
   } catch {
     // Safari-only. Other browsers ignore this.
+  }
+
+  if (!audible && "mediaSession" in navigator) {
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = "none";
   }
 }
 
