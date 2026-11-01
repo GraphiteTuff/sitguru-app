@@ -97,8 +97,8 @@ function loadHeroVideoAssets() {
 
   return [
     {
-      source: require('../assets/videos/sitguru-howl-ween-homepage.mp4') as number,
-      poster: require('../assets/images/sitguru-howl-ween-homepage-poster.jpg') as ImageSourcePropType,
+      source: require('../assets/videos/sitguru-giving-thanks-homepage.mp4') as number,
+      poster: require('../assets/images/sitguru-giving-thanks-homepage-poster.jpg') as ImageSourcePropType,
     },
     {
       source: require('../assets/videos/sitguru-homepage-hero.mp4') as number,
@@ -116,7 +116,7 @@ function loadHeroVideoAssets() {
 }
 
 const sitGuruLogoDark =
-  require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
+  require('../assets/images/sitguru-thanksgiving-logo-dark.png') as ImageSourcePropType;
 
 const pawBackgroundAsset =
   require('../assets/images/paw-background-mark.png') as ImageSourcePropType;
