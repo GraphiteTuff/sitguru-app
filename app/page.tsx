@@ -31,7 +31,7 @@ type HeroVideo = {
   playbackRate: number;
   hasPromotionalAudio: boolean;
   objectPositionClassName: string;
-  /** Howl-ween fills a 16:9 stage so burned-in titles are not cropped or covered. */
+  /** Seasonal hero clips stay uncropped on all devices. */
   frameClassName?: string;
 };
 
@@ -41,9 +41,9 @@ const defaultHeroPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 
 const heroVideos: readonly HeroVideo[] = [
   {
-    src: "/videos/sitguru-howl-ween-homepage.mp4",
-    label: "SitGuru Howl-ween",
-    poster: "/images/sitguru-howl-ween-homepage-poster.jpg",
+    src: "/videos/sitguru-giving-thanks-homepage.mp4",
+    label: "SitGuru Giving Thanks",
+    poster: "/images/sitguru-giving-thanks-homepage-poster.jpg",
     playbackRate: 1,
     hasPromotionalAudio: true,
     objectPositionClassName: "object-center",
@@ -663,67 +663,6 @@ function heroPlayWasInterrupted(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-const HOWLWEEN_BAT_PATH =
-  "M50 30 L45 16 L36 12 L28 2 L24 12 L14 6 L6 0 L12 14 L2 16 L0 22 L14 22 L10 32 L22 26 L32 34 L42 42 L50 30 L58 42 L68 34 L78 26 L90 32 L86 22 L100 22 L98 16 L88 14 L94 0 L86 6 L76 12 L72 2 L64 12 L55 16 Z";
-
-const howlweenGutter = (amount: number) =>
-  `calc((100% - min(100%, 78vh * 16 / 9)) / 2 * ${amount})`;
-
-const HOWLWEEN_BATS: ReadonlyArray<{
-  top: string;
-  left?: string;
-  right?: string;
-  size: number;
-  rotate: number;
-  flip?: boolean;
-  opacity: number;
-}> = [
-  { top: "4%", left: howlweenGutter(0.08), size: 30, rotate: -22, opacity: 0.95 },
-  { top: "16%", left: howlweenGutter(0.34), size: 40, rotate: 12, flip: true, opacity: 0.9 },
-  { top: "31%", left: howlweenGutter(0.1), size: 24, rotate: -8, opacity: 0.78 },
-  { top: "43%", left: howlweenGutter(0.4), size: 34, rotate: 18, opacity: 0.92 },
-  { top: "56%", left: howlweenGutter(0.06), size: 44, rotate: -14, flip: true, opacity: 0.96 },
-  { top: "70%", left: howlweenGutter(0.32), size: 28, rotate: 26, opacity: 0.82 },
-  { top: "84%", left: howlweenGutter(0.12), size: 34, rotate: -18, flip: true, opacity: 0.9 },
-  { top: "5%", right: howlweenGutter(0.1), size: 38, rotate: 16, flip: true, opacity: 0.94 },
-  { top: "18%", right: howlweenGutter(0.36), size: 26, rotate: -20, opacity: 0.8 },
-  { top: "31%", right: howlweenGutter(0.08), size: 42, rotate: 8, opacity: 0.96 },
-  { top: "46%", right: howlweenGutter(0.38), size: 22, rotate: -24, flip: true, opacity: 0.74 },
-  { top: "58%", right: howlweenGutter(0.14), size: 40, rotate: 14, opacity: 0.9 },
-  { top: "73%", right: howlweenGutter(0.34), size: 30, rotate: -12, flip: true, opacity: 0.84 },
-  { top: "86%", right: howlweenGutter(0.08), size: 36, rotate: 20, opacity: 0.92 },
-];
-
-function HowlweenBatField({ visible }: { visible: boolean }) {
-  return (
-    <div
-      className={`pointer-events-none absolute inset-x-0 top-0 h-[min(78vh,56.25vw)] overflow-hidden text-white transition-opacity duration-1000 ease-in-out motion-reduce:transition-none ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-      aria-hidden="true"
-    >
-      {HOWLWEEN_BATS.map((bat, index) => (
-        <svg
-          key={index}
-          viewBox="0 0 100 48"
-          className="absolute"
-          style={{
-            top: bat.top,
-            left: bat.left,
-            right: bat.right,
-            width: bat.size,
-            height: bat.size * 0.48,
-            opacity: bat.opacity,
-            transform: `rotate(${bat.rotate}deg) scaleX(${bat.flip ? -1 : 1})`,
-          }}
-        >
-          <path fill="currentColor" d={HOWLWEEN_BAT_PATH} />
-        </svg>
-      ))}
-    </div>
-  );
-}
-
 function HeroSoundIcon({ audible }: { audible: boolean }) {
   return (
     <svg
@@ -779,7 +718,7 @@ function HeroVisual({
     activeVideo.hasPromotionalAudio && promotionalAudioEnabled;
   const videoMuted = !heroAudioAudible || soundOutputMuted;
 
-  function setHalloweenAudioEnabled(enabled: boolean) {
+  function setSeasonalAudioEnabled(enabled: boolean) {
     promotionalAudioEnabledRef.current = enabled;
     setPromotionalAudioEnabled(enabled);
   }
@@ -794,7 +733,7 @@ function HeroVisual({
     const unlockSound = (event: Event) => {
       if (started) return;
       const target = event.target;
-      if (target instanceof Element && target.closest('button[aria-label*="Halloween music"]')) return;
+      if (target instanceof Element && target.closest('button[aria-label*="Thanksgiving video sound"]')) return;
 
       const video = videoRef.current;
       const clip = activeVideoRef.current;
@@ -994,13 +933,13 @@ function HeroVisual({
     setIsVideoPaused(true);
   }
 
-  function toggleHalloweenAudio() {
+  function toggleSeasonalAudio() {
     const video = videoRef.current;
     if (!video || !activeVideo.hasPromotionalAudio) return;
 
     const hearingSound = !video.muted && video.volume > 0;
     const nextEnabled = !hearingSound;
-    setHalloweenAudioEnabled(nextEnabled);
+    setSeasonalAudioEnabled(nextEnabled);
     if (nextEnabled) setSoundOutputMuted(false);
     syncHeroPlayback(video, activeVideo, nextEnabled);
 
@@ -1097,14 +1036,14 @@ function HeroVisual({
         {activeVideo.hasPromotionalAudio ? (
           <button
             type="button"
-            onClick={toggleHalloweenAudio}
+            onClick={toggleSeasonalAudio}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25"
             aria-pressed={heroAudioAudible}
             aria-label={
-              heroAudioAudible ? "Mute Halloween music" : "Play Halloween music"
+              heroAudioAudible ? "Mute Thanksgiving video sound" : "Play Thanksgiving video sound"
             }
             title={
-              heroAudioAudible ? "Mute Halloween music" : "Play Halloween music"
+              heroAudioAudible ? "Mute Thanksgiving video sound" : "Play Thanksgiving video sound"
             }
           >
             <HeroSoundIcon audible={heroAudioAudible} />
@@ -2143,7 +2082,7 @@ export default function HomePage() {
   const [source, setSource] = useState("direct");
   const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
   const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
-  const howlweenStage = Boolean(
+  const seasonalStage = Boolean(
     heroVideos[activeHeroVideoIndex]?.hasPromotionalAudio,
   );
   const heroSectionRef = useRef<HTMLElement | null>(null);
@@ -2250,7 +2189,7 @@ export default function HomePage() {
       window.clearTimeout(timeout);
       clearStyles();
     };
-  }, [howlweenStage]);
+  }, [seasonalStage]);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
   const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
@@ -2505,16 +2444,15 @@ export default function HomePage() {
       <section
         ref={heroSectionRef}
         className={
-          howlweenStage
+          seasonalStage
             ? "relative overflow-hidden bg-slate-950"
             : "relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]"
         }
       >
-        <HowlweenBatField visible={howlweenStage} />
         <div
           ref={heroStageRef}
           className={
-            howlweenStage
+            seasonalStage
               ? "relative z-10 mx-auto aspect-video w-full max-w-[calc(78vh*16/9)] bg-black"
               : "absolute inset-0"
           }
@@ -2528,14 +2466,14 @@ export default function HomePage() {
         <div
           ref={heroCopyRef}
           className={
-            howlweenStage
+            seasonalStage
               ? "relative z-10 mx-auto flex w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
               : "relative z-10 mx-auto flex min-h-[920px] max-w-7xl px-4 sm:min-h-[860px] sm:px-6 md:min-h-[790px] lg:min-h-[690px] lg:items-center lg:px-8 lg:py-12"
           }
         >
           <div
             className={
-              howlweenStage
+              seasonalStage
                 ? "flex w-full max-w-3xl flex-col"
                 : "flex w-full max-w-3xl flex-col self-stretch pb-8 pt-12 sm:pb-10 sm:pt-14 md:pb-12 md:pt-16 lg:block lg:self-auto lg:py-0"
             }
@@ -2570,7 +2508,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className={howlweenStage ? "pt-6" : "mt-auto pt-24 sm:pt-28 md:pt-20 lg:mt-8 lg:pt-0"}>
+            <div className={seasonalStage ? "pt-6" : "mt-auto pt-24 sm:pt-28 md:pt-20 lg:mt-8 lg:pt-0"}>
               <div className="max-w-3xl">
                 <SearchPanel
                   searchForm={searchForm}
