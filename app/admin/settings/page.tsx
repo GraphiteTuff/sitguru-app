@@ -1043,6 +1043,14 @@ function getSystemCheckClass(value: boolean) {
     : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
+function savedAreaLabels(areas: string[] | null) {
+  if (!areas?.length) return [];
+  const selected = new Set(areas);
+  return PORTAL_AREA_OPTIONS.filter((area) => selected.has(area.key)).map(
+    (area) => area.label,
+  );
+}
+
 function Pill({
   children,
   className,
@@ -1358,6 +1366,14 @@ function UserAccessCard({
               >
                 {user.canAccessFinancials ? "Finance Access" : "No Finance"}
               </Pill>
+              {savedAreaLabels(user.portalAreas).map((label) => (
+                <Pill
+                  key={label}
+                  className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                >
+                  {label}
+                </Pill>
+              ))}
             </div>
             <p className="mt-2 text-xs font-semibold text-slate-500">
               Confirmed: {formatDate(user.confirmedAt)}
@@ -1430,10 +1446,26 @@ function UserAccessCard({
             <p className="mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
               Admin areas
             </p>
-            <p className="mb-3 text-xs font-semibold leading-5 text-slate-500">
-              Turn areas on for this account. Financials stay closed until that
-              switch is on.
+            <p className="mb-2 text-xs font-semibold leading-5 text-slate-500">
+              Green pills are what is saved. The switches are the next save.
+              Financials stay closed until that switch is on.
             </p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {savedAreaLabels(user.portalAreas).length ? (
+                savedAreaLabels(user.portalAreas).map((label) => (
+                  <Pill
+                    key={`saved-${label}`}
+                    className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                  >
+                    {label}
+                  </Pill>
+                ))
+              ) : (
+                <Pill className="border-slate-200 bg-slate-50 text-slate-600">
+                  Nothing saved yet
+                </Pill>
+              )}
+            </div>
             <PortalAreaForm user={user} />
           </div>
         ) : null}
