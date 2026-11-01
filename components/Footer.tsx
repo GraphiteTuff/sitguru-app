@@ -181,7 +181,7 @@ export default function Footer() {
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div className="max-w-xl">
               <SiteLogo
-                variant="halloween"
+                variant="thanksgiving"
                 wrapperClassName="w-[190px] sm:w-[210px] lg:w-[230px]"
               />
 
