@@ -696,7 +696,7 @@ function HeroVisual({
   onVideoTransitionChange: (isTransitioning: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const promotionalAudioEnabledRef = useRef(true);
+  const promotionalAudioEnabledRef = useRef(false);
   const userPausedRef = useRef(false);
   const holdForReducedMotionRef = useRef(true);
   const failedVideoSrcsRef = useRef<Set<string>>(new Set());
@@ -704,7 +704,7 @@ function HeroVisual({
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [readyVideoSrc, setReadyVideoSrc] = useState<string | null>(null);
-  const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(true);
+  const [promotionalAudioEnabled, setPromotionalAudioEnabled] = useState(false);
   const [soundOutputMuted, setSoundOutputMuted] = useState(false);
   const [handoffStill, setHandoffStill] = useState<string | null>(null);
   const [handoffFrameClassName, setHandoffFrameClassName] = useState<string | undefined>();
@@ -962,6 +962,12 @@ function HeroVisual({
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-slate-950">
+      <link
+        rel="preload"
+        as="video"
+        href={heroVideos[0].src}
+        type="video/mp4"
+      />
       <img
         key={activeVideo.poster}
         src={activeVideo.poster}
@@ -975,7 +981,9 @@ function HeroVisual({
       <video
         key={activeVideo.src}
         ref={videoRef}
-        className={`absolute transition-opacity duration-1000 ease-in-out ${
+        className={`absolute ${
+          activeVideo.hasPromotionalAudio ? "" : "transition-opacity duration-700 ease-in-out"
+        } ${
           activeVideo.frameClassName ??
           `inset-0 h-full w-full object-cover ${activeVideo.objectPositionClassName}`
         } ${videoFrameReady ? "opacity-100" : "opacity-0"}`}
@@ -987,7 +995,13 @@ function HeroVisual({
         disablePictureInPicture
         preload="auto"
         aria-hidden="true"
-        onLoadedData={() => setReadyVideoSrc(activeVideo.src)}
+        onLoadedData={(event) => {
+          setReadyVideoSrc(activeVideo.src);
+          if (userPausedRef.current) return;
+          if (prefersReducedMotion() && holdForReducedMotionRef.current) return;
+          if (!event.currentTarget.paused) return;
+          void event.currentTarget.play().catch(() => undefined);
+        }}
         onPlaying={() => setReadyVideoSrc(activeVideo.src)}
         onCanPlay={(event) => {
           event.currentTarget.playbackRate = activeVideo.playbackRate;

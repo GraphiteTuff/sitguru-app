@@ -256,7 +256,7 @@ function RotatingHeroVideo({
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [paused, setPaused] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
 
   const clip = clips[activeIndex] ?? clips[0];
