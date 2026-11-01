@@ -1,0 +1,33 @@
+name: Verify Thanksgiving media assets
+on:
+  pull_request:
+    branches: [sitguru-main]
+    paths:
+      - "app/page.tsx"
+      - "components/Header.tsx"
+      - "components/Footer.tsx"
+      - "components/SiteLogo.tsx"
+      - "components/SitGuruDarkLogo.tsx"
+      - "sitguru-mobile/src/app/index.tsx"
+      - "sitguru-mobile/src/components/home-hero-clips.ts"
+      - "sitguru-mobile/src/components/HomeHeroMedia.tsx"
+      - "public/images/sitguru-thanksgiving-*"
+      - "public/images/sitguru-giving-thanks-*"
+      - "public/videos/sitguru-giving-thanks-*"
+      - "sitguru-mobile/src/assets/images/sitguru-thanksgiving-*"
+      - "sitguru-mobile/src/assets/images/sitguru-giving-thanks-*"
+      - "sitguru-mobile/src/assets/videos/sitguru-giving-thanks-*"
+      - "scripts/verify-thanksgiving-assets.mjs"
+      - ".github/workflows/verify-thanksgiving-assets.yml"
+  workflow_dispatch:
+
+jobs:
+  seasonal-media:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify required Thanksgiving media paths and formats
+        run: node scripts/verify-thanksgiving-assets.mjs
