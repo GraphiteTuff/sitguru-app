@@ -70,6 +70,7 @@ const PORTAL_AREA_PREFIXES: Record<AdminNavModule, readonly string[]> = {
     "/admin/commissions",
     "/admin/payouts",
     "/admin/tax",
+    "/admin/exports",
   ],
   analytics_admin: [
     "/admin/analytics",
@@ -77,7 +78,6 @@ const PORTAL_AREA_PREFIXES: Record<AdminNavModule, readonly string[]> = {
     "/admin/settings",
     "/admin/audit-trail",
     "/admin/security",
-    "/admin/exports",
   ],
 };
 

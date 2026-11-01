@@ -471,13 +471,15 @@ export default async function AdminProgramsHubPage() {
             >
               Gurus
             </Link>
-            <Link
-              href={routes.exports}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
-            >
-              <Download size={13} className="mr-1 inline" />
-              Export
-            </Link>
+            {actor.canAccessFinancials ? (
+              <Link
+                href={routes.exports}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+              >
+                <Download size={13} className="mr-1 inline" />
+                Export
+              </Link>
+            ) : null}
           </div>
         </div>
         <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">

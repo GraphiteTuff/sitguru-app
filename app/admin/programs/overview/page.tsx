@@ -1839,13 +1839,15 @@ export default async function AdminProgramsOverviewPage() {
               Review Applications
             </Link>
 
-            <Link
-              href={adminRoutes.programsExport}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <Download size={17} />
-              Export CSV
-            </Link>
+            {actor.canAccessFinancials ? (
+              <Link
+                href={adminRoutes.programsExport}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+              >
+                <Download size={17} />
+                Export CSV
+              </Link>
+            ) : null}
 
             <Link
               href={adminRoutes.partners}

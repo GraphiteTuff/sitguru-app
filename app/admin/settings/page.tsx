@@ -1261,12 +1261,14 @@ function UserAccessCard({
   canManageUsers,
   canResetPasswords,
   allowSuperUserRoles,
+  showFinance,
 }: {
   user: UserAccessRow;
   roles: RoleRow[];
   canManageUsers: boolean;
   canResetPasswords: boolean;
   allowSuperUserRoles: boolean;
+  showFinance: boolean;
 }) {
   return (
     <article className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -1357,16 +1359,20 @@ function UserAccessCard({
               >
                 {user.canAccessAdmin ? "Admin Access" : "No Admin"}
               </Pill>
-              <Pill
-                className={
-                  user.canAccessFinancials
-                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 bg-slate-50 text-slate-600"
-                }
-              >
-                {user.canAccessFinancials ? "Finance Access" : "No Finance"}
-              </Pill>
-              {savedAreaLabels(user.portalAreas).map((label) => (
+              {showFinance ? (
+                <Pill
+                  className={
+                    user.canAccessFinancials
+                      ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                      : "border-slate-200 bg-slate-50 text-slate-600"
+                  }
+                >
+                  {user.canAccessFinancials ? "Finance Access" : "No Finance"}
+                </Pill>
+              ) : null}
+              {savedAreaLabels(user.portalAreas)
+                .filter((label) => showFinance || label !== "Financials")
+                .map((label) => (
                 <Pill
                   key={label}
                   className="border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -1480,12 +1486,14 @@ function UserAccessTable({
   canManageUsers,
   canResetPasswords,
   allowSuperUserRoles,
+  showFinance,
 }: {
   users: UserAccessRow[];
   roles: RoleRow[];
   canManageUsers: boolean;
   canResetPasswords: boolean;
   allowSuperUserRoles: boolean;
+  showFinance: boolean;
 }) {
   if (!users.length) {
     return (
@@ -1505,6 +1513,7 @@ function UserAccessTable({
           canManageUsers={canManageUsers}
           canResetPasswords={canResetPasswords}
           allowSuperUserRoles={allowSuperUserRoles}
+          showFinance={showFinance}
         />
       ))}
     </div>
@@ -2142,11 +2151,13 @@ export default async function AdminSettingsPage({
               value={settingsData.totals.admins.toLocaleString()}
               detail="Users with Admin or department access."
             />
-            <StatCard
-              label="Finance Access"
-              value={settingsData.totals.finance.toLocaleString()}
-              detail="Users who can access financial Admin pages."
-            />
+            {actor.canAccessFinancials ? (
+              <StatCard
+                label="Finance Access"
+                value={settingsData.totals.finance.toLocaleString()}
+                detail="Users who can access financial Admin pages."
+              />
+            ) : null}
             <StatCard
               label="Tech Support"
               value={settingsData.totals.techSupport.toLocaleString()}
@@ -2176,16 +2187,20 @@ export default async function AdminSettingsPage({
             title="Audit Trail"
             description="Review Admin actions, role changes, password support actions, and financial updates."
           />
-          <SettingsCard
-            href="/admin/financials/exports"
-            title="Export Center"
-            description="CPA packages, statement downloads, and finance export history."
-          />
-          <SettingsCard
-            href="/admin/financials"
-            title="Financial Access"
-            description="Review Financial Overview, P&L, Balance Sheet, Cash Flow, Pro Forma, and reconciliation."
-          />
+          {actor.canAccessFinancials ? (
+            <SettingsCard
+              href="/admin/financials/exports"
+              title="Export Center"
+              description="CPA packages, statement downloads, and finance export history."
+            />
+          ) : null}
+          {actor.canAccessFinancials ? (
+            <SettingsCard
+              href="/admin/financials"
+              title="Financial Access"
+              description="Review Financial Overview, P&L, Balance Sheet, Cash Flow, Pro Forma, and reconciliation."
+            />
+          ) : null}
         </section>
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -2283,7 +2298,9 @@ export default async function AdminSettingsPage({
                 <option value="all">All users</option>
                 <option value="unconfirmed">Unconfirmed</option>
                 <option value="admin">Admin access</option>
-                <option value="finance">Finance access</option>
+                {actor.canAccessFinancials ? (
+                  <option value="finance">Finance access</option>
+                ) : null}
                 <option value="super">Super users</option>
                 <option value="growth">Social & Marketing</option>
               </select>
@@ -2311,6 +2328,7 @@ export default async function AdminSettingsPage({
               canManageUsers={actor.canManageUsers}
               canResetPasswords={actor.canResetPasswords}
               allowSuperUserRoles={actor.isSuperUser}
+              showFinance={actor.canAccessFinancials}
             />
           </div>
         </section>

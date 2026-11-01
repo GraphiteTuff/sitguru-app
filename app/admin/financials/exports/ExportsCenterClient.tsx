@@ -155,7 +155,6 @@ type DeliveryOption = {
 
 const SITGURU_COMPANY = "SitGuru";
 const SITGURU_EMAIL = "billing@sitguru.com";
-const SITGURU_PHONE = "(855) 474-8738";
 const SITGURU_WEBSITE = "www.SitGuru.com";
 const SITGURU_ADDRESS = "1036 Mariwill Dr. Quakertown, PA 18951";
 const SITGURU_LOGO_SRC = "/images/sitguru-logo-cropped.png";
@@ -954,7 +953,7 @@ function InvoicePreview() {
             <br />
             {SITGURU_ADDRESS}
             <br />
-            {SITGURU_PHONE} · {SITGURU_EMAIL}
+            {SITGURU_EMAIL}
             <br />
             {SITGURU_WEBSITE}
           </p>
@@ -1008,7 +1007,7 @@ function PurchaseOrderPreview() {
             <br />
             {SITGURU_ADDRESS}
             <br />
-            {SITGURU_PHONE} · {SITGURU_EMAIL}
+            {SITGURU_EMAIL}
             <br />
             {SITGURU_WEBSITE}
           </p>

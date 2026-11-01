@@ -1191,9 +1191,14 @@ export default async function AdminAnalyticsOverviewPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {adminLinks.map((link) => (
-                <ActionLink key={link.href} href={link.href} label={link.label} primary={link.primary} />
-              ))}
+              {adminLinks
+                .filter(
+                  (link) =>
+                    actor.canAccessFinancials || link.href !== "/admin/financials",
+                )
+                .map((link) => (
+                  <ActionLink key={link.href} href={link.href} label={link.label} primary={link.primary} />
+                ))}
             </div>
           </div>
 
@@ -1234,15 +1239,23 @@ export default async function AdminAnalyticsOverviewPage() {
             icon={<DollarSign className="h-5 w-5" />}
             label="Total Revenue"
             value={money(analytics.totals.totalRevenue)}
-            detail="Gross booking amount plus captured tax across marketplace bookings."
-            href="/admin/financials"
+            detail={
+              actor.canAccessFinancials
+                ? "Gross booking amount plus captured tax across marketplace bookings."
+                : "Gross booking amount across marketplace bookings."
+            }
+            href={actor.canAccessFinancials ? "/admin/financials" : "/admin/bookings"}
           />
           <StatCard
             icon={<TrendingUp className="h-5 w-5" />}
             label="Platform Revenue"
             value={money(analytics.totals.platformRevenue)}
             detail={`${percent(analytics.totals.takeRate)} current estimated SitGuru take rate.`}
-            href="/admin/financials/profit-loss"
+            href={
+              actor.canAccessFinancials
+                ? "/admin/financials/profit-loss"
+                : "/admin/bookings"
+            }
           />
           <StatCard
             icon={<CalendarCheck className="h-5 w-5" />}
@@ -1256,7 +1269,7 @@ export default async function AdminAnalyticsOverviewPage() {
             label="Guru Payout Exposure"
             value={money(analytics.totals.guruPayouts)}
             detail="Estimated Guru payout exposure from booking records."
-            href="/admin/financials/payouts"
+            href={actor.canAccessFinancials ? "/admin/financials/payouts" : "/admin/gurus"}
           />
         </div>
 
@@ -1423,7 +1436,9 @@ export default async function AdminAnalyticsOverviewPage() {
             actions={
               <>
                 <ActionLink href="/admin/referrals" label="Growth & Referrals" />
-                <ActionLink href="/admin/financials" label="Financials" primary />
+                {actor.canAccessFinancials ? (
+                  <ActionLink href="/admin/financials" label="Financials" primary />
+                ) : null}
               </>
             }
           >
@@ -1449,7 +1464,11 @@ export default async function AdminAnalyticsOverviewPage() {
             eyebrow="Growth Strategy"
             title="Channel return by bookings and revenue"
             description="Use channel ROI to decide whether to scale, refine, pause, or improve conversion."
-            actions={<ActionLink href="/admin/financials/pro-forma" label="Forecasting" />}
+            actions={
+              actor.canAccessFinancials ? (
+                <ActionLink href="/admin/financials/pro-forma" label="Forecasting" />
+              ) : undefined
+            }
           >
             <div className="space-y-5">
               {analytics.growthChannelMix.length ? (
@@ -1533,7 +1552,11 @@ export default async function AdminAnalyticsOverviewPage() {
             eyebrow="Markets"
             title="Revenue by location"
             description="See which cities and states are showing the strongest marketplace traction."
-            actions={<ActionLink href="/admin/exports" label="Export" />}
+            actions={
+              actor.canAccessFinancials ? (
+                <ActionLink href="/admin/exports" label="Export" />
+              ) : undefined
+            }
           >
             <div className="space-y-5">
               {analytics.marketRevenue.length ? (
@@ -1552,7 +1575,11 @@ export default async function AdminAnalyticsOverviewPage() {
             eyebrow="Event Sources"
             title="Where tracked behavior is coming from"
             description="This uses source values from analytics_events, including direct, social, referral, and campaign links."
-            actions={<ActionLink href="/admin/exports" label="Export" />}
+            actions={
+              actor.canAccessFinancials ? (
+                <ActionLink href="/admin/exports" label="Export" />
+              ) : undefined
+            }
           >
             <div className="space-y-5">
               {analytics.eventSourceMix.length ? (
@@ -1605,7 +1632,11 @@ export default async function AdminAnalyticsOverviewPage() {
             eyebrow="Trend"
             title="Bookings by month"
             description="Simple month grouping based on booking, start, request, or created date."
-            actions={<ActionLink href="/admin/exports" label="Export" />}
+            actions={
+              actor.canAccessFinancials ? (
+                <ActionLink href="/admin/exports" label="Export" />
+              ) : undefined
+            }
           >
             <div className="space-y-5">
               {analytics.monthlyBookings.length ? (
