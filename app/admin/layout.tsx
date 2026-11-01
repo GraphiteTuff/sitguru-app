@@ -676,7 +676,7 @@ function MobileNav({
               </p>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {section.items.map((item) => {
+                {section.items.filter((item) => allow(item.href)).map((item) => {
                   const Icon = item.icon;
                   const active = isActivePath(pathname, item.href);
 
@@ -724,7 +724,15 @@ function MobileNav({
   );
 }
 
-function AdminFooter() {
+function AdminFooter({
+  modules,
+  limitNav,
+}: {
+  modules: AdminNavAccess | null;
+  limitNav: boolean;
+}) {
+  const showLink = (href: string) =>
+    !limitNav || !modules || href === "/" || isAdminPathAllowedForModules(href, modules);
   const footerSections = [
     {
       title: "Operations",
@@ -810,7 +818,17 @@ function AdminFooter() {
         { label: "Settings", href: adminRoutes.settings },
       ],
     },
-  ];
+  ]
+    .map((section) => ({
+      ...section,
+      links: section.links.filter((link) => showLink(link.href)),
+    }))
+    .filter((section) => section.links.length > 0);
+
+  const footerLead =
+    limitNav && modules && !modules.financials
+      ? "SitGuru Admin keeps the areas open on this account together: bookings, pet parents, gurus, ambassadors, growth, messages, programs, and reporting."
+      : "SitGuru Admin keeps bookings, Gurus, Pet Parents, Ambassadors, messages, financials, training, academies, programs, referrals, partners, taxes, and reporting connected in one clean operating center.";
 
   return (
     <footer className="mt-6 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
@@ -819,10 +837,7 @@ function AdminFooter() {
           <AdminLogo />
 
           <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-slate-600">
-            SitGuru Admin keeps bookings, Gurus, Pet Parents, Ambassadors,
-            messages, financials, training, academies, programs, referrals,
-            partners, taxes, and reporting connected in one clean operating
-            center.
+            {footerLead}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -872,33 +887,41 @@ function AdminFooter() {
             Homepage
           </Link>
 
+          {showLink(adminRoutes.settings) ? (
           <Link
             href={adminRoutes.settings}
             className="transition hover:text-green-800"
           >
             Settings
           </Link>
+          ) : null}
 
+          {showLink(adminRoutes.financialExports) ? (
           <Link
             href={adminRoutes.financialExports}
             className="transition hover:text-green-800"
           >
             Exports
           </Link>
+          ) : null}
 
+          {showLink(adminRoutes.taxReports) ? (
           <Link
             href={adminRoutes.taxReports}
             className="transition hover:text-green-800"
           >
             Tax Center
           </Link>
+          ) : null}
 
+          {showLink(adminRoutes.auditTrail) ? (
           <Link
             href={adminRoutes.auditTrail}
             className="transition hover:text-green-800"
           >
             Audit Trail
           </Link>
+          ) : null}
         </div>
       </div>
     </footer>
@@ -921,11 +944,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     !isSuperUser &&
     !isGrowthChrome &&
     !Object.values(modules || {}).every(Boolean);
-  const visibleNavSections = isGrowthChrome
-    ? growthNavSections
-    : limitNav
-      ? navSections.filter((section) => isNavSectionOn(section.title, modules))
-      : navSections;
+  const visibleNavSections = (isGrowthChrome ? growthNavSections : navSections)
+    .map((section) => ({
+      ...section,
+      items:
+        !limitNav || !modules
+          ? section.items
+          : section.items.filter((item) =>
+              isAdminPathAllowedForModules(item.href, modules),
+            ),
+    }))
+    .filter((section) => {
+      if (!section.items.length) return false;
+      if (isGrowthChrome || !limitNav || !modules) return true;
+      return isNavSectionOn(section.title, modules);
+    });
   const visibleHeaderLinks = (
     isGrowthChrome ? growthHeaderLinks : topHeaderLinks
   ).filter((item) =>
@@ -978,7 +1011,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
               </div>
 
-              {isGrowthChrome ? null : (
+              {isGrowthChrome || (limitNav && !modules?.social_media) ? null : (
                 <Link
                   href={adminRoutes.growth}
                   className="mt-2 flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-black text-white shadow-sm"
@@ -1045,7 +1078,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
                     <AdminLogo />
-                    {isGrowthChrome || isMessagesWorkspace ? null : (
+                    {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
                       <Link
                         href={adminRoutes.growth}
                         className="inline-flex min-h-12 items-center gap-2 rounded-xl px-3 text-xs font-black text-white"
@@ -1079,7 +1112,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-                  {isGrowthChrome || isMessagesWorkspace ? null : (
+                  {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
                     <Link
                       href={adminRoutes.growth}
                       className="hidden min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
@@ -1160,7 +1193,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {children}
             </div>
 
-            {isMessagesWorkspace || isGrowthChrome ? null : <AdminFooter />}
+            {isMessagesWorkspace || isGrowthChrome ? null : (
+              <AdminFooter modules={limitNav ? modules : null} limitNav={limitNav} />
+            )}
             {isGrowthChrome ? <GrowthPhoneBar pathname={pathname} /> : null}
           </main>
         </div>

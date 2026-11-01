@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   defaultWorkspaceForLoginRoles,
   getAvailableDashboardSwitches,
+  mergeApprovedAdminSwitchRole,
   resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
 } from "./role-switch";
@@ -75,6 +76,40 @@ describe("founder personal marketplace roles", () => {
     );
     assert.equal(switches.some((item) => item.path === "/admin"), false);
     assert.equal(switches.some((item) => item.shortLabel === "Intern"), false);
+
+    const approved = mergeApprovedAdminSwitchRole(roles, {
+      email: "ava@sitguru.com",
+      roleKey: "social_community_manager",
+      isActive: true,
+      portalAreas: [
+        "social_media",
+        "growth_marketing",
+        "operations",
+        "analytics_admin",
+      ],
+    });
+    assert.deepEqual(approved, [
+      "parent",
+      "ambassador",
+      "manager",
+      "growth",
+      "admin",
+    ]);
+    const approvedSwitches = getAvailableDashboardSwitches({
+      currentRole: "growth",
+      authorizedRoles: approved,
+    });
+    assert.deepEqual(
+      approvedSwitches.map((item) => item.shortLabel),
+      ["Pet Parent", "Ambassador", "Admin HQ"],
+    );
+    const growthOnly = mergeApprovedAdminSwitchRole(roles, {
+      email: "ava@sitguru.com",
+      roleKey: "social_community_manager",
+      isActive: true,
+      portalAreas: ["social_media"],
+    });
+    assert.equal(growthOnly.includes("admin"), false);
   });
 
   it("shows Manager Portal once and keeps Intern Team out of the switcher", () => {

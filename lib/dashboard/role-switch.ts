@@ -3,8 +3,13 @@
  * Pet Parent always maps to `/customer/dashboard`.
  */
 
-import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
+import {
+  effectivePortalModules,
+  isAdminPathAllowedForModules,
+  parsePortalAreas,
+} from "@/lib/admin/portal-areas";
+import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 
 export type DashboardSwitchRole =
   | "parent"
@@ -247,6 +252,34 @@ export function switchPortalRoles(roles: readonly DashboardSwitchRole[]) {
   const ordered = uniqueOrderedRoles([...roles]);
   if (ordered.includes("growth")) return ordered.filter((role) => role !== "manager");
   return ordered;
+}
+
+/**
+ * Add Admin to the switcher only when this account can open /admin.
+ * Explicit portal areas replace the role default, so unapproved areas stay off.
+ */
+export function mergeApprovedAdminSwitchRole(
+  roles: readonly DashboardSwitchRole[],
+  input: {
+    email?: string | null;
+    roleKey?: string | null;
+    isActive?: boolean | null;
+    portalAreas?: unknown;
+  },
+): DashboardSwitchRole[] {
+  const current = uniqueOrderedRoles([...roles]);
+  if (!input.isActive) return current;
+  if (isSitGuruSuperUser(input.email) || isFounderPersonalMarketplaceEmail(input.email)) {
+    return current;
+  }
+
+  const modules = effectivePortalModules({
+    role: input.roleKey,
+    isSuperUser: false,
+    portalAreas: parsePortalAreas(input.portalAreas),
+  });
+  if (!isAdminPathAllowedForModules("/admin", modules)) return current;
+  return uniqueOrderedRoles([...current, "admin"]);
 }
 
 /** Parse profile.authorizedRoles / authorized_roles (array, CSV, or JSON string). */

@@ -6,9 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
+  mergeApprovedAdminSwitchRole,
+  resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { isAdminPathAllowedForModules } from "@/lib/admin/portal-areas";
+import type { AdminNavAccess } from "@/lib/admin/nav-access";
 import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import {
   ChevronDown,
@@ -201,6 +205,8 @@ export default function AdminAccountMenu() {
     getAdminAccountFromEmail(null),
   );
   const [growthOnly, setGrowthOnly] = useState(false);
+  const [switchRoles, setSwitchRoles] = useState<DashboardSwitchRole[]>([]);
+  const [modules, setModules] = useState<AdminNavAccess | null>(null);
 
   const visibleRoleLabel = growthOnly
     ? "Social & Growth Manager"
@@ -228,6 +234,43 @@ export default function AdminAccountMenu() {
 
       if (sessionEmail && mounted) {
         setAccount(getAdminAccountFromEmail(sessionEmail));
+      }
+
+      const activeUser = session?.user;
+      if (activeUser?.id && mounted) {
+        const [{ data: profile }, { data: roleRows }, { data: hqAccess }] =
+          await Promise.all([
+            supabase
+              .from("profiles")
+              .select("role, account_type, signup_role")
+              .eq("id", activeUser.id)
+              .maybeSingle(),
+            supabase.from("user_roles").select("role").eq("user_id", activeUser.id),
+            supabase
+              .from("admin_user_access")
+              .select("role_key, is_active, portal_areas")
+              .eq("user_id", activeUser.id)
+              .eq("is_active", true)
+              .maybeSingle(),
+          ]);
+        if (!mounted) return;
+        setSwitchRoles(
+          mergeApprovedAdminSwitchRole(
+            resolveAuthorizedRolesFromProfile({
+              profile: (profile as Record<string, unknown> | null) || null,
+              roleRows: ((roleRows || []) as Array<{ role?: string | null }>).map(
+                (row) => row.role,
+              ),
+              email: activeUser.email,
+            }),
+            {
+              email: activeUser.email,
+              roleKey: hqAccess?.role_key,
+              isActive: Boolean(hqAccess?.is_active),
+              portalAreas: hqAccess?.portal_areas,
+            },
+          ),
+        );
         return;
       }
 
@@ -258,6 +301,7 @@ export default function AdminAccountMenu() {
       .then((data) => {
         if (!mounted || !data) return;
         setGrowthOnly(data.workspace === "growth");
+        if (data.modules) setModules(data.modules as AdminNavAccess);
         if (data.workspace === "growth") {
           setAccount((current) => ({
             ...current,
@@ -323,9 +367,17 @@ export default function AdminAccountMenu() {
 
   const adminSwitchRoles: DashboardSwitchRole[] = isSitGuruSuperUser(account.email)
     ? FOUNDER_ROLES
-    : growthOnly
-      ? ["growth"]
-      : ["parent", "admin"];
+    : switchRoles.length
+      ? switchRoles
+      : growthOnly
+        ? ["growth"]
+        : ["parent"];
+
+  const canShowAdminLink = (href: string) => {
+    if (isSitGuruSuperUser(account.email) || !modules) return true;
+    if (Object.values(modules).every(Boolean)) return true;
+    return isAdminPathAllowedForModules(href, modules);
+  };
 
   return (
     <div ref={menuRef} className="relative shrink-0">
@@ -404,6 +456,7 @@ export default function AdminAccountMenu() {
               onNavigate={() => setOpen(false)}
               className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
             />
+            {canShowAdminLink("/admin/growth") ? (
             <Link
               href="/admin/growth"
               role="menuitem"
@@ -413,9 +466,11 @@ export default function AdminAccountMenu() {
               <Megaphone size={19} className="text-green-800" />
               Growth Portal
             </Link>
+            ) : null}
 
             {growthOnly ? null : (
               <>
+            {canShowAdminLink("/admin") ? (
             <Link
               href="/admin"
               role="menuitem"
@@ -425,7 +480,9 @@ export default function AdminAccountMenu() {
               <LayoutDashboard size={19} className="text-green-800" />
               Dashboard
             </Link>
+            ) : null}
 
+            {canShowAdminLink("/admin/hr/growth-hire") ? (
             <Link
               href="/admin/hr/growth-hire"
               role="menuitem"
@@ -435,7 +492,9 @@ export default function AdminAccountMenu() {
               <Users size={19} className="text-green-800" />
               Hire Social
             </Link>
+            ) : null}
 
+            {canShowAdminLink("/admin/messages") ? (
             <Link
               href="/admin/messages"
               role="menuitem"
@@ -445,7 +504,9 @@ export default function AdminAccountMenu() {
               <MessageCircle size={19} className="text-green-800" />
               Messages
             </Link>
+            ) : null}
 
+            {canShowAdminLink("/admin/petparents") ? (
             <Link
               href="/admin/petparents"
               role="menuitem"
@@ -455,7 +516,9 @@ export default function AdminAccountMenu() {
               <Users size={19} className="text-green-800" />
               Pet Parents
             </Link>
+            ) : null}
 
+            {canShowAdminLink("/admin/gurus") ? (
             <Link
               href="/admin/gurus"
               role="menuitem"
@@ -465,7 +528,9 @@ export default function AdminAccountMenu() {
               <ShieldCheck size={19} className="text-green-800" />
               Gurus
             </Link>
+            ) : null}
 
+            {canShowAdminLink("/admin/settings") ? (
             <Link
               href="/admin/settings"
               role="menuitem"
@@ -475,6 +540,7 @@ export default function AdminAccountMenu() {
               <Settings size={19} className="text-green-800" />
               Settings
             </Link>
+            ) : null}
               </>
             )}
 

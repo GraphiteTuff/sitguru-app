@@ -10,6 +10,7 @@ import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-sessio
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
   getAuthorizedDashboardTargets,
+  mergeApprovedAdminSwitchRole,
   resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
   switchPortalRoles,
@@ -67,10 +68,16 @@ export function SiteAccountMenu({
       }
 
       const email = user.email || "";
-      const [{ data: profile }, { data: roleRows }, { data: guru }, { data: ambassador }, hasInternRecord] =
+      const [{ data: profile }, { data: roleRows }, { data: hqAccess }, { data: guru }, { data: ambassador }, hasInternRecord] =
         await Promise.all([
           supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", user.id),
+          supabase
+            .from("admin_user_access")
+            .select("role_key, is_active, portal_areas")
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .maybeSingle(),
           email
             ? supabase
                 .from("gurus")
@@ -90,7 +97,8 @@ export function SiteAccountMenu({
           fetchInternPortalAccess(),
         ]);
 
-      const authorizedRoles = resolveAuthorizedRolesFromProfile({
+      const authorizedRoles = mergeApprovedAdminSwitchRole(
+        resolveAuthorizedRolesFromProfile({
         profile: (profile as Record<string, unknown> | null) || null,
         roleRows: ((roleRows || []) as Array<{ role?: string | null }>).map(
           (row) => row.role,
@@ -103,7 +111,14 @@ export function SiteAccountMenu({
         hasGuruRecord: Boolean(guru?.id),
         hasAmbassadorRecord: Boolean(ambassador?.id),
         hasInternRecord,
-      });
+      }),
+        {
+          email,
+          roleKey: hqAccess?.role_key,
+          isActive: Boolean(hqAccess?.is_active),
+          portalAreas: hqAccess?.portal_areas,
+        },
+      );
 
       const firstLast = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
       setAccount({
@@ -256,7 +271,7 @@ export function SiteAccountMenu({
   const portalTargets = inlineSwitcher
     ? getAuthorizedDashboardTargets({
         authorizedRoles: switchPortalRoles(loadedAccount.authorizedRoles),
-        includeAdmin: false,
+        includeAdmin: switchPortalRoles(loadedAccount.authorizedRoles).includes("admin"),
       }).filter((target) => target.id !== "intern" && target.id !== "guru")
     : [];
 

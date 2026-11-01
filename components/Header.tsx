@@ -20,9 +20,11 @@ import NotificationBell from "@/components/NotificationBell";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
   accessFlagsFromAuthorizedRoles,
+  mergeApprovedAdminSwitchRole,
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
@@ -568,15 +570,30 @@ export default function Header({ user = null }: HeaderProps) {
           account_type: metadataAccountType,
         } as Record<string, unknown>;
 
-        const authorizedRoles = resolveAuthorizedRolesFromProfile({
-          profile: (profile as Record<string, unknown> | null) || null,
-          roleRows: roles,
-          metadata: metadataPayload,
-          email: activeEmail,
-          hasGuruRecord: Boolean(guru?.id),
-          hasAmbassadorRecord: Boolean(ambassador?.id),
-          hasInternRecord,
-        });
+        const { data: hqAccess } = await supabase
+          .from("admin_user_access")
+          .select("role_key, is_active, portal_areas")
+          .eq("user_id", activeUser.id)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        const authorizedRoles = mergeApprovedAdminSwitchRole(
+          resolveAuthorizedRolesFromProfile({
+            profile: (profile as Record<string, unknown> | null) || null,
+            roleRows: roles,
+            metadata: metadataPayload,
+            email: activeEmail,
+            hasGuruRecord: Boolean(guru?.id),
+            hasAmbassadorRecord: Boolean(ambassador?.id),
+            hasInternRecord,
+          }),
+          {
+            email: activeEmail,
+            roleKey: hqAccess?.role_key,
+            isActive: Boolean(hqAccess?.is_active),
+            portalAreas: hqAccess?.portal_areas,
+          },
+        );
 
         const accessFlags = accessFlagsFromAuthorizedRoles(authorizedRoles);
         const hasAdminAccess = Boolean(accessFlags.admin);
@@ -584,8 +601,11 @@ export default function Header({ user = null }: HeaderProps) {
         const hasGuruAccess = Boolean(accessFlags.guru);
         const hasAmbassadorAccess = Boolean(accessFlags.ambassador);
         const hasCustomerAccess = Boolean(accessFlags.parent);
+        const homeIsAdmin =
+          hasAdminAccess &&
+          (!hasGrowthAccess || isSitGuruSuperUser(activeEmail));
 
-        const rawRole = hasAdminAccess
+        const rawRole = homeIsAdmin
           ? "admin"
           : hasGrowthAccess
             ? "growth"
