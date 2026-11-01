@@ -21,10 +21,10 @@ export default function SitGuruDarkLogo({
       aria-label="Go to SitGuru home"
     >
       <Image
-        src="/images/sitguru-logo-dark.png"
+        src="/images/sitguru-thanksgiving-logo-footer-dark.svg"
         alt="SitGuru"
-        width={300}
-        height={112}
+        width={1800}
+        height={620}
         priority={priority}
         className={`h-auto w-[170px] sm:w-[210px] lg:w-[240px] ${imageClassName}`}
       />
