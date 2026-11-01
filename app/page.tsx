@@ -737,27 +737,41 @@ function HeroVisual({
   useEffect(() => {
     let started = false;
     const unlockSound = (event: Event) => {
-      if (started) return;
+      if (started || userPausedRef.current) return;
       const target = event.target;
       if (target instanceof Element && target.closest('button[aria-label*="Thanksgiving video sound"]')) return;
 
       const video = videoRef.current;
       const clip = activeVideoRef.current;
-      if (!video || !clip.hasPromotionalAudio || !promotionalAudioEnabledRef.current) return;
-      if (!video.muted && video.volume > 0 && !video.paused) return;
+      if (!video || !clip.hasPromotionalAudio) return;
+      if (!video.muted && video.volume > 0 && !video.paused) {
+        started = true;
+        return;
+      }
 
       started = true;
+      holdForReducedMotionRef.current = false;
+      promotionalAudioEnabledRef.current = true;
+      setPromotionalAudioEnabled(true);
       setSoundOutputMuted(false);
       syncHeroPlayback(video, clip, true);
-      void video.play().catch(() => undefined);
+      void video.play().catch(() => {
+        started = false;
+        promotionalAudioEnabledRef.current = false;
+        setPromotionalAudioEnabled(false);
+        setSoundOutputMuted(true);
+        syncHeroPlayback(video, clip, false);
+      });
     };
-    window.addEventListener("click", unlockSound, true);
-    window.addEventListener("touchend", unlockSound, true);
-    window.addEventListener("keydown", unlockSound, true);
+    window.addEventListener("pointerdown", unlockSound, true);
+    window.addEventListener("touchstart", unlockSound, { capture: true, passive: true });
+    window.addEventListener("wheel", unlockSound, { capture: true, passive: true });
+    window.addEventListener("scroll", unlockSound, { capture: true, passive: true });
     return () => {
-      window.removeEventListener("click", unlockSound, true);
-      window.removeEventListener("touchend", unlockSound, true);
-      window.removeEventListener("keydown", unlockSound, true);
+      window.removeEventListener("pointerdown", unlockSound, true);
+      window.removeEventListener("touchstart", unlockSound, true);
+      window.removeEventListener("wheel", unlockSound, true);
+      window.removeEventListener("scroll", unlockSound, true);
       if (handoffTimerRef.current !== null) {
         window.clearTimeout(handoffTimerRef.current);
       }
