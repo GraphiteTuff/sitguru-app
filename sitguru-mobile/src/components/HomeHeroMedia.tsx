@@ -33,7 +33,7 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 export { HOME_HERO_CLIP_SETTINGS, HOME_HERO_VIDEO_LABELS };
 
 /** Share of the 16:9 frame kept visible on a tall phone before we stop zooming out. */
-const HOWLWEEN_TARGET_VISIBLE_WIDTH = 0.66;
+const SEASONAL_TARGET_VISIBLE_WIDTH = 0.66;
 
 export type HomeHeroClip = {
   source: number;
@@ -41,7 +41,7 @@ export type HomeHeroClip = {
   label: string;
   playbackRate: number;
   hasAudioControl: boolean;
-  framing: 'standard' | 'howlween';
+  framing: 'standard' | 'seasonal';
 };
 
 type HomeHeroMediaProps = {
@@ -130,13 +130,13 @@ function PosterFallback({ poster }: { poster: ImageSourcePropType }) {
   );
 }
 
-function howlweenScaleFor(width: number, height: number) {
+function seasonalScaleFor(width: number, height: number) {
   if (width <= 0 || height <= 0) return 1;
 
   const coverVisibleFraction = width / (height * (16 / 9));
-  if (coverVisibleFraction >= HOWLWEEN_TARGET_VISIBLE_WIDTH) return 1;
+  if (coverVisibleFraction >= SEASONAL_TARGET_VISIBLE_WIDTH) return 1;
 
-  return coverVisibleFraction / HOWLWEEN_TARGET_VISIBLE_WIDTH;
+  return coverVisibleFraction / SEASONAL_TARGET_VISIBLE_WIDTH;
 }
 
 function applyClipAudio(player: VideoPlayer, audible: boolean) {
@@ -221,7 +221,7 @@ function ActiveHeroClip({
       pointerEvents="none"
       style={
         useBanner
-          ? [styles.howlweenBanner, { top: bannerTop, height: bannerHeight }]
+          ? [styles.seasonalBanner, { top: bannerTop, height: bannerHeight }]
           : styles.fill
       }
     >
@@ -263,8 +263,8 @@ function RotatingHeroVideo({
   const screenActive = isFocused && appActive;
   const playbackPaused = paused || !screenActive;
   const audible = Boolean(clip?.hasAudioControl && audioEnabled && screenActive && !playbackPaused);
-  const useHowlweenBanner =
-    clip?.framing === 'howlween' && howlweenScaleFor(frameSize.width, frameSize.height) < 0.995;
+  const useSeasonalBanner =
+    clip?.framing === 'seasonal' && seasonalScaleFor(frameSize.width, frameSize.height) < 0.995;
   const bannerHeight = frameSize.width * (9 / 16);
   const bannerTop = Math.max(0, (frameSize.height - bannerHeight) * 0.42);
 
@@ -374,7 +374,7 @@ function RotatingHeroVideo({
         accessible={false}
         alt=""
         source={clip.poster}
-        blurRadius={useHowlweenBanner ? 28 : 0}
+        blurRadius={useSeasonalBanner ? 28 : 0}
         resizeMode="cover"
         style={styles.fill}
       />
@@ -386,7 +386,7 @@ function RotatingHeroVideo({
           playbackRate={clip.playbackRate}
           paused={playbackPaused}
           audible={audible}
-          useBanner={useHowlweenBanner}
+          useBanner={useSeasonalBanner}
           bannerTop={bannerTop}
           bannerHeight={bannerHeight}
           onEnded={() => {
@@ -408,7 +408,7 @@ function RotatingHeroVideo({
       >
         {clip.hasAudioControl ? (
           <BubblePressable
-            accessibilityLabel={audible ? 'Mute Halloween music' : 'Play Halloween music'}
+            accessibilityLabel={audible ? 'Mute Thanksgiving video sound' : 'Play Thanksgiving video sound'}
             accessibilityRole="button"
             accessibilityState={{ selected: audible }}
             hitSlop={8}
@@ -444,7 +444,7 @@ function RotatingHeroVideo({
 }
 
 /**
- * Website-matching full-bleed hero. Howl-ween leads the rotation and is the
+ * Website-matching full-bleed hero. Thanksgiving leads the rotation and is the
  * only clip with a soundtrack control.
  */
 export default function HomeHeroMedia(props: HomeHeroMediaProps) {
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     right: 18,
     zIndex: 5,
   },
-  howlweenBanner: {
+  seasonalBanner: {
     left: 0,
     overflow: 'hidden',
     position: 'absolute',
