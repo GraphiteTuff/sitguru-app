@@ -1,5 +1,5 @@
 export const HOME_HERO_VIDEO_LABELS = [
-  'SitGuru Howl-ween',
+  'SitGuru Giving Thanks',
   'Dog Walking',
   'Drop-In Visits',
   'Join the SitGuru Community',
@@ -10,7 +10,7 @@ export const HOME_HERO_CLIP_SETTINGS = [
     label: HOME_HERO_VIDEO_LABELS[0],
     playbackRate: 1,
     hasAudioControl: true,
-    framing: 'howlween',
+    framing: 'seasonal',
   },
   {
     label: HOME_HERO_VIDEO_LABELS[1],
