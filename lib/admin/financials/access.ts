@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
+import {
+  parsePortalAreas,
+  portalAreasIncludeFinancials,
+} from "@/lib/admin/portal-areas";
 
 export const FINANCE_ROLES = [
   "owner",
@@ -53,6 +57,24 @@ export async function getFinanceAdminIdentity(): Promise<FinanceAdminIdentity | 
 
   if (isHardcodedSuperUserEmail(email) || envEmails.includes(email)) {
     return { id: user.id, email, role: "super_admin" };
+  }
+
+  const hqAccess = await supabaseAdmin
+    .from("admin_user_access")
+    .select("role_key,email,is_active,portal_areas")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .limit(1);
+  const hqRow = hqAccess.data?.[0] || null;
+  const portalAreas = parsePortalAreas(hqRow?.portal_areas);
+
+  if (portalAreas) {
+    if (!portalAreasIncludeFinancials(portalAreas)) return null;
+    return {
+      id: user.id,
+      email: String(hqRow?.email || email || "").toLowerCase(),
+      role: String(hqRow?.role_key || "admin").toLowerCase(),
+    };
   }
 
   const [adminUser, profile, users] = await Promise.all([

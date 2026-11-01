@@ -10,6 +10,12 @@ import {
   isFounderPersonalMarketplaceEmail,
   isHardcodedSuperUserEmail,
 } from "@/lib/admin/super-users";
+import type { AdminNavAccess } from "@/lib/admin/nav-access";
+import {
+  effectivePortalModules,
+  parsePortalAreas,
+  portalAreasIncludeFinancials,
+} from "@/lib/admin/portal-areas";
 
 /** Roles that unlock general /admin access across SitGuru. */
 export const ADMIN_ROLES = [
@@ -77,6 +83,8 @@ export type AdminIdentity = {
   canManageRoles: boolean;
   canResetPasswords: boolean;
   isSuperUser: boolean;
+  portalAreas: string[] | null;
+  modules: AdminNavAccess;
 };
 
 function getEnvAdminEmails() {
@@ -192,6 +200,12 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
       id: user.id,
       email,
       role: "super_admin",
+      portalAreas: null,
+      modules: effectivePortalModules({
+        role: "super_admin",
+        isSuperUser: true,
+        portalAreas: null,
+      }),
       ...caps,
     };
   }
@@ -204,6 +218,11 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
       id: user.id,
       email,
       role: "social_community_manager",
+      portalAreas: null,
+      modules: effectivePortalModules({
+        role: "social_community_manager",
+        portalAreas: null,
+      }),
       ...caps,
     };
   }
@@ -211,7 +230,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
   const [hqAccess, adminUser, profile, users, roleRows] = await Promise.all([
     supabaseAdmin
       .from("admin_user_access")
-      .select("role_key,email,is_active,access_level")
+      .select("role_key,email,is_active,access_level,portal_areas")
       .eq("email", email)
       .eq("is_active", true)
       .limit(1),
@@ -258,15 +277,29 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
   if (hqRow && hqRow.is_active === false) return null;
   if (row && row.is_active === false) return null;
 
-  const explicitFinance = Boolean(row?.can_access_financials);
+  const portalAreas = parsePortalAreas(hqRow?.portal_areas);
+  const explicitFinance =
+    Boolean(row?.can_access_financials) ||
+    portalAreasIncludeFinancials(portalAreas);
   const caps = buildCapabilities(role, explicitFinance);
+  const modules = effectivePortalModules({
+    role,
+    isSuperUser: caps.isSuperUser,
+    portalAreas,
+  });
 
   if (!caps.canAccessAdmin) return null;
+
+  if (portalAreas) {
+    caps.canAccessFinancials = portalAreasIncludeFinancials(portalAreas);
+  }
 
   return {
     id: user.id,
     email: String(hqRow?.email || row?.email || email || "").toLowerCase(),
     role,
+    portalAreas,
+    modules,
     ...caps,
   };
 }

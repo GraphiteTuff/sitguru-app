@@ -48,6 +48,11 @@ import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
+import {
+  isNavSectionOn,
+  type AdminNavAccess,
+} from "@/lib/admin/nav-access";
+import { isAdminPathAllowedForModules } from "@/lib/admin/portal-areas";
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -522,10 +527,14 @@ function SidebarSection({
 function MobileNav({
   pathname,
   growthOnly = false,
+  modules = null,
 }: {
   pathname: string;
   growthOnly?: boolean;
+  modules?: AdminNavAccess | null;
 }) {
+  const allow = (href: string) =>
+    !modules || href === "/" || isAdminPathAllowedForModules(href, modules);
   if (growthOnly) {
     const growthLinks = growthNavSections[0]?.items || [];
     return (
@@ -567,7 +576,7 @@ function MobileNav({
   return (
     <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-3 py-3 lg:hidden">
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {mobileQuickLinks.map((item) => {
+        {mobileQuickLinks.filter((item) => allow(item.href)).map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
 
@@ -622,7 +631,7 @@ function MobileNav({
         </summary>
 
         <div className="grid max-h-[48dvh] gap-2 overflow-y-auto border-t border-green-50 p-3">
-          {mobileGrowthLinks.map((item) => {
+          {mobileGrowthLinks.filter((item) => allow(item.href)).map((item) => {
             const Icon = item.icon;
             const active = isActivePath(pathname, item.href);
 
@@ -658,7 +667,9 @@ function MobileNav({
         </summary>
 
         <div className="grid max-h-[58dvh] gap-4 overflow-y-auto border-t border-[#edf3ee] p-3">
-          {navSections.map((section) => (
+          {navSections
+            .filter((section) => !modules || isNavSectionOn(section.title, modules))
+            .map((section) => (
             <div key={section.title}>
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
                 {section.title}
@@ -691,7 +702,7 @@ function MobileNav({
       </details>
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {topHeaderLinks.map((item) => {
+        {topHeaderLinks.filter((item) => allow(item.href)).map((item) => {
           const active = isActivePath(pathname, item.href);
 
           return (
@@ -899,14 +910,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const isAdminLoginPage = pathname === "/admin/login";
   const [workspace, setWorkspace] = useState<"full" | "growth">("full");
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [modules, setModules] = useState<AdminNavAccess | null>(null);
   const [openSection, setOpenSection] = useState<string>("Operations");
   const onGrowthPortal = pathname.startsWith("/admin/growth");
   const isMessagesWorkspace = pathname.startsWith("/admin/messages");
-  const isGrowthChrome = workspace === "growth" || onGrowthPortal;
-  const visibleNavSections = isGrowthChrome ? growthNavSections : navSections;
-  const visibleHeaderLinks = isGrowthChrome
-    ? growthHeaderLinks
-    : topHeaderLinks;
+  const isGrowthChrome =
+    workspace === "growth" || (onGrowthPortal && isSuperUser);
+  const limitNav =
+    Boolean(modules) &&
+    !isSuperUser &&
+    !isGrowthChrome &&
+    !Object.values(modules || {}).every(Boolean);
+  const visibleNavSections = isGrowthChrome
+    ? growthNavSections
+    : limitNav
+      ? navSections.filter((section) => isNavSectionOn(section.title, modules))
+      : navSections;
+  const visibleHeaderLinks = (
+    isGrowthChrome ? growthHeaderLinks : topHeaderLinks
+  ).filter((item) =>
+    !limitNav || !modules
+      ? true
+      : item.href === "/" || isAdminPathAllowedForModules(item.href, modules),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -916,7 +942,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       .then((data) => {
         if (cancelled || !data) return;
         if (data.workspace === "growth") setWorkspace("growth");
+        else setWorkspace("full");
         setIsSuperUser(Boolean(data.isSuperUser));
+        if (data.modules) setModules(data.modules as AdminNavAccess);
       })
       .catch(() => {});
 
@@ -993,7 +1021,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            {isGrowthChrome ? null : (
+            {isGrowthChrome || (limitNav && !modules?.analytics_admin) ? null : (
             <div className="shrink-0 border-t border-[#e8eee5] px-2.5 py-2">
               <Link
                 href={adminRoutes.settings}
@@ -1064,7 +1092,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <div className={`items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm ${isMessagesWorkspace ? "hidden lg:flex" : "flex"}`}>
                     <SearchBar />
 
-                    {isGrowthChrome ? null : (
+                    {isGrowthChrome || (limitNav && !modules?.financials) ? null : (
                     <>
                     <Link
                       href="/admin/gurus/new"
@@ -1107,7 +1135,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
 
             {isGrowthChrome || isMessagesWorkspace ? null : (
-              <MobileNav pathname={pathname} growthOnly={false} />
+              <MobileNav
+                pathname={pathname}
+                growthOnly={false}
+                modules={limitNav ? modules : null}
+              />
             )}
           </header>
 

@@ -328,8 +328,8 @@ export default function AdminLoginPage() {
               </h1>
 
               <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-6 text-slate-600">
-                Use your approved SitGuru Super User email/password or a secure
-                admin phone code to continue.
+                Use your SitGuru work email and password. Phone codes stay
+                limited to Super User accounts.
               </p>
             </div>
 

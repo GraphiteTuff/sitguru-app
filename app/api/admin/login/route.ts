@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  isHardcodedSuperUserEmail,
-  normalizeAdminEmail,
-} from "@/lib/admin/super-users";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { adminLoginDestination } from "@/lib/admin/growth-paths";
+import { normalizeAdminEmail } from "@/lib/admin/super-users";
 
 type SafeFormData = {
   get(name: string): unknown;
@@ -56,14 +55,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!isHardcodedSuperUserEmail(email)) {
-    return redirectWithMessage(
-      request,
-      "error",
-      "This account is not authorized for admin access.",
-    );
-  }
-
   const supabase = await createClient();
 
   const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -94,9 +85,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const verifiedEmail = normalizeAdminEmail(user.email);
+  const identity = await getAdminIdentity();
 
-  if (!isHardcodedSuperUserEmail(verifiedEmail)) {
+  if (!identity?.canAccessAdmin || identity.id !== user.id) {
     await supabase.auth.signOut();
 
     return redirectWithMessage(
@@ -106,10 +97,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // jason@ / nette@ are HQ Super Users. The same Jason account is also a
-  // Pet Parent (profiles.role = customer). Proxy already allows Admin by
-  // email; do not sign out after a successful password check.
   const baseUrl = getBaseUrl(request);
+  const destination = adminLoginDestination({
+    role: identity.role,
+    isSuperUser: identity.isSuperUser,
+    portalAreas: identity.portalAreas,
+  });
 
-  return NextResponse.redirect(new URL("/admin", baseUrl), 303);
+  return NextResponse.redirect(new URL(destination, baseUrl), 303);
 }

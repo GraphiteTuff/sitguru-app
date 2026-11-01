@@ -10,6 +10,12 @@ import {
   type AdminIdentity,
 } from "@/lib/admin/access";
 import { isFinanceRole } from "@/lib/admin/financials/access";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
+import {
+  PORTAL_AREA_OPTIONS,
+  effectivePortalModules,
+  parsePortalAreas,
+} from "@/lib/admin/portal-areas";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +84,7 @@ type UserAssignmentRow = {
   notes?: string | null;
   assigned_by_email?: string | null;
   assigned_at?: string | null;
+  portal_areas?: unknown;
 };
 
 type UserAccessRow = {
@@ -101,6 +108,7 @@ type UserAccessRow = {
   createdAt: string;
   confirmedAt: string;
   assignmentId: string;
+  portalAreas: string[] | null;
 };
 
 type PermissionSummary = {
@@ -805,6 +813,77 @@ async function assignHqAccess(formData: FormData) {
   redirectSettings("ok", `Assigned ${role.name} to ${email}.`);
 }
 
+async function updatePortalAreas(formData: FormData) {
+  "use server";
+
+  const actor = await getAdminIdentity();
+
+  if (!actor || !actor.isSuperUser) {
+    redirectSettings("error", "Only a Super Admin can change Admin areas.");
+  }
+
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const accessId = String(formData.get("accessId") || "").trim();
+  const requested = formData
+    .getAll("portalAreas")
+    .map((value) => String(value || "").trim());
+  const portalAreas = parsePortalAreas(requested);
+
+  if (!email || !accessId) {
+    redirectSettings("error", "Assign an HQ role before choosing Admin areas.");
+  }
+
+  if (!portalAreas?.length) {
+    redirectSettings("error", "Leave at least one Admin area on.");
+  }
+
+  if (isHardcodedSuperUserEmail(email)) {
+    redirectSettings("error", "Super User accounts already have every Admin area.");
+  }
+
+  const existing = await safeRows<UserAssignmentRow>(
+    supabaseAdmin
+      .from("admin_user_access")
+      .select("id,email,role_key,is_active")
+      .eq("id", accessId)
+      .limit(1),
+    "admin_user_access_portal_areas",
+  );
+  const assignment = existing[0];
+
+  if (!assignment || asTrimmedString(assignment.email).toLowerCase() !== email) {
+    redirectSettings("error", "That HQ access record was not found.");
+  }
+
+  if (isSuperUserRole(assignment.role_key)) {
+    redirectSettings("error", "Super User accounts already have every Admin area.");
+  }
+
+  const { error } = await supabaseAdmin
+    .from("admin_user_access")
+    .update({
+      portal_areas: portalAreas,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", accessId);
+
+  if (error) {
+    redirectSettings("error", `Unable to save Admin areas. ${error.message}`);
+  }
+
+  await writeAdminSettingsAuditLog({
+    actor,
+    action: "hq_portal_areas_updated",
+    targetType: "admin_user_access",
+    targetId: email,
+    metadata: { email, portal_areas: portalAreas },
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin");
+  redirectSettings("ok", `Updated Admin areas for ${email}.`);
+}
+
 async function deactivateHqAccess(formData: FormData) {
   "use server";
 
@@ -1117,6 +1196,57 @@ function AssignAccessForm({
   );
 }
 
+function PortalAreaForm({ user }: { user: UserAccessRow }) {
+  const defaults = user.portalAreas
+    ? new Set(user.portalAreas)
+    : new Set(
+        PORTAL_AREA_OPTIONS.filter(
+          (area) =>
+            effectivePortalModules({
+              role: user.hqRoleKey,
+              portalAreas: null,
+            })[area.key],
+        ).map((area) => area.key),
+      );
+
+  return (
+    <form action={updatePortalAreas} className="grid gap-2">
+      <input type="hidden" name="email" value={user.email} />
+      <input type="hidden" name="accessId" value={user.assignmentId} />
+      <div className="grid gap-2">
+        {PORTAL_AREA_OPTIONS.map((area) => (
+          <label
+            key={area.key}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-slate-950">
+                {area.label}
+              </span>
+              <span className="mt-0.5 block text-xs font-semibold leading-5 text-slate-500">
+                {area.detail}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              name="portalAreas"
+              value={area.key}
+              defaultChecked={defaults.has(area.key)}
+              className="h-5 w-5 shrink-0 accent-emerald-700"
+            />
+          </label>
+        ))}
+      </div>
+      <button
+        type="submit"
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+      >
+        Save Admin areas
+      </button>
+    </form>
+  );
+}
+
 function UserAccessCard({
   user,
   roles,
@@ -1291,6 +1421,22 @@ function UserAccessCard({
             </div>
           </div>
         </div>
+
+        {allowSuperUserRoles &&
+        user.canAccessAdmin &&
+        user.assignmentId &&
+        !isSuperUserRole(user.hqRoleKey) ? (
+          <div className="border-t border-slate-100 pt-4">
+            <p className="mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Admin areas
+            </p>
+            <p className="mb-3 text-xs font-semibold leading-5 text-slate-500">
+              Turn areas on for this account. Financials stay closed until that
+              switch is on.
+            </p>
+            <PortalAreaForm user={user} />
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -1641,12 +1787,16 @@ async function getAdminSettingsData() {
         adminActive &&
         profileActive &&
         assignmentActive &&
-        (superUser || explicitFinanceAccess || hasFinancialRole(hqRoleKey)),
+        (superUser ||
+          explicitFinanceAccess ||
+          hasFinancialRole(hqRoleKey) ||
+          Boolean(parsePortalAreas(assignment?.portal_areas)?.includes("financials"))),
       mfaEnabled: user.factors.length > 0,
       lastSignInAt: user.lastSignInAt,
       createdAt: user.createdAt,
       confirmedAt: user.confirmedAt,
       assignmentId: asTrimmedString(assignment?.id),
+      portalAreas: parsePortalAreas(assignment?.portal_areas),
     };
   });
 
@@ -1893,9 +2043,8 @@ export default async function AdminSettingsPage({
                 <Link href="/admin/growth" className="font-black text-emerald-800">
                   Growth Portal
                 </Link>{" "}
-                for them. Super Admins can use the same portal. They get
-                marketing tools only: no Stripe, payouts, IDs, or private
-                messages.
+                for them. On each manager card below, use Admin areas to turn
+                extra sections on. Financials stay off until that switch is on.
               </p>
             </div>
 

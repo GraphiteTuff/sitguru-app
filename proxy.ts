@@ -6,9 +6,11 @@ import {
   normalizeAdminEmail,
 } from "@/lib/admin/super-users";
 import {
+  decideAdminPath,
   hasGrowthOnlyRole,
   isGrowthAllowedAdminPath,
 } from "@/lib/admin/growth-paths";
+import { parsePortalAreas } from "@/lib/admin/portal-areas";
 import {
   guruLookupOrFilter,
   isEligibleGuruProfile,
@@ -516,14 +518,21 @@ export async function proxy(request: NextRequest) {
 
     if (hasAdminRole) {
       const growthOnly = hasGrowthOnlyRole([profileRole, ...roleList]);
-      if (
-        growthOnly &&
-        (pathname === "/admin" ||
-          pathname === "/admin/" ||
-          !isGrowthAllowedAdminPath(pathname))
-      ) {
+      const { data: hqAccess } = await supabase
+        .from("admin_user_access")
+        .select("portal_areas")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+      const decision = decideAdminPath({
+        pathname,
+        growthOnly,
+        portalAreas: parsePortalAreas(hqAccess?.portal_areas),
+      });
+
+      if (!decision.allowed) {
         const growthUrl = request.nextUrl.clone();
-        growthUrl.pathname = "/manager";
+        growthUrl.pathname = decision.redirectTo;
         growthUrl.search = "";
         return NextResponse.redirect(growthUrl);
       }

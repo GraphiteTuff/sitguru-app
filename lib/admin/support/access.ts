@@ -5,6 +5,7 @@ import {
   type AdminIdentity,
 } from "@/lib/admin/access";
 import { createClient } from "@/lib/supabase/server";
+import { effectivePortalModules } from "@/lib/admin/portal-areas";
 
 /** Support dashboard is restricted to Super Users and platform Admins only. */
 export const SUPPORT_DASHBOARD_ROLES = new Set([
@@ -74,6 +75,12 @@ export async function requireSupportDashboardAccess(): Promise<AdminIdentity> {
       canManageRoles: isSuper,
       canResetPasswords: true,
       isSuperUser: isSuper,
+      portalAreas: null,
+      modules: effectivePortalModules({
+        role: metadataRole || "admin",
+        isSuperUser: isSuper,
+        portalAreas: null,
+      }),
     };
   }
 
