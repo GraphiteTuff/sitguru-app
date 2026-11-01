@@ -26,6 +26,7 @@ export default function SitGuruDarkLogo({
         width={1800}
         height={620}
         priority={priority}
+        unoptimized
         className={`h-auto w-[170px] sm:w-[210px] lg:w-[240px] ${imageClassName}`}
       />
     </Link>

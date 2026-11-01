@@ -47,6 +47,7 @@ export default function SiteLogo({
         width={logoFile.width}
         height={logoFile.height}
         priority={priority}
+        unoptimized={logoFile.src.endsWith(".svg")}
         className={
           variant !== "default"
             ? `h-auto w-full object-contain object-left ${imageClassName}`

@@ -867,6 +867,7 @@ export default function Header({ user = null }: HeaderProps) {
             width={2172}
             height={724}
             priority
+            unoptimized
             className="h-auto max-h-10 w-auto max-w-[124px] bg-transparent object-contain object-left min-[360px]:max-h-12 min-[360px]:max-w-[148px] lg:max-h-14 lg:max-w-none"
             style={{ background: "transparent" }}
           />

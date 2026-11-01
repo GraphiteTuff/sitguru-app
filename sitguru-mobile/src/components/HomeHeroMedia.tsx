@@ -334,7 +334,7 @@ function RotatingHeroVideo({
     playerRef.current?.pause();
   }
 
-  function toggleHalloweenAudio() {
+  function toggleThanksgivingAudio() {
     if (!clip?.hasAudioControl) return;
 
     const nextEnabled = !audioEnabled;
@@ -412,7 +412,7 @@ function RotatingHeroVideo({
             accessibilityRole="button"
             accessibilityState={{ selected: audible }}
             hitSlop={8}
-            onPress={toggleHalloweenAudio}
+            onPress={toggleThanksgivingAudio}
             scaleTo={0.88}
             style={styles.controlButton}
           >
