@@ -121,7 +121,8 @@ export function lifecycleLabel(status: string) {
   const map: Record<string, string> = {
     applicant: "Candidate",
     candidate: "Candidate",
-    pending_university_approval: "Pending university approval",
+    pending_university_approval: "Employer decision pending",
+    awaiting_onboarding: "Approved / awaiting onboarding",
     accepted: "Approved",
     approved: "Approved",
     onboarding: "Onboarding",
@@ -136,10 +137,14 @@ export function lifecycleLabel(status: string) {
 
 export function universityApprovalLabel(status: string) {
   const map: Record<string, string> = {
-    pending: "Pending",
-    approved: "Approved",
-    confirmed: "Approved",
-    needs_information: "Needs information",
+    pending: "Not confirmed",
+    student_reported: "Student confirmation received / verification pending",
+    verification_pending: "Verification pending",
+    verified: "Verified",
+    university_verified: "Verified",
+    approved: "Verified",
+    confirmed: "Verified",
+    needs_information: "Verification pending",
     declined: "Declined",
     not_required: "Not required",
   };

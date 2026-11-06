@@ -16,6 +16,7 @@ export type RosterInternRecord = {
   email: string;
   userId: string | null;
   status: string;
+  approvalStatus?: string;
   portalEnabled: boolean;
   universityName: string;
   credits: number | null;
@@ -156,15 +157,23 @@ function accountFor(
   );
 }
 
-export function rosterStatusLabel(status: string) {
+export function rosterStatusLabel(status: string, approvalStatus = "pending") {
   if (status === "prospective") return "Prospective / pending confirmation";
-  if (status === "pending_university_approval" || status === "candidate" || status === "applicant") {
-    return "University approval pending";
-  }
-  if (status === "onboarding") return "Onboarding";
-  if (status === "approved" || status === "accepted") return "Approved";
   if (status === "active") return "Active";
   if (status === "completed") return "Completed";
+  if (status === "onboarding") return "Onboarding";
+  if (approvalStatus === "approved" || approvalStatus === "accepted" || status === "awaiting_onboarding") {
+    return "Approved / awaiting onboarding";
+  }
+  if (status === "approved" || status === "accepted") return "Approved";
+  if (
+    status === "pending_university_approval" ||
+    status === "candidate" ||
+    status === "applicant" ||
+    !status
+  ) {
+    return "Employer decision pending";
+  }
   return lifecycleLabel(status);
 }
 
@@ -234,7 +243,7 @@ export function buildSpringRoster(input: {
       hoursLabel: hoursLabel(plan, record, status),
       weeklyLabel: `${formatAmount(weekly)} planned hours/week`,
       weeksLabel: `${formatAmount(weeks)} planned weeks`,
-      statusLabel: rosterStatusLabel(status),
+      statusLabel: rosterStatusLabel(status, record?.approvalStatus || "pending"),
       accountLabel: accountLabel({ record, account, ambiguous }),
       emailLabel: email || "No contact email on file",
       recordId: record?.id || null,

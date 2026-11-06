@@ -11,6 +11,19 @@ import {
   type RosterInternRecord,
 } from "@/lib/internship/team-roster";
 import SpringInternTable, { type InternTableRow } from "@/components/admin/hr/SpringInternTable";
+import type { InternshipApprovalCard } from "@/components/internship/InternshipApprovalControls";
+import {
+  activationLabel,
+  activeStatusNeedsReview,
+  employerDecision,
+  employerDecisionLabel,
+  nextApprovalAction,
+  onboardingStage,
+  onboardingStageLabel,
+  SPRING_2027_SCHEDULE_NOTE,
+  universityCountsAsVerified,
+  universityDecisionLabel,
+} from "@/lib/internship/approval-workflow";
 import type { InternshipMilestone, InternshipProject, InternshipUniversity } from "@/lib/internship/types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -143,6 +156,7 @@ export default async function InternshipProgramCommandCenter({
       email: intern.email,
       userId: intern.userId,
       status: intern.status,
+      approvalStatus: intern.approvalStatus,
       portalEnabled: intern.portalEnabled,
       universityName: universityName.get(intern.universityId) || "",
       credits: optionalStoredNumber(raw?.credits),
@@ -158,12 +172,48 @@ export default async function InternshipProgramCommandCenter({
     fullName: text(row.full_name),
   }));
   const roster = buildSpringRoster({ interns: records, accounts: accountHints });
+  const today = new Date().toISOString().slice(0, 10);
+  const onboardingById = new Map<string, ReturnType<typeof onboardingStage>>();
+  const internIds = roster.map((person) => person.recordId).filter(Boolean) as string[];
+  if (internIds.length) {
+    const { data: acknowledgments } = await supabaseAdmin
+      .from("internship_onboarding_acknowledgments")
+      .select(
+        "intern_id,onboarding_status,policy_version,typed_legal_name,access_rules_accepted_at,electronic_signed_at,wet_ink_uploaded_at,wet_ink_storage_path,wet_ink_file_hash,wet_ink_submitted_at",
+      )
+      .in("intern_id", internIds);
+    for (const row of acknowledgments || []) {
+      const ack = {
+        policyVersion: text(row.policy_version),
+        typedLegalName: text(row.typed_legal_name),
+        accessRulesAcceptedAt: text(row.access_rules_accepted_at) || null,
+        electronicSignedAt: text(row.electronic_signed_at) || null,
+        wetInkUploadedAt: text(row.wet_ink_uploaded_at) || null,
+        wetInkStoragePath: text(row.wet_ink_storage_path),
+        wetInkFileHash: text(row.wet_ink_file_hash),
+        wetInkSubmittedAt: text(row.wet_ink_submitted_at) || null,
+        onboardingStatus: text(row.onboarding_status),
+      };
+      onboardingById.set(text(row.intern_id), onboardingStage(ack));
+    }
+  }
+  const internById = new Map(interns.map((intern) => [intern.id, intern]));
   const verifiedCount = roster.filter((person) => {
-    const raw = person.recordId ? academicById.get(person.recordId) : null;
-    const status = text(raw?.university_verification_status).toLowerCase();
-    return status === "verified" || status === "confirmed" || status === "university_verified";
+    const intern = person.recordId ? internById.get(person.recordId) : null;
+    return universityCountsAsVerified(intern?.universityVerificationStatus);
   }).length;
-  const activeCount = roster.filter((person) => person.workspaceAction === "active").length;
+  const activeCount = roster.filter((person) => {
+    const intern = person.recordId ? internById.get(person.recordId) : null;
+    if (!intern || intern.status !== "active") return false;
+    const stage = onboardingById.get(intern.id) || "not_started";
+    return !activeStatusNeedsReview({
+      status: intern.status,
+      universityStatus: intern.universityVerificationStatus,
+      onboardingComplete: stage === "fully_executed",
+      startDate: intern.academicStartDate || startsOn,
+      today,
+    });
+  }).length;
   const plannedHours = roster.reduce((sum, person) => {
     const plan = SPRING_2027_CANDIDATE_PLANS.find((item) => item.key === person.key);
     const raw = person.recordId ? academicById.get(person.recordId) : null;
@@ -176,21 +226,61 @@ export default async function InternshipProgramCommandCenter({
 
   const rows: InternTableRow[] = roster.map((person) => {
     const raw = person.recordId ? academicById.get(person.recordId) : null;
+    const intern = person.recordId ? internById.get(person.recordId) : null;
     const plan = SPRING_2027_CANDIDATE_PLANS.find((item) => item.key === person.key);
+    const stage = intern ? onboardingById.get(intern.id) || "not_started" : "not_started";
+    const reviewNote = intern
+      ? activeStatusNeedsReview({
+          status: intern.status,
+          universityStatus: intern.universityVerificationStatus,
+          onboardingComplete: stage === "fully_executed",
+          startDate: intern.academicStartDate || startsOn,
+          today,
+        })
+      : "";
+    const approval: InternshipApprovalCard | null = intern
+      ? {
+          recordId: intern.id,
+          name: intern.fullName,
+          university: person.universityLabel,
+          position: intern.internshipTitle || "Social Media & Community Growth Intern",
+          cohort: cohortName || "Spring 2027",
+          dates: `${startsOn || "Start date pending"} to ${endsOn || "end date pending"}`,
+          credits: person.creditLabel,
+          hours: person.hoursLabel,
+          schedule: `${person.weeklyLabel} · ${person.weeksLabel}`,
+          manager: intern.managerName || "Ava Venezia",
+          supervisor: intern.supervisorName || "Founder/Admin",
+          employer: employerDecisionLabel(intern.approvalStatus),
+          employerPending: employerDecision(intern.approvalStatus) === "pending",
+          universityStatus: universityDecisionLabel(intern.universityVerificationStatus),
+          onboarding: onboardingStageLabel(stage),
+          activation: activationLabel({ status: intern.status, reviewNote }),
+          nextAction: nextApprovalAction({
+            approvalStatus: intern.approvalStatus,
+            universityStatus: intern.universityVerificationStatus,
+            onboardingStage: stage,
+            status: intern.status,
+          }),
+        }
+      : null;
     return {
       key: person.key,
       name: person.fullName,
       roleTitle: "Social Media & Community Growth Intern",
-      academicProgram: plan?.academicProgram || "Program pending",
+      academicProgram: plan?.academicProgram || intern?.academicProgram || "Program pending",
       university: person.universityLabel,
       creditLine: person.creditLabel,
       hoursLine: person.hoursLabel,
       weeklyLine: `${person.weeklyLabel} · ${person.weeksLabel}`,
       status: person.recordId ? person.statusLabel : person.accountLabel,
       statusTone: statusTone(person.recordId ? person.statusLabel : person.accountLabel),
+      universityStatus: intern ? universityDecisionLabel(intern.universityVerificationStatus) : "Not confirmed",
+      statusNote: reviewNote,
+      approval,
       microsoft: person.recordId ? microsoftLabel(text(raw?.microsoft_readiness)) : "Not created",
-      onboarding: "Not started",
-      managerName: "Ava Venezia",
+      onboarding: onboardingStageLabel(stage),
+      managerName: intern?.managerName || "Ava Venezia",
       recordId: person.recordId,
       canCreate: person.canCreatePendingRecord,
     };
@@ -287,6 +377,7 @@ export default async function InternshipProgramCommandCenter({
           <p className="mt-1 text-sm font-semibold text-slate-500">
             Planned dates for the cohort. Each school still confirms its own academic calendar.
           </p>
+          <p className="mt-2 text-xs font-semibold text-amber-800">{SPRING_2027_SCHEDULE_NOTE}</p>
           <ol className="mt-4 space-y-3">
             {[
               [startsOn || "Jan 11, 2027", "Program start"],

@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Filter, MoreHorizontal, Search } from "lucide-react";
+import { Filter, Search } from "lucide-react";
+import {
+  InternshipApprovalMenu,
+  type InternshipApprovalCard,
+} from "@/components/internship/InternshipApprovalControls";
 
 export type InternTableRow = {
   key: string;
@@ -20,9 +24,10 @@ export type InternTableRow = {
   managerName: string;
   recordId: string | null;
   canCreate: boolean;
+  universityStatus?: string;
+  statusNote?: string;
+  approval?: InternshipApprovalCard | null;
 };
-
-const menuLink = "block rounded-xl px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50";
 
 function initials(name: string) {
   return name
@@ -83,7 +88,7 @@ export default function SpringInternTable({
             className="min-h-11 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-bold text-slate-700"
           >
             <option value="all">Filter</option>
-            <option value="pending">University approval pending</option>
+            <option value="pending">Employer decision pending</option>
             <option value="prospective">Prospective</option>
             <option value="active">Active</option>
           </select>
@@ -137,6 +142,12 @@ export default function SpringInternTable({
                   <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${toneClass(row.statusTone)}`}>
                     {row.status}
                   </span>
+                  {row.universityStatus ? (
+                    <span className="mt-1 block text-xs font-semibold text-slate-500">{row.universityStatus}</span>
+                  ) : null}
+                  {row.statusNote ? (
+                    <span className="mt-1 block max-w-[16rem] text-xs font-semibold text-amber-800">{row.statusNote}</span>
+                  ) : null}
                 </td>
                 <td className="py-3 pr-3 text-sm font-semibold text-slate-600">{row.onboarding}</td>
                 <td className="py-3 pr-3 text-sm font-semibold text-slate-600">{row.microsoft}</td>
@@ -157,20 +168,8 @@ export default function SpringInternTable({
                     ) : (
                       <span className="inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-black text-slate-400">View</span>
                     )}
-                    {row.recordId ? (
-                      <details className="relative">
-                        <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 text-slate-600">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">More actions for {row.name}</span>
-                        </summary>
-                        <div className="absolute right-0 z-10 mt-1 w-48 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
-                          <Link className={menuLink} href={`/admin/internship/interns/${row.recordId}#profile`}>View profile</Link>
-                          <Link className={menuLink} href={`/admin/internship/interns#plan-${row.recordId}`}>Edit academic plan</Link>
-                          <Link className={menuLink} href={`/admin/internship/interns/${row.recordId}#onboarding`}>View onboarding</Link>
-                          <Link className={menuLink} href={`/admin/hr/team-access`}>Assign manager</Link>
-                          <Link className={menuLink} href={`/intern?view=${encodeURIComponent(row.recordId)}`}>Open intern portal</Link>
-                        </div>
-                      </details>
+                    {row.approval ? (
+                      <InternshipApprovalMenu card={row.approval} canAdminister={canAdminister} />
                     ) : null}
                   </div>
                 </td>

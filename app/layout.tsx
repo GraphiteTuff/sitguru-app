@@ -8,6 +8,7 @@ import RouteShell from "@/components/RouteShell";
 import AmbientAudioSession from "@/components/AmbientAudioSession";
 import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
 import GoogleOneTapHost from "@/components/auth/GoogleOneTapHost";
+import { PawPulseProvider } from "@/components/pawpulse/PawPulseProvider";
 
 const plusJakartaSans = localFont({
   src: "./fonts/plus-jakarta-sans-latin.woff2",
@@ -161,7 +162,9 @@ export default function RootLayout({
         />
 
         <AmbientAudioSession />
-        <RouteShell>{children}</RouteShell>
+        <PawPulseProvider>
+          <RouteShell>{children}</RouteShell>
+        </PawPulseProvider>
         <AmbassadorReferralCapture />
         <GoogleOneTapHost />
         <CrispWidget />

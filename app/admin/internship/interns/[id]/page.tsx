@@ -19,6 +19,18 @@ import { academicLevelLabel } from "@/lib/internship/labels";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import { internOnboardingStatusLabel } from "@/lib/internship/onboarding";
 import { buildInternshipProcess } from "@/lib/internship/process";
+import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
+import {
+  activationLabel,
+  activeStatusNeedsReview,
+  employerDecision,
+  employerDecisionLabel,
+  nextApprovalAction,
+  onboardingStage,
+  onboardingStageLabel,
+  universityDecisionLabel,
+} from "@/lib/internship/approval-workflow";
+import { InternshipApprovalButtons } from "@/components/internship/InternshipApprovalControls";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +56,39 @@ export default async function InternshipInternDetailPage({
   const packet = packetDocumentsForRequirement(requirement);
 
   const process = buildInternshipProcess(workspace);
+  const stage = onboardingStage(workspace.onboarding);
+  const today = new Date().toISOString().slice(0, 10);
+  const reviewNote = activeStatusNeedsReview({
+    status: workspace.intern.status,
+    universityStatus: workspace.intern.universityVerificationStatus,
+    onboardingComplete: stage === "fully_executed",
+    startDate: workspace.intern.academicStartDate || workspace.cohort?.startsOn || null,
+    today,
+  });
+  const approvalCard = {
+    recordId: workspace.intern.id,
+    name: workspace.intern.fullName,
+    university: workspace.university?.displayName || workspace.university?.name || "University pending",
+    position: workspace.intern.internshipTitle || "Social Media & Community Growth Intern",
+    cohort: workspace.cohort?.name || INTERNSHIP_PROGRAM_NAME,
+    dates: `${workspace.cohort?.startsOn || "Start date pending"} to ${workspace.cohort?.endsOn || "end date pending"}`,
+    credits: workspace.intern.credits == null ? "Credits pending" : `${workspace.intern.credits} planned credits`,
+    hours: workspace.intern.requiredHours == null ? "Hours pending" : `${workspace.intern.requiredHours} required hours`,
+    schedule: `${workspace.intern.plannedWeeklyHours || "—"} hours/week · ${workspace.intern.internshipWeeks || "—"} weeks`,
+    manager: workspace.intern.managerName || "Ava Venezia",
+    supervisor: workspace.intern.supervisorName || "Founder/Admin",
+    employer: employerDecisionLabel(workspace.intern.approvalStatus),
+    employerPending: employerDecision(workspace.intern.approvalStatus) === "pending",
+    universityStatus: universityDecisionLabel(workspace.intern.universityVerificationStatus),
+    onboarding: onboardingStageLabel(stage),
+    activation: activationLabel({ status: workspace.intern.status, reviewNote }),
+    nextAction: nextApprovalAction({
+      approvalStatus: workspace.intern.approvalStatus,
+      universityStatus: workspace.intern.universityVerificationStatus,
+      onboardingStage: stage,
+      status: workspace.intern.status,
+    }),
+  };
 
   const paramsIn = searchParams ? await searchParams : {};
   const ok = Array.isArray(paramsIn.ok) ? paramsIn.ok[0] : paramsIn.ok;
@@ -102,6 +147,28 @@ export default async function InternshipInternDetailPage({
         </div>
         </div>
       </div>
+
+      <section id="approvals" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-5">
+        <h2 className="text-lg font-black text-slate-950">Internship Status & Approvals</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-600">
+          Next: {approvalCard.nextAction}
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Employer acceptance", approvalCard.employer],
+            ["University approval", approvalCard.universityStatus],
+            ["Onboarding", approvalCard.onboarding],
+            ["Program activation", approvalCard.activation],
+          ].map(([label, value]) => (
+            <article key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</p>
+              <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
+            </article>
+          ))}
+        </div>
+        {reviewNote ? <p className="mt-3 text-sm font-semibold text-amber-800">{reviewNote}</p> : null}
+        {canAdministerInternshipOnboarding(actor) ? <InternshipApprovalButtons card={approvalCard} /> : null}
+      </section>
 
       <section id="onboarding" className="scroll-mt-24 rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">Onboarding & confidentiality</h2>

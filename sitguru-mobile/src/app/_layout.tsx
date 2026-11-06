@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import KeyboardSafeHost from '@/components/mobile/KeyboardSafeHost';
 import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import MobileAlertHosts from '@/components/mobile/MobileAlertHosts';
+import { PawPulseHost } from '@/components/mobile/PawPulseHost';
 import RootErrorBoundary from '@/components/RootErrorBoundary';
 import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
 import { AuthProvider } from '@/context/AuthContext';
@@ -129,6 +130,7 @@ export default function RootLayout() {
           <SitGuruPaymentsProvider>
             <AuthProvider>
               <TabBarMotionProvider>
+              <PawPulseHost>
                 <StatusBar
                   style={colorScheme === 'dark' ? 'light' : 'dark'}
                 />
@@ -143,6 +145,7 @@ export default function RootLayout() {
                 />
 
                 <MobileAlertHosts />
+              </PawPulseHost>
               </TabBarMotionProvider>
             </AuthProvider>
           </SitGuruPaymentsProvider>

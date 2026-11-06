@@ -78,7 +78,7 @@ describe("Spring 2027 team roster", () => {
     assert.equal(ryan.creditLabel, "3 planned credits");
     assert.equal(ryan.hoursLabel, "150 planned hours");
     assert.equal(ryan.weeklyLabel, "10 planned hours/week");
-    assert.equal(ryan.statusLabel, "University approval pending");
+    assert.equal(ryan.statusLabel, "Employer decision pending");
   });
 
   it("keeps Lola and Lalita pending and unregistered", () => {
@@ -88,7 +88,7 @@ describe("Spring 2027 team roster", () => {
     assert.equal(lolaCard.creditLabel, "Credits pending");
     assert.equal(lolaCard.hoursLabel, "150 proposed hours");
     assert.equal(lolaCard.workspaceAction, "preview");
-    assert.equal(lolaCard.statusLabel, "University approval pending");
+    assert.equal(lolaCard.statusLabel, "Employer decision pending");
     assert.equal(lalitaCard.accountLabel, "Needs Registration");
     assert.equal(lalitaCard.creditLabel, "6 requested credits");
     assert.equal(lalitaCard.hoursLabel, "300 provisional planned hours");
