@@ -12,6 +12,15 @@ export const SITGURU_SHAREPOINT_SITE_URL =
 
 export const SITGURU_SHAREPOINT_DOCUMENTS_URL = `${SITGURU_SHAREPOINT_SITE_URL}/Shared%20Documents`;
 
+/**
+ * Private Teams channel. Its files are not inside the parent site's Documents library.
+ * Confirmed site: SitGuruMarketingCommunityGrowth-Leadership-JasonDanetteandAva.
+ */
+export const SITGURU_SHAREPOINT_LEADERSHIP_SITE_URL =
+  "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth-Leadership-JasonDanetteandAva";
+
+export const SITGURU_SHAREPOINT_LEADERSHIP_DOCUMENTS_URL = `${SITGURU_SHAREPOINT_LEADERSHIP_SITE_URL}/Shared%20Documents`;
+
 export const SITGURU_SHAREPOINT_LIBRARY = {
   team: "SitGuru | Marketing & Community Growth",
   rootLabel: "Documents",
@@ -392,9 +401,18 @@ function safeHttpsUrl(raw: string) {
   }
 }
 
-function sharePointPath(section: string, name: string) {
-  const part = (value: string) => encodeURIComponent(value);
-  return `${SITGURU_SHAREPOINT_DOCUMENTS_URL}/${part(section)}/${part(name)}`;
+function sharePointFolderView(siteUrl: string, segments: string[]) {
+  const sitePath = new URL(siteUrl).pathname.replace(/\/$/, "");
+  const relative = [sitePath, "Shared Documents", ...segments].join("/");
+  const id = encodeURIComponent(relative);
+  return `${siteUrl}/Shared%20Documents/Forms/AllItems.aspx?id=${id}`;
+}
+
+function sharePointPath(folder: SitguruSharePointFolder) {
+  if (folder.leadershipOnly) {
+    return sharePointFolderView(SITGURU_SHAREPOINT_LEADERSHIP_SITE_URL, [folder.name]);
+  }
+  return sharePointFolderView(SITGURU_SHAREPOINT_SITE_URL, [folder.section, folder.name]);
 }
 
 export function sitguruSharePointLibraryHref() {
@@ -407,7 +425,7 @@ export function sitguruSharePointLibraryHref() {
 export function sitguruSharePointFolderHref(folder: SitguruSharePointFolder) {
   const configured = safeHttpsUrl(process.env[folder.envKey] || "");
   if (configured) return configured;
-  return sharePointPath(folder.section, folder.name);
+  return sharePointPath(folder);
 }
 
 export type SitguruSharePointShortcut = {
