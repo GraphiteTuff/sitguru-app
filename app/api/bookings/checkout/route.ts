@@ -10,6 +10,7 @@ import {
   createStripeTaxCustomer,
   stripeCheckoutTaxCollectionParams,
 } from "@/lib/payments/stripe-tax";
+import { paypalCheckoutChargeAllowed } from "@/lib/payments/paypal-readiness";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -427,7 +428,7 @@ export async function POST(req: NextRequest) {
       transactions must not be created until SitGuru receives PayPal
       marketplace approval and production credentials.
     */
-    if (checkoutRail.processor === "paypal") {
+    if (checkoutRail.processor === "paypal" && !paypalCheckoutChargeAllowed()) {
       return json(
         req,
         {
