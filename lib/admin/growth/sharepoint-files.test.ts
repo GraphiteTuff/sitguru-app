@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  SITGURU_SHAREPOINT_DOCUMENTS_URL,
   SITGURU_SHAREPOINT_FOLDERS,
   SITGURU_SHAREPOINT_LIBRARY,
+  sitguruSharePointFolderHref,
+  sitguruSharePointLibraryHref,
   sitguruSharePointShortcuts,
 } from "./sharepoint-files";
 
@@ -31,5 +34,10 @@ describe("SitGuru Growth SharePoint Documents", () => {
       includeLeadership: false,
     });
     assert.ok(without.every((item) => !item.leadershipOnly));
+    assert.equal(sitguruSharePointLibraryHref(), SITGURU_SHAREPOINT_DOCUMENTS_URL);
+    const guides = SITGURU_SHAREPOINT_FOLDERS.find((folder) => folder.id === "general-team-guides");
+    assert.ok(guides);
+    assert.match(sitguruSharePointFolderHref(guides), /01%20Team%20Guides/);
+    assert.ok(withLeadership.every((item) => item.configured && item.href.startsWith("https://sitgurullc.sharepoint.com/")));
   });
 });

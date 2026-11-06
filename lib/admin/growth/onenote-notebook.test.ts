@@ -4,6 +4,8 @@ import {
   SITGURU_GROWTH_TEAM_WORKFLOW,
   SITGURU_ONENOTE_NOTEBOOK,
   SITGURU_ONENOTE_SECTIONS,
+  sitguruOneNoteNotebookHref,
+  sitguruOneNoteSectionHref,
   sitguruOneNoteShortcuts,
 } from "./onenote-notebook";
 
@@ -30,6 +32,10 @@ describe("SitGuru Growth OneNote notebook", () => {
 
   it("only exposes shortcuts for SitGuru work emails", () => {
     assert.equal(sitguruOneNoteShortcuts({ email: "ryan@school.edu" }).length, 0);
-    assert.ok(sitguruOneNoteShortcuts({ email: "ava@sitguru.com" }).length >= 7);
+    const ava = sitguruOneNoteShortcuts({ email: "ava@sitguru.com" });
+    assert.ok(ava.length >= 7);
+    assert.match(sitguruOneNoteNotebookHref(), /sitgurullc\.sharepoint\.com/);
+    assert.match(sitguruOneNoteSectionHref(SITGURU_ONENOTE_SECTIONS[0]), /00%20Start%20Here\.one/);
+    assert.ok(ava.every((item) => item.configured && item.href.startsWith("https://")));
   });
 });

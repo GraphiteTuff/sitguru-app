@@ -6,6 +6,12 @@
 
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 
+/** Marketing & Community Growth team site. Env URLs still override these. */
+export const SITGURU_SHAREPOINT_SITE_URL =
+  "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth";
+
+export const SITGURU_SHAREPOINT_DOCUMENTS_URL = `${SITGURU_SHAREPOINT_SITE_URL}/Shared%20Documents`;
+
 export const SITGURU_SHAREPOINT_LIBRARY = {
   team: "SitGuru | Marketing & Community Growth",
   rootLabel: "Documents",
@@ -386,18 +392,22 @@ function safeHttpsUrl(raw: string) {
   }
 }
 
+function sharePointPath(section: string, name: string) {
+  const part = (value: string) => encodeURIComponent(value);
+  return `${SITGURU_SHAREPOINT_DOCUMENTS_URL}/${part(section)}/${part(name)}`;
+}
+
 export function sitguruSharePointLibraryHref() {
   return (
     safeHttpsUrl(process.env[SITGURU_SHAREPOINT_LIBRARY.envKey] || "") ||
-    safeHttpsUrl(process.env.NEXT_PUBLIC_SITGURU_TEAMS_GROWTH_URL || "") ||
-    ""
+    SITGURU_SHAREPOINT_DOCUMENTS_URL
   );
 }
 
 export function sitguruSharePointFolderHref(folder: SitguruSharePointFolder) {
   const configured = safeHttpsUrl(process.env[folder.envKey] || "");
   if (configured) return configured;
-  return sitguruSharePointLibraryHref();
+  return sharePointPath(folder.section, folder.name);
 }
 
 export type SitguruSharePointShortcut = {

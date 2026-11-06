@@ -4,12 +4,14 @@
  * (Ava, Jason, Danette, and other Growth staff).
  */
 
+import { SITGURU_SHAREPOINT_SITE_URL } from "@/lib/admin/growth/sharepoint-files";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 
 export const SITGURU_ONENOTE_NOTEBOOK = {
   name: "SitGuru - Marketing & Community Growth Notebook",
   shortName: "Growth Team Notebook",
   siteHint: "sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth",
+  url: `${SITGURU_SHAREPOINT_SITE_URL}/SiteAssets/${encodeURIComponent("SitGuru - Marketing & Community Growth Notebook")}`,
   /** Notebook / site deep link. */
   envKey: "NEXT_PUBLIC_SITGURU_ONENOTE_GROWTH_URL",
 } as const;
@@ -178,13 +180,16 @@ function safeHttpsUrl(raw: string) {
 }
 
 export function sitguruOneNoteNotebookHref() {
-  return safeHttpsUrl(process.env[SITGURU_ONENOTE_NOTEBOOK.envKey] || "");
+  return (
+    safeHttpsUrl(process.env[SITGURU_ONENOTE_NOTEBOOK.envKey] || "") ||
+    SITGURU_ONENOTE_NOTEBOOK.url
+  );
 }
 
 export function sitguruOneNoteSectionHref(section: SitguruOneNoteSection) {
   const configured = safeHttpsUrl(process.env[section.envKey] || "");
   if (configured) return configured;
-  return sitguruOneNoteNotebookHref();
+  return `${sitguruOneNoteNotebookHref()}/${encodeURIComponent(section.name)}.one`;
 }
 
 export type SitguruOneNoteShortcut = {

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { sitguruOneNoteNotebookHref } from "@/lib/admin/growth/onenote-notebook";
+import { sitguruSharePointLibraryHref } from "@/lib/admin/growth/sharepoint-files";
+import { sitguruTeamsHref } from "@/lib/admin/growth/teams-access";
 import {
   INTERN_COLLABORATION_EXPECTATIONS,
   INTERN_MANAGER_SUPPORT,
@@ -30,7 +33,17 @@ export default function InternWorkSystemsCard({
       </div>
 
       <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {INTERN_WORK_SYSTEMS.map((system) => (
+        {INTERN_WORK_SYSTEMS.map((system) => {
+          const href =
+            system.id === "teams"
+              ? sitguruTeamsHref()
+              : system.id === "sharepoint"
+                ? sitguruSharePointLibraryHref()
+                : system.id === "onenote"
+                  ? sitguruOneNoteNotebookHref()
+                  : system.href;
+          const external = Boolean(href && href.startsWith("http"));
+          return (
           <li
             key={system.id}
             className="rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3 py-3"
@@ -39,16 +52,28 @@ export default function InternWorkSystemsCard({
             <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
               {system.role}
             </p>
-            {system.href ? (
-              <Link
-                href={system.href}
-                className="mt-2 inline-flex text-xs font-bold text-[#2563EB]"
-              >
-                Open →
-              </Link>
+            {href ? (
+              external ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex text-xs font-bold text-[#2563EB]"
+                >
+                  Open →
+                </a>
+              ) : (
+                <Link
+                  href={href}
+                  className="mt-2 inline-flex text-xs font-bold text-[#2563EB]"
+                >
+                  Open →
+                </Link>
+              )
             ) : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <div className="grid gap-3 lg:grid-cols-2">
