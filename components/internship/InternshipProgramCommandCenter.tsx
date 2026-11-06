@@ -249,8 +249,10 @@ export default async function InternshipProgramCommandCenter({
           credits: person.creditLabel,
           hours: person.hoursLabel,
           schedule: `${person.weeklyLabel} · ${person.weeksLabel}`,
-          manager: intern.managerName || "Ava Venezia",
-          supervisor: intern.supervisorName || "Founder/Admin",
+          manager: [intern.dayToDayManagerName || intern.managerName, intern.siteSupervisorName || intern.supervisorName]
+            .filter(Boolean)
+            .join(" and ") || "Ava Venezia",
+          supervisor: intern.siteSupervisorName || intern.supervisorName || "Founder/Admin",
           employer: employerDecisionLabel(intern.approvalStatus),
           employerPending: employerDecision(intern.approvalStatus) === "pending",
           universityStatus: universityDecisionLabel(intern.universityVerificationStatus),
@@ -280,7 +282,10 @@ export default async function InternshipProgramCommandCenter({
       approval,
       microsoft: person.recordId ? microsoftLabel(text(raw?.microsoft_readiness)) : "Not created",
       onboarding: onboardingStageLabel(stage),
-      managerName: intern?.managerName || "Ava Venezia",
+      managerName:
+        [intern?.dayToDayManagerName || intern?.managerName, intern?.siteSupervisorName || intern?.supervisorName]
+          .filter(Boolean)
+          .join(" and ") || "Ava Venezia",
       recordId: person.recordId,
       canCreate: person.canCreatePendingRecord,
     };
