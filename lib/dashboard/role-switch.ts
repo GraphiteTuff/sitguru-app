@@ -34,28 +34,28 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
     label: "Switch to Pet Parent",
     shortLabel: "Pet Parent",
     path: "/customer/dashboard",
-    helper: "Pets, bookings, PawPerks, and care details",
+    helper: "Explore pet care",
   },
   {
     id: "guru",
     label: "Switch to Guru",
     shortLabel: "Guru",
     path: "/guru/dashboard",
-    helper: "Services, bookings, messages, and earnings",
+    helper: "Manage your Guru profile",
   },
   {
     id: "ambassador",
     label: "Switch to Ambassador",
     shortLabel: "Ambassador",
     path: "/ambassador/dashboard",
-    helper: "Referrals, training, rewards, and outreach",
+    helper: "Grow the SitGuru community",
   },
   {
     id: "intern",
     label: "Switch to Intern",
     shortLabel: "Intern",
     path: "/intern",
-    helper: "Internship portal, weekly tasks, and growth work",
+    helper: "Internship workspace",
   },
   {
     id: "manager",
@@ -387,7 +387,7 @@ export function resolveAuthorizedRolesFromProfile(input: {
     if (input.hasInternRecord && !withRecords.includes("intern")) {
       withRecords.push("intern");
     }
-    return uniqueOrderedRoles(withRecords);
+    return finishOwnedRoles(withRecords);
   }
 
   const metadataSignals: unknown[] = [
@@ -433,7 +433,16 @@ export function resolveAuthorizedRolesFromProfile(input: {
     derived.push("parent");
   }
 
-  return uniqueOrderedRoles(derived);
+  return finishOwnedRoles(derived);
+}
+
+/** Guru, Ambassador, and Intern accounts keep the Pet Parent workspace. */
+function finishOwnedRoles(roles: DashboardSwitchRole[]) {
+  const ordered = uniqueOrderedRoles(roles);
+  if (ordered.some((role) => role === "guru" || role === "ambassador" || role === "intern")) {
+    return uniqueOrderedRoles([...ordered, "parent"]);
+  }
+  return ordered;
 }
 
 /** All authorized workspaces, including the one the user is already in. */

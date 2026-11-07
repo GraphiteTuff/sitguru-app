@@ -456,7 +456,20 @@ export async function findInternByAccount(input: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return attachInternAvatar(data ? mapIntern(data as Record<string, unknown>) : null);
+  if (data) {
+    return attachInternAvatar(mapIntern(data as Record<string, unknown>));
+  }
+
+  const { data: byWorkEmail } = await supabaseAdmin
+    .from("internship_interns")
+    .select("*")
+    .ilike("work_email", email)
+    .eq("portal_enabled", true)
+    .in("status", ["accepted", "active", "approved", "completed"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return attachInternAvatar(byWorkEmail ? mapIntern(byWorkEmail as Record<string, unknown>) : null);
 }
 
 export async function getInternWorkspace(

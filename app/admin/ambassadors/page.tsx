@@ -41,6 +41,7 @@ import {
   resolveCanonicalContactEmail,
 } from "@/lib/auth/contact-email";
 import { listAuthProviders } from "@/lib/auth/signup-identity";
+import { matchesAmbassadorWorkQueue } from "@/lib/ambassador/application-queue";
 import AmbassadorRecordsTable, {
   type AmbassadorDisplayRow,
 } from "@/app/admin/ambassadors/AmbassadorRecordsTable";
@@ -169,6 +170,7 @@ type AmbassadorRegistryFilters = {
   photo: string;
   rewards: string;
   attention: string;
+  queue: string;
 };
 
 type GenericRow = Record<string, unknown>;
@@ -1505,6 +1507,91 @@ function buildUnifiedAmbassadorRows({
   });
 }
 
+type OpenAmbassadorApplication = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  status: string | null;
+  source: string | null;
+  created_at: string | null;
+  applicant_user_id: string | null;
+};
+
+async function loadOpenAmbassadorApplications() {
+  const { data, error } = await supabaseAdmin
+    .from("program_applications")
+    .select("id,full_name,email,phone,city,state,zip_code,status,source,created_at,applicant_user_id,program")
+    .eq("program", "ambassador-program")
+    .in("status", ["new", "reviewing", "contacted", "checkr_pending", "onboarding"])
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn("Unable to load Ambassador applications:", error.message);
+    return [] as OpenAmbassadorApplication[];
+  }
+  return (data || []) as OpenAmbassadorApplication[];
+}
+
+function appendOpenAmbassadorApplications(
+  ambassadors: AmbassadorSummaryRow[],
+  applications: OpenAmbassadorApplication[],
+) {
+  const known = new Set(
+    ambassadors
+      .map((row) => String(row.email || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const extras = applications
+    .filter((application) => {
+      const email = String(application.email || "").trim().toLowerCase();
+      return email && !known.has(email);
+    })
+    .map((application) => ({
+      ambassador_id: `application:${application.id}`,
+      user_id: application.applicant_user_id,
+      full_name: application.full_name,
+      email: application.email,
+      phone: application.phone,
+      program: "Ambassador Program",
+      internal_role: "ambassador",
+      source: application.source || "public_ambassador_application",
+      status: application.status || "new",
+      referral_code: null,
+      referral_link: null,
+      city: application.city,
+      state: application.state,
+      county: null,
+      country: null,
+      training_status: "not_started",
+      training_percent: 0,
+      created_at: application.created_at,
+      pet_parent_signups: 0,
+      guru_signups: 0,
+      business_signups: 0,
+      completed_bookings: 0,
+      pending_rewards: 0,
+      approved_rewards: 0,
+      ready_for_payout_rewards: 0,
+      paid_rewards: 0,
+      total_earned: 0,
+      total_paid: 0,
+      workspace_exists: false,
+      needs_attention: true,
+      attention_items: ["New Ambassador application"],
+      dashboard_enabled: false,
+      login_enabled: false,
+      profile_zip_code: application.zip_code,
+      onboarding_percent: 0,
+      ambassador_photo_url: null,
+      photo_approved: false,
+      auth_created_at: application.created_at,
+    } as AmbassadorSummaryRow));
+  return [...extras, ...ambassadors];
+}
+
 function currency(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -1819,6 +1906,9 @@ function getAmbassadorCompletion(ambassador: AmbassadorSummaryRow) {
 }
 
 function getAmbassadorNextAction(ambassador: AmbassadorSummaryRow) {
+  if (ambassador.ambassador_id.startsWith("application:")) {
+    return "Approve Ambassador application";
+  }
   if (isMissingAmbassadorWorkspace(ambassador)) {
     return "Provision Ambassador workspace";
   }
@@ -1867,6 +1957,7 @@ function toAmbassadorDisplayRow(
   options?: { possibleDuplicate?: boolean },
 ): AmbassadorDisplayRow {
   const archived = isArchivedAmbassador(ambassador);
+  const openApplication = ambassador.ambassador_id.startsWith("application:");
   const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
   const needsAttention = hasNeedsAttention(ambassador);
   const possibleDuplicate = Boolean(options?.possibleDuplicate);
@@ -1895,9 +1986,11 @@ function toAmbassadorDisplayRow(
     ),
     statusLabel: archived
       ? "Archived"
-      : missingWorkspace
-        ? "Missing Workspace"
-        : prettyStatus(ambassador.status),
+      : openApplication
+        ? "New application"
+        : missingWorkspace
+          ? "Missing Workspace"
+          : prettyStatus(ambassador.status),
     nextAction: possibleDuplicate
       ? "Review possible duplicate Ambassador"
       : getAmbassadorNextAction(ambassador),
@@ -1906,9 +1999,11 @@ function toAmbassadorDisplayRow(
     lastLogin: ambassador.last_sign_in_at
       ? formatDateTime(ambassador.last_sign_in_at)
       : "—",
-    recordSourceLabel: missingWorkspace
-      ? "Signup intent / no workspace"
-      : getSourceLabel(ambassador),
+    recordSourceLabel: openApplication
+      ? "Ambassador application"
+      : missingWorkspace
+        ? "Signup intent / no workspace"
+        : getSourceLabel(ambassador),
     completionPercentage: getAmbassadorCompletion(ambassador),
     missingRequirements: ambassador.attention_items || [],
     flaggedForReview: needsAttention || possibleDuplicate,
@@ -2621,6 +2716,7 @@ function buildRegistryFilters(
     photo: getSingleSearchParam(searchParams, "photo"),
     rewards: getSingleSearchParam(searchParams, "rewards"),
     attention: getSingleSearchParam(searchParams, "attention"),
+    queue: getSingleSearchParam(searchParams, "queue") || "all",
   };
 }
 
@@ -2632,7 +2728,8 @@ function hasActiveRegistryFilters(filters: AmbassadorRegistryFilters) {
       filters.training ||
       filters.photo ||
       filters.rewards ||
-      filters.attention,
+      filters.attention ||
+      (filters.queue && filters.queue !== "all"),
   );
 }
 
@@ -2761,6 +2858,13 @@ function filterAmbassadorsForRegistry(
       ambassador,
       filters.attention,
     );
+    const matchesQueue = matchesAmbassadorWorkQueue({
+      queue: filters.queue,
+      id: ambassador.ambassador_id,
+      status: status,
+      needsAttention: hasNeedsAttention(ambassador),
+      archived: isArchivedAmbassador(ambassador),
+    });
 
     return (
       matchesQuery &&
@@ -2769,7 +2873,8 @@ function filterAmbassadorsForRegistry(
       matchesTraining &&
       matchesPhoto &&
       matchesRewards &&
-      matchesAttention
+      matchesAttention &&
+      matchesQueue
     );
   });
 }
@@ -3044,8 +3149,8 @@ function AmbassadorRegistryTable({
 }) {
   const activeFilters = hasActiveRegistryFilters(filters);
   const statusOptions = [
+    { value: "new", label: "New Application" },
     { value: "active", label: "Active" },
-    { value: "new", label: "New" },
     { value: "contacted", label: "Contacted" },
     { value: "interested", label: "Interested" },
     { value: "onboarding_sent", label: "Onboarding Sent" },
@@ -3156,10 +3261,37 @@ function AmbassadorRegistryTable({
           </div>
         </div>
 
+        <nav className="mt-5 flex flex-wrap gap-2" aria-label="Ambassador work queue">
+          {[
+            ["new", "New Applications"],
+            ["pending", "Pending Review"],
+            ["attention", "Needs Attention"],
+            ["approved", "Approved"],
+            ["all", "All Ambassadors"],
+          ].map(([value, label]) => {
+            const selected = (filters.queue || "all") === value;
+            return (
+              <Link
+                key={value}
+                href={value === "all" ? "/admin/ambassadors" : `/admin/ambassadors?queue=${value}`}
+                className={`inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black ${
+                  selected
+                    ? "bg-[#0D5C3A] !text-white"
+                    : "border border-[#cfe4c8] bg-white text-[#0D5C3A]"
+                }`}
+                aria-current={selected ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
         <form
           action="/admin/ambassadors"
           className="mt-5 rounded-[1.5rem] border border-[#e2ecd9] bg-[#f8fbf6] p-4"
         >
+          <input type="hidden" name="queue" value={filters.queue || "all"} />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
@@ -3422,20 +3554,23 @@ export default async function AdminAmbassadorsPage({
     }
   }
 
-  const ambassadors = buildUnifiedAmbassadorRows({
-    summaryRows,
-    detailRows,
-    profileRows,
-    roleRows,
-    authUsers,
-    referralRows,
-    leadRows,
-    rewardRows,
-    activityRows,
-    trainingStepRows,
-    trainingProgressRows,
-    onboardingRows,
-  });
+  const ambassadors = appendOpenAmbassadorApplications(
+    buildUnifiedAmbassadorRows({
+      summaryRows,
+      detailRows,
+      profileRows,
+      roleRows,
+      authUsers,
+      referralRows,
+      leadRows,
+      rewardRows,
+      activityRows,
+      trainingStepRows,
+      trainingProgressRows,
+      onboardingRows,
+    }),
+    await loadOpenAmbassadorApplications(),
+  );
 
   const registryFilters = buildRegistryFilters(resolvedSearchParams);
   const registryAmbassadors = filterAmbassadorsForRegistry(

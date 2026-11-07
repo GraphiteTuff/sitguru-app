@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { approveAmbassadorApplicationAction } from "@/app/admin/ambassadors/approve-application-action";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -121,6 +122,7 @@ function searchMatches(row: AmbassadorDisplayRow, query: string) {
 }
 
 function getPriority(row: AmbassadorDisplayRow) {
+  if (row.id.startsWith("application:")) return -1;
   if (row.flaggedForReview) return 0;
   if (row.needsAttention) return 1;
   if (row.possibleDuplicate) return 2;
@@ -421,13 +423,36 @@ export default function AmbassadorRecordsTable({
                   </div>
 
                   <div className="grid min-w-[180px] gap-2">
-                    <Link
-                      href={ambassador.href}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
-                    >
-                      <UserRoundCheck size={16} />
-                      Review Ambassador
-                    </Link>
+                    {ambassador.id.startsWith("application:") ? (
+                      <form action={approveAmbassadorApplicationAction}>
+                        <input
+                          type="hidden"
+                          name="application_id"
+                          value={ambassador.id.slice("application:".length)}
+                        />
+                        <input
+                          name="work_email"
+                          type="email"
+                          placeholder="Work email, optional"
+                          className="mb-2 min-h-11 w-full rounded-2xl border border-emerald-200 px-3 text-sm font-semibold text-slate-800"
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 py-3 text-sm font-black !text-white transition hover:bg-[#08462C]"
+                        >
+                          <UserRoundCheck size={16} />
+                          Approve Ambassador
+                        </button>
+                      </form>
+                    ) : (
+                      <Link
+                        href={ambassador.href}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+                      >
+                        <UserRoundCheck size={16} />
+                        Review Ambassador
+                      </Link>
+                    )}
 
                     {roles.includes("Pet Parent") && ambassador.userId ? (
                       <Link

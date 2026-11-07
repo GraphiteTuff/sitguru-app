@@ -36,6 +36,16 @@ type AmbassadorApplicationPayload = {
   utmTerm?: string;
 };
 
+async function accountIdForEmail(email: string) {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
+  return data?.id ? String(data.id) : null;
+}
+
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -310,6 +320,7 @@ export async function POST(request: Request) {
     }
 
     const submittedAt = new Date().toISOString();
+    const applicantUserId = await accountIdForEmail(email);
     const locationLabel = [city, state, zipCode].filter(Boolean).join(", ");
     const referralSource =
       referredByCode ||
@@ -370,6 +381,7 @@ export async function POST(request: Request) {
       notes,
       status: "new",
       source: "public_ambassador_application",
+      applicant_user_id: applicantUserId,
     };
 
     let data: { id?: string } | null = null;
@@ -405,6 +417,7 @@ export async function POST(request: Request) {
           notes,
           status: "new",
           source: "public_ambassador_application",
+          applicant_user_id: applicantUserId,
         })
         .select("id")
         .single();

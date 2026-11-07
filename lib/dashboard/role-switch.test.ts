@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   defaultWorkspaceForLoginRoles,
+  getAuthorizedDashboardTargets,
   getAvailableDashboardSwitches,
   mergeApprovedAdminSwitchRole,
   resolveAuthorizedRolesFromProfile,
@@ -151,6 +152,26 @@ describe("founder personal marketplace roles", () => {
       roleRows: ["customer"],
     });
     assert.deepEqual(roles, ["parent"]);
+  });
+
+  it("keeps Pet Parent, Guru, Ambassador, and Intern on one Guru signup", () => {
+    const roles = resolveAuthorizedRolesFromProfile({
+      email: "student@university.edu",
+      profile: { role: "guru", account_type: "guru" },
+      metadata: { authorizedRoles: ["guru"], signup_role: "guru" },
+      roleRows: ["guru"],
+      hasGuruRecord: true,
+      hasAmbassadorRecord: true,
+      hasInternRecord: true,
+    });
+    assert.deepEqual(roles, ["parent", "guru", "ambassador", "intern"]);
+    const switches = getAuthorizedDashboardTargets({ authorizedRoles: roles });
+    assert.deepEqual(
+      switches.map((item) => item.shortLabel),
+      ["Pet Parent", "Guru", "Ambassador", "Intern"],
+    );
+    assert.equal(roles.includes("admin"), false);
+    assert.equal(roles.includes("manager"), false);
   });
 
   it("adds Intern for assigned marketplace accounts without Admin", () => {
