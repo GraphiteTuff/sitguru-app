@@ -310,7 +310,8 @@ export async function settleCompanionTurn(input: {
     });
     // Static catalog answers are still voiced by the companion.
     // Approved Help Center articles are sent as written.
-    return { takeOver: !staticFaq as const, reply: faq };
+    const takeOver = staticFaq.length === 0;
+    return { takeOver, reply: faq };
   }
   if (input.holdForCompanion || !question) {
     if (question) {
