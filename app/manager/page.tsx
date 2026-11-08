@@ -1,6 +1,7 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
 import ManagerDeskHome from "@/components/manager/ManagerDeskHome";
+import { countPendingContentReviews } from "@/lib/internship/content-studio-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,9 @@ export default async function ManagerPortalHomePage({
       </div>
     );
   }
-  return <ManagerDeskHome desk={desk} />;
+  const pendingContent = await countPendingContentReviews(
+    desk.viewingUserId || access.actor.id,
+    desk.viewingUserId ? false : access.actor.isSuperUser,
+  );
+  return <ManagerDeskHome desk={desk} pendingContent={pendingContent} />;
 }

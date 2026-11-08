@@ -50,7 +50,7 @@ export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.resources, label: "Resources", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.help, label: "Help", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.weeklyWork, label: "My Weekly Work", match: "prefix" as const, group: "My Growth Work" },
-  { href: MANAGER_ROUTES.campaignsContent, label: "Campaigns & Content", match: "prefix" as const, group: "My Growth Work" },
+  { href: MANAGER_ROUTES.campaignsContent, label: "Content Studio", match: "prefix" as const, group: "My Growth Work" },
   { href: MANAGER_ROUTES.outreach, label: "Community Outreach", match: "prefix" as const, group: "My Growth Work" },
   { href: MANAGER_ROUTES.surveys, label: "Polls & Surveys", match: "prefix" as const, group: "My Growth Work" },
   { href: MANAGER_ROUTES.conversions, label: "Growth & Conversions", match: "prefix" as const, group: "My Growth Work" },

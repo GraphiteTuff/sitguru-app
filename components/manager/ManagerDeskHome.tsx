@@ -79,7 +79,13 @@ function managerHref(path: string, viewingUserId?: string | null) {
   return `${path}${join}as=${encodeURIComponent(viewingUserId)}`;
 }
 
-export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
+export default function ManagerDeskHome({
+  desk,
+  pendingContent = 0,
+}: {
+  desk: ManagerDeskBundle;
+  pendingContent?: number;
+}) {
   const queue = buildManagerDeskReviewQueue(desk.reviews, desk.questions);
   const href = (path: string) => managerHref(path, desk.viewingUserId);
   const cards = desk.cards;
@@ -156,6 +162,14 @@ export default function ManagerDeskHome({ desk }: { desk: ManagerDeskBundle }) {
         }
         quote={"Support.\nDevelop.\nCreate Opportunities.\nBigger Impact.®"}
       />
+
+      <Link href={href("/manager/campaigns-content")} className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-[#F0FDF4] px-4 py-3">
+        <span>
+          <span className="block text-sm font-black text-slate-950">Pending my approval</span>
+          <span className="text-xs font-semibold text-slate-600">Intern content assigned to this desk</span>
+        </span>
+        <span className="text-2xl font-black text-[#0D5C3A]">{pendingContent}</span>
+      </Link>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat

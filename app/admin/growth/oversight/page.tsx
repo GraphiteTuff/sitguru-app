@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { approveOutreach } from "@/lib/manager-growth/actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { loadManagerContentStudio, studioRowLabel } from "@/lib/internship/content-studio-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,8 @@ export default async function GrowthOversightPage() {
     .eq("leadership_approved", false)
     .limit(40);
   const waiting = (data || []).filter((row) => String(row.status) === "Needs leadership approval" || ["Contract", "Sponsorship", "Financial arrangement", "Legal agreement", "Major company partnership"].includes(String(row.commitment)));
+  const studio = await loadManagerContentStudio(access.actor.id, true);
+  const escalated = studio.items.filter((item) => studioRowLabel(item).action === "CEO review");
   return (
     <main className="mx-auto max-w-3xl space-y-4 px-4 py-8">
       <h1 className="text-3xl font-black text-[#0F2744]">Growth oversight</h1>
@@ -32,6 +36,20 @@ export default async function GrowthOversightPage() {
         ))}
         {!waiting.length ? <li className="text-sm text-slate-500">Nothing is waiting for a formal commitment.</li> : null}
       </ul>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-black text-[#0F2744]">Content escalations</h2>
+        <p className="mt-1 text-sm text-slate-600">Managers approve ordinary posts. Only escalated content is listed here.</p>
+        <ul className="mt-3 space-y-2">
+          {escalated.map((item) => (
+            <li key={item.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
+              <span className="font-black text-slate-950">{item.title}</span>
+              <span className="text-slate-600"> · {item.internName}</span>
+            </li>
+          ))}
+          {!escalated.length ? <li className="text-sm text-slate-500">No content is escalated.</li> : null}
+        </ul>
+        <Link href="/manager/campaigns-content" className="mt-3 inline-flex text-sm font-black text-[#1D4ED8]">Open Content Studio</Link>
+      </section>
     </main>
   );
 }

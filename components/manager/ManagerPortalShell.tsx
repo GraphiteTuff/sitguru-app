@@ -51,7 +51,7 @@ const ICONS = {
   "My Team": Users,
   "Intern Team": Users,
   "My Weekly Work": ClipboardList,
-  "Campaigns & Content": Megaphone,
+  "Content Studio": Megaphone,
   "Community Outreach": Users,
   "Polls & Surveys": PieChart,
   "Growth & Conversions": LineChart,

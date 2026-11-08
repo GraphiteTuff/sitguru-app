@@ -1,5 +1,7 @@
-import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { ContentStudioBoard } from "@/components/manager/ContentStudioBoard";
 import { CampaignPanel, GrowthFrame } from "@/components/manager/GrowthWorkPanels";
+import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { loadManagerContentStudio } from "@/lib/internship/content-studio-actions";
 import { loadCampaignDesk } from "@/lib/manager-growth/data";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +18,18 @@ export default async function CampaignsContentPage({
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
-  const desk = await loadCampaignDesk(access.actor.id);
+  const [desk, studio] = await Promise.all([
+    loadCampaignDesk(access.actor.id),
+    loadManagerContentStudio(access.actor.id, access.actor.isSuperUser),
+  ]);
   return (
-    <GrowthFrame title="Campaigns & Content" subtitle="Create organic campaigns and keep the caption, the link, and the lesson." notice={first(params.ok)}>
+    <GrowthFrame title="Content Studio" subtitle="Review intern content, then keep your own campaigns beside it." notice={first(params.ok)}>
+      <ContentStudioBoard
+        items={studio.items}
+        summary={studio.summary}
+        isSuperUser={access.actor.isSuperUser}
+        error={first(params.error)}
+      />
       <CampaignPanel campaigns={desk.campaigns} content={desk.content} />
     </GrowthFrame>
   );
