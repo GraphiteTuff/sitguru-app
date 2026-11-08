@@ -201,8 +201,8 @@ export default function InternBrandLibrary({
             </div>
             <div className="mt-3"><Preview asset={selected} /></div>
             <p className="mt-3 break-words text-sm font-semibold text-slate-600">{brandCategoryLabel(selected.category)}</p>
-            {isThirdPartyBrandCategory(selected.category) ? (
-              <p className="mt-1 text-xs font-medium text-slate-600">{brandCategoryNotice(selected.category)}</p>
+            {brandCategoryNotice(selected.category) ? (
+              <p className="mt-1 break-words text-xs font-medium text-slate-600">{brandCategoryNotice(selected.category)}</p>
             ) : null}
             <button
               type="button"

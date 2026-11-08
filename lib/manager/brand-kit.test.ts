@@ -220,6 +220,60 @@ describe("brand library order", () => {
     assert.equal(intern.approve, false);
   });
 
+  it("accepts stock photos as drafts and keeps them out of the logo folders", () => {
+    assert.equal(isBrandCategory("photography_stock"), true);
+    assert.equal(brandCategoryLabel("photography_stock"), "Photography & Stock Images");
+    assert.equal(isThirdPartyBrandCategory("photography_stock"), false);
+    assert.match(brandCategoryNotice("photography_stock"), /commercial-use rights/i);
+    assert.match(brandCategoryNotice("photography_stock"), /not presented as SitGuru employees or Ambassadors/i);
+    for (const file of [
+      { fileName: "asset-031.jpg", declaredMime: "image/jpeg" },
+      { fileName: "campus.png", declaredMime: "image/png" },
+      { fileName: "lifestyle.webp", declaredMime: "image/webp" },
+    ]) {
+      const claim = assessBrandUploadClaim({ ...file, declaredSize: 4096 });
+      assert.equal(claim.ok, true);
+    }
+    const photo = brandMasterFolder({
+      category: "photography_stock",
+      mimeType: "image/jpeg",
+      approvalStatus: "draft",
+    });
+    assert.equal(photo.path, "02 Brand Kit / 04 Marketing & Print Assets / Ambassador_Program / 02 Stock Photography");
+    assert.match(photo.purpose, /descriptive subfolder/i);
+    assert.equal(photo.archived, false);
+    const retired = brandMasterFolder({
+      category: "photography_stock",
+      mimeType: "image/jpeg",
+      approvalStatus: "archived",
+    });
+    assert.equal(retired.name, "99 Brand Archive");
+    const logo = brandMasterFolder({
+      category: "official_logos",
+      mimeType: "image/jpeg",
+      approvalStatus: "approved",
+    });
+    assert.equal(logo.name, "02 Digital & Social Logos");
+    assert.equal(brandAssetMatchesCategory("photography_stock", "photography_stock"), true);
+    assert.equal(brandAssetMatchesCategory("official_logos", "photography_stock"), false);
+    assert.equal(BRAND_UPLOAD_STATUS, "draft");
+    const manager = brandKitCapabilities({
+      canAccessAdmin: true,
+      isSuperUser: false,
+      growthOnly: true,
+      intern: false,
+    });
+    const admin = brandKitCapabilities({
+      canAccessAdmin: true,
+      isSuperUser: true,
+      growthOnly: false,
+      intern: false,
+    });
+    assert.equal(manager.approve, false);
+    assert.equal(admin.approve, true);
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: false, status: "draft" }), "approved");
+  });
+
   it("accepts a SitGuru SharePoint file URL and rejects other destinations", () => {
     const file = parseSitGuruSharePointUrl(
       "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/General/02%20Brand%20Kit/02%20Digital%20%26%20Social%20Logos/horizontal.jpg",

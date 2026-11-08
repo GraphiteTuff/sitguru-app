@@ -16,6 +16,7 @@ export const BRAND_CATEGORIES = [
   { id: "platform_icons", label: "Platform & App Store Icons" },
   { id: "merchandise", label: "Merchandise & Product Designs" },
   { id: "partner_logos", label: "Third-Party Partner Logos" },
+  { id: "photography_stock", label: "Photography & Stock Images" },
 ] as const;
 
 export type BrandCategoryId = (typeof BRAND_CATEGORIES)[number]["id"];
@@ -96,6 +97,9 @@ export function brandCategoryNotice(value: string) {
   }
   if (value === "platform_icons" || value === "partner_logos") {
     return "Third-party artwork. This is not an official SitGuru logo.";
+  }
+  if (value === "photography_stock") {
+    return "Third-party stock photos need commercial-use rights and any required releases before approval. People in these photos are not presented as SitGuru employees or Ambassadors.";
   }
   return "";
 }
@@ -508,6 +512,12 @@ export function brandMasterFolder(input: {
     return brandFolder(
       "04 Marketing & Print Assets",
       "Third-party partner marks. These are not official SitGuru logos.",
+    );
+  }
+  if (input.category === "photography_stock") {
+    return brandFolder(
+      "04 Marketing & Print Assets / Ambassador_Program / 02 Stock Photography",
+      "Stock and lifestyle photos. Ambassador groups can use a descriptive subfolder under 02 Stock Photography. Confirm commercial-use rights and releases before approval.",
     );
   }
   if (input.category === "seasonal") {

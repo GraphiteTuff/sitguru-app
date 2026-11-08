@@ -49,6 +49,7 @@ export function buildManagerToolkit(input: {
         { label: "Platform & App Store Icons", detail: "Third-party platform and app-store marks.", href: `${MANAGER_ROUTES.toolkit}/brand?category=platform_icons` },
         { label: "Merchandise & Product Designs", detail: "Product and merchandise designs.", href: `${MANAGER_ROUTES.toolkit}/brand?category=merchandise` },
         { label: "Third-Party Partner Logos", detail: "Partner marks that are not official SitGuru logos.", href: `${MANAGER_ROUTES.toolkit}/brand?category=partner_logos` },
+        { label: "Photography & Stock Images", detail: "Lifestyle and recruitment photos. Confirm rights before approval.", href: `${MANAGER_ROUTES.toolkit}/brand?category=photography_stock` },
         external("SharePoint Brand Kit", "Master files that stay in Microsoft 365.", folder("general-brand-kit")),
       ],
     },

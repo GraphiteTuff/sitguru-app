@@ -639,7 +639,7 @@ function AssetDrawer({
         <section className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
           <h3 className="font-black text-[#0F2744]">SharePoint Source File</h3>
           <p className="mt-1 break-words text-xs font-medium">Recommended folder: General / {master.path}</p>
-          {isThirdPartyBrandCategory(asset.category) ? <p className="mt-1 text-xs font-bold text-slate-600">{brandCategoryNotice(asset.category)}</p> : null}
+          {brandCategoryNotice(asset.category) ? <p className="mt-1 break-words text-xs font-bold text-slate-600">{brandCategoryNotice(asset.category)}</p> : null}
           <p className="mt-1 text-xs font-medium">{master.purpose}</p>
           <p className="mt-2 text-xs font-medium">SitGuru does not copy this file into SharePoint, and a saved URL is not a verified master. Only a retired design belongs in 99 Brand Archive.</p>
           {source ? (
