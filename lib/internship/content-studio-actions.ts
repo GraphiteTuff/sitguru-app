@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { canUseGrowthPortal } from "@/lib/admin/growth/access";
+import { contentCreativeOwned } from "@/lib/internship/content-creative";
+import { confirmContentCreative } from "@/lib/internship/content-creative-store";
 import {
   canRecordPublication,
   canReviewAssignedContent,
@@ -13,6 +15,7 @@ import {
   studioSummary,
   type StudioItem,
 } from "@/lib/internship/content-studio";
+import { notifyContentReview } from "@/lib/internship/content-studio-notify";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { statusForStage } from "@/lib/internship/review-flow";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -33,6 +36,9 @@ export type StudioContentRow = StudioItem & {
   campaignId: string;
   taskId: string;
   assetIds: string[];
+  creativePath: string;
+  creativeMime: string;
+  creativeName: string;
   createdAt: string;
 };
 
@@ -52,6 +58,12 @@ function bounce(path: string, kind: "ok" | "error", message: string): never {
   const params = new URLSearchParams();
   params.set(kind, message);
   redirect(`${path}?${params.toString()}`);
+}
+
+function studioReturn(formData: FormData, fallback: string) {
+  const requested = text(formData, "returnTo");
+  if (requested === "/admin/growth/content" || requested === "/manager/campaigns-content") return requested;
+  return fallback;
 }
 
 async function currentUser() {
@@ -83,6 +95,9 @@ function mapRow(row: Record<string, unknown>, internName: string, assetIds: stri
     campaignId: String(row.campaign_id || ""),
     taskId: String(row.task_id || ""),
     assetIds,
+    creativePath: String(row.creative_path || ""),
+    creativeMime: String(row.creative_mime || ""),
+    creativeName: String(row.creative_name || ""),
     createdAt: String(row.created_at || ""),
   };
 }
@@ -200,7 +215,16 @@ export async function saveStudioContent(formData: FormData) {
   const caption = text(formData, "caption");
   const draftUrl = text(formData, "draftUrl");
   const platform = text(formData, "platform");
-  const key = contentCreativeKey({ caption, draftUrl, platform, assetIds });
+  const creativePath = text(formData, "creativePath");
+  const creativeMime = text(formData, "creativeMime");
+  const creativeName = text(formData, "creativeName");
+  if (creativePath && !contentCreativeOwned(internId, creativePath)) {
+    bounce("/intern/content", "error", "That creative file is not on your draft.");
+  }
+  if (creativePath && !(await confirmContentCreative(internId, creativePath))) {
+    bounce("/intern/content", "error", "Upload the creative again, then save.");
+  }
+  const key = contentCreativeKey({ caption, draftUrl, platform, assetIds, creativePath });
   const existingId = text(formData, "id");
   const payload = {
     title,
@@ -213,6 +237,9 @@ export async function saveStudioContent(formData: FormData) {
     campaign_id: text(formData, "campaignId") || null,
     task_id: text(formData, "taskId") || null,
     due_on: text(formData, "plannedAt").slice(0, 10) || null,
+    creative_path: creativePath,
+    creative_mime: creativePath ? creativeMime : "",
+    creative_name: creativePath ? creativeName : "",
   };
 
   let contentId = existingId;
@@ -277,12 +304,13 @@ export async function saveStudioContent(formData: FormData) {
     });
     if (!decision.ok) bounce("/intern/content", "error", decision.error);
     const now = new Date().toISOString();
-    await supabaseAdmin.from("internship_content").update({
+    const { data: submitted } = await supabaseAdmin.from("internship_content").update({
       review_stage: decision.stage,
       status: statusForStage(decision.stage),
       submitted_at: now,
       supervisor_approved: false,
-    }).eq("id", contentId);
+    }).eq("id", contentId).eq("review_stage", String(current?.review_stage || "")).select("id");
+    if (!submitted?.length) bounce("/intern/content", "error", "This draft was already submitted.");
     await supabaseAdmin.from("internship_review_events").insert({
       intern_id: internId,
       target_type: "content",
@@ -293,6 +321,21 @@ export async function saveStudioContent(formData: FormData) {
       status: decision.stage,
       comment: "Submitted for manager review.",
     });
+    const { data: owner } = await supabaseAdmin
+      .from("internship_interns")
+      .select("manager_user_id,preferred_name,full_name")
+      .eq("id", internId)
+      .maybeSingle();
+    if (owner?.manager_user_id) {
+      await notifyContentReview({
+        kind: "submitted",
+        contentId,
+        title,
+        recipientUserId: String(owner.manager_user_id),
+        actorUserId: user.id,
+        eventStamp: now,
+      });
+    }
   }
 
   revalidatePath("/intern/content");
@@ -315,7 +358,7 @@ export async function reviewStudioContent(formData: FormData) {
   }
   const { data: intern } = await supabaseAdmin
     .from("internship_interns")
-    .select("manager_user_id")
+    .select("manager_user_id,supervisor_user_id,user_id,email,preferred_name,full_name")
     .eq("id", internId)
     .maybeSingle();
   if (!canReviewAssignedContent({
@@ -327,7 +370,7 @@ export async function reviewStudioContent(formData: FormData) {
   }
   const { data: current } = await supabaseAdmin
     .from("internship_content")
-    .select("review_stage,status,caption,draft_url,platform")
+    .select("review_stage,status,title,caption,draft_url,platform,creative_path")
     .eq("id", contentId)
     .eq("intern_id", internId)
     .maybeSingle();
@@ -356,11 +399,12 @@ export async function reviewStudioContent(formData: FormData) {
     actor,
     comment,
   });
-  if (!decision.ok) bounce("/manager/campaigns-content", "error", decision.error);
+  const destination = studioReturn(formData, "/manager/campaigns-content");
+  if (!decision.ok) bounce(destination, "error", decision.error);
   const { data: links } = await supabaseAdmin.from("internship_content_assets").select("asset_id").eq("content_id", contentId);
   const now = new Date().toISOString();
   const approved = decision.stage === "ava_approved" || decision.stage === "ceo_approved";
-  const { error } = await supabaseAdmin.from("internship_content").update({
+  const { data: saved, error } = await supabaseAdmin.from("internship_content").update({
     review_stage: decision.stage,
     status: statusForStage(decision.stage),
     supervisor_notes: comment,
@@ -373,10 +417,12 @@ export async function reviewStudioContent(formData: FormData) {
           draftUrl: String(current.draft_url || ""),
           platform: String(current.platform || ""),
           assetIds: (links || []).map((row) => String(row.asset_id)),
+          creativePath: String(current.creative_path || ""),
         })
       : "",
-  }).eq("id", contentId);
-  if (error) bounce("/manager/campaigns-content", "error", error.message);
+  }).eq("id", contentId).eq("review_stage", String(current.review_stage || "")).select("id");
+  if (error) bounce(destination, "error", error.message);
+  if (!saved?.length) bounce(destination, "error", "This review was already saved.");
   await supabaseAdmin.from("internship_review_events").insert({
     intern_id: internId,
     target_type: "content",
@@ -387,10 +433,39 @@ export async function reviewStudioContent(formData: FormData) {
     status: decision.stage,
     comment,
   });
+  const noticeKind = decision.stage === "changes_requested"
+    ? "changes"
+    : approved
+      ? "approved"
+      : decision.stage === "submitted_to_jason"
+        ? "escalated"
+        : "";
+  if ((noticeKind === "changes" || noticeKind === "approved") && intern?.user_id) {
+    await notifyContentReview({
+      kind: noticeKind,
+      contentId,
+      title: String(current.title || "SitGuru content"),
+      recipientUserId: String(intern.user_id),
+      fallbackEmail: String(intern.email || ""),
+      actorUserId: user.id,
+      eventStamp: now,
+    });
+  }
+  if (noticeKind === "escalated" && intern?.supervisor_user_id) {
+    await notifyContentReview({
+      kind: "escalated",
+      contentId,
+      title: String(current.title || "SitGuru content"),
+      recipientUserId: String(intern.supervisor_user_id),
+      actorUserId: user.id,
+      eventStamp: now,
+    });
+  }
   revalidatePath("/manager/campaigns-content");
   revalidatePath("/manager");
   revalidatePath("/intern/content");
-  bounce("/manager/campaigns-content", "ok", approved ? "Content approved. It is not published yet." : "Review saved.");
+  revalidatePath("/admin/growth/content");
+  bounce(destination, "ok", approved ? "Content approved. It is not published yet." : "Review saved.");
 }
 
 export async function recordStudioPublication(formData: FormData) {

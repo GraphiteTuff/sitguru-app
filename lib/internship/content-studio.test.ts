@@ -5,9 +5,12 @@ import {
   canReviewAssignedContent,
   contentCreativeKey,
   contentEditResetsApproval,
+  contentReviewNotice,
+  deliverableMailbox,
   studioDecision,
   studioSummary,
 } from "./content-studio";
+import { assessContentCreative, contentCreativeOwned, creativeBytesMatch } from "./content-creative";
 
 describe("content studio workflow", () => {
   it("routes a draft to the assigned manager and blocks intern self-approval", () => {
@@ -90,5 +93,45 @@ describe("content studio workflow", () => {
     assert.equal(counts.pending, 1);
     assert.equal(counts.scheduled, 1);
     assert.equal(counts.published, 0);
+    assert.equal(
+      contentEditResetsApproval({
+        reviewStage: "ava_approved",
+        approvedSnapshot: first,
+        nextKey: contentCreativeKey({
+          caption: "Hello pets",
+          draftUrl: "https://canva.com/design/1",
+          platform: "Instagram",
+          assetIds: ["logo"],
+          creativePath: "interns/lola/content/reel.mp4",
+        }),
+      }),
+      true,
+    );
+  });
+
+  it("keeps phone-login addresses out of review mail and describes the notice", () => {
+    assert.equal(deliverableMailbox("phone.16098195819@users.sitguru.internal", "lola.uhl5@gmail.com"), "lola.uhl5@gmail.com");
+    assert.equal(deliverableMailbox(""), "");
+    const notice = contentReviewNotice({
+      kind: "submitted",
+      title: "Pet Safety",
+      href: "https://www.sitguru.com/manager/campaigns-content?content=1",
+    });
+    assert.match(notice.subject, /Pet Safety/);
+    assert.match(notice.text, /manager\/campaigns-content/);
+  });
+});
+
+describe("content creative files", () => {
+  it("accepts a png, rejects a public-looking path, and checks file bytes", () => {
+    const png = assessContentCreative({ name: "logo.PNG", size: 1200, type: "image/png" });
+    assert.equal(png.ok && png.direct, true);
+    const huge = assessContentCreative({ name: "reel.mp4", size: 30 * 1024 * 1024, type: "video/mp4" });
+    assert.equal(huge.ok, false);
+    assert.equal(contentCreativeOwned("intern-1", "interns/intern-1/content/file.png"), true);
+    assert.equal(contentCreativeOwned("intern-1", "interns/intern-2/content/file.png"), false);
+    assert.equal(contentCreativeOwned("intern-1", "interns/intern-1/../secret.png"), false);
+    assert.equal(creativeBytesMatch("image/png", Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0])), true);
+    assert.equal(creativeBytesMatch("image/png", Uint8Array.from([0x3c, 0x73, 0x63, 0x72, 0, 0, 0, 0, 0, 0, 0, 0])), false);
   });
 });

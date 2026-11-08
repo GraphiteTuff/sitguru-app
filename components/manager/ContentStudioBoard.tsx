@@ -16,18 +16,29 @@ const PLATFORM_LINKS: Record<string, string> = {
   YouTube: "https://www.youtube.com/",
 };
 
+function CreativePreview({ item }: { item: StudioContentRow }) {
+  if (!item.creativePath) return null;
+  const src = `/api/content-studio/${item.id}/file`;
+  if (item.creativeMime.startsWith("video/")) {
+    return <video src={src} controls className="mt-3 max-h-80 w-full rounded-xl bg-slate-950" />;
+  }
+  return <img src={src} alt="" className="mt-3 max-h-80 w-full rounded-xl object-contain bg-slate-50" />;
+}
+
 export function ContentStudioBoard({
   items,
   summary,
   isSuperUser,
   notice,
   error,
+  focusId = "",
 }: {
   items: StudioContentRow[];
   summary: ReturnType<typeof studioSummary>;
   isSuperUser: boolean;
   notice?: string;
   error?: string;
+  focusId?: string;
 }) {
   const cards = [
     ["Drafts", summary.drafts],
@@ -71,7 +82,7 @@ export function ContentStudioBoard({
           const labels = studioRowLabel(item);
           const platformHref = PLATFORM_LINKS[item.platform] || "";
           return (
-            <article key={item.id} className={`${DESK_UI.card} p-4`}>
+            <article id={`content-${item.id}`} key={item.id} className={`${DESK_UI.card} p-4 ${focusId === item.id ? "ring-2 ring-[#2563EB]" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h4 className="text-lg font-black text-slate-950">{item.title}</h4>
@@ -81,6 +92,7 @@ export function ContentStudioBoard({
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">{labels.action}</span>
               </div>
+              <CreativePreview item={item} />
               {item.caption ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.caption}</p> : null}
               {item.draftUrl ? <p className="mt-2 break-all text-sm font-semibold text-[#1D4ED8]">{item.draftUrl}</p> : null}
               <p className="mt-2 text-xs font-semibold text-slate-500">

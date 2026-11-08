@@ -17,13 +17,15 @@ export function contentCreativeKey(input: {
   draftUrl: string;
   platform: string;
   assetIds: string[];
+  creativePath?: string;
 }) {
-  return [
+  const base = [
     input.caption.trim(),
     input.draftUrl.trim(),
     input.platform.trim(),
     [...input.assetIds].sort().join(","),
   ].join("|");
+  return input.creativePath ? `${base}|file:${input.creativePath}` : base;
 }
 
 export function contentEditResetsApproval(input: {
@@ -107,6 +109,54 @@ export function studioNextAction(status: string, reviewStage?: string | null, pu
   if (isOfficialReviewStage(stage)) return "Publish";
   if (stage === "submitted_to_jason") return "CEO review";
   return "Open";
+}
+
+export function deliverableMailbox(...candidates: Array<string | null | undefined>) {
+  for (const candidate of candidates) {
+    const email = String(candidate || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+    if (email.endsWith("@users.sitguru.internal")) continue;
+    return email;
+  }
+  return "";
+}
+
+export function contentReviewNotice(input: {
+  kind: "submitted" | "changes" | "approved" | "escalated";
+  title: string;
+  href: string;
+}) {
+  const title = input.title.trim() || "SitGuru content";
+  if (input.kind === "submitted") {
+    return {
+      subject: `Content ready for your review: ${title}`,
+      title: "Content needs your review",
+      body: `${title} was submitted and is waiting for your review.`,
+      text: `${title} was submitted and is waiting for your review.\n\nOpen the review: ${input.href}`,
+    };
+  }
+  if (input.kind === "changes") {
+    return {
+      subject: `Changes requested: ${title}`,
+      title: "Changes requested",
+      body: `Your manager asked for changes on ${title}.`,
+      text: `Your manager asked for changes on ${title}.\n\nOpen the draft: ${input.href}`,
+    };
+  }
+  if (input.kind === "approved") {
+    return {
+      subject: `Content approved: ${title}`,
+      title: "Content approved",
+      body: `${title} was approved. It is not published yet.`,
+      text: `${title} was approved. It is not published yet.\n\nOpen the draft: ${input.href}`,
+    };
+  }
+  return {
+    subject: `Content escalated: ${title}`,
+    title: "Content escalated",
+    body: `${title} was escalated for Admin review.`,
+    text: `${title} was escalated for Admin review.\n\nOpen the overview: ${input.href}`,
+  };
 }
 
 export function studioRowLabel(row: {

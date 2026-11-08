@@ -29,6 +29,7 @@ export default async function CampaignsContentPage({
         summary={studio.summary}
         isSuperUser={access.actor.isSuperUser}
         error={first(params.error)}
+        focusId={first(params.content)}
       />
       <CampaignPanel campaigns={desk.campaigns} content={desk.content} />
     </GrowthFrame>

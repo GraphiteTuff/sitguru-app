@@ -49,7 +49,7 @@ export default async function GrowthOversightPage() {
           ))}
           {!escalated.length ? <li className="text-sm text-slate-500">No content is escalated.</li> : null}
         </ul>
-        <Link href="/manager/campaigns-content" className="mt-3 inline-flex text-sm font-black text-[#1D4ED8]">Open Content Studio</Link>
+        <Link href="/admin/growth/content" className="mt-3 inline-flex text-sm font-black text-[#1D4ED8]">Open the full content overview</Link>
       </section>
     </main>
   );

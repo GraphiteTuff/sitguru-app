@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContentCreativeField } from "@/components/internship/ContentCreativeField";
 import { CONTENT_PLATFORMS, CONTENT_TYPES, studioRowLabel } from "@/lib/internship/content-studio";
 import { loadInternContentStudio, saveStudioContent } from "@/lib/internship/content-studio-actions";
 import { currentAssignedIntern, requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -57,7 +58,13 @@ export default async function InternContentPage({
         <label className="block text-sm font-black text-slate-800">Caption
           <textarea name="caption" rows={4} defaultValue={editing?.caption || ""} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Post text, hashtags, and call to action" />
         </label>
-        <label className="block text-sm font-black text-slate-800">Creative file or Canva link
+        <div>
+          <p className="text-sm font-black text-slate-800">Finished graphic or video</p>
+          <ContentCreativeField
+            initial={editing?.creativePath ? { path: editing.creativePath, mime: editing.creativeMime, name: editing.creativeName } : null}
+          />
+        </div>
+        <label className="block text-sm font-black text-slate-800">Or a Canva link
           <input name="draftUrl" defaultValue={editing?.draftUrl || ""} className={`mt-1 ${field}`} placeholder="https://" />
         </label>
         <fieldset>

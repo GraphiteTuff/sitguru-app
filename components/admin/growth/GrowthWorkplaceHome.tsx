@@ -211,6 +211,14 @@ export async function GrowthWorkplaceHome({
       detail: "Business performance and trends",
       icon: BarChart3,
     },
+    ...(workplace.kind === "admin"
+      ? [{
+          href: "/admin/growth/content",
+          label: "Content overview",
+          detail: "Read-only intern content, plus escalations",
+          icon: Megaphone,
+        }]
+      : []),
     {
       href: intern ? "/intern" : "/intern/manage",
       label: intern ? "Intern Portal" : "Intern Team Desk",

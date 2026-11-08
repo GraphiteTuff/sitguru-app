@@ -27,6 +27,7 @@ const MANAGER: DeskSearchHit[] = [
   { href: "/manager/help", title: "Help", detail: "Guides for the manager desk", keywords: "help support faq" },
   { href: "/manager/weekly-work", title: "My Weekly Work", detail: "Initiatives and weekly learning", keywords: "weekly work initiative goals" },
   { href: "/manager/campaigns-content", title: "Content Studio", detail: "Review, approve, and record intern content", keywords: "campaign content review approve publish" },
+  { href: "/admin/growth/content", title: "Content overview", detail: "Read-only intern content pipeline", keywords: "content review approved published escalation" },
   { href: "/intern/content", title: "Create Content", detail: "Draft a post and submit it to your manager", keywords: "content draft caption brand" },
   { href: "/manager/outreach", title: "Community Outreach", detail: "Partners and follow-ups", keywords: "outreach partner shelter" },
   { href: "/manager/surveys", title: "Polls & Surveys", detail: "Community questions", keywords: "poll survey" },
