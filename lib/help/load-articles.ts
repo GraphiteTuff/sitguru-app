@@ -39,6 +39,7 @@ function mapDbArticle(row: Record<string, unknown>): HelpArticle | null {
       "Account & Profiles",
       "Booking & Cancellations",
       "Trust & Safety",
+      "Careers & Internships",
     ].includes(category)
       ? category
       : "Pet Parent Support",

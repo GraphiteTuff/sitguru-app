@@ -37,6 +37,8 @@ import {
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
 import { personableFactHint } from "@/lib/ai/companion-answer-protocol";
+import { shouldHoldForCompanion } from "@/lib/messaging/chat-library";
+import { rememberModelAnswer, settleCompanionTurn } from "@/lib/messaging/chat-archive";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
   buildCompanionAuthPromptBlock,
@@ -507,6 +509,23 @@ export async function POST(req: Request) {
     const instantFaq = instantFaqRaw
       ? stripDisallowedCompanionCtas(instantFaqRaw, viewer)
       : null;
+    const assist = await settleCompanionTurn({
+      question: lastUserText,
+      staticFaq: instantFaq,
+      companion: companionKey,
+      pagePath,
+      actorUserId: session?.id || null,
+      actorName: viewer.firstName || bodyGuruName || "",
+      actorRole: actorLabel,
+      holdForCompanion:
+        Boolean(scoutNeedsDirectory || blockFaqForMatching || scoutMatchingAsk) ||
+        shouldHoldForCompanion(lastUserText),
+    });
+    if (assist.takeOver) {
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(assist.reply, viewer),
+      );
+    }
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
     if (officer === "delilah") {
@@ -657,6 +676,17 @@ export async function POST(req: Request) {
         messages: messages.slice(-16),
         temperature: 0.45,
         maxTokens: 1800,
+        onFinish: ({ text }) => {
+          if (instantFaq) return;
+          void rememberModelAnswer({
+            question: lastUserText,
+            answer: String(text || ""),
+            companion: companionKey,
+            pagePath,
+            actorUserId: session?.id || null,
+            actorName: viewer.firstName || bodyGuruName || "",
+          });
+        },
         ...(officer === "scout"
           ? {
               tools: { lookupGurus: lookupGurusTool },

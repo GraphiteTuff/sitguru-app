@@ -6,6 +6,8 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
+import { rememberChat } from "@/lib/messaging/chat-archive";
+import { isLiveAgentSeat } from "@/lib/messaging/chat-library";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -88,7 +90,19 @@ export async function saveStaffMessage(input: {
 
   if (recipientId && recipientId !== who.userId) {
     if (who.role === "intern" && recipientId !== who.intern?.managerUserId) {
-      return { ok: false as const, error: "You can message your manager from here." };
+      const { data: recipient } = await supabaseAdmin
+        .from("profiles")
+        .select("email,role,account_type")
+        .eq("id", recipientId)
+        .maybeSingle();
+      const allowed = isLiveAgentSeat({
+        email: String(recipient?.email || ""),
+        role: String(recipient?.role || ""),
+        accountType: String(recipient?.account_type || ""),
+      });
+      if (!allowed) {
+        return { ok: false as const, error: "You can message SitGuru Admin or your manager from here." };
+      }
     }
     const { data: mine } = await supabaseAdmin.from("conversation_participants").select("conversation_id").eq("user_id", who.userId).limit(100);
     const mineIds = (mine || []).map((row) => String(row.conversation_id || "")).filter(Boolean);
@@ -125,7 +139,9 @@ export async function saveStaffMessage(input: {
   }
 
   if (!conversationId) {
-    const managerId = who.role === "intern" ? who.intern?.managerUserId || null : recipientId || null;
+    const managerId = who.role === "intern"
+      ? recipientId || who.intern?.managerUserId || null
+      : recipientId || null;
     const audience = String(input.audience || "");
     const { data, error } = await supabaseAdmin
       .from("conversations")
@@ -165,6 +181,46 @@ export async function saveStaffMessage(input: {
     created_at: now,
   }).select("id").single();
   if (error || !saved?.id) return { ok: false as const, error: "The message could not be saved." };
+  const { data: thread } = await supabaseAdmin
+    .from("conversations")
+    .select("conversation_type,subject")
+    .eq("id", conversationId)
+    .maybeSingle();
+  const liveAgent = String(thread?.conversation_type || "") === "live_agent";
+  if (liveAgent && who.role !== "intern") {
+    const { data: opener } = await supabaseAdmin
+      .from("messages")
+      .select("body,content,sender_id")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const asked = String(opener?.body || opener?.content || thread?.subject || "").trim();
+    if (asked && String(opener?.sender_id || "") !== who.userId) {
+      void rememberChat({
+        source: "live_agent",
+        conversationId,
+        actorUserId: who.userId,
+        actorName: firstName,
+        actorRole: "admin",
+        question: asked,
+        answer: textBody,
+        compilable: true,
+        preferAnswer: true,
+      });
+    }
+  } else {
+    void rememberChat({
+      source: "staff",
+      conversationId,
+      actorUserId: who.userId,
+      actorName: firstName,
+      actorRole: who.role,
+      question: String(input.subject || peerName || "").trim() || textBody,
+      answer: textBody,
+      compilable: false,
+    });
+  }
   await supabaseAdmin.from("conversations").update({
     last_message_preview: preview,
     last_message_at: now,

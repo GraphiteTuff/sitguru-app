@@ -14,6 +14,7 @@ const MANAGER: DeskSearchHit[] = [
   { href: "/manager/check-ins", title: "Check-Ins", detail: "Weekly check-ins to review", keywords: "check in checkins weekly review" },
   { href: "/manager/milestones", title: "Milestones", detail: "Goals and pace", keywords: "milestones goals progress" },
   { href: "/manager/messages", title: "Messaging", detail: "Team notes and conversations", keywords: "messages chat inbox" },
+  { href: "/manager/faqs", title: "Chat FAQs", detail: "Approve chat answers for the Help Center", keywords: "faq help article chat approve live agent" },
   { href: "/manager/my-time", title: "My Time", detail: "Log hours and the weekly pace", keywords: "time hours timer log" },
   { href: "/manager/payments", title: "My Payments", detail: "Pay periods and history", keywords: "payments pay invoice rate" },
   { href: "/manager/results", title: "Live Results", detail: "People and social totals", keywords: "results live reach posts" },

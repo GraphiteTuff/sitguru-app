@@ -424,9 +424,9 @@ export default function ManagerMessagesHome({
               <div className="m-auto w-full max-w-md">
                 <p className="text-center text-sm font-semibold text-slate-500">Start a chat. First names and photos stay with the message.</p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {["intern", "parent", "guru", "ambassador"].map((item) => (
+                  {["intern", "parent", "guru", "ambassador", "admin"].map((item) => (
                     <button key={item} type="button" onClick={() => setAudiencePick(item)} className={`rounded-full px-3 py-1.5 text-xs font-bold ${audiencePick === item ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
-                      {item === "parent" ? "Pet Parents" : item === "intern" ? "Interns" : item === "guru" ? "Gurus" : "Ambassadors"}
+                      {item === "parent" ? "Pet Parents" : item === "intern" ? "Interns" : item === "guru" ? "Gurus" : item === "admin" ? "Admins" : "Ambassadors"}
                     </button>
                   ))}
                 </div>

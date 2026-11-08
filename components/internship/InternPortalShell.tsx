@@ -35,6 +35,7 @@ import {
   isInternPortalChromePath,
 } from "@/lib/internship/intern-portal-nav";
 import { INTERN_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
+import DeskChatDock from "@/components/messaging/DeskChatDock";
 
 const ICONS = {
   Home,
@@ -195,6 +196,7 @@ export default function InternPortalShell({
           ) : null}
 
           <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
+          {showFullChrome ? <DeskChatDock mode="intern" /> : null}
 
           {showFullChrome ? (
             <WebappBottomNav

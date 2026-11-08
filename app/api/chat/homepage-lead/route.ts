@@ -36,6 +36,12 @@ import {
   isReservedPreferredName,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
+import {
+  matchMarketingFaq,
+  matchRoguePublicSoftIntent,
+  ROGUE_PUBLIC_MARKETING_FAQS,
+} from "@/lib/ai/officer-marketing-faqs";
+import { settleCompanionTurn } from "@/lib/messaging/chat-archive";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -617,6 +623,82 @@ async function handleHomepageLeadPost(req: NextRequest) {
       triggers: handoff.triggers,
       reply,
       model: homepageLeadModel(),
+    });
+    if (setGuestCookie) {
+      response.cookies.set(GUEST_COOKIE, guestId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
+  }
+
+  const staticFaq =
+    matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, message)?.answer ||
+    matchRoguePublicSoftIntent(message)?.answer ||
+    "";
+  const assist = await settleCompanionTurn({
+    question: message,
+    staticFaq,
+    companion: "rogue",
+    pagePath: "/",
+    actorName: clientFirstName || "",
+    actorRole: "guest",
+  });
+  if (assist.takeOver || staticFaq) {
+    const reply = assist.takeOver ? assist.reply : staticFaq;
+    if (adminUserId) {
+      await insertAiMessage({
+        conversationId,
+        recipientUserId: adminUserId,
+        text: reply,
+      }).catch(() => null);
+    }
+    if (wantStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          const send = (payload: Record<string, unknown>) => {
+            controller.enqueue(encoder.encode(sseEncode(payload)));
+          };
+          send({ type: "meta", conversationId, guestId, model: assist.takeOver ? "live-agent" : "faq" });
+          send({ type: "delta", text: reply });
+          send({
+            type: "done",
+            text: reply,
+            model: assist.takeOver ? "live-agent" : "faq",
+            conversationId,
+            aiAssistEnabled,
+            handedOff: assist.takeOver,
+          });
+          controller.close();
+        },
+      });
+      const headers = new Headers({
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      });
+      if (setGuestCookie) {
+        const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+        headers.append(
+          "Set-Cookie",
+          `${GUEST_COOKIE}=${guestId}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax; HttpOnly${secure}`,
+        );
+      }
+      return new Response(stream, { headers });
+    }
+    const response = NextResponse.json({
+      ok: true,
+      handedOff: assist.takeOver,
+      conversationId,
+      guestId,
+      aiAssistEnabled,
+      reply,
+      model: assist.takeOver ? "live-agent" : "faq",
     });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {

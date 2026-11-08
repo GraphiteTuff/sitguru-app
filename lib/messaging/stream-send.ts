@@ -36,6 +36,8 @@ import {
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
 import { personableFactHint } from "@/lib/ai/companion-answer-protocol";
+import { shouldHoldForCompanion } from "@/lib/messaging/chat-library";
+import { rememberModelAnswer, settleCompanionTurn } from "@/lib/messaging/chat-archive";
 import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 import {
@@ -441,6 +443,22 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       viewer,
     );
 
+    const assist = await settleCompanionTurn({
+      question: lastUserText,
+      staticFaq: factForVoice,
+      companion: companionKey,
+      pagePath,
+      actorUserId: userId,
+      actorName: clientFirstName,
+      actorRole: userTypeLabel,
+      holdForCompanion: shouldHoldForCompanion(careThread) || shouldForceGuruLookup(careThread),
+    });
+    if (assist.takeOver) {
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(assist.reply, viewer),
+      );
+    }
+
     let systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
@@ -500,6 +518,18 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
             }),
             viewer,
           );
+        }
+
+        if (!factForVoice && assistantText) {
+          void rememberModelAnswer({
+            question: lastUserText,
+            answer: assistantText,
+            companion: companionKey,
+            pagePath,
+            actorUserId: userId,
+            actorName: clientFirstName,
+            conversationId,
+          });
         }
 
         void (async () => {
@@ -571,6 +601,17 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
             );
 
             if (!assistantText) return;
+            if (!factForVoice) {
+              void rememberModelAnswer({
+                question: lastUserText,
+                answer: assistantText,
+                companion: companionKey,
+                pagePath,
+                actorUserId: userId,
+                actorName: clientFirstName,
+                conversationId,
+              });
+            }
 
             if (conversationId && userId) {
               const { error } = await supabase.from("messages").insert({
