@@ -202,9 +202,127 @@ export type BrandAssetRecord = {
   fileSize: number;
   version: number;
   createdAt: string;
+  updatedAt: string;
   uploadedByName: string;
   previewKind: "image" | "video" | "file";
 };
+
+export const BRAND_PAGE_SIZE = 12;
+
+export type BrandLibraryStatus = "approved" | "draft" | "pending_review" | "archived" | "active" | "all";
+
+export type BrandLibrarySort = "approved_first" | "newest" | "oldest" | "name_asc" | "name_desc" | "updated";
+
+export function brandDownloadFileName(fileName: string) {
+  const safe = safeBrandFileName(fileName);
+  return safe && safe.includes(".") ? safe : safe ? `${safe}.bin` : "sitguru-brand-file";
+}
+
+/** Ava and interns stay on approved files. Super Admins can open the other queues. */
+export function resolveBrandLibraryStatus(input: { isSuperUser: boolean; status?: string }): BrandLibraryStatus {
+  const requested = String(input.status || "").trim();
+  if (!input.isSuperUser) return "approved";
+  if (
+    requested === "approved" ||
+    requested === "draft" ||
+    requested === "pending_review" ||
+    requested === "archived" ||
+    requested === "all"
+  ) {
+    return requested;
+  }
+  return "active";
+}
+
+export function sortBrandAssets<
+  T extends { title: string; approvalStatus: string; createdAt: string; updatedAt?: string },
+>(assets: T[], sort: string) {
+  const rank = (status: string) =>
+    status === "approved" ? 0 : status === "pending_review" ? 1 : status === "draft" ? 2 : 3;
+  const time = (value?: string) => Date.parse(value || "") || 0;
+  return [...assets].sort((a, b) => {
+    if (sort === "oldest") return time(a.createdAt) - time(b.createdAt);
+    if (sort === "name_asc") return a.title.localeCompare(b.title);
+    if (sort === "name_desc") return b.title.localeCompare(a.title);
+    if (sort === "updated") return time(b.updatedAt || b.createdAt) - time(a.updatedAt || a.createdAt);
+    if (sort === "newest") return time(b.createdAt) - time(a.createdAt);
+    const byStatus = rank(a.approvalStatus) - rank(b.approvalStatus);
+    if (byStatus) return byStatus;
+    return time(b.createdAt) - time(a.createdAt);
+  });
+}
+
+export function paginateBrandAssets<T>(assets: T[], page: number, pageSize = BRAND_PAGE_SIZE) {
+  const size = Math.min(200, Math.max(1, pageSize));
+  const total = assets.length;
+  const pages = Math.max(1, Math.ceil(total / size));
+  const current = Math.min(Math.max(1, page || 1), pages);
+  const start = (current - 1) * size;
+  return { assets: assets.slice(start, start + size), page: current, pages, total };
+}
+
+export type BrandMasterFolder = {
+  name: string;
+  purpose: string;
+  archived: boolean;
+};
+
+/**
+ * SharePoint holds the master. Approved files stay in an active folder.
+ * Only retired designs belong in 99 Brand Archive.
+ */
+export function brandMasterFolder(input: {
+  category: string;
+  mimeType: string;
+  approvalStatus: string;
+}): BrandMasterFolder {
+  if (input.approvalStatus === "archived") {
+    return {
+      name: "99 Brand Archive",
+      purpose: "Old designs, superseded versions, and references. Current logos stay out of this folder.",
+      archived: true,
+    };
+  }
+  if (input.category === "seasonal") {
+    return {
+      name: "03 Seasonal Logos",
+      purpose: "Halloween, Thanksgiving, Christmas, and other seasonal marks.",
+      archived: false,
+    };
+  }
+  if (input.category === "guidelines") {
+    return {
+      name: "05 Brand Guidelines",
+      purpose: "Colors, fonts, and approved logo usage.",
+      archived: false,
+    };
+  }
+  if (
+    input.category === "flyers" ||
+    input.category === "templates" ||
+    input.category === "campaign_materials" ||
+    input.category === "videos"
+  ) {
+    return {
+      name: "04 Marketing & Print Assets",
+      purpose: "Flyers, QR graphics, and print-ready files.",
+      archived: false,
+    };
+  }
+  const mime = input.mimeType.toLowerCase();
+  if (input.category === "social_graphics" || mime === "image/jpeg" || mime === "image/webp") {
+    return {
+      name: "02 Digital & Social Logos",
+      purpose: "Web, Canva, and social profile versions, including horizontal JPG files.",
+      archived: false,
+    };
+  }
+  return {
+    name: "01 Official Master Logos",
+    purpose: "Approved SVG, EPS, and transparent PNG masters.",
+    archived: false,
+  };
+}
 
 export function brandPreviewKind(mime: string): "image" | "video" | "file" {
   if (mime === "image/png" || mime === "image/jpeg" || mime === "image/webp") return "image";

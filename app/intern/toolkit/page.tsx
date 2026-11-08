@@ -58,7 +58,7 @@ export default async function InternToolkitPage({
     if (requested === "brand") {
       const actor = await resolveBrandActor();
       if (actor?.capabilities.viewApproved) {
-        const listed = await listBrandAssets({ actor, status: "approved" });
+        const listed = await listBrandAssets({ actor, status: "approved", pageSize: 200 });
         officialBrand = listed.assets.map((asset) => ({ id: asset.id, title: asset.title }));
       }
     }

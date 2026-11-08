@@ -5,13 +5,17 @@ import { findInternByAccount } from "@/lib/internship/queries";
 import {
   BRAND_KIT_BUCKET,
   assessBrandUploadClaim,
+  brandDownloadFileName,
   brandKitCapabilities,
   brandPreviewKind,
   inspectBrandBytes,
   isBrandCategory,
   isBrandStatus,
+  paginateBrandAssets,
+  resolveBrandLibraryStatus,
   sanitizeBrandTags,
   sanitizeBrandText,
+  sortBrandAssets,
   type BrandActor,
   type BrandAssetRecord,
   type BrandCapabilities,
@@ -65,13 +69,14 @@ function mapAsset(row: AssetRow): BrandAssetRecord {
     fileSize: Number(row.file_size || 0),
     version: Number(row.version || 1),
     createdAt: "",
+    updatedAt: "",
     uploadedByName: row.uploaded_by_name || "SitGuru",
     previewKind: brandPreviewKind(row.mime_type),
   };
 }
 
-async function withCreatedAt(row: AssetRow & { created_at?: string }): Promise<BrandAssetRecord> {
-  return { ...mapAsset(row), createdAt: text(row.created_at) };
+function withTimes(row: AssetRow & { created_at?: string; updated_at?: string }): BrandAssetRecord {
+  return { ...mapAsset(row), createdAt: text(row.created_at), updatedAt: text(row.updated_at) || text(row.created_at) };
 }
 
 export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
@@ -149,39 +154,48 @@ export async function listBrandAssets(input: {
   query?: string;
   category?: string;
   status?: string;
+  sort?: string;
+  page?: number;
+  pageSize?: number;
 }) {
   const editor = input.actor.capabilities.viewLibrary;
   if (!editor && !input.actor.capabilities.viewApproved) {
-    return { assets: [] as BrandAssetRecord[], error: "Not allowed." };
+    return { assets: [] as BrandAssetRecord[], error: "Not allowed.", page: 1, pages: 1, total: 0 };
   }
-  const { data, error } = await supabaseAdmin
+  const status = resolveBrandLibraryStatus({
+    isSuperUser: input.actor.isSuperUser,
+    status: input.status,
+  });
+  let query = supabaseAdmin
     .from("growth_brand_assets")
     .select(
-      "id,title,description,category,tags,approval_status,file_name,mime_type,file_size,storage_bucket,storage_path,version,version_group,replaces_id,verified,uploaded_by,uploaded_by_name,created_at",
+      "id,title,description,category,tags,approval_status,file_name,mime_type,file_size,storage_bucket,storage_path,version,version_group,replaces_id,verified,uploaded_by,uploaded_by_name,created_at,updated_at",
     )
     .eq("verified", true)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) return { assets: [] as BrandAssetRecord[], error: libraryError(error) };
+    .limit(500);
+  if (!input.actor.isSuperUser) query = query.eq("approval_status", "approved");
+  else if (status !== "all" && status !== "active") query = query.eq("approval_status", status);
+  else if (status === "active") query = query.neq("approval_status", "archived");
+  const { data, error } = await query;
+  if (error) return { assets: [] as BrandAssetRecord[], error: libraryError(error), page: 1, pages: 1, total: 0 };
 
   const needle = String(input.query || "").trim().toLowerCase();
   const category = String(input.category || "");
-  const status = String(input.status || "");
-  const assets: BrandAssetRecord[] = [];
-  for (const row of (data || []) as Array<AssetRow & { created_at?: string }>) {
-    if (!editor && row.approval_status !== "approved") continue;
-    if (!editor && row.approval_status === "archived") continue;
+  const matched: BrandAssetRecord[] = [];
+  for (const row of (data || []) as Array<AssetRow & { created_at?: string; updated_at?: string }>) {
     if (category && category !== "all" && row.category !== category) continue;
-    if (status === "archived" && row.approval_status !== "archived") continue;
-    if (status && status !== "all" && status !== "archived" && row.approval_status !== status) continue;
-    if (!status && row.approval_status === "archived") continue;
-    const mapped = await withCreatedAt(row);
+    const mapped = withTimes(row);
     if (!editor) mapped.uploadedByName = "SitGuru";
     const blob = `${mapped.title} ${mapped.description} ${mapped.fileName} ${mapped.tags.join(" ")}`.toLowerCase();
     if (needle && !blob.includes(needle)) continue;
-    assets.push(mapped);
+    matched.push(mapped);
   }
-  return { assets, error: "" };
+  const page = paginateBrandAssets(
+    sortBrandAssets(matched, input.sort || "approved_first"),
+    Number(input.page || 1),
+    input.pageSize,
+  );
+  return { assets: page.assets, error: "", page: page.page, pages: page.pages, total: page.total };
 }
 
 export async function prepareBrandUpload(input: {
@@ -512,7 +526,7 @@ export async function deleteBrandAsset(input: { actor: ResolvedBrandActor; id: s
   return { error: "" };
 }
 
-export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id: string }) {
+export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id: string; download?: boolean }) {
   const { data: row } = await supabaseAdmin
     .from("growth_brand_assets")
     .select("id,title,file_name,mime_type,approval_status,storage_path,verified")
@@ -523,20 +537,18 @@ export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id:
   if (!editor && (row.approval_status !== "approved" || !input.actor.capabilities.viewApproved)) {
     return { error: "Not allowed.", status: 403 as const };
   }
-  const attachment = row.mime_type === "image/svg+xml" || row.mime_type === "application/pdf" || row.mime_type === "application/zip";
-  if (attachment) {
-    const downloaded = await supabaseAdmin.storage.from(BRAND_KIT_BUCKET).download(row.storage_path);
-    if (downloaded.error || !downloaded.data) return { error: "File not found.", status: 404 as const };
-    const bytes = Buffer.from(await downloaded.data.arrayBuffer());
-    return {
-      error: "",
-      status: 200 as const,
-      bytes,
-      mimeType: row.mime_type,
-      fileName: row.file_name,
-    };
-  }
-  const signed = await supabaseAdmin.storage.from(BRAND_KIT_BUCKET).createSignedUrl(row.storage_path, 60);
+  const fileName = brandDownloadFileName(row.file_name);
+  const signed = await supabaseAdmin.storage.from(BRAND_KIT_BUCKET).createSignedUrl(
+    row.storage_path,
+    60,
+    input.download ? { download: fileName } : undefined,
+  );
   if (signed.error || !signed.data?.signedUrl) return { error: "File not found.", status: 404 as const };
-  return { error: "", status: 200 as const, redirectUrl: signed.data.signedUrl };
+  return {
+    error: "",
+    status: 200 as const,
+    redirectUrl: signed.data.signedUrl,
+    fileName,
+    mimeType: row.mime_type,
+  };
 }

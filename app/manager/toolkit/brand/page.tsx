@@ -1,5 +1,7 @@
 import Link from "next/link";
 import BrandKitManager from "@/components/manager/BrandKitManager";
+import { SITGURU_SHAREPOINT_FOLDERS, sitguruSharePointFolderHref } from "@/lib/admin/growth/sharepoint-files";
+import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 
@@ -21,9 +23,14 @@ export default async function ManagerBrandKitPage({
   const category = first(params.category);
   const status = first(params.status);
   const query = first(params.q);
+  const sort = first(params.sort) || "approved_first";
+  const page = Number(first(params.page) || "1");
+  const brandFolder = SITGURU_SHAREPOINT_FOLDERS.find((folder) => folder.id === "general-brand-kit");
+  const sharePointHref =
+    brandFolder && isSitGuruWorkEmail(access.actor.email) ? sitguruSharePointFolderHref(brandFolder) : "";
   const listed = actor
-    ? await listBrandAssets({ actor })
-    : { assets: [], error: "Sign in required." };
+    ? await listBrandAssets({ actor, query, category, status, sort, page, pageSize: 12 })
+    : { assets: [], error: "Sign in required.", page: 1, pages: 1, total: 0 };
 
   return (
     <div className="space-y-4 pb-28 lg:pb-8">
@@ -33,11 +40,14 @@ export default async function ManagerBrandKitPage({
         </Link>
         <h1 className="mt-2 text-2xl font-black text-[#0F2744] sm:text-3xl">Brand Kit</h1>
         <p className="mt-1 max-w-2xl text-sm font-medium text-slate-600">
-          Upload, organize, and approve SitGuru logos and creative files. SharePoint still holds the Microsoft 365 masters.
+          Your SitGuru library of approved logos, graphics, and creative resources. SharePoint keeps the master files. This page is the team download library, and uploads are not copied there automatically.
         </p>
       </div>
       <BrandKitManager
         assets={listed.assets}
+        total={listed.total}
+        page={listed.page}
+        pages={listed.pages}
         loadError={listed.error}
         capabilities={{
           upload: Boolean(actor?.capabilities.upload),
@@ -46,9 +56,12 @@ export default async function ManagerBrandKitPage({
           approve: Boolean(actor?.capabilities.approve),
           delete: Boolean(actor?.capabilities.delete),
         }}
-        initialCategory={category}
-        initialStatus={status}
-        initialQuery={query}
+        isSuperUser={Boolean(actor?.isSuperUser)}
+        query={query}
+        category={category}
+        status={status}
+        sort={sort}
+        sharePointHref={sharePointHref}
       />
     </div>
   );

@@ -219,7 +219,7 @@ export default function InternStudentTools({
             <ul className="mt-2 space-y-2">
               {officialBrand.map((asset) => (
                 <li key={asset.id}>
-                  <a className="text-sm font-black text-emerald-800" href={`/api/brand-kit/${asset.id}/file`}>
+                  <a className="text-sm font-black text-emerald-800" href={`/api/brand-kit/${asset.id}/file?download=1`} download={asset.title}>
                     {asset.title}
                   </a>
                 </li>

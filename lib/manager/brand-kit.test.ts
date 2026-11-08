@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assessBrandUploadClaim,
+  brandDownloadFileName,
   brandKitCapabilities,
+  brandMasterFolder,
   inspectBrandBytes,
+  paginateBrandAssets,
+  resolveBrandLibraryStatus,
   safeBrandFileName,
+  sortBrandAssets,
 } from "./brand-kit";
 
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
@@ -91,5 +96,55 @@ describe("brand kit files", () => {
       declaredSize: 1024,
     });
     assert.equal(zip.ok, true);
+    assert.equal(brandDownloadFileName("SitGuru Logo.jpg"), "SitGuru-Logo.jpg");
+  });
+});
+
+describe("brand library order", () => {
+  it("keeps Ava and interns on approved files and lets an admin open the other queues", () => {
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: false, status: "draft" }), "approved");
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: false }), "approved");
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: true, status: "draft" }), "draft");
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: true, status: "pending_review" }), "pending_review");
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: true, status: "archived" }), "archived");
+    assert.equal(resolveBrandLibraryStatus({ isSuperUser: true }), "active");
+  });
+
+  it("sorts approved assets ahead of drafts", () => {
+    const sorted = sortBrandAssets(
+      [
+        { title: "Draft mark", approvalStatus: "draft", createdAt: "2026-11-07T00:00:00Z" },
+        { title: "Approved wordmark", approvalStatus: "approved", createdAt: "2026-11-01T00:00:00Z" },
+      ],
+      "approved_first",
+    );
+    assert.equal(sorted[0]?.title, "Approved wordmark");
+    const page = paginateBrandAssets(Array.from({ length: 30 }, (_, index) => index), 2, 12);
+    assert.equal(page.assets.length, 12);
+    assert.equal(page.page, 2);
+    assert.equal(page.pages, 3);
+    assert.equal(page.total, 30);
+  });
+
+  it("sends current JPG and SVG masters to active SharePoint folders, not the archive", () => {
+    const jpg = brandMasterFolder({
+      category: "official_logos",
+      mimeType: "image/jpeg",
+      approvalStatus: "approved",
+    });
+    assert.equal(jpg.name, "02 Digital & Social Logos");
+    assert.equal(jpg.archived, false);
+    const svg = brandMasterFolder({
+      category: "official_logos",
+      mimeType: "image/svg+xml",
+      approvalStatus: "approved",
+    });
+    assert.equal(svg.name, "01 Official Master Logos");
+    const retired = brandMasterFolder({
+      category: "official_logos",
+      mimeType: "image/svg+xml",
+      approvalStatus: "archived",
+    });
+    assert.equal(retired.name, "99 Brand Archive");
   });
 });

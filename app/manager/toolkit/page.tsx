@@ -47,7 +47,7 @@ export default async function ManagerToolkitPage({
   let assetError = "";
   const actor = await resolveBrandActor();
   if (actor?.capabilities.viewLibrary) {
-    const listed = await listBrandAssets({ actor, query });
+    const listed = await listBrandAssets({ actor, query, pageSize: 200 });
     assetError = listed.error;
     assets = listed.assets.map((asset) => ({
       title: asset.title,
