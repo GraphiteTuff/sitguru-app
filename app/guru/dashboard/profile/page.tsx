@@ -25,6 +25,17 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  beginSingleSubmission,
+  endSingleSubmission,
+  EXPERIENCE_YEARS_HELP,
+  EXPERIENCE_YEARS_LABEL,
+  experienceYearsWrite,
+  friendlyGuruProfileSaveError,
+  nextGuruProfileDestination,
+  parseExperienceYearsInput,
+  resumeExperienceYearsInput,
+} from "@/lib/gurus/experience-years";
 import { VeteransMilitaryFamiliesOptIn } from "@/components/programs/VeteransMilitaryFamiliesOptIn";
 import {
   readVeteransMilitaryFamiliesOptIn,
@@ -300,22 +311,6 @@ function normalizeServices(value: GuruProfile["services"]): string[] {
       .filter(Boolean);
   }
   return [];
-}
-
-function normalizeExperienceValue(value: unknown) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed <= 0) return "";
-
-  return String(Math.round(parsed));
-}
-
-function normalizeRateValue(value: unknown) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 0) return "";
-
-  return String(parsed);
 }
 
 function isRateUnit(value: unknown): value is RateUnit {
@@ -638,6 +633,10 @@ async function saveGuruPayload({
   profileExists: boolean;
   payload: Record<string, unknown>;
 }) {
+  const experienceColumns = experienceYearsWrite(payload.experience_years);
+  payload.experience_years = experienceColumns.experience_years;
+  payload.years_experience = experienceColumns.years_experience;
+
   const mapPayload = {
     user_id: payload.user_id,
     display_name: payload.display_name,
@@ -883,6 +882,7 @@ function GuruDashboardProfilePageContent() {
         ? "3"
         : "1";
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const saveLock = useRef({ current: false });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -908,6 +908,8 @@ function GuruDashboardProfilePageContent() {
   const [longitude, setLongitude] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [yearsExperience, setYearsExperience] = useState("");
+  const [experienceFieldError, setExperienceFieldError] = useState("");
+  const [saveLocked, setSaveLocked] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
   const [services, setServices] = useState<string[]>([]);
   const [serviceRates, setServiceRates] = useState<ServiceRateState[]>(() =>
@@ -1086,9 +1088,10 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setYearsExperience(
-          normalizeExperienceValue(
-            profile.years_experience ?? profile.experience_years,
-          ),
+          resumeExperienceYearsInput({
+            experience_years: profile.experience_years,
+            years_experience: profile.years_experience,
+          }),
         );
         setProfilePhotoUrl(
           firstSitGuruPhotoUrl([
@@ -1283,7 +1286,10 @@ function GuruDashboardProfilePageContent() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving || !userId) return;
+    if (!userId || saving || saveLocked || !beginSingleSubmission(saveLock.current)) {
+      return;
+    }
+    setSaveLocked(true);
 
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
@@ -1291,19 +1297,18 @@ function GuruDashboardProfilePageContent() {
       submitter?.value === "continue" && activeStep !== "3"
         ? "continue"
         : "dashboard";
-    const nextStepHref =
-      activeStep === "1"
-        ? "/guru/dashboard/profile?step=2"
-        : activeStep === "2"
-          ? "/guru/dashboard/profile?step=3"
-          : routes.dashboard;
-    const nextStepNumber =
-      activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
 
     setSaving(true);
     setJustSaved(false);
     setErrorMessage("");
     setSuccessMessage("");
+    setExperienceFieldError("");
+
+    const stop = () => {
+      endSingleSubmission(saveLock.current);
+      setSaveLocked(false);
+      setSaving(false);
+    };
 
     const cleanDisplayName = displayName.trim();
     const cleanSlug = slugify(slug || displayName);
@@ -1323,43 +1328,48 @@ function GuruDashboardProfilePageContent() {
     const cleanServices = getEnabledServiceLabels(serviceRates);
 
     const parsedRate = hourlyRate ? Number(hourlyRate) : null;
-    const parsedExperience = yearsExperience ? Number(yearsExperience) : null;
+    const experienceResult = parseExperienceYearsInput(yearsExperience);
 
     if (!cleanDisplayName) {
       setErrorMessage("Display name is required.");
-      setSaving(false);
+      stop();
       return;
     }
 
     if (!cleanSlug) {
       setErrorMessage("Public profile slug is required.");
-      setSaving(false);
+      stop();
       return;
     }
 
     if (parsedRate !== null && (Number.isNaN(parsedRate) || parsedRate < 0)) {
       setErrorMessage("Hourly rate must be a valid non-negative number.");
-      setSaving(false);
+      stop();
       return;
     }
 
-    if (
-      parsedExperience !== null &&
-      (Number.isNaN(parsedExperience) || parsedExperience < 0)
-    ) {
-      setErrorMessage(
-        "Years of experience must be a valid non-negative number.",
-      );
-      setSaving(false);
+    if (!experienceResult.ok) {
+      const experienceMessage =
+        activeStep === "1"
+          ? experienceResult.message
+          : `${experienceResult.message} This answer is on Step 1.`;
+      setExperienceFieldError(experienceMessage);
+      setErrorMessage(experienceMessage);
+      stop();
+      if (activeStep === "1") {
+        document.getElementById("years_experience")?.focus();
+      }
       return;
     }
+
+    const experienceColumns = experienceYearsWrite(experienceResult.years);
 
     if (
       parsedServiceRadius !== null &&
       (Number.isNaN(parsedServiceRadius) || parsedServiceRadius < 0)
     ) {
       setErrorMessage("Service radius must be a valid non-negative number.");
-      setSaving(false);
+      stop();
       return;
     }
 
@@ -1380,7 +1390,7 @@ function GuruDashboardProfilePageContent() {
         setErrorMessage(
           `${service.service_label} needs a valid non-negative rate amount, or choose Custom quote.`,
         );
-        setSaving(false);
+        stop();
         return;
       }
 
@@ -1391,7 +1401,7 @@ function GuruDashboardProfilePageContent() {
         setErrorMessage(
           `${service.service_label} duration must be a valid non-negative number.`,
         );
-        setSaving(false);
+        stop();
         return;
       }
     }
@@ -1403,7 +1413,7 @@ function GuruDashboardProfilePageContent() {
         parsedLatitude > 90)
     ) {
       setErrorMessage("Latitude must be between -90 and 90.");
-      setSaving(false);
+      stop();
       return;
     }
 
@@ -1414,7 +1424,7 @@ function GuruDashboardProfilePageContent() {
         parsedLongitude > 180)
     ) {
       setErrorMessage("Longitude must be between -180 and 180.");
-      setSaving(false);
+      stop();
       return;
     }
 
@@ -1472,8 +1482,8 @@ function GuruDashboardProfilePageContent() {
       location_updated_at: new Date().toISOString(),
       hourly_rate: parsedRate,
       rate: parsedRate,
-      years_experience: parsedExperience,
-      experience_years: parsedExperience,
+      years_experience: experienceColumns.years_experience,
+      experience_years: experienceColumns.experience_years,
       profile_photo_url: cleanPhotoUrl || null,
       image_url: cleanPhotoUrl || null,
       avatar_url: cleanPhotoUrl || null,
@@ -1581,9 +1591,10 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setYearsExperience(
-          normalizeExperienceValue(
-            refreshed.years_experience ?? refreshed.experience_years,
-          ),
+          resumeExperienceYearsInput({
+            experience_years: refreshed.experience_years,
+            years_experience: refreshed.years_experience,
+          }),
         );
         setProfilePhotoUrl(
           firstSitGuruPhotoUrl([
@@ -1604,14 +1615,29 @@ function GuruDashboardProfilePageContent() {
         setProfileExists(true);
       }
 
-      const destination =
-        saveIntent === "continue" && nextStepNumber
-          ? nextStepHref
-          : routes.dashboard;
+      const destination = nextGuruProfileDestination({
+        saved: true,
+        activeStep,
+        intent: saveIntent,
+      });
+
+      if (!destination.advance) {
+        setErrorMessage(
+          "This step was not saved, so SitGuru stayed on this page.",
+        );
+        stop();
+        return;
+      }
+
+      const continuingTo = destination.href.endsWith("step=2")
+        ? "2"
+        : destination.href.endsWith("step=3")
+          ? "3"
+          : "";
 
       setSuccessMessage(
-        saveIntent === "continue" && nextStepNumber
-          ? `Saved. Continuing to Step ${nextStepNumber}.`
+        continuingTo
+          ? `Saved. Continuing to Step ${continuingTo}.`
           : safeIsPublic
             ? "Saved. Returning to your dashboard so you can see Steps 1, 2, and 3 marked complete."
             : isPublic
@@ -1622,12 +1648,11 @@ function GuruDashboardProfilePageContent() {
 
       window.setTimeout(() => {
         router.refresh();
-        router.push(destination);
+        router.push(destination.href);
       }, 700);
     } catch (error) {
-      setErrorMessage(
-        `Could not save your guru profile: ${stringifyError(error)}`,
-      );
+      setErrorMessage(friendlyGuruProfileSaveError(error));
+      stop();
     } finally {
       setSaving(false);
     }
@@ -1728,9 +1753,6 @@ function GuruDashboardProfilePageContent() {
   const hasNextStep = activeStep !== "3";
   const nextStepNumber =
     activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
-  const nextStepHref = nextStepNumber
-    ? `/guru/dashboard/profile?step=${nextStepNumber}`
-    : routes.dashboard;
   const primarySaveLabel = hasNextStep
     ? `Save Step ${activeStep} & Continue to Step ${nextStepNumber}`
     : `Save Step ${activeStep} & Return to Dashboard`;
@@ -1894,9 +1916,12 @@ function GuruDashboardProfilePageContent() {
               },
               {
                 label: "Experience",
-                value: yearsExperience.trim()
-                  ? `${yearsExperience.trim()} yr`
-                  : "Not listed",
+                value:
+                  yearsExperience.trim() === ""
+                    ? "Not listed"
+                    : yearsExperience.trim() === "0"
+                      ? "0 years"
+                      : `${yearsExperience.trim()} years`,
                 icon: "🏡",
               },
               { label: "Rate", value: publicPreviewRate, icon: "💚" },
@@ -1937,7 +1962,10 @@ function GuruDashboardProfilePageContent() {
         />
 
         {!!errorMessage && (
-          <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm">
+          <div
+            role="alert"
+            className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm"
+          >
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
               <div>
@@ -1951,7 +1979,11 @@ function GuruDashboardProfilePageContent() {
         )}
 
         {!!successMessage && (
-          <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800 shadow-sm">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800 shadow-sm"
+          >
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div>
@@ -1991,7 +2023,11 @@ function GuruDashboardProfilePageContent() {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form
+                onSubmit={handleSubmit}
+                aria-busy={saving || saveLocked}
+                className="space-y-6"
+              >
                 {activeStep === "1" ? (
                   <section
                     id="profile"
@@ -2005,8 +2041,9 @@ function GuruDashboardProfilePageContent() {
                         Complete your Guru profile
                       </h3>
                       <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
-                        Add your public name, headline, bio, experience, and
-                        photo so pet parents understand who you are.
+                        Add your public name, headline, bio, years of pet care
+                        experience, and photo so pet parents understand who you
+                        are.
                       </p>
                     </div>
 
@@ -2068,18 +2105,47 @@ function GuruDashboardProfilePageContent() {
                           htmlFor="years_experience"
                           className="mb-2 block text-sm font-extrabold !text-slate-950"
                         >
-                          Years of experience
+                          {EXPERIENCE_YEARS_LABEL}
                         </label>
                         <input
                           id="years_experience"
+                          name="experience_years"
+                          type="number"
                           value={yearsExperience}
-                          onChange={(event) =>
-                            setYearsExperience(event.target.value)
-                          }
-                          placeholder="Leave blank if not listed yet"
+                          onChange={(event) => {
+                            setYearsExperience(event.target.value);
+                            setExperienceFieldError("");
+                          }}
+                          placeholder="0"
                           inputMode="numeric"
+                          min={0}
+                          max={80}
+                          step={1}
+                          required
+                          aria-required="true"
+                          aria-invalid={experienceFieldError ? true : undefined}
+                          aria-describedby="years_experience_help years_experience_error"
                           className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
+                        <p
+                          id="years_experience_help"
+                          className="mt-2 text-sm font-semibold leading-6 !text-slate-600"
+                        >
+                          {EXPERIENCE_YEARS_HELP}
+                        </p>
+                        {experienceFieldError ? (
+                          <p
+                            id="years_experience_error"
+                            role="alert"
+                            className="mt-2 text-sm font-extrabold leading-6 text-rose-700"
+                          >
+                            {experienceFieldError}
+                          </p>
+                        ) : (
+                          <p id="years_experience_error" className="sr-only">
+                            Years of pet care experience is required.
+                          </p>
+                        )}
                       </div>
 
                       <div className="md:col-span-2">
@@ -2655,7 +2721,7 @@ function GuruDashboardProfilePageContent() {
                     type="submit"
                     name="saveAction"
                     value={hasNextStep ? "continue" : "dashboard"}
-                    disabled={saving}
+                    disabled={saving || saveLocked}
                     className={[
                       "inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-extrabold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-70",
                       justSaved
@@ -2691,7 +2757,7 @@ function GuruDashboardProfilePageContent() {
                       type="submit"
                       name="saveAction"
                       value="dashboard"
-                      disabled={saving}
+                      disabled={saving || saveLocked}
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <span
@@ -2720,23 +2786,6 @@ function GuruDashboardProfilePageContent() {
                       Return to Dashboard
                     </span>
                   </Link>
-
-                  {hasNextStep ? (
-                    <Link
-                      href={nextStepHref}
-                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-slate-50"
-                    >
-                      <span
-                        className="font-extrabold"
-                        style={{
-                          color: "#0f172a",
-                          WebkitTextFillColor: "#0f172a",
-                        }}
-                      >
-                        Go to Step {nextStepNumber} without saving
-                      </span>
-                    </Link>
-                  ) : null}
                 </div>
               </form>
             </section>

@@ -174,6 +174,26 @@ describe("founder personal marketplace roles", () => {
     assert.equal(roles.includes("manager"), false);
   });
 
+  it("keeps approved Pet Parent, Guru, Ambassador, and Intern switches out of Admin", () => {
+    const roles = resolveAuthorizedRolesFromProfile({
+      email: "approved-multi-role@example.com",
+      roleRows: ["ambassador", "customer", "guru", "intern"],
+    });
+    assert.deepEqual(roles, ["parent", "guru", "ambassador", "intern"]);
+    const switches = getAvailableDashboardSwitches({
+      currentRole: "guru",
+      authorizedRoles: roles,
+    });
+    assert.deepEqual(
+      switches.map((item) => item.id),
+      ["parent", "ambassador", "intern"],
+    );
+    assert.equal(
+      switches.some((item) => item.path.startsWith("/admin")),
+      false,
+    );
+  });
+
   it("adds Intern for assigned marketplace accounts without Admin", () => {
     const roles = resolveAuthorizedRolesFromProfile({
       email: "intern@example.edu",

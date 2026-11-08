@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     StyleSheet,
     Text,
@@ -20,6 +20,13 @@ import {
     type GuruSetupDraft,
 } from '@/hooks/data/useRoleSetup';
 import { useThemeMode } from '@/hooks/use-theme';
+import {
+  beginSingleSubmission,
+  endSingleSubmission,
+  EXPERIENCE_YEARS_HELP,
+  EXPERIENCE_YEARS_LABEL,
+  parseExperienceYearsInput,
+} from '@/lib/gurus/experience-years';
 
 type StepNumber = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -37,7 +44,7 @@ const setupSteps: SetupStep[] = [
     shortTitle: 'Profile',
     title: 'Complete Your Profile',
     description:
-      'Add your display name, photo, bio, contact details, and care style so Pet Parents can understand who you are.',
+      'Add your display name, photo, bio, years of pet care experience, and contact details so Pet Parents can understand who you are.',
     usedFor:
       'Public Guru profile, search cards, messages, booking requests, trust signals, and dashboard profile health.',
   },
@@ -147,6 +154,8 @@ export default function GuruSetupScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [yearsExperience, setYearsExperience] = useState('');
+  const [experienceError, setExperienceError] = useState('');
+  const advanceLock = useRef({ current: false });
   const [bio, setBio] = useState('');
   const [serviceArea, setServiceArea] = useState('');
   const [serviceAreaEnabled, setServiceAreaEnabled] = useState(true);
@@ -246,19 +255,20 @@ export default function GuruSetupScreen() {
     const result = await save(buildDraft(), nextStep, { complete });
 
     if (!result.persisted) {
-      showError(
-        'Guru setup was not saved',
-        result.error || 'Your changes were not stored. Please try again.',
-      );
+      const message =
+        result.error || 'Your changes were not stored. Please try again.';
+      if (currentStep === 1) setExperienceError(message);
+      showError('Guru setup was not saved', message);
       return false;
     }
 
-    if (complete) {
-      showSaved(
-        'Guru setup saved',
-        'Your profile, service area, services, and readiness details were saved to your Guru account.',
-      );
-    }
+    setExperienceError('');
+    showSaved(
+      complete ? 'Guru setup saved' : `Step ${currentStep} saved`,
+      complete
+        ? 'Your profile, service area, services, and readiness details were saved to your Guru account.'
+        : 'Opening the next step.',
+    );
 
     return true;
   }
@@ -324,30 +334,55 @@ export default function GuruSetupScreen() {
   }
 
   async function goNext() {
-    if (saving || loading) return;
+    if (saving || loading || !beginSingleSubmission(advanceLock.current)) return;
 
-    if (currentStep < 6) {
-      const nextStep = (currentStep + 1) as StepNumber;
-      const saved = await persistAndAdvance(nextStep);
-      if (!saved) return;
-      setCurrentStep(nextStep);
-      return;
+    if (currentStep === 1) {
+      const parsed = parseExperienceYearsInput(yearsExperience);
+      if (!parsed.ok) {
+        setExperienceError(parsed.message);
+        showError('Add your experience', parsed.message);
+        endSingleSubmission(advanceLock.current);
+        return;
+      }
     }
 
-    const saved = await persistAndAdvance(6, true);
-    if (!saved) return;
-    router.push('/guru-dashboard');
+    try {
+      if (currentStep < 6) {
+        const nextStep = (currentStep + 1) as StepNumber;
+        const saved = await persistAndAdvance(nextStep);
+        if (!saved) return;
+        setCurrentStep(nextStep);
+        return;
+      }
+
+      const saved = await persistAndAdvance(6, true);
+      if (!saved) return;
+      router.push('/guru-dashboard');
+    } finally {
+      endSingleSubmission(advanceLock.current);
+    }
   }
 
   async function goToStep(step: StepNumber) {
-    if (step === currentStep || saving || loading) return;
-
-    if (step > currentStep) {
-      const saved = await persistAndAdvance(step);
-      if (!saved) return;
+    if (
+      step === currentStep ||
+      saving ||
+      loading ||
+      !beginSingleSubmission(advanceLock.current)
+    ) {
+      return;
     }
 
-    setCurrentStep(step);
+    try {
+      if (step > currentStep) {
+        const saved = await persistAndAdvance(step);
+        if (!saved) return;
+      }
+
+      setCurrentStep(step);
+    } finally {
+      endSingleSubmission(advanceLock.current);
+    }
   }
 
   function renderStepContent() {
@@ -389,9 +424,16 @@ export default function GuruSetupScreen() {
               value={phone}
             />
             <Field
-              label="Years of experience"
-              onChangeText={setYearsExperience}
-              placeholder="3 years"
+              accessibilityLabel={EXPERIENCE_YEARS_LABEL}
+              error={experienceError}
+              hint={EXPERIENCE_YEARS_HELP}
+              keyboardType="number-pad"
+              label={EXPERIENCE_YEARS_LABEL}
+              onChangeText={(value) => {
+                setYearsExperience(value);
+                setExperienceError('');
+              }}
+              placeholder="0"
               value={yearsExperience}
             />
           </View>
@@ -884,11 +926,11 @@ export default function GuruSetupScreen() {
 
         <BubblePressable
           accessibilityRole="button"
-          disabled={saving || loading}
+          disabled={saving || loading || advanceLock.current.current}
           onPress={() => void goNext()}
           style={styles.dockPrimaryAction}
         >
-          <Text style={styles.dockPrimaryText}>
+          <Text accessibilityLiveRegion="polite" style={styles.dockPrimaryText}>
             {saving
               ? 'Saving...'
               : currentStep === 6
@@ -914,6 +956,9 @@ function Field({
   multiline = false,
   value,
   onChangeText,
+  hint,
+  error,
+  accessibilityLabel,
 }: {
   label: string;
   placeholder: string;
@@ -921,6 +966,9 @@ function Field({
   multiline?: boolean;
   value?: string;
   onChangeText?: (value: string) => void;
+  hint?: string;
+  error?: string;
+  accessibilityLabel?: string;
 }) {
   const [localValue, setLocalValue] = useState('');
   const isControlled = value !== undefined || onChangeText !== undefined;
@@ -939,6 +987,8 @@ function Field({
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        accessibilityHint={hint}
+        accessibilityLabel={accessibilityLabel || label}
         keyboardType={keyboardType}
         multiline={multiline}
         onChangeText={handleChangeText}
@@ -947,6 +997,12 @@ function Field({
         style={[styles.input, multiline && styles.multilineInput]}
         value={inputValue}
       />
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      {error ? (
+        <Text accessibilityLiveRegion="polite" style={styles.fieldError}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -1232,6 +1288,18 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 13,
     fontWeight: '900',
+  },
+  fieldHint: {
+    color: SitGuruColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  fieldError: {
+    color: SitGuruColors.danger,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   input: {
     backgroundColor: SitGuruColors.background,

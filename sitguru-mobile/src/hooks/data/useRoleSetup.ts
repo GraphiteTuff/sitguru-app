@@ -17,6 +17,12 @@ import {
 } from '@/lib/data/pets';
 import { PET_OWNER_ID_FIELDS, TABLES } from '@/lib/data/schema';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import {
+  experienceYearsWrite,
+  friendlyGuruProfileSaveError,
+  parseExperienceYearsInput,
+  resumeExperienceYearsInput,
+} from '@/lib/gurus/experience-years';
 
 export type SetupSaveResult = {
   persisted: boolean;
@@ -298,12 +304,17 @@ export function useGuruSetup() {
         };
       }
 
+      const experienceResult = parseExperienceYearsInput(draft.yearsExperience);
+      if (!experienceResult.ok) {
+        return { persisted: false, error: experienceResult.message };
+      }
+      const experienceColumns = experienceYearsWrite(experienceResult.years);
+
       setSaving(true);
 
       try {
         const now = new Date().toISOString();
         const complete = Boolean(options?.complete);
-        const experience = parseLooseNumber(draft.yearsExperience);
         const walkingRate = parseLooseNumber(draft.walkingRate);
         const displayName = draft.displayName.trim();
         const city = draft.serviceCity.trim();
@@ -323,8 +334,8 @@ export function useGuruSetup() {
           phone: emptyToNull(draft.phone),
           bio: emptyToNull(draft.bio),
           about: emptyToNull(draft.bio),
-          years_experience: experience,
-          experience_years: experience,
+          years_experience: experienceColumns.years_experience,
+          experience_years: experienceColumns.experience_years,
           service_area: emptyToNull(serviceArea),
           city: emptyToNull(city),
           state: emptyToNull(state),
@@ -398,7 +409,9 @@ export function useGuruSetup() {
         setSaving(false);
         return {
           persisted: false,
-          error: getErrorMessage(error, 'Guru setup was not saved.'),
+          error: friendlyGuruProfileSaveError(
+            getErrorMessage(error, 'Guru setup was not saved.'),
+          ),
         };
       }
     },
@@ -1139,9 +1152,13 @@ function applyGuruRow(draft: GuruSetupDraft, row: RecordRow | null) {
     firstString(row, ['email', 'contact_email', 'login_email']) ||
     draft.email;
   draft.phone = firstString(row, ['phone', 'phone_number']) || draft.phone;
-  draft.yearsExperience =
-    firstString(row, ['years_experience', 'experience_years']) ||
-    draft.yearsExperience;
+  const resumedExperience = resumeExperienceYearsInput({
+    experience_years: row.experience_years,
+    years_experience: row.years_experience,
+  });
+  if (resumedExperience !== '') {
+    draft.yearsExperience = resumedExperience;
+  }
   draft.bio = firstString(row, ['bio', 'about', 'description']) || draft.bio;
   draft.serviceArea =
     firstString(row, ['service_area', 'location']) || draft.serviceArea;
