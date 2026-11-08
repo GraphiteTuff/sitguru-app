@@ -206,23 +206,10 @@ export async function prepareBrandUpload(input: {
   const title = sanitizeBrandText(input.title || claim.safeName, 140);
   if (!title) return { error: "Add a name for this file." };
 
-  let version = 1;
-  let versionGroup = "";
-  let replacesId: string | null = null;
-  if (input.replacesId) {
-    const { data: previous } = await supabaseAdmin
-      .from("growth_brand_assets")
-      .select("id,version,version_group,uploaded_by,title")
-      .eq("id", input.replacesId)
-      .eq("verified", true)
-      .maybeSingle();
-    if (!previous) return { error: "The file you are replacing is not in the library." };
-    const owns = previous.uploaded_by === input.actor.id || input.actor.capabilities.approve;
-    if (!owns) return { error: "You can replace files you uploaded. A Super Admin can replace any file." };
-    version = Number(previous.version || 1) + 1;
-    versionGroup = text(previous.version_group);
-    replacesId = text(previous.id);
-  }
+  const version = await nextVersion(input.actor, input.replacesId);
+  if (version.error) return { error: version.error };
+  const versionGroup = version.versionGroup;
+  const replacesId = version.replacesId;
 
   const id = crypto.randomUUID();
   const storagePath = `library/${id}/${claim.safeName}`;
@@ -238,7 +225,7 @@ export async function prepareBrandUpload(input: {
     file_size: claim.size,
     storage_bucket: BRAND_KIT_BUCKET,
     storage_path: storagePath,
-    version,
+    version: version.version,
     version_group: versionGroup || id,
     replaces_id: replacesId,
     verified: false,
@@ -253,6 +240,102 @@ export async function prepareBrandUpload(input: {
     return { error: signed.error?.message || "Upload could not be started." };
   }
   return { error: "", id, signedUrl: signed.data.signedUrl, token: signed.data.token };
+}
+
+async function nextVersion(actor: ResolvedBrandActor, replacesId?: string) {
+  if (!replacesId) return { error: "", version: 1, versionGroup: "", replacesId: null as string | null };
+  const { data: previous } = await supabaseAdmin
+    .from("growth_brand_assets")
+    .select("id,version,version_group,uploaded_by")
+    .eq("id", replacesId)
+    .eq("verified", true)
+    .maybeSingle();
+  if (!previous) return { error: "The file you are replacing is not in the library.", version: 1, versionGroup: "", replacesId: null as string | null };
+  const owns = previous.uploaded_by === actor.id || actor.capabilities.approve;
+  if (!owns) {
+    return {
+      error: "You can replace files you uploaded. A Super Admin can replace any file.",
+      version: 1,
+      versionGroup: "",
+      replacesId: null as string | null,
+    };
+  }
+  return {
+    error: "",
+    version: Number(previous.version || 1) + 1,
+    versionGroup: text(previous.version_group),
+    replacesId: text(previous.id),
+  };
+}
+
+/** Same-origin save for logos and other files that fit in a server request. */
+export async function saveBrandFile(input: {
+  actor: ResolvedBrandActor;
+  bytes: Uint8Array;
+  fileName: string;
+  declaredMime: string;
+  category: string;
+  title: string;
+  description: string;
+  tags: unknown;
+  replacesId?: string;
+}) {
+  if (!input.actor.capabilities.upload) return { error: "You cannot upload brand files." };
+  if (input.bytes.byteLength > 4 * 1024 * 1024) {
+    return { error: "Files over 4MB use the large-file upload." };
+  }
+  const inspected = inspectBrandBytes({
+    bytes: input.bytes,
+    fileName: input.fileName,
+    declaredMime: input.declaredMime,
+    byteLength: input.bytes.byteLength,
+  });
+  if (!inspected.ok) return { error: inspected.error };
+  if (!isBrandCategory(input.category)) return { error: "Choose a brand category." };
+  const title = sanitizeBrandText(input.title || inspected.safeName, 140);
+  if (!title) return { error: "Add a name for this file." };
+  const version = await nextVersion(input.actor, input.replacesId);
+  if (version.error) return { error: version.error };
+
+  const id = crypto.randomUUID();
+  const storagePath = `library/${id}/${inspected.safeName}`;
+  const uploaded = await supabaseAdmin.storage.from(BRAND_KIT_BUCKET).upload(storagePath, Buffer.from(input.bytes), {
+    contentType: inspected.mime,
+    upsert: false,
+  });
+  if (uploaded.error) return { error: uploaded.error.message || "The file could not be stored." };
+
+  const { error } = await supabaseAdmin.from("growth_brand_assets").insert({
+    id,
+    title,
+    description: sanitizeBrandText(input.description, 2000),
+    category: input.category,
+    tags: sanitizeBrandTags(input.tags),
+    approval_status: "draft",
+    file_name: inspected.safeName,
+    mime_type: inspected.mime,
+    file_size: input.bytes.byteLength,
+    storage_bucket: BRAND_KIT_BUCKET,
+    storage_path: storagePath,
+    version: version.version,
+    version_group: version.versionGroup || id,
+    replaces_id: version.replacesId,
+    verified: true,
+    uploaded_by: input.actor.id,
+    uploaded_by_name: input.actor.name,
+  });
+  if (error) {
+    await supabaseAdmin.storage.from(BRAND_KIT_BUCKET).remove([storagePath]);
+    return { error: libraryError(error) };
+  }
+  await recordEvent({
+    assetId: id,
+    title,
+    actorId: input.actor.id,
+    action: "created",
+    detail: inspected.safeName,
+  });
+  return { error: "", id };
 }
 
 export async function verifyBrandUpload(input: { actor: ResolvedBrandActor; id: string }) {

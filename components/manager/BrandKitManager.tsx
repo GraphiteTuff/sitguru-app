@@ -31,6 +31,39 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function uploadThroughSitGuru(
+  file: File,
+  fields: { category: string; title: string; description: string; tags: string; replacesId: string },
+  onProgress: (value: number) => void,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const body = new FormData();
+    body.set("file", file);
+    body.set("category", fields.category);
+    body.set("title", fields.title || file.name);
+    body.set("description", fields.description);
+    body.set("tags", fields.tags);
+    if (fields.replacesId) body.set("replacesId", fields.replacesId);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/brand-kit/upload");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      let payload: { error?: string } = {};
+      try {
+        payload = JSON.parse(xhr.responseText || "{}");
+      } catch {
+        payload = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && !payload.error) resolve();
+      else reject(new Error(payload.error || "The file did not finish uploading."));
+    };
+    xhr.onerror = () => reject(new Error("You appear to be offline. Check your connection and try again."));
+    xhr.send(body);
+  });
+}
+
 async function putSignedFile(url: string, file: File, onProgress: (value: number) => void) {
   await new Promise<void>((resolve, reject) => {
     const body = new FormData();
@@ -114,6 +147,14 @@ export default function BrandKitManager({
       };
       try {
         update({ status: "Starting", progress: 0.02 });
+        if (file.size <= 4 * 1024 * 1024) {
+          await uploadThroughSitGuru(file, { category, title, description, tags, replacesId }, (value) =>
+            update({ progress: value, status: "Uploading" }),
+          );
+          update({ status: "Saved", progress: 1 });
+          saved += 1;
+          continue;
+        }
         const prepared = await fetch("/api/brand-kit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
