@@ -7,6 +7,8 @@ import {
   BRAND_CATEGORIES,
   BUILT_IN_BRAND_ASSETS,
   brandCategoryLabel,
+  brandCategoryNotice,
+  isThirdPartyBrandCategory,
   internBrandLibraryHref,
   type BrandAssetRecord,
 } from "@/lib/manager/brand-kit";
@@ -147,9 +149,12 @@ export default function InternBrandLibrary({
             <button type="button" className="block w-full text-left" onClick={() => setSelectedId(asset.id)}>
               <Preview asset={asset} compact />
               <p className="mt-2 truncate text-sm font-black text-slate-950">{asset.title}</p>
-              <p className="truncate text-xs font-semibold text-slate-500">
+              <p className="line-clamp-2 text-xs font-semibold text-slate-500">
                 {brandCategoryLabel(asset.category)} · {asset.fileName.split(".").pop()?.toUpperCase()}
               </p>
+              {isThirdPartyBrandCategory(asset.category) ? (
+                <p className="text-xs font-bold text-slate-500">Third-party artwork</p>
+              ) : null}
             </button>
             <button
               type="button"
@@ -195,7 +200,10 @@ export default function InternBrandLibrary({
               </button>
             </div>
             <div className="mt-3"><Preview asset={selected} /></div>
-            <p className="mt-3 text-sm font-semibold text-slate-600">{brandCategoryLabel(selected.category)}</p>
+            <p className="mt-3 break-words text-sm font-semibold text-slate-600">{brandCategoryLabel(selected.category)}</p>
+            {isThirdPartyBrandCategory(selected.category) ? (
+              <p className="mt-1 text-xs font-medium text-slate-600">{brandCategoryNotice(selected.category)}</p>
+            ) : null}
             <button
               type="button"
               disabled={downloadingId === selected.id}

@@ -8,7 +8,9 @@ import {
   BRAND_CATEGORIES,
   BUILT_IN_BRAND_ASSETS,
   brandCategoryLabel,
+  brandCategoryNotice,
   brandMasterFolder,
+  isThirdPartyBrandCategory,
   sharePointSourceAction,
   type BrandAssetRecord,
   type BrandStatus,
@@ -275,9 +277,12 @@ export default function BrandKitManager({
             <button type="button" className="block w-full text-left" onClick={() => setSelectedId(asset.id)}>
               <Preview asset={asset} compact />
               <p className="mt-2 truncate text-sm font-black text-[#0F2744]">{asset.title}</p>
-              <p className="truncate text-xs font-semibold text-slate-500">
+              <p className="line-clamp-2 text-xs font-semibold text-slate-500">
                 {brandCategoryLabel(asset.category)} · {asset.fileName.split(".").pop()?.toUpperCase()} · {asset.approvalStatus.replace(/_/g, " ")}
               </p>
+              {isThirdPartyBrandCategory(asset.category) ? (
+                <p className="text-xs font-bold text-slate-500">Third-party artwork</p>
+              ) : null}
             </button>
             <div className="mt-3 flex gap-2">
               <button
@@ -453,9 +458,10 @@ function UploadDialog({
         </div>
         <div className="mt-3 grid gap-3">
           <label className="block text-xs font-bold text-slate-500">Category
-            <select className={`${fieldClass} mt-1`} value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select className={`${fieldClass} mt-1 max-w-full`} value={category} onChange={(event) => setCategory(event.target.value)}>
               {BRAND_CATEGORIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
+            {brandCategoryNotice(category) ? <p className="mt-1 text-xs font-medium text-slate-600">{brandCategoryNotice(category)}</p> : null}
           </label>
           <label className="block text-xs font-bold text-slate-500">Name
             <input className={`${fieldClass} mt-1`} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional display name" />
@@ -632,7 +638,8 @@ function AssetDrawer({
         <p className="text-xs font-semibold text-slate-500">{formatBytes(asset.fileSize)} · v{asset.version} · {asset.uploadedByName} · {placed || "Saved"}</p>
         <section className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
           <h3 className="font-black text-[#0F2744]">SharePoint Source File</h3>
-          <p className="mt-1 text-xs font-medium">Recommended folder: General / 02 Brand Kit / {master.name}</p>
+          <p className="mt-1 break-words text-xs font-medium">Recommended folder: General / {master.path}</p>
+          {isThirdPartyBrandCategory(asset.category) ? <p className="mt-1 text-xs font-bold text-slate-600">{brandCategoryNotice(asset.category)}</p> : null}
           <p className="mt-1 text-xs font-medium">{master.purpose}</p>
           <p className="mt-2 text-xs font-medium">SitGuru does not copy this file into SharePoint, and a saved URL is not a verified master. Only a retired design belongs in 99 Brand Archive.</p>
           {source ? (
@@ -675,9 +682,10 @@ function AssetDrawer({
               <input className={`${fieldClass} mt-1`} value={description} onChange={(event) => setDescription(event.target.value)} />
             </label>
             <label className="block text-xs font-bold text-slate-500">Category
-              <select className={`${fieldClass} mt-1`} value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select className={`${fieldClass} mt-1 max-w-full`} value={category} onChange={(event) => setCategory(event.target.value)}>
                 {BRAND_CATEGORIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
+              {brandCategoryNotice(category) ? <span className="mt-1 block text-xs font-medium text-slate-600">{brandCategoryNotice(category)}</span> : null}
             </label>
             <label className="block text-xs font-bold text-slate-500">Tags
               <input className={`${fieldClass} mt-1`} value={tags} onChange={(event) => setTags(event.target.value)} />

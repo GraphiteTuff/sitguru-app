@@ -9,6 +9,8 @@ import {
   brandKitCapabilities,
   brandPreviewKind,
   inspectBrandBytes,
+  BRAND_UPLOAD_STATUS,
+  brandAssetMatchesCategory,
   isBrandCategory,
   isBrandStatus,
   paginateBrandAssets,
@@ -185,7 +187,7 @@ export async function listBrandAssets(input: {
   const category = String(input.category || "");
   const matched: BrandAssetRecord[] = [];
   for (const row of (data || []) as Array<AssetRow & { created_at?: string; updated_at?: string }>) {
-    if (category && category !== "all" && row.category !== category) continue;
+    if (!brandAssetMatchesCategory(row.category, category)) continue;
     const mapped = withTimes(row);
     if (!editor) mapped.uploadedByName = "SitGuru";
     const blob = `${mapped.title} ${mapped.description} ${mapped.fileName} ${mapped.tags.join(" ")}`.toLowerCase();
@@ -235,7 +237,7 @@ export async function prepareBrandUpload(input: {
     description: sanitizeBrandText(input.description, 2000),
     category: input.category,
     tags: sanitizeBrandTags(input.tags),
-    approval_status: "draft",
+    approval_status: BRAND_UPLOAD_STATUS,
     file_name: claim.safeName,
     mime_type: claim.mime,
     file_size: claim.size,
@@ -327,7 +329,7 @@ export async function saveBrandFile(input: {
     description: sanitizeBrandText(input.description, 2000),
     category: input.category,
     tags: sanitizeBrandTags(input.tags),
-    approval_status: "draft",
+    approval_status: BRAND_UPLOAD_STATUS,
     file_name: inspected.safeName,
     mime_type: inspected.mime,
     file_size: input.bytes.byteLength,

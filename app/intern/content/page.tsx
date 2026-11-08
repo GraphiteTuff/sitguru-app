@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContentCreativeField } from "@/components/internship/ContentCreativeField";
+import { brandCategoryLabel } from "@/lib/manager/brand-kit";
 import { CONTENT_PLATFORMS, CONTENT_TYPES, studioRowLabel } from "@/lib/internship/content-studio";
 import { loadInternContentStudio, saveStudioContent } from "@/lib/internship/content-studio-actions";
 import { currentAssignedIntern, requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -73,7 +74,7 @@ export default async function InternContentPage({
             {studio.assets.map((asset) => (
               <label key={asset.id} className="flex items-start gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
                 <input type="checkbox" name="assetId" value={asset.id} defaultChecked={editing?.assetIds.includes(asset.id)} className="mt-1" />
-                <span>{asset.title}<span className="block text-xs font-medium text-slate-500">{asset.category}</span></span>
+                <span>{asset.title}<span className="block break-words text-xs font-medium text-slate-500">{brandCategoryLabel(asset.category)}</span></span>
               </label>
             ))}
             {!studio.assets.length ? <p className="text-sm text-slate-500">No approved brand files yet. Ask a Super Admin to approve the Brand Kit.</p> : null}

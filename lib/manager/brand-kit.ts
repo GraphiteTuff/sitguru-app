@@ -12,6 +12,10 @@ export const BRAND_CATEGORIES = [
   { id: "guidelines", label: "Brand Guidelines" },
   { id: "templates", label: "Templates" },
   { id: "campaign_materials", label: "Approved Campaign Materials" },
+  { id: "payment_integrations", label: "Payment & Integration Icons" },
+  { id: "platform_icons", label: "Platform & App Store Icons" },
+  { id: "merchandise", label: "Merchandise & Product Designs" },
+  { id: "partner_logos", label: "Third-Party Partner Logos" },
 ] as const;
 
 export type BrandCategoryId = (typeof BRAND_CATEGORIES)[number]["id"];
@@ -71,6 +75,35 @@ export function brandCategoryLabel(id: string) {
 
 export function isBrandCategory(value: string): value is BrandCategoryId {
   return BRAND_CATEGORIES.some((item) => item.id === value);
+}
+
+const THIRD_PARTY_BRAND_CATEGORIES = new Set<BrandCategoryId>([
+  "payment_integrations",
+  "platform_icons",
+  "partner_logos",
+]);
+
+/** New library files stay drafts until a Super Admin approves them. */
+export const BRAND_UPLOAD_STATUS = "draft" as const;
+
+export function isThirdPartyBrandCategory(value: string) {
+  return isBrandCategory(value) && THIRD_PARTY_BRAND_CATEGORIES.has(value);
+}
+
+export function brandCategoryNotice(value: string) {
+  if (value === "payment_integrations") {
+    return "Third-party payment mark. Saving this file does not mean SitGuru accepts that payment method, and it does not turn the method on at checkout.";
+  }
+  if (value === "platform_icons" || value === "partner_logos") {
+    return "Third-party artwork. This is not an official SitGuru logo.";
+  }
+  return "";
+}
+
+export function brandAssetMatchesCategory(assetCategory: string, filter?: string) {
+  const category = String(filter || "").trim();
+  if (!category || category === "all") return true;
+  return assetCategory === category;
 }
 
 export function isBrandStatus(value: string): value is BrandStatus {
@@ -431,9 +464,14 @@ export function paginateBrandAssets<T>(assets: T[], page: number, pageSize = BRA
 
 export type BrandMasterFolder = {
   name: string;
+  path: string;
   purpose: string;
   archived: boolean;
 };
+
+function brandFolder(name: string, purpose: string, archived = false): BrandMasterFolder {
+  return { name, path: `02 Brand Kit / ${name}`, purpose, archived };
+}
 
 /**
  * SharePoint holds the master. Approved files stay in an active folder.
@@ -445,25 +483,38 @@ export function brandMasterFolder(input: {
   approvalStatus: string;
 }): BrandMasterFolder {
   if (input.approvalStatus === "archived") {
-    return {
-      name: "99 Brand Archive",
-      purpose: "Old designs, superseded versions, and references. Current logos stay out of this folder.",
-      archived: true,
-    };
+    return brandFolder(
+      "99 Brand Archive",
+      "Old designs, superseded versions, and references. Current logos stay out of this folder.",
+      true,
+    );
+  }
+  if (input.category === "payment_integrations") {
+    return brandFolder(
+      "07 Third-Party Payment & Platform Icons / 01 Payment Providers & Methods",
+      "Third-party payment marks. A file here does not enable that payment method at checkout.",
+    );
+  }
+  if (input.category === "platform_icons") {
+    return brandFolder(
+      "07 Third-Party Payment & Platform Icons / 02 Platform Icons",
+      "Third-party platform and app-store marks. These are not official SitGuru logos.",
+    );
+  }
+  if (input.category === "merchandise") {
+    return brandFolder("06 Products & Merchandise", "Product and merchandise designs.");
+  }
+  if (input.category === "partner_logos") {
+    return brandFolder(
+      "04 Marketing & Print Assets",
+      "Third-party partner marks. These are not official SitGuru logos.",
+    );
   }
   if (input.category === "seasonal") {
-    return {
-      name: "03 Seasonal Logos",
-      purpose: "Halloween, Thanksgiving, Christmas, and other seasonal marks.",
-      archived: false,
-    };
+    return brandFolder("03 Seasonal Logos", "Halloween, Thanksgiving, Christmas, and other seasonal marks.");
   }
   if (input.category === "guidelines") {
-    return {
-      name: "05 Brand Guidelines",
-      purpose: "Colors, fonts, and approved logo usage.",
-      archived: false,
-    };
+    return brandFolder("05 Brand Guidelines", "Colors, fonts, and approved logo usage.");
   }
   if (
     input.category === "flyers" ||
@@ -471,25 +522,16 @@ export function brandMasterFolder(input: {
     input.category === "campaign_materials" ||
     input.category === "videos"
   ) {
-    return {
-      name: "04 Marketing & Print Assets",
-      purpose: "Flyers, QR graphics, and print-ready files.",
-      archived: false,
-    };
+    return brandFolder("04 Marketing & Print Assets", "Flyers, QR graphics, and print-ready files.");
   }
   const mime = input.mimeType.toLowerCase();
   if (input.category === "social_graphics" || mime === "image/jpeg" || mime === "image/webp") {
-    return {
-      name: "02 Digital & Social Logos",
-      purpose: "Web, Canva, and social profile versions, including horizontal JPG files.",
-      archived: false,
-    };
+    return brandFolder(
+      "02 Digital & Social Logos",
+      "Web, Canva, and social profile versions, including horizontal JPG files.",
+    );
   }
-  return {
-    name: "01 Official Master Logos",
-    purpose: "Approved SVG, EPS, and transparent PNG masters.",
-    archived: false,
-  };
+  return brandFolder("01 Official Master Logos", "Approved SVG, EPS, and transparent PNG masters.");
 }
 
 export function brandPreviewKind(mime: string): "image" | "video" | "file" {

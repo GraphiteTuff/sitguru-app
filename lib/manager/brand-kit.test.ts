@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assessBrandUploadClaim,
+  brandAssetMatchesCategory,
+  brandCategoryLabel,
+  brandCategoryNotice,
+  BRAND_UPLOAD_STATUS,
   brandDownloadFileName,
   brandKitCapabilities,
   brandMasterFolder,
   internBrandLibraryHref,
+  isBrandCategory,
+  isThirdPartyBrandCategory,
   parseSitGuruSharePointUrl,
   sharePointSourceAction,
   inspectBrandBytes,
@@ -149,6 +155,69 @@ describe("brand library order", () => {
       approvalStatus: "archived",
     });
     assert.equal(retired.name, "99 Brand Archive");
+    assert.equal(retired.archived, true);
+  });
+
+  it("keeps new categories filterable and maps them to their SharePoint folders", () => {
+    for (const id of ["payment_integrations", "platform_icons", "merchandise", "partner_logos"] as const) {
+      assert.equal(isBrandCategory(id), true);
+      assert.equal(brandCategoryLabel(id).length > 0, true);
+    }
+    assert.equal(isBrandCategory("checkout_method"), false);
+    assert.equal(BRAND_UPLOAD_STATUS, "draft");
+    const svg = assessBrandUploadClaim({
+      fileName: "stripe-mark.svg",
+      declaredMime: "image/svg+xml",
+      declaredSize: 2048,
+    });
+    assert.equal(svg.ok, true);
+    assert.equal(isBrandCategory("payment_integrations"), true);
+
+    const payment = brandMasterFolder({
+      category: "payment_integrations",
+      mimeType: "image/svg+xml",
+      approvalStatus: "draft",
+    });
+    assert.equal(payment.path, "02 Brand Kit / 07 Third-Party Payment & Platform Icons / 01 Payment Providers & Methods");
+    assert.match(payment.purpose, /does not enable that payment method/i);
+    const platform = brandMasterFolder({
+      category: "platform_icons",
+      mimeType: "image/png",
+      approvalStatus: "approved",
+    });
+    assert.equal(platform.path, "02 Brand Kit / 07 Third-Party Payment & Platform Icons / 02 Platform Icons");
+    const merch = brandMasterFolder({
+      category: "merchandise",
+      mimeType: "image/png",
+      approvalStatus: "approved",
+    });
+    assert.equal(merch.path, "02 Brand Kit / 06 Products & Merchandise");
+    const partner = brandMasterFolder({
+      category: "partner_logos",
+      mimeType: "image/svg+xml",
+      approvalStatus: "approved",
+    });
+    assert.equal(partner.path, "02 Brand Kit / 04 Marketing & Print Assets");
+    assert.equal(isThirdPartyBrandCategory("payment_integrations"), true);
+    assert.equal(isThirdPartyBrandCategory("platform_icons"), true);
+    assert.equal(isThirdPartyBrandCategory("partner_logos"), true);
+    assert.equal(isThirdPartyBrandCategory("merchandise"), false);
+    assert.equal(isThirdPartyBrandCategory("official_logos"), false);
+    assert.match(brandCategoryNotice("payment_integrations"), /does not turn the method on at checkout/i);
+    assert.equal(brandAssetMatchesCategory("payment_integrations", "payment_integrations"), true);
+    assert.equal(brandAssetMatchesCategory("official_logos", "payment_integrations"), false);
+    assert.equal(brandAssetMatchesCategory("official_logos", ""), true);
+    assert.equal(brandAssetMatchesCategory("official_logos", "all"), true);
+
+    const intern = brandKitCapabilities({
+      canAccessAdmin: false,
+      isSuperUser: false,
+      growthOnly: false,
+      intern: true,
+    });
+    assert.equal(intern.viewApproved, true);
+    assert.equal(intern.upload, false);
+    assert.equal(intern.approve, false);
   });
 
   it("accepts a SitGuru SharePoint file URL and rejects other destinations", () => {
