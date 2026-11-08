@@ -226,8 +226,81 @@ export type BrandLibraryStatus = "approved" | "draft" | "pending_review" | "arch
 export type BrandLibrarySort = "approved_first" | "newest" | "oldest" | "name_asc" | "name_desc" | "updated";
 
 const SHAREPOINT_HOST = "sitgurullc.sharepoint.com";
-const SHAREPOINT_SITE = "/sites/SitGuruMarketingCommunityGrowth";
+const SHAREPOINT_SITE_NAME = "SitGuruMarketingCommunityGrowth";
+const SHAREPOINT_SITE = `/sites/${SHAREPOINT_SITE_NAME}`;
 const FILE_EXT = /\.(jpg|jpeg|png|webp|gif|svg|pdf|zip|mp4|webm|mov|eps|ai)$/i;
+/** Microsoft Copy Link type letters. `f` is a folder. The rest are individual files. */
+const SHARING_FILE_TYPES = new Set(["b", "i", "o", "p", "t", "u", "v", "w", "x"]);
+
+function decodeSharePointPart(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+function isMarketingSitePath(pathname: string) {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return path === SHAREPOINT_SITE || path.startsWith(`${SHAREPOINT_SITE}/`);
+}
+
+function sharePointQueryIsSafe(url: URL) {
+  for (const [key, raw] of url.searchParams) {
+    const value = raw.trim();
+    if (!value) continue;
+    if (value.includes("\\") || value.includes("..") || /[\u0000-\u001f]/.test(value)) return false;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("//")) return false;
+    const name = key.toLowerCase();
+    if (name === "redirect" || name === "returnurl" || name === "url" || name === "next" || name === "dest") return false;
+    if (name === "id" || name === "parent" || name === "rootfolder") {
+      const idPath = value.split("?")[0] || "";
+      if (!idPath.startsWith("/") || !isMarketingSitePath(idPath)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Site-scoped Copy Link: /:i:/s/SitGuruMarketingCommunityGrowth/{token}
+ * Direct Copy Link: /:i:/r/sites/SitGuruMarketingCommunityGrowth/...
+ * Returns null when the path is not a sharing link.
+ */
+function classifySharePointSharing(pathname: string):
+  | { ok: true; kind: "file" | "folder" }
+  | { ok: false; error: string }
+  | null {
+  if (!pathname.startsWith("/:")) return null;
+  const match = pathname.match(/^\/:([a-z]):\/([a-z])\/([^/]+)(\/.*)?$/i);
+  if (!match) return { ok: false, error: "That SharePoint link is malformed." };
+  const type = match[1].toLowerCase();
+  const scope = match[2].toLowerCase();
+  const head = match[3];
+  const rest = match[4] || "";
+  if (head.includes("..") || rest.includes("..") || head.includes("\\") || rest.includes("\\") || head.includes("@")) {
+    return { ok: false, error: "That SharePoint link is malformed." };
+  }
+  const kind = type === "f" ? "folder" : SHARING_FILE_TYPES.has(type) ? "file" : "";
+  if (!kind) return { ok: false, error: "That SharePoint link is malformed." };
+  if (scope === "s") {
+    if (head !== SHAREPOINT_SITE_NAME) {
+      return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+    }
+    const token = rest.split("/").filter(Boolean);
+    if (token.length !== 1 || !/^[A-Za-z0-9._~-]+$/.test(token[0] || "")) {
+      return { ok: false, error: "That SharePoint link is malformed." };
+    }
+    return { ok: true, kind };
+  }
+  if (scope === "r") {
+    const embedded = `/${head}${rest}`;
+    if (!isMarketingSitePath(embedded)) {
+      return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+    }
+    return { ok: true, kind };
+  }
+  return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+}
 
 export function parseSitGuruSharePointUrl(raw: string):
   | { ok: true; href: string; kind: "file" | "folder" }
@@ -235,28 +308,37 @@ export function parseSitGuruSharePointUrl(raw: string):
   const value = String(raw || "").trim();
   if (!value) return { ok: false, error: "Paste a SharePoint file URL." };
   if (value.length > 2000) return { ok: false, error: "That SharePoint URL is too long." };
+  if (/[\u0000-\u001f\\]/.test(value)) return { ok: false, error: "That SharePoint link is malformed." };
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     return { ok: false, error: "Paste a full https SharePoint URL." };
   }
-  if (url.protocol !== "https:" || url.username || url.password) {
+  if (url.protocol !== "https:" || url.username || url.password || url.port) {
     return { ok: false, error: "SharePoint links must be https on the SitGuru tenant." };
   }
   if (url.hostname.toLowerCase() !== SHAREPOINT_HOST) {
     return { ok: false, error: "That link is not on the SitGuru SharePoint tenant." };
   }
-  const path = decodeURIComponent(url.pathname);
-  if (!path.includes(SHAREPOINT_SITE) || path.includes("..")) {
-    return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+  const path = decodeSharePointPart(url.pathname);
+  if (!path || path.includes("..") || path.includes("\\") || path.includes("@")) {
+    return { ok: false, error: "That SharePoint link is malformed." };
   }
-  const id = decodeURIComponent(url.searchParams.get("id") || "");
-  const target = id || path;
-  const sharing = path.match(/^\/:([a-z]):\//i)?.[1]?.toLowerCase() || "";
-  const file = sharing ? sharing !== "f" : FILE_EXT.test(target);
+  if (!sharePointQueryIsSafe(url)) return { ok: false, error: "That SharePoint link is malformed." };
+  const sharing = classifySharePointSharing(path);
+  if (sharing && !sharing.ok) return sharing;
+  let kind: "file" | "folder";
+  if (sharing?.ok) {
+    kind = sharing.kind;
+  } else if (!isMarketingSitePath(path)) {
+    return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+  } else {
+    const id = url.searchParams.get("id") || "";
+    kind = FILE_EXT.test(id || path) ? "file" : "folder";
+  }
   url.hash = "";
-  return { ok: true, href: url.toString(), kind: file ? "file" : "folder" };
+  return { ok: true, href: url.toString(), kind };
 }
 
 export function sharePointSourceAction(input: {
