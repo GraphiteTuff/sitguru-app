@@ -205,13 +205,99 @@ export type BrandAssetRecord = {
   updatedAt: string;
   uploadedByName: string;
   previewKind: "image" | "video" | "file";
+  sharePointSourceUrl: string;
 };
 
 export const BRAND_PAGE_SIZE = 12;
 
+export function internBrandLibraryHref(input: { q?: string; category?: string; page?: number }) {
+  const params = new URLSearchParams();
+  params.set("tool", "brand");
+  const query = String(input.q || "").trim();
+  const category = String(input.category || "").trim();
+  if (query) params.set("q", query);
+  if (category) params.set("category", category);
+  if (input.page && input.page > 1) params.set("page", String(input.page));
+  return `/intern/toolkit?${params.toString()}`;
+}
+
 export type BrandLibraryStatus = "approved" | "draft" | "pending_review" | "archived" | "active" | "all";
 
 export type BrandLibrarySort = "approved_first" | "newest" | "oldest" | "name_asc" | "name_desc" | "updated";
+
+const SHAREPOINT_HOST = "sitgurullc.sharepoint.com";
+const SHAREPOINT_SITE = "/sites/SitGuruMarketingCommunityGrowth";
+const FILE_EXT = /\.(jpg|jpeg|png|webp|gif|svg|pdf|zip|mp4|webm|mov|eps|ai)$/i;
+
+export function parseSitGuruSharePointUrl(raw: string):
+  | { ok: true; href: string; kind: "file" | "folder" }
+  | { ok: false; error: string } {
+  const value = String(raw || "").trim();
+  if (!value) return { ok: false, error: "Paste a SharePoint file URL." };
+  if (value.length > 2000) return { ok: false, error: "That SharePoint URL is too long." };
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: "Paste a full https SharePoint URL." };
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    return { ok: false, error: "SharePoint links must be https on the SitGuru tenant." };
+  }
+  if (url.hostname.toLowerCase() !== SHAREPOINT_HOST) {
+    return { ok: false, error: "That link is not on the SitGuru SharePoint tenant." };
+  }
+  const path = decodeURIComponent(url.pathname);
+  if (!path.includes(SHAREPOINT_SITE) || path.includes("..")) {
+    return { ok: false, error: "That link is not in the SitGuru Marketing SharePoint site." };
+  }
+  const id = decodeURIComponent(url.searchParams.get("id") || "");
+  const target = id || path;
+  const sharing = path.match(/^\/:([a-z]):\//i)?.[1]?.toLowerCase() || "";
+  const file = sharing ? sharing !== "f" : FILE_EXT.test(target);
+  url.hash = "";
+  return { ok: true, href: url.toString(), kind: file ? "file" : "folder" };
+}
+
+export function sharePointSourceAction(input: {
+  sourceUrl?: string;
+  folderHref?: string;
+  libraryHref?: string;
+}) {
+  const source = String(input.sourceUrl || "").trim();
+  if (source) {
+    const parsed = parseSitGuruSharePointUrl(source);
+    if (parsed.ok && parsed.kind === "file") {
+      return {
+        label: "View SharePoint Source File",
+        href: parsed.href,
+        note: "This opens the saved SharePoint file URL. SitGuru has not checked the file itself.",
+      };
+    }
+    if (parsed.ok) {
+      return {
+        label: "Open SharePoint Folder",
+        href: parsed.href,
+        note: "This opens a SharePoint folder, not an individual file.",
+      };
+    }
+  }
+  if (input.folderHref) {
+    return {
+      label: "Open SharePoint Folder",
+      href: input.folderHref,
+      note: "This opens the Brand Kit folder. An individual file link has not been saved.",
+    };
+  }
+  if (input.libraryHref) {
+    return {
+      label: "Open SharePoint Brand Library",
+      href: input.libraryHref,
+      note: "This opens the document library. An individual file link has not been saved.",
+    };
+  }
+  return null;
+}
 
 export function brandDownloadFileName(fileName: string) {
   const safe = safeBrandFileName(fileName);

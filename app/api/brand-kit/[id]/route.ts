@@ -18,6 +18,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     category: body.category,
     tags: body.tags,
     approvalStatus: body.approvalStatus,
+    sharePointSourceUrl: body.sharePointSourceUrl,
   });
   return NextResponse.json(result, { status: result.error ? 400 : 200 });
 }

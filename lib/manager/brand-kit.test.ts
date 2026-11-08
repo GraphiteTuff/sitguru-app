@@ -5,6 +5,9 @@ import {
   brandDownloadFileName,
   brandKitCapabilities,
   brandMasterFolder,
+  internBrandLibraryHref,
+  parseSitGuruSharePointUrl,
+  sharePointSourceAction,
   inspectBrandBytes,
   paginateBrandAssets,
   resolveBrandLibraryStatus,
@@ -146,5 +149,50 @@ describe("brand library order", () => {
       approvalStatus: "archived",
     });
     assert.equal(retired.name, "99 Brand Archive");
+  });
+
+  it("accepts a SitGuru SharePoint file URL and rejects other destinations", () => {
+    const file = parseSitGuruSharePointUrl(
+      "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/General/02%20Brand%20Kit/02%20Digital%20%26%20Social%20Logos/horizontal.jpg",
+    );
+    assert.equal(file.ok && file.kind, "file");
+    const imageLink = parseSitGuruSharePointUrl(
+      "https://sitgurullc.sharepoint.com/:i:/r/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/General/02%20Brand%20Kit/green-dog-cat.jpg",
+    );
+    assert.equal(imageLink.ok && imageLink.kind, "file");
+    const folder = parseSitGuruSharePointUrl(
+      "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FSitGuruMarketingCommunityGrowth%2FShared%20Documents%2FGeneral%2F02%20Brand%20Kit",
+    );
+    assert.equal(folder.ok && folder.kind, "folder");
+    assert.equal(parseSitGuruSharePointUrl("https://contoso.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/logo.jpg").ok, false);
+    assert.equal(parseSitGuruSharePointUrl("http://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/logo.jpg").ok, false);
+    assert.equal(parseSitGuruSharePointUrl("https://sitgurullc.sharepoint.com/sites/OtherSite/logo.jpg").ok, false);
+    assert.equal(parseSitGuruSharePointUrl("javascript:alert(1)").ok, false);
+    const saved = sharePointSourceAction({
+      sourceUrl: "https://sitgurullc.sharepoint.com/:i:/r/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/logo.jpg",
+      folderHref: "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/Forms/AllItems.aspx",
+      libraryHref: "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents",
+    });
+    assert.equal(saved?.label, "View SharePoint Source File");
+    assert.match(saved?.note || "", /has not checked the file/i);
+    assert.doesNotMatch(`${saved?.label} ${saved?.note}`, /verified master/i);
+    const onlyFolder = sharePointSourceAction({
+      folderHref: "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents/Forms/AllItems.aspx",
+    });
+    assert.equal(onlyFolder?.label, "Open SharePoint Folder");
+    const library = sharePointSourceAction({
+      libraryHref: "https://sitgurullc.sharepoint.com/sites/SitGuruMarketingCommunityGrowth/Shared%20Documents",
+    });
+    assert.equal(library?.label, "Open SharePoint Brand Library");
+  });
+
+  it("keeps the intern library on SitGuru search and downloads", () => {
+    const href = internBrandLibraryHref({ q: "dog", category: "social_graphics", page: 2 });
+    assert.match(href, /^\/intern\/toolkit\?/);
+    assert.match(href, /tool=brand/);
+    assert.match(href, /q=dog/);
+    assert.match(href, /category=social_graphics/);
+    assert.match(href, /page=2/);
+    assert.doesNotMatch(href, /sharepoint/i);
   });
 });

@@ -12,6 +12,7 @@ import {
   isBrandCategory,
   isBrandStatus,
   paginateBrandAssets,
+  parseSitGuruSharePointUrl,
   resolveBrandLibraryStatus,
   sanitizeBrandTags,
   sanitizeBrandText,
@@ -72,6 +73,7 @@ function mapAsset(row: AssetRow): BrandAssetRecord {
     updatedAt: "",
     uploadedByName: row.uploaded_by_name || "SitGuru",
     previewKind: brandPreviewKind(row.mime_type),
+    sharePointSourceUrl: text((row as AssetRow & { sharepoint_source_url?: string }).sharepoint_source_url),
   };
 }
 
@@ -169,7 +171,7 @@ export async function listBrandAssets(input: {
   let query = supabaseAdmin
     .from("growth_brand_assets")
     .select(
-      "id,title,description,category,tags,approval_status,file_name,mime_type,file_size,storage_bucket,storage_path,version,version_group,replaces_id,verified,uploaded_by,uploaded_by_name,created_at,updated_at",
+      "id,title,description,category,tags,approval_status,file_name,mime_type,file_size,storage_bucket,storage_path,version,version_group,replaces_id,verified,uploaded_by,uploaded_by_name,sharepoint_source_url,created_at,updated_at",
     )
     .eq("verified", true)
     .limit(500);
@@ -442,6 +444,7 @@ export async function updateBrandAsset(input: {
   category?: string;
   tags?: unknown;
   approvalStatus?: string;
+  sharePointSourceUrl?: string;
 }) {
   if (!input.actor.capabilities.edit) return { error: "You cannot edit brand files." };
   const { data: row } = await supabaseAdmin
@@ -492,6 +495,19 @@ export async function updateBrandAsset(input: {
     }
     patch.approval_status = input.approvalStatus;
     notes.push(input.approvalStatus);
+  }
+  if (input.sharePointSourceUrl !== undefined) {
+    if (!input.actor.capabilities.approve) return { error: "A Super Admin saves the SharePoint source file." };
+    const raw = String(input.sharePointSourceUrl || "").trim();
+    if (!raw) {
+      patch.sharepoint_source_url = "";
+      notes.push("sharepoint cleared");
+    } else {
+      const parsed = parseSitGuruSharePointUrl(raw);
+      if (!parsed.ok) return { error: parsed.error };
+      patch.sharepoint_source_url = parsed.href;
+      notes.push(parsed.kind === "file" ? "sharepoint file" : "sharepoint folder");
+    }
   }
   const { error } = await supabaseAdmin.from("growth_brand_assets").update(patch).eq("id", row.id);
   if (error) return { error: libraryError(error) };

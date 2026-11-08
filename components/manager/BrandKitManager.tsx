@@ -9,6 +9,7 @@ import {
   BUILT_IN_BRAND_ASSETS,
   brandCategoryLabel,
   brandMasterFolder,
+  sharePointSourceAction,
   type BrandAssetRecord,
   type BrandStatus,
 } from "@/lib/manager/brand-kit";
@@ -335,6 +336,7 @@ export default function BrandKitManager({
       ) : null}
       {selected ? (
         <AssetDrawer
+          key={`${selected.id}-${selected.updatedAt}-${selected.sharePointSourceUrl}`}
           asset={selected}
           capabilities={capabilities}
           sharePointHref={sharePointHref}
@@ -518,8 +520,13 @@ function AssetDrawer({
   const [description, setDescription] = useState(asset.description);
   const [category, setCategory] = useState(asset.category);
   const [tags, setTags] = useState(asset.tags.join(", "));
+  const [sourceUrl, setSourceUrl] = useState(asset.sharePointSourceUrl || "");
   const [busy, setBusy] = useState(false);
   const master = brandMasterFolder(asset);
+  const source = sharePointSourceAction({
+    sourceUrl: asset.sharePointSourceUrl,
+    folderHref: sharePointHref,
+  });
   const placed = new Date(asset.createdAt || "").toLocaleString();
 
   async function patch(body: Record<string, unknown>, success: string) {
@@ -623,18 +630,42 @@ function AssetDrawer({
         <div className="mt-3"><Preview asset={asset} /></div>
         <p className="mt-3 break-all text-xs font-semibold text-slate-500">{asset.fileName}</p>
         <p className="text-xs font-semibold text-slate-500">{formatBytes(asset.fileSize)} · v{asset.version} · {asset.uploadedByName} · {placed || "Saved"}</p>
-        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-          <p className="font-black text-[#0F2744]">SharePoint master: {master.name}</p>
+        <section className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+          <h3 className="font-black text-[#0F2744]">SharePoint Source File</h3>
+          <p className="mt-1 text-xs font-medium">Recommended folder: General / 02 Brand Kit / {master.name}</p>
           <p className="mt-1 text-xs font-medium">{master.purpose}</p>
-          <p className="mt-2 text-xs font-medium">SitGuru does not copy this file into SharePoint. Save the original in the active folder and use SharePoint version history. Only a retired design belongs in 99 Brand Archive.</p>
-          {sharePointHref ? (
-            <a className="mt-2 inline-flex min-h-11 items-center font-bold text-[#2563EB]" href={sharePointHref} target="_blank" rel="noreferrer">
-              View SharePoint Master
+          <p className="mt-2 text-xs font-medium">SitGuru does not copy this file into SharePoint, and a saved URL is not a verified master. Only a retired design belongs in 99 Brand Archive.</p>
+          {source ? (
+            <a className="mt-2 inline-flex min-h-11 items-center break-all font-bold text-[#2563EB]" href={source.href} target="_blank" rel="noreferrer">
+              {source.label}
             </a>
           ) : (
-            <p className="mt-2 text-xs font-semibold">The SharePoint folder opens on an @sitguru.com work account.</p>
+            <p className="mt-2 text-xs font-semibold">No SharePoint link is saved for this file.</p>
           )}
-        </div>
+          {source ? <p className="mt-1 break-words text-xs font-medium">{source.note}</p> : null}
+          {capabilities.approve ? (
+            <div className="mt-3 space-y-2">
+              <label className="block text-xs font-bold text-slate-500">Exact SharePoint file URL
+                <input
+                  className={`${fieldClass} mt-1`}
+                  value={sourceUrl}
+                  placeholder="https://sitgurullc.sharepoint.com/..."
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={busy} className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-bold !text-white disabled:opacity-60" onClick={() => patch({ sharePointSourceUrl: sourceUrl }, "SharePoint source saved.")}>
+                  Save source link
+                </button>
+                {asset.sharePointSourceUrl ? (
+                  <button type="button" disabled={busy} className="inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold" onClick={() => patch({ sharePointSourceUrl: "" }, "SharePoint source removed.")}>
+                    Remove source link
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </section>
         {capabilities.edit ? (
           <div className="mt-4 space-y-2">
             <label className="block text-xs font-bold text-slate-500">Name

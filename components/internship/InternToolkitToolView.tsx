@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import InternStudentTools from "@/components/internship/InternStudentTools";
+import type { InternBrandCard } from "@/components/internship/InternBrandLibrary";
 import type { InternHomeToolId, InternPromoteEvent } from "@/lib/internship/intern-tools";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
@@ -10,13 +11,21 @@ export default function InternToolkitToolView({
   events,
   tool,
   preview = false,
-  officialBrand = [],
+  brandLibrary,
 }: {
   data: InternshipWorkspaceData;
   events: InternPromoteEvent[];
   tool: InternHomeToolId;
   preview?: boolean;
-  officialBrand?: Array<{ id: string; title: string }>;
+  brandLibrary?: {
+    assets: InternBrandCard[];
+    total: number;
+    page: number;
+    pages: number;
+    loadError: string;
+    query: string;
+    category: string;
+  };
 }) {
   const router = useRouter();
   return (
@@ -25,7 +34,7 @@ export default function InternToolkitToolView({
       events={events}
       tool={tool}
       preview={preview}
-      officialBrand={officialBrand}
+      brandLibrary={brandLibrary}
       onBack={() => router.push("/intern/toolkit")}
     />
   );

@@ -1,5 +1,6 @@
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
 import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
+import type { InternBrandCard } from "@/components/internship/InternBrandLibrary";
 import {
   listGrowthInitiatives,
   listGrowthIntelligence,
@@ -54,12 +55,57 @@ export default async function InternToolkitPage({
       );
     }
     const events = await listInternPromoteEvents();
-    let officialBrand: Array<{ id: string; title: string }> = [];
+    const brandQuery = first(params.q);
+    const brandCategory = first(params.category);
+    const brandPage = Number(first(params.page) || 1);
+    let brandLibrary: {
+      assets: InternBrandCard[];
+      total: number;
+      page: number;
+      pages: number;
+      loadError: string;
+      query: string;
+      category: string;
+    } | undefined;
     if (requested === "brand") {
       const actor = await resolveBrandActor();
       if (actor?.capabilities.viewApproved) {
-        const listed = await listBrandAssets({ actor, status: "approved", pageSize: 200 });
-        officialBrand = listed.assets.map((asset) => ({ id: asset.id, title: asset.title }));
+        const listed = await listBrandAssets({
+          actor,
+          status: "approved",
+          query: brandQuery,
+          category: brandCategory,
+          page: brandPage,
+          pageSize: 12,
+          sort: "approved_first",
+        });
+        brandLibrary = {
+          assets: listed.assets.map((asset) => ({
+            id: asset.id,
+            title: asset.title,
+            category: asset.category,
+            fileName: asset.fileName,
+            mimeType: asset.mimeType,
+            fileSize: asset.fileSize,
+            previewKind: asset.previewKind,
+          })),
+          total: listed.total,
+          page: listed.page,
+          pages: listed.pages,
+          loadError: listed.error,
+          query: brandQuery,
+          category: brandCategory,
+        };
+      } else {
+        brandLibrary = {
+          assets: [],
+          total: 0,
+          page: 1,
+          pages: 1,
+          loadError: "Approved brand files are not available on this login.",
+          query: brandQuery,
+          category: brandCategory,
+        };
       }
     }
     return (
@@ -77,7 +123,7 @@ export default async function InternToolkitPage({
           events={events}
           tool={requested}
           preview={Boolean(first(params.view))}
-          officialBrand={officialBrand}
+          brandLibrary={brandLibrary}
         />
       </div>
     );

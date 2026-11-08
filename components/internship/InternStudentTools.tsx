@@ -27,6 +27,7 @@ import {
   SITGURU_BRAND_GREEN_DARK,
   SITGURU_BRAND_GREEN_LIGHT,
 } from "@/lib/internship/intern-ui";
+import InternBrandLibrary, { type InternBrandCard } from "@/components/internship/InternBrandLibrary";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 
 function Field({
@@ -125,14 +126,22 @@ export default function InternStudentTools({
   tool,
   onBack,
   preview = false,
-  officialBrand = [],
+  brandLibrary,
 }: {
   data: InternshipWorkspaceData;
   events: InternPromoteEvent[];
   tool: InternHomeToolId;
   onBack: () => void;
   preview?: boolean;
-  officialBrand?: Array<{ id: string; title: string }>;
+  brandLibrary?: {
+    assets: InternBrandCard[];
+    total: number;
+    page: number;
+    pages: number;
+    loadError: string;
+    query: string;
+    category: string;
+  };
 }) {
   const snapshot = internMarketSnapshot(data);
   const platforms = internContentByPlatform(data.content);
@@ -141,7 +150,7 @@ export default function InternStudentTools({
     return (
       <ToolShell
         title="Brand kit"
-        blurb="Use SitGuru’s logo, green, and @SitGuruOfficial. Upload your Canva or CapCut files here for SitGuru to review. Don’t use school logos unless the school says yes."
+        blurb="Use approved SitGuru logos from this page. Download the file here, then submit your post to your manager."
         tool={tool}
         onBack={onBack}
       >
@@ -211,22 +220,15 @@ export default function InternStudentTools({
           <li>Don’t say a university endorses SitGuru.</li>
           <li>Tag {SITGURU_OFFICIAL_HANDLE} when you post about SitGuru.</li>
         </ul>
-        {officialBrand.length ? (
-          <article className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-              Approved company files
-            </p>
-            <ul className="mt-2 space-y-2">
-              {officialBrand.map((asset) => (
-                <li key={asset.id}>
-                  <a className="text-sm font-black text-emerald-800" href={`/api/brand-kit/${asset.id}/file?download=1`} download={asset.title}>
-                    {asset.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </article>
-        ) : null}
+        <InternBrandLibrary
+          assets={brandLibrary?.assets || []}
+          total={brandLibrary?.total || 0}
+          page={brandLibrary?.page || 1}
+          pages={brandLibrary?.pages || 1}
+          loadError={brandLibrary?.loadError || ""}
+          query={brandLibrary?.query || ""}
+          category={brandLibrary?.category || ""}
+        />
         <InternWorkAttachments
           internId={data.intern.id}
           itemType="brand"
