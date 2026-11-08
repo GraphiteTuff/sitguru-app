@@ -77,7 +77,7 @@ export function ManagerSimpleToolsPage({
     },
     toolkit: {
       title: "Manager Toolkit",
-      subtitle: "Quick tools for Ava — brand, tracking, market snapshot, and team resources.",
+      subtitle: "Your workspace for creating, promoting, tracking, and growing the SitGuru community.",
       icon: <Wrench size={22} />,
       overlay: "Lead with clarity. Grow with care.",
       links: [

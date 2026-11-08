@@ -38,6 +38,7 @@ import {
   isBaselineGrowthBriefTask,
   parseBaselineBriefPayload,
 } from "@/lib/internship/baseline-brief";
+import { internAttachmentReturnPath } from "@/lib/internship/attachment-return";
 import { internPortalTheme, internSafeLinkedInUrl, internWorkItemType } from "@/lib/internship/portal";
 import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import {
@@ -1210,10 +1211,7 @@ export async function saveMilestoneStatus(formData: FormData) {
 }
 
 function workspacePath(internId: string, mode: string, itemType?: string | null) {
-  if (mode === "supervisor") return `/admin/internship/interns/${internId}`;
-  if (itemType === "brand") return "/intern?tool=brand";
-  if (itemType === "task") return "/intern?tab=work&work=tasks";
-  return "/intern";
+  return internAttachmentReturnPath(mode, internId, itemType);
 }
 
 export async function saveInternProfile(formData: FormData) {

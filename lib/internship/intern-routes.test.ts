@@ -19,7 +19,8 @@ describe("intern flat routes", () => {
     assert.equal(internLegacySectionRedirect({ tab: "work" }), "/intern/assignments");
     assert.equal(internLegacySectionRedirect({ tab: "project" }), "/intern/milestones");
     assert.equal(internLegacySectionRedirect({ focus: "messages" }), "/intern/messages");
-    assert.equal(internLegacySectionRedirect({ tool: "brand" }), "/intern/toolkit");
+    assert.equal(internLegacySectionRedirect({ tool: "brand" }), "/intern/toolkit?tool=brand");
+    assert.equal(internLegacySectionRedirect({ tool: "toolkit" }), "/intern/toolkit");
     assert.equal(internLegacySectionRedirect({ edit: "page" }), "/intern/settings");
   });
 });

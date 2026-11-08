@@ -28,7 +28,7 @@ import {
 import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
 import Link from "next/link";
-import { internLegacySectionRedirect } from "@/lib/internship/intern-routes";
+import { internLegacySectionRedirect, withInternFlash } from "@/lib/internship/intern-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +59,9 @@ export default async function InternPortalPage({
       work: first(params.work),
       edit: first(params.edit),
     });
-    if (flat && flat !== "/intern") redirect(flat);
+    if (flat && flat !== "/intern") {
+      redirect(withInternFlash(flat, { ok, error }));
+    }
   }
 
   if (internDocumentationModeEnabled()) {

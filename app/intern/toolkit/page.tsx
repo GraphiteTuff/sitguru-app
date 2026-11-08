@@ -1,4 +1,5 @@
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
+import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import {
   listGrowthInitiatives,
   listGrowthIntelligence,
@@ -37,6 +38,8 @@ export default async function InternToolkitPage({
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
   const requested = first(params.tool);
+  const notice = first(params.ok) || first(params.error);
+  const noticeError = Boolean(first(params.error));
   const section = await loadInternSectionWorkspace();
 
   if (isTool(requested)) {
@@ -51,13 +54,32 @@ export default async function InternToolkitPage({
       );
     }
     const events = await listInternPromoteEvents();
+    let officialBrand: Array<{ id: string; title: string }> = [];
+    if (requested === "brand") {
+      const actor = await resolveBrandActor();
+      if (actor?.capabilities.viewApproved) {
+        const listed = await listBrandAssets({ actor, status: "approved" });
+        officialBrand = listed.assets.map((asset) => ({ id: asset.id, title: asset.title }));
+      }
+    }
     return (
-      <InternToolkitToolView
-        data={section.workspace}
-        events={events}
-        tool={requested}
-        preview={Boolean(first(params.view))}
-      />
+      <div className="space-y-3">
+        {notice ? (
+          <p
+            role={noticeError ? "alert" : "status"}
+            className={`rounded-2xl px-4 py-3 text-sm font-bold ${noticeError ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}
+          >
+            {notice}
+          </p>
+        ) : null}
+        <InternToolkitToolView
+          data={section.workspace}
+          events={events}
+          tool={requested}
+          preview={Boolean(first(params.view))}
+          officialBrand={officialBrand}
+        />
+      </div>
     );
   }
 

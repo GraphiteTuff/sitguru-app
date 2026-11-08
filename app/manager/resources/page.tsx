@@ -1,25 +1,49 @@
-import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import GrowthOneNoteShortcuts from "@/components/admin/growth/GrowthOneNoteShortcuts";
 import GrowthSharePointShortcuts from "@/components/admin/growth/GrowthSharePointShortcuts";
-import ResourcesBoard from "@/components/portal/ResourcesBoard";
+import ManagerResourceLibrary from "@/components/manager/ManagerResourceLibrary";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
+import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { buildManagerResources, searchResources } from "@/lib/manager/resource-catalog";
+import { managerWorkLinks } from "@/lib/manager/work-links";
 
 export const dynamic = "force-dynamic";
 
-export default async function ManagerResourcesPage() {
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value || "";
+}
+
+export default async function ManagerResourcesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
+  const params = searchParams ? await searchParams : {};
+  const query = first(params.q).slice(0, 80);
+  const links = managerWorkLinks(access.actor.email);
+  const groups = searchResources(
+    query,
+    buildManagerResources({
+      isSuperUser: access.actor.isSuperUser,
+      folders: links.folders,
+      teamsHref: links.teamsHref,
+    }),
+  );
   const showWorkLinks = isSitGuruWorkEmail(access.actor.email);
 
   return (
-    <div className="space-y-5">
-      <ResourcesBoard audience="manager" />
+    <ManagerResourceLibrary groups={groups} query={query} empty={Boolean(query) && groups.length === 0}>
       {showWorkLinks ? (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <>
           <GrowthSharePointShortcuts email={access.actor.email} />
           <GrowthOneNoteShortcuts email={access.actor.email} />
-        </div>
-      ) : null}
-    </div>
+        </>
+      ) : (
+        <p className="text-sm font-semibold text-slate-600">
+          SharePoint and OneNote stay closed until this account uses an @sitguru.com work email. Nothing is copied into SitGuru.
+        </p>
+      )}
+    </ManagerResourceLibrary>
   );
 }

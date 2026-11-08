@@ -10,11 +10,13 @@ export default function InternToolkitToolView({
   events,
   tool,
   preview = false,
+  officialBrand = [],
 }: {
   data: InternshipWorkspaceData;
   events: InternPromoteEvent[];
   tool: InternHomeToolId;
   preview?: boolean;
+  officialBrand?: Array<{ id: string; title: string }>;
 }) {
   const router = useRouter();
   return (
@@ -23,6 +25,7 @@ export default function InternToolkitToolView({
       events={events}
       tool={tool}
       preview={preview}
+      officialBrand={officialBrand}
       onBack={() => router.push("/intern/toolkit")}
     />
   );

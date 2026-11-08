@@ -42,7 +42,10 @@ export function internLegacySectionRedirect(input: {
   if (edit === "page") return INTERN_ROUTES.settings;
   if (focus === "checkin" || focus === "check-in") return INTERN_ROUTES.checkIns;
   if (focus === "messages" || focus === "message") return INTERN_ROUTES.messages;
-  if (tool === "brand" || tool === "toolkit") return INTERN_ROUTES.toolkit;
+  if (tool === "brand" || tool === "tracking" || tool === "snapshot" || tool === "events" || tool === "social") {
+    return `${INTERN_ROUTES.toolkit}?tool=${tool}`;
+  }
+  if (tool === "toolkit") return INTERN_ROUTES.toolkit;
   if (tool === "calendar") return INTERN_ROUTES.calendar;
   if (tool === "metrics") return INTERN_ROUTES.metrics;
   if (tab === "work" || work === "tasks" || work === "assignments") {
@@ -54,6 +57,19 @@ export function internLegacySectionRedirect(input: {
   if (tab === "growth") return INTERN_ROUTES.growth;
   if (tab === "help") return INTERN_ROUTES.help;
   return null;
+}
+
+/** Keep a success or error notice when a legacy query is flattened. */
+export function withInternFlash(
+  path: string,
+  flash: { ok?: string; error?: string },
+) {
+  const [base, existing] = path.split("?");
+  const params = new URLSearchParams(existing || "");
+  if (flash.ok) params.set("ok", flash.ok);
+  if (flash.error) params.set("error", flash.error);
+  const query = params.toString();
+  return query ? `${base}?${query}` : base || "/intern";
 }
 
 export const INTERN_MENU_WIRED = [
