@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     .limit(200);
   const senderIds = [...new Set(((data || []) as { sender_id?: string }[]).map((row) => text(row.sender_id)).filter(Boolean))];
   const { data: profiles } = senderIds.length
-    ? await supabaseAdmin.from("profiles").select("id,first_name,full_name,avatar_url,profile_photo_url").in("id", senderIds)
+    ? await supabaseAdmin.from("profiles").select("id,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("id", senderIds)
     : { data: [] };
   const people = new Map(((profiles || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]));
   const messages = ((data || []) as Record<string, unknown>[]).map((row) => {

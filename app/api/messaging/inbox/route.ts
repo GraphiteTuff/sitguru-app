@@ -54,19 +54,6 @@ export async function GET() {
   const { data: participants } = ids.length
     ? await supabaseAdmin.from("conversation_participants").select("conversation_id,user_id").in("conversation_id", ids)
     : { data: [] };
-  const peerIds = [
-    ...new Set(
-      ((participants || []) as Record<string, unknown>[])
-        .map((row) => text(row.user_id))
-        .filter((id) => id && id !== userId),
-    ),
-  ];
-  const { data: profiles } = peerIds.length
-    ? await supabaseAdmin.from("profiles").select("id,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("id", peerIds)
-    : { data: [] };
-  const people = new Map(
-    ((profiles || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]),
-  );
   const peerByConversation = new Map<string, string>();
   for (const row of (participants || []) as Record<string, unknown>[]) {
     const conversationId = text(row.conversation_id);
@@ -74,6 +61,29 @@ export async function GET() {
     if (!conversationId || !personId || personId === userId || peerByConversation.has(conversationId)) continue;
     peerByConversation.set(conversationId, personId);
   }
+  for (const row of rows) {
+    const id = text(row.id);
+    if (peerByConversation.has(id)) continue;
+    const assigned = text(row.assigned_user_id);
+    const started = text(row.started_by_user_id);
+    const peerId = assigned && assigned !== userId ? assigned : started && started !== userId ? started : "";
+    if (peerId) peerByConversation.set(id, peerId);
+  }
+  const peerIds = [...new Set([...peerByConversation.values()].filter(Boolean))];
+  const [{ data: profiles }, { data: interns }] = await Promise.all([
+    peerIds.length
+      ? supabaseAdmin.from("profiles").select("id,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("id", peerIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    peerIds.length
+      ? supabaseAdmin.from("internship_interns").select("user_id,full_name,preferred_name,avatar_url").in("user_id", peerIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+  ]);
+  const people = new Map(
+    ((profiles || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]),
+  );
+  const internByUser = new Map(
+    ((interns || []) as Record<string, unknown>[]).map((row) => [text(row.user_id), row]),
+  );
 
   const { data: unread } = ids.length
     ? await supabaseAdmin
@@ -93,19 +103,22 @@ export async function GET() {
 
   const threads = rows.map((row) => {
     const id = text(row.id);
-    const peer = people.get(peerByConversation.get(id) || "");
+    const peerId = peerByConversation.get(id) || "";
+    const peer = people.get(peerId);
+    const intern = internByUser.get(peerId);
     const type = text(row.conversation_type);
     const name = peer
       ? firstName(text(peer.first_name) || text(peer.full_name))
-      : firstName(text(row.subject)) || "Chat";
+      : firstName(text(intern?.preferred_name) || text(intern?.full_name) || text(row.subject)) || "Chat";
+    const avatarUrl = (peer ? resolvePetParentAvatarUrl(peer) : "") || text(intern?.avatar_url);
     return {
       id,
       name,
-      avatarUrl: peer ? resolvePetParentAvatarUrl(peer) : "",
+      avatarUrl,
       detail: type === "live_agent" ? "Needs a live answer" : "Chat",
       preview: text(row.last_message_preview),
       unread: unreadByConversation.get(id) || 0,
-      recipientId: peerByConversation.get(id) || "",
+      recipientId: peerId,
     };
   });
   const waiting = threads.reduce((sum, thread) => sum + (thread.unread > 0 ? 1 : 0), 0);

@@ -56,23 +56,41 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [alert, setAlert] = useState<InboxThread | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const seenPreviews = useRef<Map<string, string> | null>(null);
+  const openThreadId = useRef("");
+
+  useEffect(() => {
+    openThreadId.current = threadId;
+  }, [threadId]);
 
   useEffect(() => {
     const pull = () => {
       void fetch("/api/messaging/inbox", { credentials: "same-origin" })
         .then((response) => response.json())
         .then((payload: { threads?: InboxThread[]; waiting?: number }) => {
-          setThreads(payload.threads || []);
+          const next = payload.threads || [];
+          const previous = seenPreviews.current;
+          if (previous) {
+            const incoming = next.find((thread) => {
+              if (!thread.unread || !thread.preview) return false;
+              if (thread.id === openThreadId.current) return false;
+              return previous.get(thread.id) !== thread.preview;
+            });
+            if (incoming) setAlert(incoming);
+          }
+          seenPreviews.current = new Map(next.map((thread) => [thread.id, thread.preview]));
+          setThreads(next);
           setWaiting(payload.waiting || 0);
         })
         .catch(() => undefined);
     };
     pull();
-    const timer = window.setInterval(pull, open ? 8000 : 20000);
+    const timer = window.setInterval(pull, 8000);
     return () => window.clearInterval(timer);
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     if (!open || threadId || view !== "people") return;
@@ -113,6 +131,8 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   }
 
   function openThread(thread: InboxThread) {
+    setAlert(null);
+    setOpen(true);
     setPeer({
       id: thread.recipientId,
       firstName: thread.name,
@@ -177,6 +197,7 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
             {threadId ? (
               <button type="button" className="shrink-0 text-sm font-bold !text-white" onClick={() => { setThreadId(""); setPeer(null); }}>Back</button>
             ) : null}
+            {peer ? <Face name={peer.firstName} src={peer.avatarUrl} /> : null}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black !text-white">{peer?.firstName || "Chat"}</p>
               <p className="truncate text-[11px] font-semibold !text-white/80">{subtitle}</p>
@@ -306,6 +327,21 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
             </div>
           )}
         </section>
+      ) : null}
+      {alert ? (
+        <div className="mb-3 flex w-full max-w-[24rem] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_18px_50px_rgba(15,39,68,0.22)]" role="status">
+          <button type="button" onClick={() => openThread(alert)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <Face name={alert.name} src={alert.avatarUrl} size="lg" />
+            <span className="min-w-0">
+              <span className="block text-xs font-black uppercase tracking-wide text-[#0D5C3A]">New message</span>
+              <span className="block truncate text-sm font-bold text-[#0F2744]">{alert.name}</span>
+              <span className="block truncate text-xs text-slate-500">{alert.preview}</span>
+            </span>
+          </button>
+          <button type="button" className="shrink-0 rounded-full px-2 py-1 text-xs font-bold text-slate-500" onClick={() => setAlert(null)}>
+            Close
+          </button>
+        </div>
       ) : null}
       <button
         type="button"
