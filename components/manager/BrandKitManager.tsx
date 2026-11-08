@@ -15,6 +15,13 @@ import {
   type BrandAssetRecord,
   type BrandStatus,
 } from "@/lib/manager/brand-kit";
+import {
+  brandUploadHttpError,
+  brandUploadProgressLabel,
+  brandUploadTransportError,
+  brandUploadUsesSignedUrl,
+  parseBrandUploadJson,
+} from "@/lib/manager/brand-kit-upload";
 
 type Capabilities = {
   upload: boolean;
@@ -65,20 +72,21 @@ function uploadThroughSitGuru(
     if (fields.replacesId) body.set("replacesId", fields.replacesId);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/brand-kit/upload");
+    xhr.withCredentials = true;
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(event.loaded / event.total);
+      if (event.lengthComputable) onProgress(Math.min(0.95, event.loaded / event.total));
     };
     xhr.onload = () => {
-      let payload: { error?: string } = {};
-      try {
-        payload = JSON.parse(xhr.responseText || "{}");
-      } catch {
-        payload = {};
+      const payload = parseBrandUploadJson(xhr.responseText || "");
+      if (xhr.status >= 200 && xhr.status < 300 && !payload.error) {
+        onProgress(1);
+        resolve();
+        return;
       }
-      if (xhr.status >= 200 && xhr.status < 300 && !payload.error) resolve();
-      else reject(new Error(payload.error || "The file did not finish uploading."));
+      reject(new Error(brandUploadHttpError(xhr.status, payload)));
     };
-    xhr.onerror = () => reject(new Error("You appear to be offline. Check your connection and try again."));
+    xhr.onabort = () => reject(new Error(brandUploadTransportError({ aborted: true })));
+    xhr.onerror = () => reject(new Error(brandUploadTransportError({ online: typeof navigator === "undefined" ? true : navigator.onLine })));
     xhr.send(body);
   });
 }
@@ -90,16 +98,80 @@ async function putSignedFile(url: string, file: File, onProgress: (value: number
     body.append("", file);
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
+    xhr.setRequestHeader("x-upsert", "false");
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(event.loaded / event.total);
+      if (event.lengthComputable) onProgress(Math.min(0.95, event.loaded / event.total));
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error("The file did not finish uploading."));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1);
+        resolve();
+        return;
+      }
+      const payload = parseBrandUploadJson(xhr.responseText || "");
+      reject(new Error(brandUploadHttpError(xhr.status, payload)));
     };
-    xhr.onerror = () => reject(new Error("You appear to be offline. Check your connection and try again."));
+    xhr.onabort = () => reject(new Error(brandUploadTransportError({ aborted: true })));
+    xhr.onerror = () => reject(new Error(brandUploadTransportError({ online: typeof navigator === "undefined" ? true : navigator.onLine })));
     xhr.send(body);
   });
+}
+
+async function abandonBrandUpload(id: string) {
+  if (!id) return;
+  await fetch("/api/brand-kit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "abandon", id }),
+  }).catch(() => undefined);
+}
+
+async function uploadBrandAsset(
+  file: File,
+  fields: { category: string; title: string; description: string; tags: string; replacesId: string },
+  onProgress: (value: number) => void,
+) {
+  if (!brandUploadUsesSignedUrl(file.size)) {
+    await uploadThroughSitGuru(file, fields, onProgress);
+    return;
+  }
+  onProgress(0.05);
+  const prepared = await fetch("/api/brand-kit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "prepare",
+      fileName: file.name,
+      declaredMime: file.type,
+      declaredSize: file.size,
+      category: fields.category,
+      title: fields.title || file.name,
+      description: fields.description,
+      tags: fields.tags,
+      replacesId: fields.replacesId,
+    }),
+  });
+  const payload = parseBrandUploadJson(await prepared.text());
+  if (!prepared.ok || !payload.signedUrl || !payload.id) {
+    throw new Error(brandUploadHttpError(prepared.status, payload) || "Upload could not be started.");
+  }
+  try {
+    await putSignedFile(payload.signedUrl, file, (value) => onProgress(0.05 + value * 0.9));
+    onProgress(0.97);
+    const verified = await fetch("/api/brand-kit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", id: payload.id }),
+    });
+    const verifiedBody = parseBrandUploadJson(await verified.text());
+    if (!verified.ok || verifiedBody.error) {
+      throw new Error(brandUploadHttpError(verified.status, verifiedBody) || "SitGuru could not accept this file.");
+    }
+    onProgress(1);
+  } catch (error) {
+    await abandonBrandUpload(payload.id);
+    throw error;
+  }
 }
 
 export default function BrandKitManager({
@@ -395,42 +467,20 @@ function UploadDialog({
   const [tags, setTags] = useState("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [localError, setLocalError] = useState("");
+  const [lastFiles, setLastFiles] = useState<File[]>([]);
 
   async function uploadFiles(files: File[]) {
     if (uploading || files.length === 0) return;
     setUploading(true);
+    setLocalError("");
+    setLastFiles(files);
+    setProgress(0.02);
     const pulseId = pulse.begin("Uploading brand file…");
     try {
       for (const file of files) {
         setProgress(0.05);
-        if (file.size <= 4 * 1024 * 1024) {
-          await uploadThroughSitGuru(file, { category, title, description, tags, replacesId: "" }, setProgress);
-          continue;
-        }
-        const prepared = await fetch("/api/brand-kit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "prepare",
-            fileName: file.name,
-            declaredMime: file.type,
-            declaredSize: file.size,
-            category,
-            title: title || file.name,
-            description,
-            tags,
-          }),
-        });
-        const payload = await prepared.json().catch(() => ({}));
-        if (!prepared.ok || !payload.signedUrl || !payload.id) throw new Error(payload.error || "Upload could not be started.");
-        await putSignedFile(payload.signedUrl, file, setProgress);
-        const verified = await fetch("/api/brand-kit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "verify", id: payload.id }),
-        });
-        const verifiedBody = await verified.json().catch(() => ({}));
-        if (!verified.ok) throw new Error(verifiedBody.error || "SitGuru could not accept this file.");
+        await uploadBrandAsset(file, { category, title, description, tags, replacesId: "" }, setProgress);
       }
       pulse.succeed(pulseId, "Brand file saved.");
       onDone(
@@ -441,6 +491,7 @@ function UploadDialog({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed.";
       pulse.fail(pulseId, message);
+      setLocalError(message);
       onError(message);
     } finally {
       setUploading(false);
@@ -452,31 +503,32 @@ function UploadDialog({
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <h2 id="upload-brand-title" className="text-lg font-black text-[#0F2744]">Upload asset</h2>
-          <button type="button" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200" onClick={onClose} aria-label="Close upload">
+          <button type="button" disabled={uploading} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 disabled:opacity-60" onClick={onClose} aria-label="Close upload">
             <X size={16} />
           </button>
         </div>
         <div className="mt-3 grid gap-3">
           <label className="block text-xs font-bold text-slate-500">Category
-            <select className={`${fieldClass} mt-1 max-w-full`} value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select className={`${fieldClass} mt-1 max-w-full`} value={category} disabled={uploading} onChange={(event) => setCategory(event.target.value)}>
               {BRAND_CATEGORIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
             {brandCategoryNotice(category) ? <p className="mt-1 text-xs font-medium text-slate-600">{brandCategoryNotice(category)}</p> : null}
           </label>
           <label className="block text-xs font-bold text-slate-500">Name
-            <input className={`${fieldClass} mt-1`} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional display name" />
+            <input className={`${fieldClass} mt-1`} value={title} disabled={uploading} onChange={(event) => setTitle(event.target.value)} placeholder="Optional display name" />
           </label>
           <label className="block text-xs font-bold text-slate-500">Description
-            <input className={`${fieldClass} mt-1`} value={description} onChange={(event) => setDescription(event.target.value)} />
+            <input className={`${fieldClass} mt-1`} value={description} disabled={uploading} onChange={(event) => setDescription(event.target.value)} />
           </label>
           <label className="block text-xs font-bold text-slate-500">Tags
-            <input className={`${fieldClass} mt-1`} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="logo, spring, instagram" />
+            <input className={`${fieldClass} mt-1`} value={tags} disabled={uploading} onChange={(event) => setTags(event.target.value)} placeholder="logo, spring, instagram" />
           </label>
           <div
             className="rounded-2xl border border-dashed border-[#93C5FD] bg-[#EFF6FF] p-4 text-center"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
+              if (uploading) return;
               void uploadFiles(Array.from(event.dataTransfer.files || []));
             }}
           >
@@ -494,7 +546,23 @@ function UploadDialog({
                 void uploadFiles(files);
               }}
             />
-            {uploading ? <p className="mt-2 text-xs font-bold text-[#2563EB]">Uploading {Math.round(progress * 100)}%</p> : null}
+            {uploading ? <p className="mt-2 text-xs font-bold text-[#2563EB]" role="status">{brandUploadProgressLabel(progress, uploading)}</p> : null}
+            {localError ? (
+              <div className="mt-3 space-y-2 text-left">
+                <p role="alert" className="text-xs font-bold text-rose-700">{localError}</p>
+                <p className="text-xs font-medium text-slate-600">Your category, name, description, and tags are still here. Choose the file again or retry.</p>
+                {lastFiles.length ? (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    className="inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold disabled:opacity-60"
+                    onClick={() => void uploadFiles(lastFiles)}
+                  >
+                    Retry upload
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -583,35 +651,7 @@ function AssetDrawer({
     setBusy(true);
     const pulseId = pulse.begin("Replacing brand file…");
     try {
-      if (file.size <= 4 * 1024 * 1024) {
-        await uploadThroughSitGuru(file, { category, title, description, tags, replacesId: asset.id }, () => undefined);
-      } else {
-        const prepared = await fetch("/api/brand-kit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "prepare",
-            fileName: file.name,
-            declaredMime: file.type,
-            declaredSize: file.size,
-            category,
-            title,
-            description,
-            tags,
-            replacesId: asset.id,
-          }),
-        });
-        const payload = await prepared.json().catch(() => ({}));
-        if (!prepared.ok || !payload.signedUrl || !payload.id) throw new Error(payload.error || "Replace could not be started.");
-        await putSignedFile(payload.signedUrl, file, () => undefined);
-        const verified = await fetch("/api/brand-kit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "verify", id: payload.id }),
-        });
-        const verifiedBody = await verified.json().catch(() => ({}));
-        if (!verified.ok) throw new Error(verifiedBody.error || "SitGuru could not accept this file.");
-      }
+      await uploadBrandAsset(file, { category, title, description, tags, replacesId: asset.id }, () => undefined);
       pulse.succeed(pulseId, "New version saved.");
       onChanged("New version saved as a draft.");
     } catch (error) {
