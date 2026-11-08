@@ -3,10 +3,9 @@ import { CopyTextButton } from "@/components/manager/CopyTextButton";
 import {
   recordStudioPublication,
   reviewStudioContent,
-  studioRowLabel,
   type StudioContentRow,
 } from "@/lib/internship/content-studio-actions";
-import { studioSummary } from "@/lib/internship/content-studio";
+import { studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 
 const PLATFORM_LINKS: Record<string, string> = {

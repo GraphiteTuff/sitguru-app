@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CONTENT_PLATFORMS, CONTENT_TYPES } from "@/lib/internship/content-studio";
-import { loadInternContentStudio, saveStudioContent, studioRowLabel } from "@/lib/internship/content-studio-actions";
+import { CONTENT_PLATFORMS, CONTENT_TYPES, studioRowLabel } from "@/lib/internship/content-studio";
+import { loadInternContentStudio, saveStudioContent } from "@/lib/internship/content-studio-actions";
 import { currentAssignedIntern, requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 
 export const dynamic = "force-dynamic";

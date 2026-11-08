@@ -10,8 +10,6 @@ import {
   contentCreativeKey,
   contentEditResetsApproval,
   studioDecision,
-  studioNextAction,
-  studioStatusLabel,
   studioSummary,
   type StudioItem,
 } from "@/lib/internship/content-studio";
@@ -437,11 +435,4 @@ export async function recordStudioPublication(formData: FormData) {
   revalidatePath("/manager/campaigns-content");
   revalidatePath("/intern/content");
   bounce("/manager/campaigns-content", "ok", "Published link recorded. Opening a social app does not count as published.");
-}
-
-export function studioRowLabel(row: StudioContentRow) {
-  return {
-    status: studioStatusLabel(row.status, row.reviewStage, row.publishedUrl),
-    action: studioNextAction(row.status, row.reviewStage, row.publishedUrl),
-  };
 }

@@ -108,3 +108,14 @@ export function studioNextAction(status: string, reviewStage?: string | null, pu
   if (stage === "submitted_to_jason") return "CEO review";
   return "Open";
 }
+
+export function studioRowLabel(row: {
+  status: string;
+  reviewStage?: string | null;
+  publishedUrl?: string;
+}) {
+  return {
+    status: studioStatusLabel(row.status, row.reviewStage, row.publishedUrl),
+    action: studioNextAction(row.status, row.reviewStage, row.publishedUrl),
+  };
+}

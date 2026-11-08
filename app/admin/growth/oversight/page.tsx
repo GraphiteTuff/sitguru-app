@@ -2,7 +2,8 @@ import Link from "next/link";
 import { approveOutreach } from "@/lib/manager-growth/actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
-import { loadManagerContentStudio, studioRowLabel } from "@/lib/internship/content-studio-actions";
+import { studioRowLabel } from "@/lib/internship/content-studio";
+import { loadManagerContentStudio } from "@/lib/internship/content-studio-actions";
 
 export const dynamic = "force-dynamic";
 
