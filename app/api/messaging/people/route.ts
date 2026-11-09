@@ -168,8 +168,8 @@ export async function GET(request: Request) {
       avatarUrl:
         resolvePetParentAvatarUrl(row) ||
         resolvePetParentAvatarUrl({
-          profile_photo_url: row.ambassador_photo_url,
-          photo_url: row.ambassador_photo_path,
+          profile_photo_url: text(row.ambassador_photo_url) || null,
+          photo_url: text(row.ambassador_photo_path) || null,
         }),
       detail: audience === "guru" ? "Guru" : audience === "ambassador" ? "Ambassador" : "Pet Parent",
       canChat: true,
