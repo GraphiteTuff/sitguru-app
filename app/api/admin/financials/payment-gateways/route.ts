@@ -9,6 +9,10 @@ import {
   type PaymentGatewayId,
   type PaymentGatewayRange,
 } from "@/lib/admin/financials/payment-gateways";
+import {
+  countPaypalMerchantReadiness,
+  paypalReadinessStatusMessage,
+} from "@/lib/payments/paypal-readiness";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -364,17 +368,15 @@ function buildSummaries(
 
   const paypalSummary = byId.get("paypal");
   if (paypalSummary) {
+    const readinessCounts = countPaypalMerchantReadiness(paypalAccounts);
     paypalSummary.connectedAccounts = paypalAccounts.length;
-    paypalSummary.readyAccounts = paypalAccounts.filter(
-      (account) =>
-        account.status === "connected" || account.paymentsReceivable,
-    ).length;
+    paypalSummary.readyAccounts = readinessCounts.liveReady;
 
     if (paypalAccounts.length > 0 && paypalSummary.transactionCount === 0) {
       paypalSummary.status = "partial";
-      paypalSummary.statusMessage = `${paypalSummary.readyAccounts}/${paypalSummary.connectedAccounts} PayPal merchants ready`;
+      paypalSummary.statusMessage = paypalReadinessStatusMessage(paypalAccounts);
     } else if (paypalAccounts.length > 0) {
-      paypalSummary.statusMessage = `${paypalSummary.statusMessage} · ${paypalSummary.readyAccounts} merchants ready`;
+      paypalSummary.statusMessage = `${paypalSummary.statusMessage} · ${paypalReadinessStatusMessage(paypalAccounts)}`;
     }
   }
 
