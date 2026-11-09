@@ -110,7 +110,7 @@ for (const { name, api } of modules) {
           activeStep: "1",
           intent: "continue",
         }),
-        { advance: false },
+        { kind: "failed" },
       );
       assert.deepEqual(
         api.nextGuruProfileDestination({
@@ -118,7 +118,7 @@ for (const { name, api } of modules) {
           activeStep: "1",
           intent: "continue",
         }),
-        { advance: true, href: "/guru/dashboard/profile?step=2" },
+        { kind: "redirect", href: "/guru/dashboard/profile?step=2" },
       );
       assert.deepEqual(
         api.nextGuruProfileDestination({
@@ -126,7 +126,23 @@ for (const { name, api } of modules) {
           activeStep: "1",
           intent: "dashboard",
         }),
-        { advance: true, href: "/guru/dashboard" },
+        { kind: "redirect", href: "/guru/dashboard" },
+      );
+      assert.deepEqual(
+        api.nextGuruProfileDestination({
+          saved: true,
+          activeStep: "3",
+          intent: "save",
+        }),
+        { kind: "stay" },
+      );
+      assert.deepEqual(
+        api.nextGuruProfileDestination({
+          saved: true,
+          activeStep: "3",
+          intent: "dashboard",
+        }),
+        { kind: "redirect", href: "/guru/dashboard" },
       );
     });
 

@@ -24,6 +24,7 @@ import {
   Sparkles,
   UserCircle2,
 } from "lucide-react";
+import { PawIcon } from "@/components/ui/PawIcon";
 import { supabase } from "@/lib/supabase";
 import {
   beginSingleSubmission,
@@ -1293,10 +1294,13 @@ function GuruDashboardProfilePageContent() {
 
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
+    const submitValue = String(submitter?.value || "");
     const saveIntent =
-      submitter?.value === "continue" && activeStep !== "3"
+      submitValue === "continue" && activeStep !== "3"
         ? "continue"
-        : "dashboard";
+        : submitValue === "dashboard"
+          ? "dashboard"
+          : "save";
 
     setSaving(true);
     setJustSaved(false);
@@ -1370,6 +1374,15 @@ function GuruDashboardProfilePageContent() {
     ) {
       setErrorMessage("Service radius must be a valid non-negative number.");
       stop();
+      return;
+    }
+
+    if (activeStep === "3" && enabledServiceRates.length < 1) {
+      setErrorMessage(
+        "Enable at least one service and set its rate before saving Step 3. Base hourly rate alone is optional and does not replace service pricing.",
+      );
+      stop();
+      document.getElementById("services")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -1621,11 +1634,25 @@ function GuruDashboardProfilePageContent() {
         intent: saveIntent,
       });
 
-      if (!destination.advance) {
+      if (destination.kind === "failed") {
         setErrorMessage(
           "This step was not saved, so SitGuru stayed on this page.",
         );
         stop();
+        return;
+      }
+
+      if (destination.kind === "stay") {
+        setSuccessMessage(
+          safeIsPublic
+            ? "Saved successfully. Your public visibility request is saved. You can keep editing or open your Guru dashboard."
+            : "Saved successfully. You can keep editing services and pricing, or open your Guru dashboard.",
+        );
+        setJustSaved(true);
+        stop();
+        document
+          .getElementById("guru-save-status")
+          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         return;
       }
 
@@ -1637,14 +1664,15 @@ function GuruDashboardProfilePageContent() {
 
       setSuccessMessage(
         continuingTo
-          ? `Saved. Continuing to Step ${continuingTo}.`
+          ? `Saved successfully. Continuing to Step ${continuingTo}.`
           : safeIsPublic
-            ? "Saved. Returning to your dashboard so you can see Steps 1, 2, and 3 marked complete."
+            ? "Saved successfully. Returning to your dashboard so you can see Steps 1, 2, and 3 marked complete."
             : isPublic
-              ? "Saved. Returning to your dashboard so you can see what still needs to be completed before going public."
-              : "Saved. Returning to your dashboard so you can see your setup progress.",
+              ? "Saved successfully. Returning to your dashboard so you can see what still needs to be completed before going public."
+              : "Saved successfully. Returning to your dashboard so you can see your setup progress.",
       );
       setJustSaved(true);
+      stop();
 
       window.setTimeout(() => {
         router.refresh();
@@ -1653,8 +1681,6 @@ function GuruDashboardProfilePageContent() {
     } catch (error) {
       setErrorMessage(friendlyGuruProfileSaveError(error));
       stop();
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -1755,7 +1781,8 @@ function GuruDashboardProfilePageContent() {
     activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
   const primarySaveLabel = hasNextStep
     ? `Save Step ${activeStep} & Continue to Step ${nextStepNumber}`
-    : `Save Step ${activeStep} & Return to Dashboard`;
+    : "Save Step 3";
+  const primarySaveValue = hasNextStep ? "continue" : "save";
 
   if (loading) {
     return <GuruProfileLoadingFallback />;
@@ -2716,11 +2743,41 @@ function GuruDashboardProfilePageContent() {
                   </section>
                 ) : null}
 
+                <div id="guru-save-status" className="space-y-3">
+                  {saving ? (
+                    <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                        <PawIcon size={20} contrast="light" className="animate-spin" />
+                      </span>
+                      Saving your Guru profile…
+                    </div>
+                  ) : null}
+                  {justSaved && successMessage ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900">
+                      <p className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        Saved Successfully
+                      </p>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
+                        {successMessage}
+                      </p>
+                    </div>
+                  ) : null}
+                  {errorMessage ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-extrabold text-rose-800">
+                      <p className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        {errorMessage}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="submit"
                     name="saveAction"
-                    value={hasNextStep ? "continue" : "dashboard"}
+                    value={primarySaveValue}
                     disabled={saving || saveLocked}
                     className={[
                       "inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-extrabold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-70",
@@ -2730,7 +2787,7 @@ function GuruDashboardProfilePageContent() {
                     ].join(" ")}
                   >
                     {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      <PawIcon size={16} contrast="dark" className="animate-spin" />
                     ) : justSaved ? (
                       <CheckCircle2 className="h-4 w-4 text-white" />
                     ) : (
@@ -2747,7 +2804,7 @@ function GuruDashboardProfilePageContent() {
                       {saving
                         ? "Saving..."
                         : justSaved
-                          ? "Saved"
+                          ? "Saved Successfully"
                           : primarySaveLabel}
                     </span>
                   </button>
@@ -2767,10 +2824,25 @@ function GuruDashboardProfilePageContent() {
                           WebkitTextFillColor: "#065f46",
                         }}
                       >
-                        Save & Return to Dashboard
+                        Save & Go to Guru Dashboard
                       </span>
                     </button>
-                  ) : null}
+                  ) : (
+                    <Link
+                      href={routes.dashboard}
+                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-emerald-100"
+                    >
+                      <span
+                        className="font-extrabold"
+                        style={{
+                          color: "#065f46",
+                          WebkitTextFillColor: "#065f46",
+                        }}
+                      >
+                        Go to Guru Dashboard
+                      </span>
+                    </Link>
+                  )}
 
                   <Link
                     href={routes.dashboard}
@@ -2783,7 +2855,7 @@ function GuruDashboardProfilePageContent() {
                         WebkitTextFillColor: "#0f172a",
                       }}
                     >
-                      Return to Dashboard
+                      Continue editing later
                     </span>
                   </Link>
                 </div>

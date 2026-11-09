@@ -137,18 +137,30 @@ export function friendlyGuruProfileSaveError(error: unknown): string {
   return text;
 }
 
+export type GuruProfileSaveNav =
+  | { kind: "failed" }
+  | { kind: "stay" }
+  | { kind: "redirect"; href: string };
+
+/**
+ * Step 3 saves stay on the page so the Guru can keep editing.
+ * Use intent "dashboard" for an explicit return to the Guru dashboard.
+ */
 export function nextGuruProfileDestination(input: {
   saved: boolean;
   activeStep: "1" | "2" | "3";
-  intent: "continue" | "dashboard";
-}): { advance: false } | { advance: true; href: string } {
-  if (!input.saved) return { advance: false };
-  if (input.intent !== "continue" || input.activeStep === "3") {
-    return { advance: true, href: "/guru/dashboard" };
+  intent: "continue" | "dashboard" | "save";
+}): GuruProfileSaveNav {
+  if (!input.saved) return { kind: "failed" };
+  if (input.intent === "save" || (input.activeStep === "3" && input.intent !== "dashboard")) {
+    return { kind: "stay" };
+  }
+  if (input.intent === "dashboard") {
+    return { kind: "redirect", href: "/guru/dashboard" };
   }
   const next = input.activeStep === "1" ? "2" : "3";
   return {
-    advance: true,
+    kind: "redirect",
     href: `/guru/dashboard/profile?step=${next}`,
   };
 }

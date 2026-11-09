@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
@@ -12,6 +13,11 @@ import {
   formatLoginAndContact,
   resolveCanonicalContactEmail,
 } from "@/lib/auth/contact-email";
+import {
+  buildScreeningWaiverPayload,
+  isScreeningWaivedByAdmin,
+  screeningDisplayLabel,
+} from "@/lib/gurus/screening-waiver";
 
 export const dynamic = "force-dynamic";
 
@@ -324,6 +330,10 @@ function getCredentialStatus(value: unknown) {
 
 function credentialClasses(status: string) {
   const normalized = status.toLowerCase();
+
+  if (normalized.includes("waived by admin") || normalized === "waived_by_admin") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
 
   if (
     normalized === "verified" ||
@@ -1437,6 +1447,63 @@ async function getApplicationEvents(guruId: string) {
   }
 }
 
+async function waiveGuruScreeningAction(formData: FormData) {
+  "use server";
+
+  const admin = await getAdminIdentity();
+  if (!admin?.id || !admin.isSuperUser) {
+    redirect("/admin/login");
+  }
+
+  const guruId = String(formData.get("guruId") || "").trim();
+  const reason = String(formData.get("reason") || "").trim();
+  const built = buildScreeningWaiverPayload({
+    adminUserId: admin.id,
+    reason,
+  });
+
+  if (!guruId || !built.ok) {
+    redirect(
+      `/admin/gurus/${encodeURIComponent(guruId || "missing")}?error=${encodeURIComponent(
+        !built.ok ? built.error : "Invalid screening waiver request.",
+      )}`,
+    );
+  }
+
+  const { error } = await supabaseAdmin
+    .from("gurus")
+    .update(built.guruUpdate)
+    .eq("id", guruId);
+
+  if (error) {
+    redirect(
+      `/admin/gurus/${encodeURIComponent(guruId)}?error=${encodeURIComponent(
+        error.message || "Unable to save screening waiver.",
+      )}`,
+    );
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      actor_id: admin.id,
+      actor_email: admin.email,
+      action: built.audit.action,
+      area: built.audit.area,
+      target_type: "guru",
+      target_id: guruId,
+      metadata: built.audit.metadata,
+    });
+  } catch {
+    // Audit is optional if the table is unavailable.
+  }
+
+  revalidatePath(`/admin/gurus/${guruId}`);
+  revalidatePath("/admin/background-checks");
+  redirect(
+    `/admin/gurus/${encodeURIComponent(guruId)}?saved=1&emailed=0`,
+  );
+}
+
 async function updateGuruStatusAction(formData: FormData) {
   "use server";
 
@@ -1827,10 +1894,46 @@ export default async function AdminGuruDetailPage({
   const identityStatus = getCredentialStatus(
     guru.stripe_identity_status || guru.identity_status,
   );
-  const backgroundStatus = getCredentialStatus(guru.background_check_status);
+  const backgroundStatus = isScreeningWaivedByAdmin(
+    asTrimmedString(guru.background_check_status),
+  )
+    ? screeningDisplayLabel(asTrimmedString(guru.background_check_status))
+    : getCredentialStatus(guru.background_check_status);
   const safetyStatus = getCredentialStatus(guru.safety_cert_status);
   const stripeConnectStatus = getCredentialStatus(guru.stripe_connect_status);
   const lastUpdated = formatDate(guru.updated_at || guru.created_at);
+  const { data: internRow } = userId
+    ? await supabaseAdmin
+        .from("internship_interns")
+        .select("status,approval_status,full_name")
+        .eq("user_id", userId)
+        .maybeSingle()
+    : { data: null };
+  const internshipLabel = internRow
+    ? `${asTrimmedString(internRow.approval_status) || "pending"} / ${asTrimmedString(internRow.status) || "unknown"}`
+    : "Not an intern record";
+  const guruProfileComplete =
+    toBoolean(guru.profile_completed) || profileCompletion >= 80
+      ? "Complete"
+      : "In progress";
+  const trustSafetyLabel = screeningDisplayLabel(
+    asTrimmedString(guru.background_check_status),
+  );
+  const stripeLabel =
+    toBoolean(guru.stripe_onboarding_complete) ||
+    asTrimmedString(guru.stripe_connect_status).toLowerCase() === "complete"
+      ? "Connected"
+      : asTrimmedString(guru.stripe_connect_status) || "Not started";
+  const visibilityLabel = toBoolean(guru.is_public) || toBoolean(guru.is_public_visible)
+    ? asTrimmedString(guru.public_status) || "Visible"
+    : "Not public";
+  const bookingEligibilityLabel =
+    toBoolean(guru.is_bookable) && asTrimmedString(guru.booking_status) === "bookable"
+      ? "Eligible"
+      : asTrimmedString(guru.booking_status) || "Not eligible";
+  const screeningAlreadyWaived = isScreeningWaivedByAdmin(
+    asTrimmedString(guru.background_check_status),
+  );
 
   return (
     <main className="space-y-8">
@@ -1962,6 +2065,65 @@ export default async function AdminGuruDetailPage({
           value={lastUpdated}
           detail="Most recent record update"
         />
+      </section>
+
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Internship" value={internshipLabel} detail="Independent of Guru activation" />
+        <StatCard label="Guru Profile" value={guruProfileComplete} detail="Stored profile_completed / readiness" />
+        <StatCard
+          label="Trust & Safety"
+          value={trustSafetyLabel}
+          detail={
+            screeningAlreadyWaived
+              ? `Admin waiver — not a verified Checkr clear${asTrimmedString(guru.screening_waiver_reason) ? `: ${asTrimmedString(guru.screening_waiver_reason)}` : ""}`
+              : "Actual stored screening status"
+          }
+        />
+        <StatCard label="Stripe" value={stripeLabel} detail="Payout connection status" />
+        <StatCard label="Public Visibility" value={visibilityLabel} detail="Actual published / listed status" />
+        <StatCard label="Booking Eligibility" value={bookingEligibilityLabel} detail="Requires admin bookable when all gates pass" />
+      </section>
+
+      <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-amber-800">
+          Trust & Safety admin waiver
+        </p>
+        <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+          Waive screening for this Guru only
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-700">
+          Internship status never auto-waives screening. A waiver stores
+          <span className="font-black"> waived_by_admin</span> with your admin id,
+          reason, and timestamp. It does not create a verified-screening badge and
+          does not alone make the Guru bookable.
+        </p>
+        {screeningAlreadyWaived ? (
+          <p className="mt-4 rounded-2xl border border-amber-300 bg-white px-4 py-3 text-sm font-black text-amber-900">
+            Screening is already marked Waived by Admin
+            {asTrimmedString(guru.screening_waived_at)
+              ? ` · ${formatDate(guru.screening_waived_at)}`
+              : ""}
+            .
+          </p>
+        ) : (
+          <form action={waiveGuruScreeningAction} className="mt-5 space-y-3">
+            <input type="hidden" name="guruId" value={guruId} />
+            <textarea
+              name="reason"
+              required
+              minLength={8}
+              rows={3}
+              placeholder="Owner-authorized reason for waiving Trust & Safety screening for this Guru…"
+              className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+            />
+            <button
+              type="submit"
+              className="inline-flex rounded-2xl bg-amber-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-800"
+            >
+              Authorize screening waiver
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">

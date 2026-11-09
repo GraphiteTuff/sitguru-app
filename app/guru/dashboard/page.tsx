@@ -765,6 +765,18 @@ function isTrustSafetyFeeWaivedThrough2026() {
 }
 
 function getBackgroundCheckDisplay(profile: GuruProfile | null) {
+  const rawStatus = String(profile?.background_check_status || "")
+    .trim()
+    .toLowerCase();
+  if (rawStatus === "waived_by_admin") {
+    return {
+      label: "Waived by Admin",
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check",
+      verifiedBadge: false,
+    };
+  }
+
   if (isTrustSafetyScreeningBypassed()) {
     return {
       label: TRUST_SAFETY_SCREENING_BYPASS.label,
