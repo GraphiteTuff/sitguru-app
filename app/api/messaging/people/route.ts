@@ -128,14 +128,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ people });
   }
 
-  const table = audience === "guru" ? "gurus" : audience === "ambassador" ? "ambassadors" : "profiles";
-  const columns =
-    audience === "ambassador"
-      ? "id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,ambassador_photo_url,ambassador_photo_path"
-      : "id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type";
-  const { data, error } = await supabaseAdmin.from(table).select(columns).limit(40);
-  if (error) return NextResponse.json({ people: [] });
-  const people = ((data || []) as Record<string, unknown>[])
+  const result =
+    audience === "guru"
+      ? await supabaseAdmin
+          .from("gurus")
+          .select("id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
+          .limit(40)
+      : audience === "ambassador"
+        ? await supabaseAdmin
+            .from("ambassadors")
+            .select(
+              "id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,ambassador_photo_url,ambassador_photo_path",
+            )
+            .limit(40)
+        : await supabaseAdmin
+            .from("profiles")
+            .select("id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
+            .limit(40);
+  if (result.error) return NextResponse.json({ people: [] });
+  const people = ((result.data || []) as unknown as Record<string, unknown>[])
     .filter((row) => {
       if (isLiveAgentSeat({
         email: text(row.email),
