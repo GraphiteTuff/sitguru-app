@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { internshipActorKind } from "@/lib/internship/manager-access";
 import { findInternByAccount } from "@/lib/internship/queries";
+import { isTestInboxThread } from "@/lib/messaging/staff-directory";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -119,8 +120,15 @@ export async function GET() {
       preview: text(row.last_message_preview),
       unread: unreadByConversation.get(id) || 0,
       recipientId: peerId,
+      subject: text(row.subject),
     };
-  });
+  }).filter((thread) =>
+    !isTestInboxThread({
+      name: thread.name,
+      subject: thread.subject,
+      preview: thread.preview,
+    }),
+  ).map(({ subject: _subject, ...thread }) => thread);
   const waiting = threads.reduce((sum, thread) => sum + (thread.unread > 0 ? 1 : 0), 0);
   return NextResponse.json({ threads, waiting });
 }

@@ -5,7 +5,14 @@ import Link from "next/link";
 import { MessageCircle, Send, X } from "lucide-react";
 import { deskInitials } from "@/lib/portal/desk-ui";
 
-type Person = { id: string; firstName: string; avatarUrl: string; detail: string; online?: boolean };
+type Person = {
+  id: string;
+  firstName: string;
+  avatarUrl: string;
+  detail: string;
+  online?: boolean;
+  canChat?: boolean;
+};
 type ChatMessage = { id: string; author: string; avatarUrl: string; body: string; createdAt?: string; own?: boolean };
 type InboxThread = {
   id: string;
@@ -183,6 +190,10 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   }, [messages.length, open, threadId]);
 
   function choose(person: Person) {
+    if (person.canChat === false || person.id.startsWith("pending:")) {
+      setError(`${person.firstName} is not on SitGuru chat yet.`);
+      return;
+    }
     setPeer(person);
     setThreadId(`new-${person.id}`);
     setMessages([]);
@@ -253,9 +264,9 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
       : "Live alerts, staff, interns, pet parents, Gurus, Ambassadors";
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-end px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:px-4 xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
+    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-stretch px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:items-end sm:px-4 md:pb-[max(1.25rem,env(safe-area-inset-bottom))] xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
       {open ? (
-        <section className="mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)]">
+        <section className="mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
           <header className="public-dark-section flex items-center gap-2 px-3 py-3 !text-white" data-brand-green style={{ background: "#0D5C3A" }}>
             {threadId ? (
               <button type="button" className="shrink-0 text-sm font-bold !text-white" onClick={() => { setThreadId(""); setPeer(null); }}>Back</button>
@@ -326,10 +337,10 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
           ) : (
             <div className="flex min-h-0 flex-1 flex-col p-3">
               <div className="flex flex-wrap gap-1">
-                <button type="button" onClick={() => setView("inbox")} className={`rounded-full px-3 py-1.5 text-xs font-bold ${view === "inbox" ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
+                <button type="button" onClick={() => { setView("inbox"); setError(""); }} className={`rounded-full px-3 py-1.5 text-xs font-bold ${view === "inbox" ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
                   Inbox{waiting ? ` ${waiting}` : ""}
                 </button>
-                <button type="button" onClick={() => setView("people")} className={`rounded-full px-3 py-1.5 text-xs font-bold ${view === "people" ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
+                <button type="button" onClick={() => { setView("people"); setError(""); }} className={`rounded-full px-3 py-1.5 text-xs font-bold ${view === "people" ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744]"}`}>
                   People
                 </button>
                 {mode === "manager" ? (
@@ -368,20 +379,34 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
                   </div>
                   <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by first name" className="mt-2 min-h-11 w-full rounded-full bg-[#F1F5F9] px-4 text-sm outline-none" />
                   <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto">
-                    {people.map((person) => (
-                      <li key={`${person.detail}-${person.id}`}>
-                        <button type="button" onClick={() => choose(person)} className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-[#F8FAFC]">
-                          <Face name={person.firstName} src={person.avatarUrl} size="lg" online={person.online} />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-bold text-[#0F2744]">{person.firstName}</span>
-                            <span className="text-xs font-semibold text-slate-500">
-                              {person.detail}
-                              {typeof person.online === "boolean" ? ` · ${person.online ? "Online" : "Offline"}` : ""}
+                    {people.map((person) => {
+                      const locked = person.canChat === false || person.id.startsWith("pending:");
+                      return (
+                        <li key={`${person.detail}-${person.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => choose(person)}
+                            className={`flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-[#F8FAFC] ${locked ? "opacity-80" : ""}`}
+                          >
+                            <Face name={person.firstName} src={person.avatarUrl} size="lg" online={locked ? false : person.online} />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-bold text-[#0F2744]">{person.firstName}</span>
+                              <span className="text-xs font-semibold text-slate-500">
+                                {person.detail}
+                                {locked
+                                  ? ""
+                                  : typeof person.online === "boolean"
+                                    ? ` · ${person.online ? "Online" : "Offline"}`
+                                    : ""}
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {error && view === "people" && !threadId ? (
+                      <li className="px-2 pt-2 text-xs font-semibold text-rose-700">{error}</li>
+                    ) : null}
                     {!people.length ? (
                       <li className="px-2 py-8 text-center text-sm font-medium text-slate-500">
                         {audience === "staff" || audience === "admin"

@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { GROWTH_HIRE_ROLE } from "@/lib/admin/growth/hire";
 import { canReadPrivateInternRecord, internshipActorKind } from "@/lib/internship/manager-access";
 import { findInternByAccount, listInterns } from "@/lib/internship/queries";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import {
   hideFromInternDirectory,
-  isGrowthManagerSeat,
   isLiveAgentSeat,
-  sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
+import {
+  isTestDirectoryPerson,
+  loadSharedStaffDirectory,
+} from "@/lib/messaging/staff-directory";
 import { excludeFromInternPortalList } from "@/lib/internship/team-roster";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -23,138 +24,6 @@ function text(value: unknown) {
 
 function firstName(value: string) {
   return value.split(/\s+/).filter(Boolean)[0] || "SitGuru";
-}
-
-type DirectoryPerson = {
-  id: string;
-  firstName: string;
-  avatarUrl: string;
-  detail: string;
-  online?: boolean;
-};
-
-async function loadStaffPeople(input: {
-  actorUserId: string;
-  actorKind: string;
-  query: string;
-  includeInterns: boolean;
-}) {
-  const people: DirectoryPerson[] = [];
-  const seen = new Set<string>();
-
-  const push = (person: DirectoryPerson) => {
-    if (!person.id || person.id === input.actorUserId || seen.has(person.id)) return;
-    if (input.query && !person.firstName.toLowerCase().includes(input.query)) return;
-    seen.add(person.id);
-    people.push(person);
-  };
-
-  const { data: profiles } = await supabaseAdmin
-    .from("profiles")
-    .select("id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
-    .limit(120);
-
-  for (const row of (profiles || []) as Record<string, unknown>[]) {
-    const seat = {
-      email: text(row.email),
-      role: text(row.role),
-      accountType: text(row.account_type),
-    };
-    if (isLiveAgentSeat(seat)) {
-      push({
-        id: text(row.id),
-        firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name)),
-        avatarUrl: resolvePetParentAvatarUrl(row),
-        detail: "Admin",
-      });
-      continue;
-    }
-    if (isGrowthManagerSeat(seat)) {
-      push({
-        id: text(row.id),
-        firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name)),
-        avatarUrl: resolvePetParentAvatarUrl(row),
-        detail: "Manager",
-      });
-    }
-  }
-
-  const { data: accessRows } = await supabaseAdmin
-    .from("admin_user_access")
-    .select("user_id,email")
-    .eq("role_key", GROWTH_HIRE_ROLE)
-    .eq("is_active", true)
-    .limit(40);
-
-  const accessIds = ((accessRows || []) as Array<{ user_id?: string }>)
-    .map((row) => text(row.user_id))
-    .filter((id) => id && !seen.has(id));
-
-  if (accessIds.length) {
-    const { data: managerProfiles } = await supabaseAdmin
-      .from("profiles")
-      .select("id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
-      .in("id", accessIds);
-    for (const row of (managerProfiles || []) as Record<string, unknown>[]) {
-      push({
-        id: text(row.id),
-        firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name)),
-        avatarUrl: resolvePetParentAvatarUrl(row),
-        detail: "Manager",
-      });
-    }
-  }
-
-  if (input.includeInterns) {
-    const interns = (await listInterns()).filter((row) =>
-      canReadPrivateInternRecord({
-        actor: input.actorKind as "manager" | "supervisor" | "intern",
-        actorUserId: input.actorUserId,
-        targetInternId: row.id,
-        managerUserId: row.managerUserId,
-      }),
-    );
-    const ids = interns.map((row) => row.userId).filter(Boolean) as string[];
-    const { data: internProfiles } = ids.length
-      ? await supabaseAdmin.from("profiles").select("id,email,role,account_type").in("id", ids)
-      : { data: [] as Record<string, unknown>[] };
-    const profileById = new Map(
-      ((internProfiles || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]),
-    );
-    for (const row of interns) {
-      const profile = row.userId ? profileById.get(row.userId) : undefined;
-      const email = row.email || text(profile?.email);
-      const role = text(profile?.role);
-      const accountType = text(profile?.account_type);
-      if (
-        !row.userId ||
-        excludeFromInternPortalList({ email, isTest: Boolean(row.isTest) }) ||
-        hideFromInternDirectory({
-          email,
-          role,
-          accountType,
-          userId: row.userId,
-          actorUserId: input.actorUserId,
-        })
-      ) {
-        continue;
-      }
-      push({
-        id: row.userId,
-        firstName: firstName(row.preferredName || row.fullName),
-        avatarUrl: row.avatarUrl || "",
-        detail: "Intern",
-      });
-    }
-  }
-
-  const onlineById = await mapUsersOnline(people.map((person) => person.id));
-  return sortStaffDirectoryPeople(
-    people.map((person) => ({
-      ...person,
-      online: onlineById.get(person.id) === true,
-    })),
-  ).slice(0, 40);
 }
 
 export async function GET(request: Request) {
@@ -176,27 +45,27 @@ export async function GET(request: Request) {
   }
 
   if (audience === "staff") {
-    const people = await loadStaffPeople({
-      actorUserId: userId,
-      actorKind: kind,
-      query,
-      includeInterns: kind === "manager" || kind === "supervisor",
-    });
+    const people = await loadSharedStaffDirectory({ actorUserId: userId, query });
     return NextResponse.json({ people });
   }
 
   if (audience === "admin") {
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
+      .select("id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role")
       .limit(80);
     if (error) return NextResponse.json({ people: [] });
     const base = ((data || []) as Record<string, unknown>[])
       .filter((row) =>
         isLiveAgentSeat({
           email: text(row.email),
-          role: text(row.role),
+          role: text(row.role) || text(row.signup_role),
           accountType: text(row.account_type),
+        }) &&
+        !isTestDirectoryPerson({
+          firstName: text(row.first_name),
+          fullName: text(row.full_name),
+          email: text(row.email),
         }),
       )
       .map((row) => ({
@@ -204,6 +73,7 @@ export async function GET(request: Request) {
         firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name)),
         avatarUrl: resolvePetParentAvatarUrl(row),
         detail: "Admin",
+        canChat: true,
       }))
       .filter((row) => row.id && row.id !== userId && (!query || row.firstName.toLowerCase().includes(query)))
       .slice(0, 20);
@@ -237,6 +107,7 @@ export async function GET(request: Request) {
         accountType: text(profile?.account_type),
         isTest: Boolean(row.isTest),
         detail: "Intern",
+        canChat: Boolean(row.userId),
       };
     }).filter((row) =>
       row.id &&
@@ -249,6 +120,7 @@ export async function GET(request: Request) {
         userId: row.id,
         actorUserId: userId,
       }) &&
+      !isTestDirectoryPerson({ firstName: row.firstName, email: row.email }) &&
       (!query || row.firstName.toLowerCase().includes(query)),
     ).slice(0, 20).map(({ email: _email, role: _role, accountType: _account, isTest: _test, ...person }) => person);
     const onlineById = await mapUsersOnline(base.map((row) => row.id));
@@ -257,10 +129,11 @@ export async function GET(request: Request) {
   }
 
   const table = audience === "guru" ? "gurus" : audience === "ambassador" ? "ambassadors" : "profiles";
-  const { data, error } = await supabaseAdmin
-    .from(table)
-    .select("id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type")
-    .limit(40);
+  const columns =
+    audience === "ambassador"
+      ? "id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,ambassador_photo_url,ambassador_photo_path"
+      : "id,user_id,first_name,full_name,display_name,name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type";
+  const { data, error } = await supabaseAdmin.from(table).select(columns).limit(40);
   if (error) return NextResponse.json({ people: [] });
   const people = ((data || []) as Record<string, unknown>[])
     .filter((row) => {
@@ -269,6 +142,11 @@ export async function GET(request: Request) {
         role: text(row.role),
         accountType: text(row.account_type),
       })) return false;
+      if (isTestDirectoryPerson({
+        firstName: text(row.first_name),
+        fullName: text(row.full_name) || text(row.name),
+        email: text(row.email),
+      })) return false;
       if (audience !== "parent") return true;
       const role = `${text(row.role)} ${text(row.account_type)}`.toLowerCase();
       return role.includes("parent") || role.includes("customer") || role.includes("pet");
@@ -276,8 +154,14 @@ export async function GET(request: Request) {
     .map((row) => ({
       id: text(row.user_id || row.id),
       firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name) || text(row.name)),
-      avatarUrl: resolvePetParentAvatarUrl(row),
+      avatarUrl:
+        resolvePetParentAvatarUrl(row) ||
+        resolvePetParentAvatarUrl({
+          profile_photo_url: row.ambassador_photo_url,
+          photo_url: row.ambassador_photo_path,
+        }),
       detail: audience === "guru" ? "Guru" : audience === "ambassador" ? "Ambassador" : "Pet Parent",
+      canChat: true,
     }))
     .filter((row) => row.id && row.id !== userId && (!query || row.firstName.toLowerCase().includes(query)))
     .slice(0, 20);

@@ -179,10 +179,17 @@ export function isGrowthManagerSeat(input: {
   email?: string | null;
   role?: string | null;
   accountType?: string | null;
+  signupRole?: string | null;
 }) {
   if (isFounderPersonalMarketplaceEmail(input.email)) return false;
-  if (isGrowthOnlyRole(input.role) || isGrowthOnlyRole(input.accountType)) return true;
-  const role = `${input.role || ""} ${input.accountType || ""}`.toLowerCase();
+  if (
+    isGrowthOnlyRole(input.role) ||
+    isGrowthOnlyRole(input.accountType) ||
+    isGrowthOnlyRole(input.signupRole)
+  ) {
+    return true;
+  }
+  const role = `${input.role || ""} ${input.accountType || ""} ${input.signupRole || ""}`.toLowerCase();
   return /\b(social_community_manager|growth_manager|social_growth_manager)\b/.test(role);
 }
 
