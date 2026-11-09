@@ -67,9 +67,9 @@ function profileAvatar(row: Record<string, unknown>, extras?: Record<string, unk
   return (
     resolvePetParentAvatarUrl(row) ||
     resolvePetParentAvatarUrl({
-      profile_photo_url: extras?.ambassador_photo_url,
-      photo_url: extras?.ambassador_photo_path,
-      avatar_url: extras?.avatar_url,
+      profile_photo_url: text(extras?.ambassador_photo_url) || null,
+      photo_url: text(extras?.ambassador_photo_path) || null,
+      avatar_url: text(extras?.avatar_url) || null,
     }) ||
     ""
   );
