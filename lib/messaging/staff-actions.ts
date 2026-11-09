@@ -7,7 +7,7 @@ import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
 import { rememberChat } from "@/lib/messaging/chat-archive";
-import { isLiveAgentSeat } from "@/lib/messaging/chat-library";
+import { isStaffChatPeer } from "@/lib/messaging/chat-library";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -95,7 +95,7 @@ export async function saveStaffMessage(input: {
         .select("email,role,account_type")
         .eq("id", recipientId)
         .maybeSingle();
-      const allowed = isLiveAgentSeat({
+      const allowed = isStaffChatPeer({
         email: String(recipient?.email || ""),
         role: String(recipient?.role || ""),
         accountType: String(recipient?.account_type || ""),
@@ -147,7 +147,10 @@ export async function saveStaffMessage(input: {
       .from("conversations")
       .insert({
         subject: String(input.subject || "").trim() || peerName || (who.role === "intern" ? "Note for my manager" : "SitGuru chat"),
-        conversation_type: audience === "intern" || who.role === "intern" ? "internal_direct" : "community_direct",
+        conversation_type:
+          audience === "intern" || audience === "staff" || audience === "admin" || who.role === "intern"
+            ? "internal_direct"
+            : "community_direct",
         workflow_status: "open",
         started_by_user_id: who.userId,
         assigned_user_id: managerId,

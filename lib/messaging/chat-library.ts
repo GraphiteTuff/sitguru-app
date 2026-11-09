@@ -3,6 +3,7 @@
  * No database access — safe to unit test.
  */
 
+import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import {
   isFounderPersonalMarketplaceEmail,
   isHardcodedSuperUserEmail,
@@ -173,6 +174,43 @@ export function isLiveAgentSeat(input: {
   return /\b(admin|founder|owner|super_admin|superuser)\b/.test(role);
 }
 
+/** Ava and other Growth Manager seats in the Staff directory. */
+export function isGrowthManagerSeat(input: {
+  email?: string | null;
+  role?: string | null;
+  accountType?: string | null;
+}) {
+  if (isFounderPersonalMarketplaceEmail(input.email)) return false;
+  if (isGrowthOnlyRole(input.role) || isGrowthOnlyRole(input.accountType)) return true;
+  const role = `${input.role || ""} ${input.accountType || ""}`.toLowerCase();
+  return /\b(social_community_manager|growth_manager|social_growth_manager)\b/.test(role);
+}
+
+/** Interns may message Admin HQ or their Growth Manager (Ava). */
+export function isStaffChatPeer(input: {
+  email?: string | null;
+  role?: string | null;
+  accountType?: string | null;
+}) {
+  return isLiveAgentSeat(input) || isGrowthManagerSeat(input);
+}
+
+export function sortStaffDirectoryPeople<T extends { online?: boolean; firstName: string; detail: string }>(
+  people: T[],
+) {
+  return [...people].sort((a, b) => {
+    if (Boolean(a.online) !== Boolean(b.online)) return a.online ? -1 : 1;
+    const rank = (detail: string) => {
+      const value = detail.toLowerCase();
+      if (value.includes("admin")) return 0;
+      if (value.includes("manager")) return 1;
+      return 2;
+    };
+    if (rank(a.detail) !== rank(b.detail)) return rank(a.detail) - rank(b.detail);
+    return a.firstName.localeCompare(b.firstName);
+  });
+}
+
 /** Admin and founder logins are not Interns in the chat directory. */
 export function hideFromInternDirectory(input: {
   email?: string | null;
@@ -184,5 +222,5 @@ export function hideFromInternDirectory(input: {
   if (input.userId && input.actorUserId && input.userId === input.actorUserId) return true;
   if (isHardcodedSuperUserEmail(input.email)) return true;
   if (isFounderPersonalMarketplaceEmail(input.email)) return true;
-  return isLiveAgentSeat(input);
+  return isLiveAgentSeat(input) || isGrowthManagerSeat(input);
 }

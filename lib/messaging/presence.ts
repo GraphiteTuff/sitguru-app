@@ -1,12 +1,26 @@
 // lib/messaging/presence.ts
 /**
- * Online presence for omnichannel SMS outfall (offline → Twilio SMS).
+ * Online presence for omnichannel SMS outfall (offline → Twilio SMS)
+ * and staff desk directory (Ava + interns).
  */
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
 /** Consider offline if no heartbeat within this window */
 export const PRESENCE_OFFLINE_MS = 2 * 60 * 1000;
+
+export function presenceRowIsOnline(
+  row: { last_seen_at?: string | null; is_online?: boolean | null } | null | undefined,
+  now = Date.now(),
+) {
+  if (!row) return false;
+  if (row.is_online === false) return false;
+  const lastSeen = String(row.last_seen_at || "").trim();
+  if (!lastSeen) return false;
+  const seenAt = new Date(lastSeen).getTime();
+  if (!Number.isFinite(seenAt)) return false;
+  return now - seenAt < PRESENCE_OFFLINE_MS;
+}
 
 export async function touchUserPresence(params: {
   userId: string;
@@ -53,22 +67,56 @@ export async function isUserOnline(userId: string, now = Date.now()): Promise<bo
     .eq("user_id", id)
     .maybeSingle();
 
-  const lastSeen =
-    (data as { last_seen_at?: string; is_online?: boolean } | null)?.last_seen_at ||
-    null;
+  if (data) return presenceRowIsOnline(data as { last_seen_at?: string; is_online?: boolean }, now);
 
-  if (!lastSeen) {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("last_seen_at")
-      .eq("id", id)
-      .maybeSingle();
-    const profileSeen = (profile as { last_seen_at?: string } | null)?.last_seen_at;
-    if (!profileSeen) return false;
-    return now - new Date(profileSeen).getTime() < PRESENCE_OFFLINE_MS;
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("last_seen_at")
+    .eq("id", id)
+    .maybeSingle();
+  return presenceRowIsOnline(
+    { last_seen_at: (profile as { last_seen_at?: string } | null)?.last_seen_at, is_online: true },
+    now,
+  );
+}
+
+/** Batch online map for staff directory rows. */
+export async function mapUsersOnline(userIds: string[], now = Date.now()) {
+  const ids = [...new Set(userIds.map((id) => String(id || "").trim()).filter(Boolean))];
+  const online = new Map<string, boolean>();
+  for (const id of ids) online.set(id, false);
+  if (!ids.length) return online;
+
+  const { data: presenceRows } = await supabaseAdmin
+    .from("user_presence")
+    .select("user_id,last_seen_at,is_online")
+    .in("user_id", ids);
+
+  const seen = new Set<string>();
+  for (const row of (presenceRows || []) as Array<{
+    user_id?: string;
+    last_seen_at?: string;
+    is_online?: boolean;
+  }>) {
+    const id = String(row.user_id || "").trim();
+    if (!id) continue;
+    seen.add(id);
+    online.set(id, presenceRowIsOnline(row, now));
   }
 
-  const row = data as { last_seen_at?: string; is_online?: boolean };
-  if (row.is_online === false) return false;
-  return now - new Date(String(row.last_seen_at)).getTime() < PRESENCE_OFFLINE_MS;
+  const missing = ids.filter((id) => !seen.has(id));
+  if (!missing.length) return online;
+
+  const { data: profiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id,last_seen_at")
+    .in("id", missing);
+
+  for (const row of (profiles || []) as Array<{ id?: string; last_seen_at?: string }>) {
+    const id = String(row.id || "").trim();
+    if (!id) continue;
+    online.set(id, presenceRowIsOnline({ last_seen_at: row.last_seen_at, is_online: true }, now));
+  }
+
+  return online;
 }

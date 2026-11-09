@@ -5,11 +5,14 @@ import {
   faqTitleFromQuestion,
   helpCategoryForQuestion,
   hideFromInternDirectory,
+  isGrowthManagerSeat,
   isLiveAgentSeat,
+  isStaffChatPeer,
   isSubstantiveQuestion,
   LIVE_AGENT_REPLY,
   matchApprovedFaq,
   shouldHoldForCompanion,
+  sortStaffDirectoryPeople,
 } from "./chat-library";
 
 describe("companion FAQ or live agent", () => {
@@ -80,6 +83,26 @@ describe("admin chat directory", () => {
         actorUserId: "jason",
       }),
       false,
+    );
+    assert.equal(
+      isGrowthManagerSeat({ role: "social_community_manager" }),
+      true,
+    );
+    assert.equal(
+      isStaffChatPeer({ email: "jason@sitguru.com" }),
+      true,
+    );
+    assert.equal(
+      isStaffChatPeer({ role: "social_community_manager" }),
+      true,
+    );
+    assert.deepEqual(
+      sortStaffDirectoryPeople([
+        { firstName: "Lola", detail: "Intern", online: true },
+        { firstName: "Jason", detail: "Admin", online: false },
+        { firstName: "Ava", detail: "Manager", online: true },
+      ]).map((row) => row.firstName),
+      ["Ava", "Lola", "Jason"],
     );
   });
 

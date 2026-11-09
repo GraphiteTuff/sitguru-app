@@ -5,7 +5,7 @@ import Link from "next/link";
 import { MessageCircle, Send, X } from "lucide-react";
 import { deskInitials } from "@/lib/portal/desk-ui";
 
-type Person = { id: string; firstName: string; avatarUrl: string; detail: string };
+type Person = { id: string; firstName: string; avatarUrl: string; detail: string; online?: boolean };
 type ChatMessage = { id: string; author: string; avatarUrl: string; body: string; createdAt?: string; own?: boolean };
 type InboxThread = {
   id: string;
@@ -18,6 +18,7 @@ type InboxThread = {
 };
 
 const MANAGER_AUDIENCES = [
+  { id: "staff", label: "Staff" },
   { id: "intern", label: "Interns" },
   { id: "parent", label: "Pet Parents" },
   { id: "guru", label: "Gurus" },
@@ -25,19 +26,38 @@ const MANAGER_AUDIENCES = [
   { id: "admin", label: "Admins" },
 ] as const;
 
-const INTERN_AUDIENCES = [{ id: "admin", label: "Admin" }] as const;
+const INTERN_AUDIENCES = [{ id: "staff", label: "Staff" }] as const;
 
-function Face({ name, src, size = "md" }: { name: string; src?: string; size?: "md" | "lg" }) {
+function Face({
+  name,
+  src,
+  size = "md",
+  online,
+}: {
+  name: string;
+  src?: string;
+  size?: "md" | "lg";
+  online?: boolean;
+}) {
   const box = size === "lg" ? "h-11 w-11" : "h-9 w-9";
   return (
-    <span className={`relative inline-flex ${box} shrink-0 overflow-hidden rounded-full bg-white ring-2 ring-white shadow-sm`}>
-      <span className="absolute inset-0 bg-white" />
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img alt="" src={src} className="relative z-[1] h-full w-full object-cover object-[center_18%]" />
-      ) : (
-        <span className="relative z-[1] m-auto text-[11px] font-black text-[#1D4ED8]">{deskInitials(name)}</span>
-      )}
+    <span className={`relative inline-flex ${box} shrink-0`}>
+      <span className={`relative inline-flex h-full w-full overflow-hidden rounded-full bg-white ring-2 ring-white shadow-sm`}>
+        <span className="absolute inset-0 bg-white" />
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt="" src={src} className="relative z-[1] h-full w-full object-cover object-[center_18%]" />
+        ) : (
+          <span className="relative z-[1] m-auto text-[11px] font-black text-[#1D4ED8]">{deskInitials(name)}</span>
+        )}
+      </span>
+      {typeof online === "boolean" ? (
+        <span
+          className={`absolute bottom-0 right-0 z-[2] h-3 w-3 rounded-full border-2 border-white ${online ? "bg-emerald-500" : "bg-slate-300"}`}
+          title={online ? "Online" : "Offline"}
+          aria-hidden
+        />
+      ) : null}
     </span>
   );
 }
@@ -46,7 +66,7 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   const audiences = mode === "intern" ? INTERN_AUDIENCES : MANAGER_AUDIENCES;
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"inbox" | "people">(mode === "intern" ? "people" : "inbox");
-  const [audience, setAudience] = useState<(typeof audiences)[number]["id"]>(mode === "intern" ? "admin" : "intern");
+  const [audience, setAudience] = useState<(typeof audiences)[number]["id"]>("staff");
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Person[]>([]);
   const [threads, setThreads] = useState<InboxThread[]>([]);
@@ -65,6 +85,33 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   useEffect(() => {
     openThreadId.current = threadId;
   }, [threadId]);
+
+  useEffect(() => {
+    const beat = () => {
+      void fetch("/api/messaging/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ isOnline: true, deviceLabel: mode === "intern" ? "intern-desk" : "manager-desk" }),
+      });
+    };
+    beat();
+    const timer = window.setInterval(beat, 45_000);
+    const offline = () => {
+      void fetch("/api/messaging/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ isOnline: false, deviceLabel: mode === "intern" ? "intern-desk" : "manager-desk" }),
+        keepalive: true,
+      });
+    };
+    window.addEventListener("pagehide", offline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pagehide", offline);
+    };
+  }, [mode]);
 
   useEffect(() => {
     const pull = () => {
@@ -94,13 +141,26 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
 
   useEffect(() => {
     if (!open || threadId || view !== "people") return;
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    const pull = () => {
       void fetch(`/api/messaging/people?audience=${audience}&q=${encodeURIComponent(query)}`, { credentials: "same-origin" })
         .then((response) => response.json())
-        .then((payload: { people?: Person[] }) => setPeople(payload.people || []))
-        .catch(() => setPeople([]));
-    }, 180);
-    return () => window.clearTimeout(timer);
+        .then((payload: { people?: Person[] }) => {
+          if (!cancelled) setPeople(payload.people || []);
+        })
+        .catch(() => {
+          if (!cancelled) setPeople([]);
+        });
+    };
+    const debounce = window.setTimeout(pull, 180);
+    const refresh = audience === "staff" || audience === "admin" || audience === "intern"
+      ? window.setInterval(pull, 20_000)
+      : 0;
+    return () => {
+      cancelled = true;
+      window.clearTimeout(debounce);
+      if (refresh) window.clearInterval(refresh);
+    };
   }, [audience, open, query, threadId, view]);
 
   useEffect(() => {
@@ -184,10 +244,13 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   }
 
   const subtitle = threadId
-    ? peer?.detail || "Chat"
+    ? [
+        peer?.detail || "Chat",
+        typeof peer?.online === "boolean" ? (peer.online ? "Online" : "Offline") : "",
+      ].filter(Boolean).join(" · ")
     : mode === "intern"
-      ? "Message Admin about a problem"
-      : "Live alerts, interns, pet parents, Gurus, Ambassadors";
+      ? "Message Admin or Ava"
+      : "Live alerts, staff, interns, pet parents, Gurus, Ambassadors";
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-end px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:px-4 xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
@@ -197,7 +260,7 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
             {threadId ? (
               <button type="button" className="shrink-0 text-sm font-bold !text-white" onClick={() => { setThreadId(""); setPeer(null); }}>Back</button>
             ) : null}
-            {peer ? <Face name={peer.firstName} src={peer.avatarUrl} /> : null}
+            {peer ? <Face name={peer.firstName} src={peer.avatarUrl} online={peer.online} /> : null}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black !text-white">{peer?.firstName || "Chat"}</p>
               <p className="truncate text-[11px] font-semibold !text-white/80">{subtitle}</p>
@@ -308,17 +371,22 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
                     {people.map((person) => (
                       <li key={`${person.detail}-${person.id}`}>
                         <button type="button" onClick={() => choose(person)} className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-[#F8FAFC]">
-                          <Face name={person.firstName} src={person.avatarUrl} size="lg" />
+                          <Face name={person.firstName} src={person.avatarUrl} size="lg" online={person.online} />
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-bold text-[#0F2744]">{person.firstName}</span>
-                            <span className="text-xs font-semibold text-slate-500">{person.detail}</span>
+                            <span className="text-xs font-semibold text-slate-500">
+                              {person.detail}
+                              {typeof person.online === "boolean" ? ` · ${person.online ? "Online" : "Offline"}` : ""}
+                            </span>
                           </span>
                         </button>
                       </li>
                     ))}
                     {!people.length ? (
                       <li className="px-2 py-8 text-center text-sm font-medium text-slate-500">
-                        {audience === "admin" ? "No other Admin is on this chat yet." : "No one with that first name yet."}
+                        {audience === "staff" || audience === "admin"
+                          ? "No other staff on this chat yet."
+                          : "No one with that first name yet."}
                       </li>
                     ) : null}
                   </ul>
