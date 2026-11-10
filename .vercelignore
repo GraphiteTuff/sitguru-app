@@ -3,3 +3,15 @@ docs/production-references/
 docs/development/verification-screenshots/
 .release-local/
 supabase/.temp/
+
+# Keep CLI production deploys lean; Vercel installs deps on the build machine.
+node_modules/
+sitguru-mobile/node_modules/
+.npm-cache/
+.next/
+.next-fixture-*/
+.tools/
+.git/
+*.tsbuildinfo
+.env*
+!.env.example
