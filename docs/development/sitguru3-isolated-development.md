@@ -85,10 +85,13 @@ an isolated tenant and test recipients; no messages are sent by these checks.
 
 ## Vercel feature Preview blocker
 
-The existing `vercel.json` intentionally skips every branch except
-`sitguru-main`. It remains unchanged. The alternative `vercel.preview.json`
-provides an isolated path for this feature branch using a **separate Preview
-project**. It has no cron definitions and does not enable previews by default.
+Committed `vercel.json` on production history still skips every branch except
+`sitguru-main`. This feature branch carries a gated `vercel.json` that allows
+Production for `sitguru-main` or an explicitly opted-in isolated Preview for
+`feature/sitguru3-manager-community` only. Without Preview opt-in flags and an
+isolated Supabase backend, the ignore command skips the build. The alternative
+`vercel.preview.json` remains the safer **separate Preview project** option. It
+has no cron definitions and does not enable previews by default.
 Vercel's [ignored build step](https://vercel.com/docs/project-configuration/vercel-json#ignorecommand)
 uses exit 0 to skip and exit 1 to build; the separate pre-build check also blocks
 unsafe environments if the ignored-build step is bypassed.

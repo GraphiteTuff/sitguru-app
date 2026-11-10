@@ -1,0 +1,950 @@
+{
+  "projectId": "prj_fa3TnhjSSV3QH4iKIxOLvdGBfLsb",
+  "changed": [
+    "RESEND_WEBHOOK_SECRET",
+    "ACCOUNTING_TOKEN_ENCRYPTION_KEY",
+    "WAVE_ACCOUNTING_ENABLED",
+    "WAVE_GRAPHQL_URL",
+    "WAVE_REDIRECT_URI",
+    "WAVE_CLIENT_SECRET",
+    "WAVE_CLIENT_ID",
+    "QUICKBOOKS_ENVIRONMENT",
+    "QUICKBOOKS_REDIRECT_URI",
+    "QUICKBOOKS_CLIENT_SECRET",
+    "QUICKBOOKS_CLIENT_ID",
+    "GEOCODING_API_KEY",
+    "GOOGLE_PLACES_API_KEY",
+    "SITGURU_SMS_INTEGRATION_KEY",
+    "SITGURU_SMS_INTEGRATION_ENABLED",
+    "TWILIO_MESSAGING_SERVICE_SID",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_API_KEY",
+    "PAYPAL_DELAY_FUNDS_DISBURSEMENT_ENABLED",
+    "PAYPAL_ENV",
+    "PAYPAL_SANDBOX_PARTNER_MERCHANT_ID",
+    "PAYPAL_SANDBOX_PARTNER_ATTRIBUTION_ID",
+    "PAYPAL_SANDBOX_WEBHOOK_ID",
+    "PAYPAL_SANDBOX_CLIENT_SECRET",
+    "PAYPAL_SANDBOX_CLIENT_ID",
+    "PAYPAL_ENVIRONMENT",
+    "CRON_SECRET",
+    "SITGURU_SUPPORT_EMAIL",
+    "RESEND_FROM_EMAIL",
+    "TURNSTILE_SECRET_KEY",
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    "ALERT_FROM_EMAIL",
+    "SIGNUP_ALERT_SECRET",
+    "ADMIN_ALERT_SMS_TO",
+    "ADMIN_ALERT_EMAILS",
+    "GURU_ONBOARDING_PACKET_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SITGURU_SUPPORT_SMS_TO",
+    "TWILIO_VERIFY_SERVICE_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_ACCOUNT_SID",
+    "RESEND_REPLY_TO_EMAIL",
+    "NEXT_PUBLIC_APP_URL",
+    "CHECKR_PACKAGE",
+    "CHECKR_API_KEY",
+    "SITGURU_SUPPORT_FROM",
+    "RESEND_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "SITE_MODE"
+  ],
+  "before": [
+    {
+      "key": "RESEND_WEBHOOK_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SEND_SMS_HOOK_SECRETS",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ACCOUNTING_TOKEN_ENCRYPTION_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "WAVE_ACCOUNTING_ENABLED",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_GRAPHQL_URL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_REDIRECT_URI",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_CLIENT_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "WAVE_CLIENT_ID",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_ENVIRONMENT",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_REDIRECT_URI",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_CLIENT_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "QUICKBOOKS_CLIENT_ID",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "GEOCODING_API_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "GOOGLE_PLACES_API_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "SERPAPI_DAILY_BUDGET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SERPAPI_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SMS_INTEGRATION_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SMS_INTEGRATION_ENABLED",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_MESSAGING_SERVICE_SID",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SUPABASE_SERVICE_ROLE_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ANTHROPIC_MODEL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ANTHROPIC_API_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_DELAY_FUNDS_DISBURSEMENT_ENABLED",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_ENV",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_PARTNER_MERCHANT_ID",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_PARTNER_ATTRIBUTION_ID",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_WEBHOOK_ID",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_CLIENT_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_CLIENT_ID",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_ENVIRONMENT",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CRON_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_EMAIL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "RESEND_FROM_EMAIL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TURNSTILE_SECRET_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ALERT_FROM_EMAIL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SIGNUP_ALERT_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ADMIN_ALERT_SMS_TO",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ADMIN_ALERT_EMAILS",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "GURU_ONBOARDING_PACKET_URL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_SMS_TO",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_VERIFY_SERVICE_SID",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_AUTH_TOKEN",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_ACCOUNT_SID",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_ENV",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_CLIENT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "RESEND_REPLY_TO_EMAIL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_APP_URL",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CHECKR_PACKAGE",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CHECKR_API_KEY",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_FROM",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITE_MODE",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "type": "sensitive"
+    }
+  ],
+  "productionValuesUnchanged": true,
+  "previewVariablesRemaining": [],
+  "productionBranchUnchanged": true,
+  "ignoreRuleUnchanged": true,
+  "after": [
+    {
+      "key": "RESEND_WEBHOOK_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SEND_SMS_HOOK_SECRETS",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ACCOUNTING_TOKEN_ENCRYPTION_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "WAVE_ACCOUNTING_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_GRAPHQL_URL",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_REDIRECT_URI",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "WAVE_CLIENT_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "WAVE_CLIENT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_ENVIRONMENT",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_REDIRECT_URI",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "QUICKBOOKS_CLIENT_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "QUICKBOOKS_CLIENT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "GEOCODING_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "GOOGLE_PLACES_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "SERPAPI_DAILY_BUDGET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SERPAPI_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SMS_INTEGRATION_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SMS_INTEGRATION_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_MESSAGING_SERVICE_SID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SUPABASE_SERVICE_ROLE_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ANTHROPIC_MODEL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ANTHROPIC_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_DELAY_FUNDS_DISBURSEMENT_ENABLED",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_ENV",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_PARTNER_MERCHANT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_PARTNER_ATTRIBUTION_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_WEBHOOK_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_CLIENT_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_SANDBOX_CLIENT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PAYPAL_ENVIRONMENT",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CRON_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_EMAIL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "RESEND_FROM_EMAIL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TURNSTILE_SECRET_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ALERT_FROM_EMAIL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SIGNUP_ALERT_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ADMIN_ALERT_SMS_TO",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "ADMIN_ALERT_EMAILS",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "GURU_ONBOARDING_PACKET_URL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_SMS_TO",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_VERIFY_SERVICE_SID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_AUTH_TOKEN",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "TWILIO_ACCOUNT_SID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_ENV",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "PLAID_CLIENT_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "RESEND_REPLY_TO_EMAIL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_APP_URL",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CHECKR_PACKAGE",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "CHECKR_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITGURU_SUPPORT_FROM",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "key": "SITE_MODE",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    }
+  ],
+  "sharedEnvironmentVariables": [],
+  "sharedPreviewVariables": [],
+  "productionDeploymentUnchanged": true,
+  "futurePreviewHasNoProjectCredentials": true,
+  "existingDeploymentsRetainPreviousEnvironment": true
+}

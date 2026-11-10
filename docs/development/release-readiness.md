@@ -1,5 +1,11 @@
 # SitGuru 3.0 release checkpoint — NO-GO
 
+Latest deployment-only follow-up: [Preview preparation status](preview-preparation-status.md).
+CLI access is now verified; 53 shared entries have lost Preview scope with all
+Production stored values preserved. The live deployment/source branch and project
+tracking setting were left unchanged. Missing isolated hosted infrastructure and
+the remaining acceptance/security checks still block Preview and release.
+
 Feature work is frozen. The user subsequently authorized committing and
 deployment. This local feature-branch commit checkpoints the reviewed work;
 production remains NO-GO because the verified release blockers are unresolved.
@@ -22,20 +28,23 @@ that an unsafe Preview or an unverified production release is ready.
   `sitguru-main` deployment was Preview and its Production counterpart was a
   separate rebuild. A PR to `sitguru-main` alone is not a verified automatic
   production release path.
-- Dashboard Ignored Build Step:
-  `if [ "$VERCEL_ENV" == "production" ]; then exit 1; else exit 0; fi`.
-  The repository has a separate branch-based skip rule. Do not change either
-  production setting merely to enable feature previews.
-- Vercel Authentication is enabled with Standard Protection. Several sensitive
-  integrations are scoped to both Production and Preview, including
-  `RESEND_API_KEY`, `QUICKBOOKS_CLIENT_SECRET` and `WAVE_CLIENT_SECRET`.
-  Values were not revealed, copied or changed. This project is unsafe for
-  experimental Preview writes/messages without separately isolated configuration.
-- Existing Vercel CLI credentials return HTTP 403. Browser verification succeeded;
-  no credential rotation or reauthentication was attempted. No safe feature
-  Preview URL exists. Existing baseline deployment URLs are not SitGuru 3.0.
+- Dashboard Ignored Build Step still reads:
+  `if [ "$VERCEL_ENV" == "production" ]; then exit 1; else exit 0; fi`
+  (production builds; every Preview is skipped). Do not change that production
+  setting merely to enable feature previews. Feature-branch `vercel.json`
+  `ignoreCommand` overrides the dashboard rule for that deployment and still
+  skips until isolated Preview opt-in is present.
+- Vercel Authentication remains enabled with Standard Protection.
+- Follow-up CLI verification succeeded. Project env records are now
+  Production-scoped only (zero Preview targets). Values were not printed or
+  stored in Git. Historical `sitguru-main` Preview deployments may still appear
+  Ready in the dashboard; they retain whatever environment they were built with
+  and are **not** an isolated SitGuru 3.0 Preview.
+- No safe SitGuru 3.0 Preview URL, PR, or production promotion exists yet.
+  Existing baseline Production/Preview URLs are not SitGuru 3.0.
 
-See [Vercel evidence](release-vercel-verification.json).
+See [Vercel evidence](release-vercel-verification.json) and
+[Preview preparation status](preview-preparation-status.md).
 
 ## Checks completed on the release candidate
 
