@@ -3,7 +3,8 @@
  * Business state stays on shared Supabase tables; this only triggers refresh callbacks.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { useRealtimeSubscription } from '@/hooks/data/useRealtimeSubscription';
 import { LIVE_SIGNAL_TABLE, REALTIME_CHANNELS } from '@/lib/data/schema';
@@ -25,11 +26,20 @@ export function useWorkspaceLiveSync({
 }: UseWorkspaceLiveSyncOptions) {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [syncMode, setSyncMode] = useState<'realtime' | 'idle'>('idle');
+  const relevantSignal = useRef(false);
 
   const refresh = useCallback(() => {
     setLastSyncedAt(new Date().toISOString());
     onRefresh?.();
   }, [onRefresh]);
+
+  useEffect(() => {
+    if (!enabled || !userId) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => subscription.remove();
+  }, [enabled, userId, refresh]);
 
   useRealtimeSubscription({
     channelName: userId
@@ -44,7 +54,12 @@ export function useWorkspaceLiveSync({
       const row = (payload.new || {}) as { scope?: string };
       const scope = String(row.scope || '');
       if (scopes?.length && scope && !scopes.includes(scope)) return;
+      relevantSignal.current = true;
       setSyncMode('realtime');
+    },
+    onChange: () => {
+      if (!relevantSignal.current) return;
+      relevantSignal.current = false;
       refresh();
     },
   });

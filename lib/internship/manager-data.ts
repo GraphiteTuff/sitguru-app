@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { buildActivityHeatmap } from "@/lib/internship/activity-heatmap";
 import {
   buildInternManagerCard,
   buildManagerReviewQueue,
@@ -71,6 +72,7 @@ export async function loadManagerDashboard(input: {
       schedule: [] as ReturnType<typeof buildManagerSchedule>,
       interns,
       notices,
+      activityHeatmap: buildActivityHeatmap({}),
     };
   }
 
@@ -137,6 +139,7 @@ export async function loadManagerDashboard(input: {
     interns,
     notices,
     schedule: buildManagerSchedule({ tasks, reviews, names }),
+    activityHeatmap: buildActivityHeatmap({ logs, submissions: [...tasks, ...content, ...reviews] }),
   };
 }
 

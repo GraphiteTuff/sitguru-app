@@ -62,7 +62,7 @@ export const SITGURU_GROWTH_TEAMS_CHANNELS: readonly SitguruGrowthTeamsChannel[]
     label: "Content and Social",
     process:
       "Draft and review content in Teams + Canva. Track published outcomes and campaigns in SitGuru Growth.",
-    sitguruPaths: ["/manager/content", "/manager/media", "/manager/campaigns"],
+    sitguruPaths: ["/manager/content", "/manager/media", "/manager/campaigns", "/manager/community-studio", "/intern/community-studio"],
     envKey: "NEXT_PUBLIC_SITGURU_TEAMS_CHANNEL_CONTENT_URL",
   },
   {

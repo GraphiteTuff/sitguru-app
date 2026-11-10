@@ -154,7 +154,7 @@ export const SITGURU_ONENOTE_SECTIONS: readonly SitguruOneNoteSection[] = [
     name: "05 Partnerships and Community",
     purpose:
       "Partnership and community working notes. Official partner files stay in SharePoint.",
-    sitguruPaths: ["/manager/partners", "/manager/events"],
+    sitguruPaths: ["/manager/partners", "/manager/events", "/manager/community-studio", "/intern/community-studio"],
     envKey: "NEXT_PUBLIC_SITGURU_ONENOTE_PARTNERSHIPS_URL",
   },
   {

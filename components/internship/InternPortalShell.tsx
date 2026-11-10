@@ -42,6 +42,7 @@ const ICONS = {
   "Intern Portal": LayoutDashboard,
   "My Work": ClipboardList,
   "Create Content": PenLine,
+  "Community Studio": PawPrint,
   "My Assignments": ClipboardList,
   "My Milestones": Flag,
   "My Hours": Clock3,
@@ -65,6 +66,7 @@ export default function InternPortalShell({
   unreadMessages = 0,
   profileTitle = "Social Media & Content Intern",
   schoolLogoUrl = "",
+  localVerification = false,
 }: {
   children: React.ReactNode;
   assigned?: boolean;
@@ -72,8 +74,11 @@ export default function InternPortalShell({
   unreadMessages?: number;
   profileTitle?: string;
   schoolLogoUrl?: string;
+  /** Render existing chrome in the guarded /dev fixture; never changes authentication. */
+  localVerification?: boolean;
 }) {
-  const pathname = usePathname() || "/intern";
+  const currentPathname = usePathname() || "/intern";
+  const pathname = process.env.NODE_ENV === "development" && localVerification ? "/intern" : currentPathname;
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ? `?${searchParams.toString()}` : "";
 

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Local fixture servers can verify a patched build without disturbing an existing dev server.
+  distDir: process.env.SITGURU_LOCAL_PREVIEW_DIST || ".next",
   allowedDevOrigins: ["twentieth-turban-silver.ngrok-free.dev"],
 
   experimental: {

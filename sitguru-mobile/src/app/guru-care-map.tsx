@@ -89,7 +89,7 @@ const OPEN_STATUSES = [
 const METERS_PER_MILE = 1609.344;
 const WEB_MAPLIBRE_CSS_ID = 'sitguru-guru-care-maplibre-css';
 const WEB_MAPLIBRE_CSS_URL =
-  'https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css';
+  'https://unpkg.com/maplibre-gl@6.17.0/dist/maplibre-gl.css';
 const WEB_MAP_STYLE_LIGHT = {
   version: 8,
   sources: {
@@ -1005,7 +1005,7 @@ function WebCareMap({
 
     try {
       ensureMapLibreCss();
-      const maplibregl = require('maplibre-gl');
+      const maplibregl = require('maplibre-gl/dist/maplibre-gl.mjs');
       mapLibreRef.current = maplibregl;
 
       const savedCamera = cameraRef.current;

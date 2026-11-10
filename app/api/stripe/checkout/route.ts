@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { getStripeServer } from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
@@ -16,16 +17,6 @@ import {
 } from "@/lib/payments/stripe-tax";
 
 export const dynamic = "force-dynamic";
-
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-if (!stripeSecretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY in environment");
-}
-
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2026-03-25.dahlia",
-});
 
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
@@ -1477,6 +1468,8 @@ export async function POST(req: NextRequest) {
     if (userError || !user) {
       return jsonResponse(req, { error: "Unauthorized" }, 401);
     }
+
+    const stripe = getStripeServer();
 
     const bookingResult = await fetchBookingById(bookingId);
     const booking = bookingResult.data;

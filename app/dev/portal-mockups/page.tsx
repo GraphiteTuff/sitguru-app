@@ -5,6 +5,7 @@ import {
   ManagerMockFrame,
   MockupLinks,
 } from "@/components/dev/PortalMockupFrames";
+import { notFound } from 'next/navigation';
 import { documentationInternWorkspace } from "@/lib/internship/documentation-fixture";
 import { summarizeInternshipHours } from "@/lib/internship/hours";
 import type { ManagerDeskBundle } from "@/lib/admin/growth/manager-desk-model";
@@ -237,6 +238,7 @@ export default async function PortalMockupsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if (process.env.NODE_ENV !== 'development' || process.env.VERCEL || process.env.SITGURU_LOCAL_PREVIEW !== 'true') notFound();
   const params = searchParams ? await searchParams : {};
   const view = Array.isArray(params.view) ? params.view[0] : params.view || "both";
   const workspace = documentationInternWorkspace();

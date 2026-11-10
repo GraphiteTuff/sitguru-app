@@ -1,0 +1,5 @@
+{
+  "filesReviewed": 124,
+  "findings": [],
+  "note": "Pattern scan only; values never logged. Ignored local test credentials and temporary screenshots are excluded."
+}

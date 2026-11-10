@@ -1,0 +1,5 @@
+# Temporary production screenshots are for local QA only.
+docs/production-references/
+docs/development/verification-screenshots/
+.release-local/
+supabase/.temp/

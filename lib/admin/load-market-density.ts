@@ -123,21 +123,34 @@ function readLocation(row: AnyRow) {
 }
 
 async function safeSelect(table: string, columns: string) {
+  const collected: AnyRow[] = [];
+  const selected = columns.split(",").map((column) => column.trim());
+  let schemaIssue = "";
   try {
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .select(columns)
-      .limit(4000);
-
-    if (error) {
-      console.warn(`Market density ${table} query failed:`, error.message);
-      return [] as AnyRow[];
+    for (let page = 0; page < 20; page += 1) {
+      let response = await supabaseAdmin.from(table).select(selected.join(",")).order("id").range(page * 1000, page * 1000 + 999);
+      // Deployments have different optional location columns. Remove only the
+      // named missing column; do not turn schema drift into an empty market.
+      for (let retry = 0; response.error && retry < 20; retry += 1) {
+        const missing = response.error.message.match(/column (?:[\w]+\.)?([\w]+) does not exist/i)?.[1]
+          || response.error.message.match(/Could not find the '([\w]+)' column/i)?.[1];
+        if (!missing || !selected.includes(missing) || missing === "id") break;
+        if (missing === "is_bookable") schemaIssue = `${table} is missing bookability data`;
+        selected.splice(selected.indexOf(missing), 1);
+        response = await supabaseAdmin.from(table).select(selected.join(",")).order("id").range(page * 1000, page * 1000 + 999);
+      }
+      if (response.error) {
+        console.warn(`Market density ${table} query failed:`, response.error.message);
+        return { rows: collected, issue: `${table} could not be fully loaded` };
+      }
+      const rows = Array.isArray(response.data) ? response.data as unknown as AnyRow[] : [];
+      collected.push(...rows);
+      if (rows.length < 1000) return { rows: collected, issue: schemaIssue };
     }
-
-    return Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
+    return { rows: collected, issue: `${table} reached the 20,000-record reporting limit` };
   } catch (error) {
     console.warn(`Market density ${table} query crashed:`, error);
-    return [] as AnyRow[];
+    return { rows: collected, issue: `${table} is unavailable` };
   }
 }
 
@@ -182,13 +195,14 @@ function getOrCreateBucket(
 export type MarketDensityPayload = {
   markets: MarketDensityMarket[];
   summary: MarketDensitySummary;
+  issues: string[];
 };
 
 export async function loadMarketDensity(): Promise<MarketDensityPayload> {
-  const [gurus, profiles, ambassadors, bookings] = await Promise.all([
+  const sources = await Promise.all([
     safeSelect(
       "gurus",
-      "id, is_bookable, is_public, city, state, zip_code, service_city, service_state, service_zip, service_zip_code, latitude, longitude, service_latitude",
+      "id, is_bookable, is_public, city, state, zip_code, service_city, service_state, service_zip, service_zip_code, latitude, longitude, service_latitude, service_longitude",
     ),
     safeSelect(
       "profiles",
@@ -200,9 +214,10 @@ export async function loadMarketDensity(): Promise<MarketDensityPayload> {
     ),
     safeSelect(
       "bookings",
-      "id, city, state, care_zip_code, care_city, care_state, care_latitude, sit_latitude_at_booking",
+      "id, city, state, care_zip_code, care_city, care_state, care_latitude, care_longitude, sit_latitude_at_booking, sit_longitude_at_booking",
     ),
   ]);
+  const [gurus, profiles, ambassadors, bookings] = sources.map((source) => source.rows);
 
   const buckets = new Map<string, MarketBucket>();
 
@@ -267,5 +282,6 @@ export async function loadMarketDensity(): Promise<MarketDensityPayload> {
   return {
     markets,
     summary: summarizeMarkets(markets),
+    issues: sources.map((source) => source.issue).filter(Boolean),
   };
 }

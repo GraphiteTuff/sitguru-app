@@ -26,6 +26,7 @@ export type WorkspaceQueryKey =
 export const WORKSPACE_REFRESH_PATHS = {
   internPortal: "/intern",
   managerDesk: "/intern/manage",
+  managerPortal: "/manager",
   internGrowth: "/intern/growth",
   internHelp: "/intern/help",
   internOnboarding: "/intern/onboarding",
@@ -46,6 +47,7 @@ export function pathsForInternWorkspace() {
     WORKSPACE_REFRESH_PATHS.internGrowth,
     WORKSPACE_REFRESH_PATHS.internHelp,
     WORKSPACE_REFRESH_PATHS.managerDesk,
+    WORKSPACE_REFRESH_PATHS.managerPortal,
     WORKSPACE_REFRESH_PATHS.adminInternship,
   ];
 }
@@ -53,6 +55,7 @@ export function pathsForInternWorkspace() {
 export function pathsForManagerDesk() {
   return [
     WORKSPACE_REFRESH_PATHS.managerDesk,
+    WORKSPACE_REFRESH_PATHS.managerPortal,
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.adminInternship,
   ];
@@ -66,6 +69,7 @@ export function pathsForGrowthWorkspace() {
     WORKSPACE_REFRESH_PATHS.internGrowth,
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.managerDesk,
+    WORKSPACE_REFRESH_PATHS.managerPortal,
   ];
 }
 

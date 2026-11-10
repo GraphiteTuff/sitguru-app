@@ -21,6 +21,7 @@ import { BrandColors } from '@/constants/theme';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { useAuth } from '@/hooks/useAuth';
 import { sitguruApiFetch } from '@/lib/data/api';
+import { useWorkspaceLiveSync } from '@/hooks/data/useWorkspaceLiveSync';
 import InternOnboardingFlow, {
   type InternOnboardingPayload,
 } from '@/components/internship/InternOnboardingFlow';
@@ -84,7 +85,7 @@ export default function InternPortalScreen() {
     const path = internId
       ? `/api/internship/workspace?internId=${encodeURIComponent(internId)}`
       : '/api/internship/workspace';
-    const result = await sitguruApiFetch<WorkspacePayload>(path);
+    const result = await sitguruApiFetch<WorkspacePayload>(path, { cache: 'no-store' });
     if (result.error || !result.data) {
       setError(result.error || 'Could not open Intern Portal.');
       setPayload(null);
@@ -107,8 +108,11 @@ export default function InternPortalScreen() {
     const firstOpen = result.data.workspace?.tasks?.find(
       (row) => row.status !== 'approved' && row.status !== 'not_accepted',
     );
-    setSelectedTask(firstOpen || result.data.workspace?.tasks?.[0] || null);
+    const tasks = result.data.workspace?.tasks || [];
+    setSelectedTask((current) => tasks.find((task) => task.id === current?.id) || firstOpen || tasks[0] || null);
   }, [internId]);
+
+  useWorkspaceLiveSync({ userId: session?.user.id, onRefresh: () => { void load(); } });
 
   useEffect(() => {
     if (!session) return;
@@ -209,6 +213,11 @@ export default function InternPortalScreen() {
         </Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <TouchTarget accessibilityRole="button" onPress={() => router.push('/community-studio' as never)} style={styles.card}>
+          <Text style={styles.cardTitle}>Community Studio</Text>
+          <Text style={styles.body}>Create Pack stories, nominate Pet of the Week, and follow manager feedback.</Text>
+        </TouchTarget>
 
         {payload?.mode === 'supervisor' && !payload.workspace ? (
           <View style={styles.card}>

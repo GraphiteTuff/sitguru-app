@@ -175,7 +175,7 @@ export const SITGURU_SHAREPOINT_FOLDERS: readonly SitguruSharePointFolder[] = [
     name: "03 Ava Review",
     purpose:
       "Content submitted for Ava’s review, feedback, revisions, and routine manager approval.",
-    sitguruPaths: ["/manager/content", "/intern/manage"],
+    sitguruPaths: ["/manager/content", "/intern/manage", "/manager/community-studio", "/intern/community-studio"],
     envKey: "NEXT_PUBLIC_SITGURU_SP_CONTENT_AVA_REVIEW_URL",
   },
   {

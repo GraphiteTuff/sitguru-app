@@ -1,0 +1,20 @@
+{
+  "verificationMethod": "Read-only authenticated Vercel dashboard inspection; CLI API returned HTTP 403",
+  "project": "sitguru_main",
+  "team": "jason-graffs-projects",
+  "projectId": "prj_fa3TnhjSSV3QH4iKIxOLvdGBfLsb",
+  "repository": "GraphiteTuff/sitguru-app",
+  "productionBranch": "main",
+  "requestedReleaseTarget": "sitguru-main",
+  "dashboardIgnoredBuildCommand": "if [ \"$VERCEL_ENV\" == \"production\" ]; then exit 1; else exit 0; fi",
+  "repositoryIgnoredBuildCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
+  "framework": "Next.js",
+  "vercelAuthentication": "Enabled, Standard Protection",
+  "passwordProtection": "Disabled",
+  "productionDomainObserved": "www.sitguru.com",
+  "unsafeSharedEnvironmentNamesObserved": ["RESEND_API_KEY", "RESEND_WEBHOOK_SECRET", "QUICKBOOKS_CLIENT_SECRET", "WAVE_CLIENT_SECRET", "ACCOUNTING_TOKEN_ENCRYPTION_KEY", "TWILIO_MESSAGING_SERVICE_SID"],
+  "sharedScopes": ["production", "preview"],
+  "secretsRevealed": false,
+  "settingsChanged": false,
+  "safeFeaturePreviewCreated": false
+}

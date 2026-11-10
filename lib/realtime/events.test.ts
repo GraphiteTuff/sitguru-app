@@ -9,6 +9,7 @@ import { stableEventId, uniqueUserIds } from "./pure";
 import {
   pathsForGrowthWorkspace,
   pathsForInternWorkspace,
+  pathsForManagerDesk,
   WORKSPACE_QUERY_KEYS,
 } from "./query-keys";
 
@@ -47,6 +48,9 @@ describe("recipients and paths", () => {
     assert.ok(pathsForInternWorkspace().includes("/intern"));
     assert.ok(pathsForInternWorkspace().includes("/intern/manage"));
     assert.ok(pathsForGrowthWorkspace().includes("/admin/growth"));
+    assert.ok(pathsForInternWorkspace().includes("/manager"));
+    assert.ok(pathsForManagerDesk().includes("/manager"));
+    assert.ok(pathsForGrowthWorkspace().includes("/manager"));
     assert.equal(WORKSPACE_QUERY_KEYS.managerDesk, "manager-desk");
   });
 });

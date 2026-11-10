@@ -19,6 +19,7 @@ import GrowthSharePointShortcuts from "@/components/admin/growth/GrowthSharePoin
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import { InternName } from "@/components/portal/PersonFace";
 import ManagerDeskRoster from "@/components/manager/ManagerDeskRoster";
+import ManagerActivityHeatmap from "@/components/manager/ManagerActivityHeatmap";
 import {
   buildManagerDeskReviewQueue,
   type ManagerDeskBundle,
@@ -398,6 +399,8 @@ export default function ManagerDeskHome({
           </ul>
         </article>
       </section>
+
+      {desk.activityHeatmap ? <ManagerActivityHeatmap data={desk.activityHeatmap} /> : null}
 
       <ManagerDeskRoster
         rows={cards.map((card) => {

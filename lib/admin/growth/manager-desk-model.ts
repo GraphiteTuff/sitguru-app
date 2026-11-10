@@ -1,6 +1,7 @@
 import type { ManagerInternCard, ManagerQuestion, ManagerReviewItem } from "@/lib/internship/manager-dashboard";
 import type { GrowthInitiative } from "@/lib/admin/growth/outcomes";
 import type { MyTimeDashboard } from "@/lib/staff-time/types";
+import type { ActivityHeatmap } from "@/lib/internship/activity-heatmap";
 
 export type ManagerDeskMessage = {
   id: string;
@@ -36,6 +37,7 @@ export type ManagerDeskBundle = {
   messages: ManagerDeskMessage[];
   extras: ManagerDeskExtras;
   myTimeSnap: ManagerDeskTimeSnap | null;
+  activityHeatmap?: ActivityHeatmap;
   viewingAs?: string | null;
   viewingUserId?: string | null;
 };

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import type { DensityMeasure } from "./MarketDensityHeatLayer";
 import type {
   MarketDensityMarket,
   MarketDensitySummary,
@@ -56,6 +57,7 @@ export default function MarketGrowthBoard({
 }) {
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
+  const [heatMeasure, setHeatMeasure] = useState<DensityMeasure | "readiness">("petParentCount");
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -122,7 +124,18 @@ export default function MarketGrowthBoard({
         />
       </div>
 
-      {summary.mappedCount > 0 ? <MapWithNoSSR markets={visible} /> : null}
+      {summary.mappedCount > 0 ? <section className="space-y-3" aria-label="Geographic marketplace heatmap">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-black text-slate-950">Geographic intelligence</h2><p className="text-xs font-medium text-slate-500">{visible.filter((market) => market.latitude != null && market.longitude != null).length} mapped markets · tap a marker for counts</p></div>
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-600">Map layer
+            <select value={heatMeasure} onChange={(event) => setHeatMeasure(event.target.value as DensityMeasure | "readiness")} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900">
+              <option value="petParentCount">Pet Parent density</option><option value="bookableCount">Bookable Guru density</option><option value="bookingCount">Booking activity</option><option value="readiness">Launch readiness</option>
+            </select>
+          </label>
+        </div>
+        <MapWithNoSSR markets={visible} heatMeasure={heatMeasure === "readiness" ? undefined : heatMeasure} />
+        <p className="text-xs font-medium text-slate-500">{heatMeasure === "readiness" ? "Marker colors show readiness: green launch ready, amber needs Pet Parents, orange needs Gurus, red no density." : "Heat intensity shows relative counts in the filtered markets, from green (lower) through amber to orange (higher). Marker colors show launch readiness."}</p>
+      </section> : null}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
@@ -131,6 +144,7 @@ export default function MarketGrowthBoard({
               key={item.id}
               type="button"
               onClick={() => setFilter(item.id)}
+              aria-pressed={filter === item.id}
               className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
                 filter === item.id
                   ? "border-emerald-700 bg-[#0D5C3A] text-white"
@@ -147,6 +161,7 @@ export default function MarketGrowthBoard({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search city or ZIP"
+          aria-label="Search markets by city, state, or ZIP"
           className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none ring-emerald-100 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 lg:max-w-xs"
         />
       </div>

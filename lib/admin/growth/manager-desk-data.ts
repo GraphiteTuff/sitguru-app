@@ -69,6 +69,7 @@ export async function loadManagerDeskBundle(
     viewingAs: preview?.name || null,
     viewingUserId: preview?.id || null,
     cards: desk.cards,
+    activityHeatmap: desk.activityHeatmap,
     reviews: desk.reviews,
     questions: desk.questions,
     initiatives,

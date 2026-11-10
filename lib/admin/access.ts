@@ -190,6 +190,12 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
 
   if (error || !user) return null;
 
+  return resolveAdminIdentityForUser(user);
+}
+
+/** Same established role resolution for an already verified cookie or Bearer user. */
+export async function resolveAdminIdentityForUser(user: { id: string; email?: string | null }): Promise<AdminIdentity | null> {
+
   const email = String(user.email || "").toLowerCase();
   const envEmails = getEnvAdminEmails();
 

@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.npm-cache/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,9 +13,14 @@
 
 # testing
 /coverage
+/.release-local/
+/supabase/.temp/
+/docs/development/verification-screenshots/
+/docs/production-references/
 
 # next.js
 /.next/
+/.next-fixture-*/
 /out/
 
 # production

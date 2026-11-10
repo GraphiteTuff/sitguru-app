@@ -157,6 +157,10 @@ export function routeFromSitGuruUrl(rawUrl: string): RouteTarget | null {
     return { pathname: '/community-events' };
   }
 
+  if (['pack', 'pack/submit', 'community-studio', 'manager/community-studio', 'intern/community-studio'].includes(path)) {
+    return { pathname: '/community-studio' };
+  }
+
   if (path === 'intern' || path.startsWith('intern/') || path === 'admin/internship' || path.startsWith('admin/internship')) {
     return { pathname: '/intern-portal' };
   }

@@ -17,6 +17,7 @@ export const INTERN_PORTAL_SIDEBAR = [
   { id: "portal", href: INTERN_ROUTES.portal, label: "Intern Portal", match: "none" as const },
   { id: "work", href: INTERN_ROUTES.work, label: "My Work", match: "prefix" as const },
   { id: "content", href: INTERN_ROUTES.content, label: "Create Content", match: "prefix" as const },
+  { id: "community", href: INTERN_ROUTES.communityStudio, label: "Community Studio", match: "prefix" as const },
   {
     id: "assignments",
     href: INTERN_ROUTES.assignments,
@@ -103,6 +104,7 @@ export const INTERN_PORTAL_MOBILE_PRIMARY = [
 
 export const INTERN_PORTAL_MOBILE_MORE = [
   { href: INTERN_ROUTES.content, label: "Create Content" },
+  { href: INTERN_ROUTES.communityStudio, label: "Community Studio" },
   { href: INTERN_ROUTES.assignments, label: "My Assignments" },
   { href: INTERN_ROUTES.milestones, label: "My Milestones" },
   { href: INTERN_ROUTES.messages, label: "Messages" },

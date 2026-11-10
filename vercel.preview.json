@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "node scripts/vercel-preview-ignore.mjs",
+  "buildCommand": "node scripts/verify-preview-environment.mjs && npm run build"
+}

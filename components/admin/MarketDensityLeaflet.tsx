@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import type { MarketDensityMarket } from "@/lib/admin/market-density";
+import { MarketDensityHeatLayer, type DensityMeasure } from "./MarketDensityHeatLayer";
 
 const SCORE_COLORS: Record<MarketDensityMarket["score"], string> = {
   launch_ready: "#059669",
@@ -17,8 +18,10 @@ const DEFAULT_CENTER: [number, number] = [40.4418, -75.3416];
 
 export default function MarketDensityLeaflet({
   markets,
+  heatMeasure,
 }: {
   markets: MarketDensityMarket[];
+  heatMeasure?: DensityMeasure;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -74,6 +77,7 @@ export default function MarketDensityLeaflet({
     if (!map) return;
 
     const layer = L.layerGroup().addTo(map);
+    const heatLayer = heatMeasure ? new MarketDensityHeatLayer(mapped, heatMeasure).addTo(map) : null;
 
     for (const market of mapped) {
       const color = SCORE_COLORS[market.score];
@@ -89,13 +93,17 @@ export default function MarketDensityLeaflet({
           color,
           weight: 2,
           fillColor: color,
-          fillOpacity: 0.72,
+          fillOpacity: heatMeasure ? 0.25 : 0.72,
         },
       );
 
-      marker.bindPopup(
-        `<strong>${market.label}</strong><br/>${market.scoreLabel}<br/>${market.bookableCount} bookable · ${market.petParentCount} Pet Parents · ${market.bookingCount} bookings`,
-      );
+      const popup = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = market.label;
+      const detail = document.createElement("p");
+      detail.textContent = `${market.scoreLabel} · ${market.bookableCount} bookable · ${market.petParentCount} Pet Parents · ${market.bookingCount} bookings`;
+      popup.append(title, detail);
+      marker.bindPopup(popup);
       marker.addTo(layer);
     }
 
@@ -111,8 +119,9 @@ export default function MarketDensityLeaflet({
 
     return () => {
       map.removeLayer(layer);
+      heatLayer?.remove();
     };
-  }, [mapped]);
+  }, [mapped, heatMeasure]);
 
   if (mapError) {
     return (
@@ -125,6 +134,8 @@ export default function MarketDensityLeaflet({
   return (
     <div
       ref={mapElementRef}
+      role="region"
+      aria-label="Interactive market density map. Counts are also available in the market cards below."
       className="h-[360px] w-full overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-slate-100"
     />
   );

@@ -67,6 +67,8 @@ type SitGuruApiOptions = {
   auth?: boolean;
   idempotencyKey?: string;
   timeoutMs?: number;
+  /** Live workspaces bypass the short browse cache after signals or mutations. */
+  cache?: 'default' | 'no-store';
 };
 
 export async function sitguruApiFetch<T = unknown>(
@@ -119,7 +121,7 @@ export async function sitguruApiFetch<T = unknown>(
     : `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
   const method = options.method ?? (options.body !== undefined ? 'POST' : 'GET');
   const cacheKey =
-    method === 'GET' && options.body === undefined
+    method === 'GET' && options.body === undefined && options.cache !== 'no-store'
       ? `${headers.Authorization?.slice(-16) || 'anon'}:${url}`
       : '';
 

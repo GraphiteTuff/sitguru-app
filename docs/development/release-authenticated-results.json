@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "4 real local Auth users and password/JWT sessions",
+    "Unprivileged JWT cannot open Manager queue",
+    "Anonymous member API denied",
+    "Real signed upload, sanitizer, storage transfer and foreign receipt rejection",
+    "Guru consent alone cannot authorize approval",
+    "Pending private media is not available anonymously",
+    "Only booking Pet Parent can approve, separate social refusal recorded",
+    "Actual manager approval/publication and public privacy filtering",
+    "Actual parent revocation removes public story",
+    "Real authenticated Data API direct reads denied by grants/RLS"
+  ],
+  "scope": "Local Supabase, real Auth/API/storage; test-only booking prerequisite. Intern assignment scope and realtime not yet verified."
+}
