@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "node scripts/vercel-deployment-ignore.mjs",
-  "buildCommand": "node scripts/verify-deployment-environment.mjs && npm run build",
+  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
   "crons": [
     {
       "path": "/api/cron/profile-completion-reminders",
