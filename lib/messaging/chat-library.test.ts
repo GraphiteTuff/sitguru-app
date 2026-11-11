@@ -97,6 +97,14 @@ describe("admin chat directory", () => {
       true,
     );
     assert.equal(
+      isGrowthManagerSeat({
+        email: "ava@sitguru.com",
+        role: "ambassador",
+        accountType: "ambassador",
+      }),
+      true,
+    );
+    assert.equal(
       isStaffChatPeer({ email: "jason@sitguru.com" }),
       true,
     );

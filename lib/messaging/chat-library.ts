@@ -182,6 +182,11 @@ export function isGrowthManagerSeat(input: {
   signupRole?: string | null;
 }) {
   if (isFounderPersonalMarketplaceEmail(input.email)) return false;
+  const email = String(input.email || "")
+    .trim()
+    .toLowerCase();
+  // Hired Growth Manager login — keep on Staff even when marketplace role is ambassador.
+  if (email === "ava@sitguru.com") return true;
   if (
     isGrowthOnlyRole(input.role) ||
     isGrowthOnlyRole(input.accountType) ||
@@ -190,7 +195,9 @@ export function isGrowthManagerSeat(input: {
     return true;
   }
   const role = `${input.role || ""} ${input.accountType || ""} ${input.signupRole || ""}`.toLowerCase();
-  return /\b(social_community_manager|growth_manager|social_growth_manager)\b/.test(role);
+  return /\b(social_community_manager|growth_manager|social_growth_manager|social_media_community_growth_manager)\b/.test(
+    role,
+  );
 }
 
 /** Interns may message Admin HQ or their Growth Manager (Ava). */

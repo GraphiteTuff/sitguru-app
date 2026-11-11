@@ -64,7 +64,7 @@ export function GrowthCard({
   return (
     <section
       id={id}
-      className={`min-w-0 scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
+      className={`min-w-0 scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,39,68,0.05)] sm:p-5 ${className}`}
     >
       {children}
     </section>
@@ -97,12 +97,12 @@ export function AdminWorkplaceDenied({
   detail?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
-      <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+    <div className="min-h-screen bg-[#F4F7FB] px-6 py-10 text-[#0F2744]">
+      <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-[0_8px_24px_rgba(15,39,68,0.05)]">
         <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
           Access Restricted
         </p>
-        <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+        <h1 className="mt-3 text-4xl font-black tracking-tight text-[#0F2744]">
           {title}
         </h1>
         {detail ? (

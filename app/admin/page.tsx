@@ -36,12 +36,12 @@ type CountResult = {
 };
 
 const toneClasses: Record<NonNullable<MetricCard["tone"]>, string> = {
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  sky: "border-sky-200 bg-sky-50 text-sky-900",
-  amber: "border-amber-200 bg-amber-50 text-amber-900",
-  rose: "border-rose-200 bg-rose-50 text-rose-900",
-  slate: "border-slate-200 bg-white text-slate-900",
-  violet: "border-violet-200 bg-violet-50 text-violet-900",
+  emerald: "border-emerald-100/80 bg-[#F0FDF4] text-[#166534]",
+  sky: "border-sky-100/80 bg-[#EFF6FF] text-[#1D4ED8]",
+  amber: "border-amber-100/80 bg-[#FFF4ED] text-[#C2410C]",
+  rose: "border-rose-100/80 bg-rose-50 text-rose-900",
+  slate: "border-slate-200/80 bg-white text-[#0F2744]",
+  violet: "border-violet-100/80 bg-[#F5F3FF] text-[#6D28D9]",
 };
 
 const priorityTone: Record<ActionCard["priority"], string> = {
@@ -95,7 +95,7 @@ async function safeCount(
 function MetricCardView({ card }: { card: MetricCard }) {
   const content = (
     <div
-      className={`h-full rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses[card.tone || "slate"]}`}
+      className={`h-full rounded-2xl border p-5 shadow-[0_8px_24px_rgba(15,39,68,0.05)] transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses[card.tone || "slate"]}`}
     >
       <p className="text-xs font-black uppercase tracking-[0.18em] opacity-70">
         {card.label}
@@ -537,20 +537,21 @@ export default async function AdminOperationsDashboard() {
 
   return (
     <GrowthPageFrame
+      variant="desk"
       kicker={`Super Admin HQ · ${todayLabel}`}
       title="Clear queues, then grow where the pack is dense."
-      detail="Contractor hours, approvals, people, bookings, messages, payouts, and market density — Manager Portal quality density at 100% zoom."
+      detail="Contractor hours, approvals, people, bookings, messages, payouts, and market density — same desk look as Manager and Intern portals."
       action={
         <div className="flex flex-wrap gap-2">
           <Link
             href="/admin/action-center"
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-black text-green-950"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white"
           >
             Action Center
           </Link>
           <Link
             href="/admin/financials/contractor-hours"
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/50 px-4 text-sm font-black !text-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-[#0F2744]"
           >
             Contractor Hours
           </Link>

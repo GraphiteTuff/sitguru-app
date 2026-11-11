@@ -9,7 +9,8 @@ export const DEFAULT_STAFF_ENGAGEMENT = {
   expectedWeeklyMinHours: 10,
   expectedWeeklyMaxHours: 15,
   paymentCadence: "biweekly",
-  periodAnchorOn: "2025-11-02",
+  /** Team kickoff pay-period anchor (current biweekly window start). */
+  periodAnchorOn: "2026-11-01",
   hourlyRateDollars: 16.75,
   title: GROWTH_HIRE_TITLE,
 } as const;

@@ -50,6 +50,7 @@ import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
+import DeskChatDock from "@/components/messaging/DeskChatDock";
 import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import {
@@ -63,6 +64,7 @@ import {
   isActiveAdminPath,
   type HqNavIcon,
 } from "@/lib/admin/hq-nav";
+import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
 
 const HQ_ICON_MAP: Record<
   HqNavIcon,
@@ -318,18 +320,18 @@ function isActivePath(pathname: string, href: string) {
 function AdminLogo({ compact = false }: { compact?: boolean }) {
   return (
     <Link
-      href="/"
-      className="inline-flex items-center rounded-2xl transition hover:opacity-90"
-      aria-label="Back to SitGuru homepage"
+      href="/admin"
+      className="inline-flex min-w-0 items-center transition hover:opacity-90"
+      aria-label="SitGuru Admin HQ"
     >
       <Image
-        src="/images/sitguru-logo-cropped.png"
-        alt="SitGuru"
-        width={320}
-        height={114}
+        src={DESK_LOGO}
+        alt="SitGuru. Trusted Pet Care Simplified."
+        width={420}
+        height={140}
         priority
-        className={`h-auto bg-transparent object-contain ${
-          compact ? "w-[88px]" : "w-[118px]"
+        className={`h-auto w-full object-contain object-left mix-blend-multiply ${
+          compact ? "max-h-10 max-w-[140px]" : "max-h-12 max-w-[168px]"
         }`}
       />
     </Link>
@@ -338,12 +340,17 @@ function AdminLogo({ compact = false }: { compact?: boolean }) {
 
 function SearchBar() {
   return (
-    <label className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-green-50 hover:text-green-800 xl:w-[13.5rem] xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-transparent xl:px-3 2xl:w-[15.5rem]">
-      <Search size={18} className="shrink-0" aria-hidden />
+    <label className="relative flex h-11 w-11 shrink-0 items-center justify-center text-slate-500 transition hover:text-[#2563EB] xl:w-[13.5rem] xl:justify-start 2xl:w-[15.5rem]">
+      <Search
+        size={16}
+        className="pointer-events-none absolute left-3.5 top-1/2 hidden -translate-y-1/2 text-slate-400 xl:block"
+        aria-hidden
+      />
+      <Search size={18} className="shrink-0 xl:hidden" aria-hidden />
       <input
         type="search"
-        placeholder="Search admin…"
-        className="hidden min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 xl:block"
+        placeholder="Search HQ…"
+        className={`hidden xl:block ${DESK_UI.search}`}
         aria-label="Search admin"
       />
     </label>
@@ -388,8 +395,8 @@ function SidebarSection({
               aria-label={item.label}
               className={
                 active
-                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-green-800 text-white shadow-sm"
-                  : "flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 ring-1 ring-[#edf2ec] transition hover:bg-white hover:text-green-800"
+                  ? `flex h-11 w-11 items-center justify-center rounded-2xl ${DESK_UI.sidebarActive}`
+                  : `flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-slate-200/80 transition ${DESK_UI.sidebarIdle}`
               }
             >
               <Icon size={16} />
@@ -406,10 +413,10 @@ function SidebarSection({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[10px] font-black uppercase tracking-[0.16em] transition ${
+        className={`flex w-full items-center justify-between rounded-2xl px-3 py-1.5 text-left text-[10px] font-black uppercase tracking-[0.14em] transition ${
           hasActive
-            ? "text-green-800"
-            : "text-slate-400 hover:bg-white hover:text-slate-600"
+            ? "text-[#2563EB]"
+            : "text-slate-400 hover:bg-[#EEF2F6] hover:text-[#0F2744]"
         }`}
       >
         <span>{title}</span>
@@ -420,7 +427,7 @@ function SidebarSection({
       </button>
 
       {open ? (
-        <div className="space-y-px">
+        <div className="space-y-0.5">
           {items.map((item) => {
             const Icon = item.icon;
             const active = isActivePath(pathname, item.href);
@@ -431,20 +438,11 @@ function SidebarSection({
                 href={item.href}
                 className={
                   active
-                    ? "group flex min-h-10 items-center gap-2 rounded-lg bg-green-800 px-2 py-1.5 text-[13px] font-black text-white shadow-sm transition hover:bg-green-900"
-                    : "group flex min-h-10 items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
+                    ? `group flex min-h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-bold ${DESK_UI.sidebarActive}`
+                    : `group flex min-h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-semibold ${DESK_UI.sidebarIdle}`
                 }
               >
-                <span
-                  className={
-                    active
-                      ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/15 text-white"
-                      : "flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-slate-400 ring-1 ring-[#edf2ec] transition group-hover:text-green-800"
-                  }
-                >
-                  <Icon size={14} />
-                </span>
-
+                <Icon size={16} className="shrink-0 opacity-90" />
                 <span className="min-w-0 truncate">{item.label}</span>
               </Link>
             );
@@ -469,7 +467,7 @@ function MobileNav({
   if (growthOnly) {
     const growthLinks = growthNavSections[0]?.items || [];
     return (
-      <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-3 py-3 lg:hidden">
+      <div className="border-t border-slate-200/80 bg-white px-3 py-3 lg:hidden">
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {growthLinks.map((item) => {
             const Icon = item.icon;
@@ -480,16 +478,16 @@ function MobileNav({
                 href={item.href}
                 className={
                   active
-                    ? "min-w-[152px] rounded-2xl border border-green-800 bg-green-800 p-3 text-white shadow-sm"
-                    : "min-w-[152px] rounded-2xl border border-green-100 bg-white p-3 text-green-950 shadow-sm"
+                    ? `min-w-[152px] rounded-2xl p-3 ${DESK_UI.sidebarActive}`
+                    : `min-w-[152px] rounded-2xl border border-slate-200/80 bg-white p-3 text-[#0F2744] shadow-sm`
                 }
               >
-                <span className="flex items-center gap-2 text-xs font-black">
+                <span className="flex items-center gap-2 text-xs font-bold">
                   <span
                     className={
                       active
                         ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
-                        : "flex h-8 w-8 items-center justify-center rounded-xl bg-green-50 text-green-800"
+                        : "flex h-8 w-8 items-center justify-center rounded-xl bg-[#EEF2F6] text-[#2563EB]"
                     }
                   >
                     <Icon size={16} />
@@ -505,7 +503,7 @@ function MobileNav({
   }
 
   return (
-    <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-3 py-3 lg:hidden">
+    <div className="border-t border-slate-200/80 bg-white px-3 py-3 lg:hidden">
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {mobileQuickLinks.filter((item) => allow(item.href)).map((item) => {
           const Icon = item.icon;
@@ -517,16 +515,16 @@ function MobileNav({
               href={item.href}
               className={
                 item.featured || active
-                  ? "min-w-[152px] rounded-2xl border border-green-800 bg-green-800 p-3 text-white shadow-sm"
-                  : "min-w-[152px] rounded-2xl border border-green-100 bg-white p-3 text-green-950 shadow-sm"
+                  ? `min-w-[152px] rounded-2xl p-3 ${DESK_UI.sidebarActive}`
+                  : `min-w-[152px] rounded-2xl border border-slate-200/80 bg-white p-3 text-[#0F2744] shadow-sm`
               }
             >
-              <span className="flex items-center gap-2 text-xs font-black">
+              <span className="flex items-center gap-2 text-xs font-bold">
                 <span
                   className={
                     item.featured || active
                       ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
-                      : "flex h-8 w-8 items-center justify-center rounded-xl bg-green-50 text-green-800"
+                      : "flex h-8 w-8 items-center justify-center rounded-xl bg-[#EEF2F6] text-[#2563EB]"
                   }
                 >
                   <Icon size={16} />
@@ -537,8 +535,8 @@ function MobileNav({
               <span
                 className={
                   item.featured || active
-                    ? "mt-1 block text-[10px] font-bold leading-4 text-white/80"
-                    : "mt-1 block text-[10px] font-bold leading-4 text-slate-500"
+                    ? "mt-1 block text-[10px] font-semibold leading-4 text-white/80"
+                    : "mt-1 block text-[10px] font-semibold leading-4 text-slate-500"
                 }
               >
                 {item.description}
@@ -548,20 +546,20 @@ function MobileNav({
         })}
       </div>
 
-      <details className="group mt-3 rounded-2xl border border-green-100 bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-green-950 marker:hidden">
+      <details className={`group mt-3 ${DESK_UI.card}`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#0F2744] marker:hidden">
           <span className="flex items-center gap-2">
-            <Megaphone size={17} className="text-green-800" />
+            <Megaphone size={17} className="text-[#2563EB]" />
             HR, University & Growth
           </span>
 
           <ChevronDown
             size={18}
-            className="text-green-800 transition group-open:rotate-180"
+            className="text-[#2563EB] transition group-open:rotate-180"
           />
         </summary>
 
-        <div className="grid max-h-[48dvh] gap-2 overflow-y-auto border-t border-green-50 p-3">
+        <div className="grid max-h-[48dvh] gap-2 overflow-y-auto border-t border-slate-100 p-3">
           {mobileGrowthLinks.filter((item) => allow(item.href)).map((item) => {
             const Icon = item.icon;
             const active = isActivePath(pathname, item.href);
@@ -572,8 +570,8 @@ function MobileNav({
                 href={item.href}
                 className={
                   active
-                    ? "flex items-center gap-2 rounded-xl bg-green-800 px-3 py-2.5 text-xs font-black text-white"
-                    : "flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs font-black text-green-900"
+                    ? `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${DESK_UI.sidebarActive}`
+                    : `flex items-center gap-2 rounded-2xl bg-[#EEF2F6] px-3 py-2.5 text-xs font-bold text-[#0F2744]`
                 }
               >
                 <Icon size={15} />
@@ -584,25 +582,25 @@ function MobileNav({
         </div>
       </details>
 
-      <details className="group mt-3 rounded-2xl border border-[#dfe7df] bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-slate-900 marker:hidden">
+      <details className={`group mt-3 ${DESK_UI.card}`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#0F2744] marker:hidden">
           <span className="flex items-center gap-2">
-            <Gauge size={17} className="text-green-800" />
+            <Gauge size={17} className="text-[#2563EB]" />
             All admin sections
           </span>
 
           <ChevronDown
             size={18}
-            className="text-green-800 transition group-open:rotate-180"
+            className="text-[#2563EB] transition group-open:rotate-180"
           />
         </summary>
 
-        <div className="grid max-h-[58dvh] gap-4 overflow-y-auto border-t border-[#edf3ee] p-3">
+        <div className="grid max-h-[58dvh] gap-4 overflow-y-auto border-t border-slate-100 p-3">
           {navSections
             .filter((section) => !modules || isNavSectionOn(section.title, modules))
             .map((section) => (
             <div key={section.title}>
-              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
                 {section.title}
               </p>
 
@@ -617,8 +615,8 @@ function MobileNav({
                       href={item.href}
                       className={
                         active
-                          ? "flex items-center gap-2 rounded-xl bg-green-800 px-3 py-2.5 text-xs font-black text-white"
-                          : "flex items-center gap-2 rounded-xl border border-green-50 bg-green-50 px-3 py-2.5 text-xs font-black text-green-900"
+                          ? `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${DESK_UI.sidebarActive}`
+                          : `flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] px-3 py-2.5 text-xs font-bold text-[#0F2744]`
                       }
                     >
                       <Icon size={15} />
@@ -640,10 +638,10 @@ function MobileNav({
             <Link
               key={item.href}
               href={item.href}
-              className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-black shadow-sm ${
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold shadow-sm ${
                 active
-                  ? "border-green-800 bg-green-800 text-white"
-                  : "border-green-100 bg-white text-green-900"
+                  ? DESK_UI.sidebarActive
+                  : "border border-slate-200/80 bg-white text-[#0F2744]"
               }`}
             >
               {item.label}
@@ -762,7 +760,7 @@ function AdminFooter({
       : "SitGuru Admin keeps bookings, Gurus, Pet Parents, Ambassadors, messages, financials, training, academies, programs, referrals, partners, taxes, and reporting connected in one clean operating center.";
 
   return (
-    <footer className="mt-6 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+    <footer className={`mt-6 p-5 ${DESK_UI.card}`}>
       <div className="grid gap-8 xl:grid-cols-[1fr_3fr]">
         <div>
           <AdminLogo />
@@ -772,14 +770,14 @@ function AdminFooter({
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-green-800 bg-green-800 px-4 py-2 text-xs font-black text-white">
+            <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black ${DESK_UI.primary}`}>
               <span className="h-2.5 w-2.5 rounded-full bg-white" />
               Live Admin
             </span>
 
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-[#dce9df] bg-white px-4 py-2 text-xs font-black text-green-800 transition hover:bg-green-50"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-4 py-2 text-xs font-black text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
               <Home size={14} />
               Back to Homepage
@@ -790,7 +788,7 @@ function AdminFooter({
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {footerSections.map((section) => (
             <div key={section.title}>
-              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-green-800">
+              <h3 className="text-sm font-black uppercase tracking-[0.14em] text-[#2563EB]">
                 {section.title}
               </h3>
 
@@ -799,7 +797,7 @@ function AdminFooter({
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block text-sm font-bold text-slate-600 transition hover:text-green-800"
+                    className={`block text-sm font-bold text-slate-600 transition ${DESK_UI.link}`}
                   >
                     {link.label}
                   </Link>
@@ -810,18 +808,18 @@ function AdminFooter({
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col gap-3 border-t border-[#edf3ee] pt-5 text-sm font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-5 text-sm font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} SitGuru. Admin portal.</p>
 
         <div className="flex flex-wrap gap-4">
-          <Link href="/" className="transition hover:text-green-800">
+          <Link href="/" className={`transition ${DESK_UI.link}`}>
             Homepage
           </Link>
 
           {showLink(adminRoutes.settings) ? (
           <Link
             href={adminRoutes.settings}
-            className="transition hover:text-green-800"
+            className={`transition ${DESK_UI.link}`}
           >
             Settings
           </Link>
@@ -830,7 +828,7 @@ function AdminFooter({
           {showLink(adminRoutes.financialExports) ? (
           <Link
             href={adminRoutes.financialExports}
-            className="transition hover:text-green-800"
+            className={`transition ${DESK_UI.link}`}
           >
             Exports
           </Link>
@@ -839,7 +837,7 @@ function AdminFooter({
           {showLink(adminRoutes.taxReports) ? (
           <Link
             href={adminRoutes.taxReports}
-            className="transition hover:text-green-800"
+            className={`transition ${DESK_UI.link}`}
           >
             Tax Center
           </Link>
@@ -848,7 +846,7 @@ function AdminFooter({
           {showLink(adminRoutes.auditTrail) ? (
           <Link
             href={adminRoutes.auditTrail}
-            className="transition hover:text-green-800"
+            className={`transition ${DESK_UI.link}`}
           >
             Audit Trail
           </Link>
@@ -953,25 +951,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-    <div className="min-h-dvh overflow-x-hidden bg-[#f7f8f4] text-slate-950">
+    <div className={`min-h-dvh overflow-x-hidden text-[#0F2744] ${DESK_UI.pageBg}`}>
       <div
-        className={`grid min-h-dvh min-w-0 ${
+        className={`mx-auto grid min-h-dvh min-w-0 max-w-[1600px] ${
           navCollapsed && !isGrowthChrome
             ? "lg:grid-cols-[72px_minmax(0,1fr)]"
-            : "lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[264px_minmax(0,1fr)]"
+            : "lg:grid-cols-[248px_minmax(0,1fr)]"
         }`}
       >
-        <aside className="hidden min-w-0 border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
+        <aside className="hidden min-w-0 border-r border-slate-200/80 bg-white lg:block">
           <div className="sticky top-0 flex h-dvh min-h-0 flex-col">
-            <div className="shrink-0 border-b border-[#e8eee5] px-2.5 py-2.5">
+            <div className="shrink-0 border-b border-slate-100 px-4 py-4">
               <div className="flex items-center justify-between gap-2">
-                {navCollapsed && !isGrowthChrome ? (
-                  <AdminLogo compact />
-                ) : (
-                  <AdminLogo compact />
-                )}
+                <AdminLogo compact />
                 {!navCollapsed || isGrowthChrome ? (
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563EB]">
                     {isGrowthChrome ? "Growth" : "HQ"}
                   </p>
                 ) : null}
@@ -980,7 +974,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setNavCollapsed((value) => !value)}
-                  className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#e5ebe2] bg-white text-xs font-black text-green-900 transition hover:bg-green-50"
+                  className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] text-xs font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
                   aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
                   title={navCollapsed ? "Expand navigation" : "Collapse navigation"}
                 >
@@ -992,8 +986,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {isGrowthChrome || (limitNav && !modules?.social_media) ? null : (
                 <Link
                   href={adminRoutes.growth}
-                  className="mt-2 flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-black text-white shadow-sm"
-                  style={{ background: "#0D5C3A" }}
+                  className="mt-2 flex min-h-10 items-center justify-center gap-2 rounded-2xl px-3 text-xs font-black text-white shadow-sm"
+                  style={{ background: DESK_UI.teal }}
                 >
                   <Sparkles size={15} />
                   Social Media Manager
@@ -1003,7 +997,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {isSuperUser && onGrowthPortal && workspace !== "growth" ? (
                 <Link
                   href="/admin"
-                  className="mt-2 flex min-h-9 items-center justify-center rounded-lg bg-[#0D5C3A] px-3 text-xs font-black text-white"
+                  className="mt-2 flex min-h-9 items-center justify-center rounded-2xl px-3 text-xs font-black text-white"
+                  style={{ background: DESK_UI.teal }}
                 >
                   Back to Full HQ
                 </Link>
@@ -1011,8 +1006,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
 
             <nav
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 [scrollbar-width:thin] ${
-                navCollapsed && !isGrowthChrome ? "px-2" : "px-2.5"
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain py-3 [scrollbar-width:thin] ${
+                navCollapsed && !isGrowthChrome ? "px-2" : "px-3"
               }`}
             >
               {visibleNavSections.map((section) => (
@@ -1038,35 +1033,53 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            {isGrowthChrome || (limitNav && !modules?.analytics_admin) ? null : (
-            <div className="shrink-0 border-t border-[#e8eee5] px-2.5 py-2">
+            <div className="shrink-0 space-y-3 border-t border-slate-100 p-3">
+              {isGrowthChrome || (limitNav && !modules?.analytics_admin) ? null : (
               <Link
                 href={adminRoutes.settings}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
+                className={`flex min-h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-semibold ${
+                  isActivePath(pathname, adminRoutes.settings)
+                    ? DESK_UI.sidebarActive
+                    : DESK_UI.sidebarIdle
+                }`}
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-[#edf2ec]">
-                  <Settings size={14} />
-                </span>
-
+                <Settings size={16} className="shrink-0 opacity-90" />
                 <span>Settings</span>
               </Link>
+              )}
+              {navCollapsed && !isGrowthChrome ? null : (
+                <div className="overflow-hidden rounded-2xl bg-[#F0FDFA]">
+                  <div className="relative h-24">
+                    <Image
+                      src={DESK_BANNER}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="220px"
+                    />
+                  </div>
+                  <p className="flex items-start gap-2 px-3 py-3 text-xs font-semibold leading-5 text-[#0F2744]">
+                    <PawPrint size={14} className="mt-0.5 shrink-0 text-[#2563EB]" />
+                    Same people. Happier pets. Bigger impact.
+                  </p>
+                </div>
+              )}
             </div>
-            )}
           </div>
         </aside>
 
         <div className={`flex min-w-0 flex-col overflow-x-hidden ${isMessagesWorkspace ? "h-dvh min-h-0" : ""}`}>
-          <header className="sticky top-0 z-40 border-b border-[#e5ebe2] bg-[#fcfdfb]/95 backdrop-blur">
-            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-3"}`}>
-              <div className="flex items-center gap-3 xl:gap-4">
+          <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
+            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-2.5"}`}>
+              <div className="flex min-h-[4.25rem] items-center gap-3 xl:gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
                     <AdminLogo />
                     {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
                       <Link
                         href={adminRoutes.growth}
-                        className="inline-flex min-h-12 items-center gap-2 rounded-xl px-3 text-xs font-black text-white"
-                        style={{ background: "#0D5C3A" }}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-2xl px-3 text-xs font-black text-white"
+                        style={{ background: DESK_UI.teal }}
                       >
                         <Sparkles size={16} />
                         Social Media
@@ -1074,7 +1087,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     )}
                   </div>
 
-                  <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {visibleHeaderLinks.map((item) => {
                       const active = isActivePath(pathname, item.href);
 
@@ -1082,10 +1095,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-black transition 2xl:px-3.5 ${
+                          className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition 2xl:px-3.5 ${
                             active
-                              ? "bg-green-800 text-white shadow-sm"
-                              : "text-slate-600 hover:bg-green-50 hover:text-green-900"
+                              ? DESK_UI.sidebarActive
+                              : "text-slate-600 hover:bg-[#EEF2F6] hover:text-[#0F2744]"
                           }`}
                         >
                           {item.label}
@@ -1099,14 +1112,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
                     <Link
                       href={adminRoutes.growth}
-                      className="hidden min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
-                      style={{ background: "#0D5C3A" }}
+                      className="hidden min-h-11 shrink-0 items-center gap-2 rounded-2xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
+                      style={{ background: DESK_UI.teal }}
                     >
                       <Sparkles size={16} />
                       Social Media Manager
                     </Link>
                   )}
-                  <div className={`items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm ${isMessagesWorkspace ? "hidden lg:flex" : "flex"}`}>
+                  <div className={`items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm ${isMessagesWorkspace ? "hidden lg:flex" : "flex"}`}>
                     <SearchBar />
 
                     {isGrowthChrome || (limitNav && !modules?.financials) ? null : (
@@ -1114,7 +1127,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     <Link
                       href="/admin/gurus/new"
                       title="Add Guru"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-black text-green-900 transition hover:border-[#dfe7df] hover:bg-green-50 sm:px-3"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6] sm:px-3"
                     >
                       <UserPlus size={16} className="shrink-0" />
                       <span className="hidden 2xl:inline">Add Guru</span>
@@ -1123,7 +1136,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     <Link
                       href={adminRoutes.financialExports}
                       title="Export"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-black text-green-900 transition hover:border-[#dfe7df] hover:bg-green-50 sm:px-3"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6] sm:px-3"
                     >
                       <BarChart3 size={16} className="shrink-0" />
                       <span className="hidden 2xl:inline">Export</span>
@@ -1135,7 +1148,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   {isGrowthChrome ? null : (
                   <Link
                     href={adminRoutes.messages}
-                    className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900"
+                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm transition hover:brightness-95 ${DESK_UI.primary}`}
                     aria-label="Admin messages"
                     title="Messages"
                   >
@@ -1188,6 +1201,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     </div>
 
       <WorkspaceLiveSyncMount />
+
+      {isMessagesWorkspace ? null : <DeskChatDock mode="manager" />}
 
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       <SafeAssistantBubble>

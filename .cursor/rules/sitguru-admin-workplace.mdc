@@ -6,14 +6,19 @@ alwaysApply: false
 
 # SitGuru Admin workplace look
 
-New or restyled Admin pages must match Growth / Referrals / Programs — not the old white “command center” walls.
+Admin HQ must match Manager / Intern desk portals — cool gray canvas, blue active rail, soft cards — not the old pale green-slate shell or white “command center” walls.
 
-## Required chrome
-- Use `GrowthPageFrame` (or `AdminWorkplaceFrame` from `@/components/admin/AdminWorkplace`).
-- Green header `#0D5C3A` with `public-dark-section` / `data-brand-green` and `!text-white` on titles. Never dark text on brand green.
-- Color KPI tiles via `AdminThemeCard` (emerald / sky / amber / rose / violet / slate).
-- Big action tiles via `AdminWorkplaceActions` — icon, short label, one-line detail. One primary green tile when there is work to do.
-- Work queues and lists live in `GrowthCard` / `AdminWorkplaceCard`.
+## Shell (layout)
+- `app/admin/layout.tsx` uses `DESK_UI` / `DESK_LOGO` / `DESK_BANNER` from `@/lib/portal/desk-ui`.
+- Page bg `#F4F7FB`, white rail, active nav `#2563EB`, wordmark with `mix-blend-multiply`.
+- Keep SitGuru green `#0D5C3A` for brand CTAs (Social Media Manager), not as the shell fill.
+
+## Page chrome
+- Prefer `GrowthPageFrame` with `variant="desk"` (pastel sky→violet header) for HQ homes and queues.
+- Green header `#0D5C3A` (`variant="green"`) is OK for brand-heavy workplaces; always `public-dark-section` / `data-brand-green` and `!text-white` on titles. Never dark text on brand green.
+- Color KPI tiles via desk tints / `AdminThemeCard` (emerald / sky / amber / rose / violet / slate).
+- Big action tiles via `AdminWorkplaceActions` — icon, short label, one-line detail.
+- Work queues and lists live in `GrowthCard` / `AdminWorkplaceCard` (slate soft border + light shadow).
 - Source health is a compact footer (`AdminWorkplaceHealth`), not a second hero.
 
 ## Do not ship
@@ -22,6 +27,7 @@ New or restyled Admin pages must match Growth / Referrals / Programs — not the
 - Eight tiny white metric tiles in one row
 - Long technical copy as the first thing on the page
 - Grids that overflow the admin pane — use `min-w-0`, wrap text, stack before `xl`
+- Green-800 shell / nav that diverges from Manager / Intern desk tokens
 
 ## Copy
 - Punchy workplace titles (“Turn X into Y”), not department slogans.

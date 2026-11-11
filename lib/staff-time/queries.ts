@@ -254,7 +254,7 @@ export async function listPeriodsNeedingAttention(): Promise<
           expectedWeeklyMinHours: 10,
           expectedWeeklyMaxHours: 15,
           paymentCadence: "biweekly",
-          periodAnchorOn: "2025-11-02",
+          periodAnchorOn: "2026-11-01",
           currency: "USD",
           w9Status: "not_requested",
           employmentClassification: "contractor",

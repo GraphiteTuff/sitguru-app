@@ -56,14 +56,27 @@ function getSafeRoleLabel(role: string) {
     return "Pet Parent";
   }
 
+  if (
+    normalized.includes("growth") ||
+    normalized.includes("social_community") ||
+    normalized === "manager"
+  ) {
+    return "Growth Manager";
+  }
+
   if (normalized === "ambassador" || normalized === "partner") {
     return "Ambassador";
+  }
+
+  if (normalized === "intern") {
+    return "Intern";
   }
 
   return "SitGuru User";
 }
 
-function playSoftAlert() {
+/** Modern “You’ve Got Mail” — short two-note chime, never blocks the toast. */
+function playYouveGotMailChime() {
   try {
     if (!canPlayPageSound()) return;
 
@@ -77,22 +90,24 @@ function playSoftAlert() {
     if (!AudioContextClass) return;
 
     const audioContext = new AudioContextClass();
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
+    const now = audioContext.currentTime;
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(740, audioContext.currentTime);
-    oscillator.frequency.setValueAtTime(540, audioContext.currentTime + 0.13);
+    const ding = (freq: number, start: number, dur: number, peak: number) => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(start);
+      oscillator.stop(start + dur + 0.02);
+    };
 
-    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.35);
-
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.38);
+    ding(880, now, 0.22, 0.07);
+    ding(1175, now + 0.16, 0.28, 0.09);
   } catch {
     // Audio should never block the message alert.
   }
@@ -138,7 +153,7 @@ export default function GlobalMessageNotifier() {
       setIsHidden(false);
 
       if (soundEnabled && !options?.fromBroadcast) {
-        playSoftAlert();
+        playYouveGotMailChime();
       }
 
       if (!options?.fromBroadcast) {
@@ -147,9 +162,10 @@ export default function GlobalMessageNotifier() {
 
       if ("Notification" in window && Notification.permission === "granted") {
         try {
-          new Notification("New SitGuru Message", {
+          new Notification("You've Got Mail", {
             body: `${alert.senderName}: ${alert.preview}`,
             icon: "/images/sitguru-message-avatar.jpg",
+            tag: `sitguru-mail-${alert.conversationId || alert.id}`,
           });
         } catch {
           // Native browser notifications are optional.
@@ -258,23 +274,23 @@ export default function GlobalMessageNotifier() {
 
   return (
     <div className="fixed bottom-[5.75rem] left-3 right-3 z-[9999] mx-auto max-w-md sm:bottom-5 sm:left-auto sm:right-5 md:bottom-5">
-      <div className="overflow-hidden rounded-[26px] border border-emerald-200 bg-white shadow-2xl shadow-emerald-950/20">
-        <div className="flex items-start gap-3 bg-emerald-50 px-4 py-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-sm">
+      <div className="overflow-hidden rounded-[26px] border border-sky-200/80 bg-white shadow-2xl shadow-slate-950/15">
+        <div className="flex items-start gap-3 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F0FDF4] px-4 py-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#2563EB] text-white shadow-sm">
             <MessageCircle size={22} />
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              New SitGuru Message
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#2563EB]">
+              You&apos;ve Got Mail
             </p>
 
-            <h3 className="mt-1 truncate text-base font-black text-slate-950">
+            <h3 className="mt-1 truncate text-base font-black text-[#0F2744]">
               {visibleAlert.senderName || "SitGuru Message"}
             </h3>
 
             <p className="mt-1 text-xs font-bold text-slate-500">
-              {getSafeRoleLabel(visibleAlert.senderRole)}
+              {getSafeRoleLabel(visibleAlert.senderRole)} · Incoming message
             </p>
           </div>
 
@@ -297,7 +313,7 @@ export default function GlobalMessageNotifier() {
             <Link
               href={visibleAlert.href || `/messages/${visibleAlert.conversationId}`}
               onClick={() => setIsHidden(true)}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#2563EB] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#1D4ED8]"
             >
               Open Message
             </Link>
@@ -306,12 +322,12 @@ export default function GlobalMessageNotifier() {
               type="button"
               onClick={() => {
                 setSoundEnabled((current) => !current);
-                requestBrowserNotifications();
+                void requestBrowserNotifications();
               }}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
               <Volume2 size={16} />
-              {soundEnabled ? "Sound On" : "Sound Off"}
+              {soundEnabled ? "Chime On" : "Chime Off"}
             </button>
           </div>
         </div>
