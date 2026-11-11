@@ -27,6 +27,7 @@ export const MANAGER_ROUTES = {
   campaigns: "/manager/campaigns",
   weeklyWork: "/manager/weekly-work",
   campaignsContent: "/manager/campaigns-content",
+  reads: "/manager/reads",
   outreach: "/manager/outreach",
   surveys: "/manager/surveys",
   conversions: "/manager/conversions",

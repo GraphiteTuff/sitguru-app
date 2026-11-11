@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
+  BookOpen,
   Briefcase,
   CalendarDays,
   CircleHelp,
@@ -42,6 +43,7 @@ const ICONS = {
   "Intern Portal": LayoutDashboard,
   "My Work": ClipboardList,
   "Create Content": PenLine,
+  "Reads & Media": BookOpen,
   "Community Studio": PawPrint,
   "My Assignments": ClipboardList,
   "My Milestones": Flag,

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 import {
   BarChart3,
+  BookOpen,
   CalendarCheck2,
   CalendarDays,
   CircleHelp,
@@ -54,6 +55,7 @@ const ICONS = {
   "Intern Team": Users,
   "My Weekly Work": ClipboardList,
   "Content Studio": Megaphone,
+  "Reads & Media": BookOpen,
   "Community Studio": PawPrint,
   "Community Outreach": Users,
   "Polls & Surveys": PieChart,

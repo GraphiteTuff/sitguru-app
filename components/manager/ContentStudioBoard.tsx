@@ -57,8 +57,9 @@ export function ContentStudioBoard({
       </header>
       {notice ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{notice}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{error}</p> : null}
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         <Link href="/manager/create" className="rounded-2xl bg-[#2563EB] px-4 py-3 text-sm font-black !text-white">Create content</Link>
+        <Link href="/manager/reads" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">Reads &amp; Media</Link>
         <Link href="/manager/toolkit/brand" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Brand Kit</Link>
         <a href="#review" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Review queue</a>
         <Link href="/manager/calendar" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Content calendar</Link>

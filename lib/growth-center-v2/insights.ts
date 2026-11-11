@@ -9,6 +9,15 @@ import type {
 } from "./types";
 
 function hrefFor(audience: GrowthAudience, path: string) {
+  const [pathname, query = ""] = path.split("?");
+  const suffix = query ? `?${query}` : "";
+
+  if (pathname === "/manager/reads" || pathname.startsWith("/manager/reads/")) {
+    if (audience === "intern") return `/intern/content/reads${suffix}`;
+    if (audience === "admin") return `/admin/growth/reads${suffix}`;
+    return `${pathname}${suffix}`;
+  }
+
   if (audience === "intern") {
     if (path.startsWith("/manager/")) return path.replace("/manager/", "/intern/");
     if (path.startsWith("/admin/growth")) return "/intern/growth";
@@ -23,6 +32,13 @@ function hrefFor(audience: GrowthAudience, path: string) {
  * Grounded recommendations only — every insight cites observed metrics.
  * Never claims causality for social platform changes without connected data.
  */
+export type ReadsGrowthSignals = {
+  pageViews: number;
+  videoPlays: number;
+  needsReview: number;
+  partnerLeads: number;
+};
+
 export function buildGrowthInsights(input: {
   audience: GrowthAudience;
   filters: GrowthCenterFilters;
@@ -30,6 +46,7 @@ export function buildGrowthInsights(input: {
   funnel: GrowthFunnelStep[];
   campaigns: GrowthCampaignRow[];
   contentPending: number;
+  reads?: ReadsGrowthSignals | null;
 }): GrowthInsight[] {
   const range = formatRangeLabel(input.filters);
   const byId = Object.fromEntries(input.kpis.map((kpi) => [kpi.id, kpi]));
@@ -203,6 +220,53 @@ export function buildGrowthInsights(input: {
       actionHref: hrefFor(input.audience, "/manager/campaigns-content"),
       dateRangeLabel: range,
       sources: ["admin_marketing_content_calendar"],
+      confidence: "high",
+    });
+  }
+
+  const reads = input.reads;
+  if (reads && reads.needsReview > 0) {
+    insights.push({
+      id: "reads-needs-review",
+      severity: "info",
+      title: "Reads & Media items need review",
+      observation: `${reads.needsReview} Reads draft(s)/submission(s) are waiting for manager review.`,
+      reason: "Unpublished Reads content cannot drive public /reads engagement.",
+      nextAction: "Open Reads & Media and clear the review queue.",
+      actionHref: hrefFor(input.audience, "/manager/reads?tab=content"),
+      dateRangeLabel: range,
+      sources: ["reads_content"],
+      confidence: "high",
+    });
+  }
+  if (reads && reads.pageViews >= 25 && reads.videoPlays === 0) {
+    insights.push({
+      id: "reads-views-no-plays",
+      severity: "opportunity",
+      title: "Reads traffic without video plays",
+      observation: `${reads.pageViews} Reads page views and ${reads.videoPlays} recorded video plays.`,
+      reason:
+        "Visitors are opening Reads pages, but click-to-play video engagement is flat.",
+      nextAction:
+        "Feature a stronger video or podcast on /reads and confirm YouTube embeds are published.",
+      actionHref: hrefFor(input.audience, "/manager/reads?tab=videos"),
+      dateRangeLabel: range,
+      sources: ["reads_analytics_events"],
+      confidence: "medium",
+      limitations: "Only first-party Reads analytics events are counted.",
+    });
+  }
+  if (reads && reads.partnerLeads > 0) {
+    insights.push({
+      id: "reads-partner-leads",
+      severity: "opportunity",
+      title: "New Reads partnership leads",
+      observation: `${reads.partnerLeads} partner lead(s) in the Reads pipeline.`,
+      reason: "Partner submissions can become Featured / Sponsored Reads placements.",
+      nextAction: "Review partnership intake and assign next status.",
+      actionHref: hrefFor(input.audience, "/manager/reads?tab=partnerships"),
+      dateRangeLabel: range,
+      sources: ["reads_partners"],
       confidence: "high",
     });
   }

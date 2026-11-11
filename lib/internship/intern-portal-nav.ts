@@ -16,7 +16,8 @@ export const INTERN_PORTAL_SIDEBAR = [
   { id: "home", href: INTERN_ROUTES.home, label: "Home", match: "exact" as const },
   { id: "portal", href: INTERN_ROUTES.portal, label: "Intern Portal", match: "none" as const },
   { id: "work", href: INTERN_ROUTES.work, label: "My Work", match: "prefix" as const },
-  { id: "content", href: INTERN_ROUTES.content, label: "Create Content", match: "prefix" as const },
+  { id: "content", href: INTERN_ROUTES.content, label: "Create Content", match: "content" as const },
+  { id: "reads", href: INTERN_ROUTES.reads, label: "Reads & Media", match: "prefix" as const },
   { id: "community", href: INTERN_ROUTES.communityStudio, label: "Community Studio", match: "prefix" as const },
   {
     id: "assignments",
@@ -144,6 +145,13 @@ export function internPortalNavActive(
   if (item.match === "none") return false;
   if (item.match === "exact") {
     return pathname === "/intern" || pathname === "/intern/";
+  }
+  if (item.match === "content") {
+    return (
+      pathname === "/intern/content" ||
+      (pathname.startsWith("/intern/content/") &&
+        !pathname.startsWith("/intern/content/reads"))
+    );
   }
   if (item.match === "growth") {
     return pathname === INTERNSHIP_GROWTH_PATH || pathname.startsWith(`${INTERNSHIP_GROWTH_PATH}/`);

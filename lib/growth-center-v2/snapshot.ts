@@ -48,6 +48,52 @@ async function safeRows<T>(
   }
 }
 
+/** Soft-fail Reads signals so Growth Insights stay online if reads_* tables lag. */
+async function loadReadsGrowthSignals(startIso: string, endIso: string) {
+  const [events, queue, partners] = await Promise.all([
+    safeRows<{ event_name?: string }>(
+      supabaseAdmin
+        .from("reads_analytics_events")
+        .select("event_name")
+        .gte("created_at", startIso)
+        .lt("created_at", endIso)
+        .limit(5000),
+      "reads_analytics_events",
+    ),
+    safeRows<{ id?: string }>(
+      supabaseAdmin
+        .from("reads_content")
+        .select("id")
+        .in("status", ["submitted", "changes_requested"])
+        .limit(500),
+      "reads_content_queue",
+    ),
+    safeRows<{ id?: string }>(
+      supabaseAdmin
+        .from("reads_partners")
+        .select("id")
+        .in("status", ["new", "reviewing", "qualified"])
+        .limit(500),
+      "reads_partners",
+    ),
+  ]);
+
+  let pageViews = 0;
+  let videoPlays = 0;
+  for (const row of events) {
+    const name = text(row.event_name);
+    if (name === "page_view") pageViews += 1;
+    if (name === "video_play") videoPlays += 1;
+  }
+
+  return {
+    pageViews,
+    videoPlays,
+    needsReview: queue.length,
+    partnerLeads: partners.length,
+  };
+}
+
 function isVisitEvent(type: string) {
   const t = type.toLowerCase();
   return t === "click" || t === "page_view" || t === "visit" || t === "qr_scan";
@@ -607,6 +653,9 @@ export async function loadGrowthCenterSnapshot(input: {
   };
 
   const goals = await loadGoals(filters, actuals);
+
+  const readsSignals = await loadReadsGrowthSignals(filters.startIso, filters.endIso);
+
   const insights = buildGrowthInsights({
     audience,
     filters,
@@ -614,6 +663,7 @@ export async function loadGrowthCenterSnapshot(input: {
     funnel,
     campaigns,
     contentPending: pendingReview,
+    reads: readsSignals,
   });
 
   const communityCount = communitySubs.length;

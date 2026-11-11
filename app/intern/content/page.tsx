@@ -35,6 +35,12 @@ export default async function InternContentPage({
         <p className="mt-1 text-sm font-semibold text-slate-600">
           Save a draft, attach an approved Brand Kit file, then submit it to {intern.dayToDayManagerName || "your manager"}.
         </p>
+        <Link
+          href="/intern/content/reads"
+          className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-950"
+        >
+          Open Reads &amp; Media Studio
+        </Link>
       </header>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}

@@ -26,8 +26,15 @@ podcasts, YouTube videos, authors/experts, Team Picks, and partnerships.
 | Manager (Ava) | `/manager/reads` | Review, request changes, approve, schedule, publish, partnerships, analytics |
 | Admin / Super Admin | `/admin/growth/reads` | Full oversight, escalations, taxonomy, archive with audit |
 
-Content Studio entry points also link from `/admin/sales-marketing` and
-`/admin/sales-marketing/content`.
+Entry points (preserve existing Content Studio architecture):
+
+- Manager sidebar **Reads & Media** → `/manager/reads`
+- Manager Content Studio board tile → `/manager/reads`
+- Intern sidebar **Reads & Media** → `/intern/content/reads`
+- Intern Create Content header link → `/intern/content/reads`
+- Admin Sales & Marketing / Content Studio links → `/admin/growth/reads`
+- Growth Center Insights can surface Reads queue / engagement / partner leads
+  from `reads_*` tables (soft-fail if empty)
 
 ## Roles (HQ)
 
