@@ -301,14 +301,7 @@ export async function loadSharedStaffDirectory(input: {
     const row = profileById.get(seat.id);
     push({
       id: seat.id,
-      firstName:
-        seat.firstName ||
-        chatDisplayName({
-          firstName: text(row?.first_name),
-          lastName: text(row?.last_name),
-          fullName: text(row?.full_name),
-          email: seat.email,
-        }),
+      firstName: seat.firstName,
       avatarUrl:
         profileAvatar(row || { email: seat.email, id: seat.id }, ambassadorById.get(seat.id)) ||
         seat.avatarUrl,
