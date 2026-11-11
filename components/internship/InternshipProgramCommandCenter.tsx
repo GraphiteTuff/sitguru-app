@@ -10,6 +10,7 @@ import {
   type RosterAccountHint,
   type RosterInternRecord,
 } from "@/lib/internship/team-roster";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import SpringInternTable, { type InternTableRow } from "@/components/admin/hr/SpringInternTable";
 import type { InternshipApprovalCard } from "@/components/internship/InternshipApprovalControls";
 import {
@@ -266,9 +267,14 @@ export default async function InternshipProgramCommandCenter({
           }),
         }
       : null;
+    const managerName =
+      [intern?.dayToDayManagerName || intern?.managerName, intern?.siteSupervisorName || intern?.supervisorName]
+        .filter(Boolean)
+        .join(" and ") || "Ava Venezia";
     return {
       key: person.key,
       name: person.fullName,
+      avatarUrl: intern?.avatarUrl || "",
       roleTitle: "Social Media & Community Growth Intern",
       academicProgram: plan?.academicProgram || intern?.academicProgram || "Program pending",
       university: person.universityLabel,
@@ -282,10 +288,10 @@ export default async function InternshipProgramCommandCenter({
       approval,
       microsoft: person.recordId ? microsoftLabel(text(raw?.microsoft_readiness)) : "Not created",
       onboarding: onboardingStageLabel(stage),
-      managerName:
-        [intern?.dayToDayManagerName || intern?.managerName, intern?.siteSupervisorName || intern?.supervisorName]
-          .filter(Boolean)
-          .join(" and ") || "Ava Venezia",
+      managerName,
+      managerAvatarUrl: /ava/i.test(managerName)
+        ? staffAvatarFallback({ email: "ava@sitguru.com" })
+        : "",
       recordId: person.recordId,
       canCreate: person.canCreatePendingRecord,
     };

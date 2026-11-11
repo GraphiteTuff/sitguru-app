@@ -35,7 +35,7 @@ const MANAGER_AUDIENCES = [
   { id: "admin", label: "Admins" },
 ] as const;
 
-const INTERN_AUDIENCES = [{ id: "staff", label: "Staff" }] as const;
+const INTERN_AUDIENCES = MANAGER_AUDIENCES;
 
 function Face({
   name,

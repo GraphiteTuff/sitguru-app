@@ -9,7 +9,16 @@ import {
   sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
-import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
+import {
+  AVA_STAFF_EMAIL,
+  AVA_STAFF_USER_ID,
+  DANETTE_STAFF_EMAIL,
+  DANETTE_STAFF_USER_ID,
+  JASON_STAFF_EMAIL,
+  JASON_STAFF_USER_ID,
+  KNOWN_STAFF_CHAT_SEATS,
+  staffAvatarFallback,
+} from "@/lib/messaging/staff-avatars";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -83,7 +92,7 @@ async function loadProfileMap(ids: string[]) {
   const { data } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
+      "id,email,first_name,full_name,last_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
     )
     .in("id", unique);
   return new Map(((data || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]));
@@ -107,8 +116,11 @@ async function loadAmbassadorPhotos(ids: string[]) {
 export async function loadSharedStaffDirectory(input: {
   actorUserId: string;
   query?: string;
+  /** People → Staff should be managers/admins only. Interns use the Interns tab. */
+  includeInterns?: boolean;
 }) {
   const query = text(input.query).toLowerCase();
+  const includeInterns = input.includeInterns !== false;
   const people: StaffDirectoryPerson[] = [];
   const seen = new Set<string>();
 
@@ -140,6 +152,11 @@ export async function loadSharedStaffDirectory(input: {
     else seatById.set(id, "manager");
   };
 
+  // Hard-include HQ supers + Ava so Staff never depends only on join coverage.
+  markSeat(JASON_STAFF_USER_ID, "admin");
+  markSeat(DANETTE_STAFF_USER_ID, "admin");
+  markSeat(AVA_STAFF_USER_ID, "manager");
+
   const [{ data: accessRows }, { data: roleRows }, { data: eligibilityRows }, { data: adminProfiles }] =
     await Promise.all([
       supabaseAdmin
@@ -168,10 +185,10 @@ export async function loadSharedStaffDirectory(input: {
       supabaseAdmin
         .from("profiles")
         .select(
-          "id,email,first_name,full_name,display_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
+          "id,email,first_name,full_name,last_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
         )
         .or(
-          "role.ilike.%admin%,role.ilike.%founder%,role.ilike.%owner%,role.ilike.%super%,signup_role.ilike.%social_community%,signup_role.ilike.%growth%,account_type.ilike.%social_community%,account_type.ilike.%growth%,email.eq.ava@sitguru.com,email.ilike.%@sitguru.com",
+          `role.ilike.%admin%,role.ilike.%founder%,role.ilike.%owner%,role.ilike.%super%,signup_role.ilike.%social_community%,signup_role.ilike.%growth%,account_type.ilike.%social_community%,account_type.ilike.%growth%,email.eq.${AVA_STAFF_EMAIL},email.eq.${JASON_STAFF_EMAIL},email.eq.${DANETTE_STAFF_EMAIL},email.ilike.%@sitguru.com`,
         )
         .limit(80),
     ]);
@@ -260,49 +277,76 @@ export async function loadSharedStaffDirectory(input: {
       isHardcodedSuperUserEmail(email);
     const managerSeat =
       forced === "manager" ||
-      isGrowthManagerSeat({ email, role, accountType, signupRole });
+      isGrowthManagerSeat({ email, role, accountType, signupRole }) ||
+      email.toLowerCase() === AVA_STAFF_EMAIL ||
+      id === AVA_STAFF_USER_ID;
     if (!adminSeat && !managerSeat) continue;
+    const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === id);
     push({
       id,
-      firstName: firstName(text(row.first_name) || text(row.display_name) || text(row.full_name) || email),
+      firstName: firstName(
+        known?.firstName ||
+          text(row.first_name) ||
+          text(row.full_name) ||
+          email,
+      ),
       avatarUrl: profileAvatar(row, ambassadorById.get(id)),
       detail: adminSeat ? "Admin" : "Manager",
       canChat: true,
     });
   }
 
-  const interns = await listInterns();
-  for (const row of interns) {
-    if (excludeFromInternPortalList({ email: row.email, isTest: Boolean(row.isTest) })) continue;
-    if (
-      hideFromInternDirectory({
-        email: row.email,
-        userId: row.userId || undefined,
-        actorUserId: input.actorUserId,
-      })
-    ) {
-      continue;
-    }
-    if (
-      isTestDirectoryPerson({
-        firstName: row.preferredName || row.fullName,
-        fullName: row.fullName,
-        email: row.email,
-      })
-    ) {
-      continue;
-    }
-    const status = text(row.status).toLowerCase();
-    if (!["accepted", "active", "approved"].includes(status)) continue;
-
-    const chatId = text(row.userId);
+  // Guarantee Jason, Danette, Ava even when profile/access joins miss a row.
+  for (const seat of KNOWN_STAFF_CHAT_SEATS) {
+    if (seen.has(seat.id) || seat.id === input.actorUserId) continue;
+    const row = profileById.get(seat.id);
     push({
-      id: chatId || `pending:${row.id}`,
-      firstName: firstName(row.preferredName || row.fullName),
-      avatarUrl: row.avatarUrl || "",
-      detail: chatId ? "Intern" : "Intern · Invite pending",
-      canChat: Boolean(chatId),
+      id: seat.id,
+      firstName: firstName(
+        seat.firstName || text(row?.first_name) || text(row?.full_name),
+      ),
+      avatarUrl:
+        profileAvatar(row || { email: seat.email, id: seat.id }, ambassadorById.get(seat.id)) ||
+        seat.avatarUrl,
+      detail: seat.detail,
+      canChat: true,
     });
+  }
+
+  if (includeInterns) {
+    const interns = await listInterns();
+    for (const row of interns) {
+      if (excludeFromInternPortalList({ email: row.email, isTest: Boolean(row.isTest) })) continue;
+      if (
+        hideFromInternDirectory({
+          email: row.email,
+          userId: row.userId || undefined,
+          actorUserId: input.actorUserId,
+        })
+      ) {
+        continue;
+      }
+      if (
+        isTestDirectoryPerson({
+          firstName: row.preferredName || row.fullName,
+          fullName: row.fullName,
+          email: row.email,
+        })
+      ) {
+        continue;
+      }
+      const status = text(row.status).toLowerCase();
+      if (!["accepted", "active", "approved"].includes(status)) continue;
+
+      const chatId = text(row.userId);
+      push({
+        id: chatId || `pending:${row.id}`,
+        firstName: firstName(row.preferredName || row.fullName),
+        avatarUrl: row.avatarUrl || "",
+        detail: chatId ? "Intern" : "Intern · Invite pending",
+        canChat: Boolean(chatId),
+      });
+    }
   }
 
   const onlineIds = people.filter((person) => person.canChat).map((person) => person.id);

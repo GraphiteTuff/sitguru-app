@@ -7,10 +7,12 @@ import {
   InternshipApprovalMenu,
   type InternshipApprovalCard,
 } from "@/components/internship/InternshipApprovalControls";
+import PersonFace from "@/components/portal/PersonFace";
 
 export type InternTableRow = {
   key: string;
   name: string;
+  avatarUrl?: string;
   roleTitle: string;
   university: string;
   academicProgram: string;
@@ -22,21 +24,13 @@ export type InternTableRow = {
   onboarding: string;
   microsoft: string;
   managerName: string;
+  managerAvatarUrl?: string;
   recordId: string | null;
   canCreate: boolean;
   universityStatus?: string;
   statusNote?: string;
   approval?: InternshipApprovalCard | null;
 };
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-}
 
 function toneClass(tone: InternTableRow["statusTone"]) {
   if (tone === "emerald") return "bg-emerald-50 text-emerald-800";
@@ -122,9 +116,7 @@ export default function SpringInternTable({
               <tr key={row.key} className="border-t border-slate-100">
                 <td className="py-3 pr-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
-                      {initials(row.name)}
-                    </span>
+                    <PersonFace name={row.name} src={row.avatarUrl} size="md" />
                     <span>
                       <span className="block text-sm font-black text-slate-950">{row.name}</span>
                       <span className="block text-xs font-semibold text-slate-500">{row.roleTitle}</span>
@@ -153,9 +145,11 @@ export default function SpringInternTable({
                 <td className="py-3 pr-3 text-sm font-semibold text-slate-600">{row.microsoft}</td>
                 <td className="py-3 pr-3">
                   <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-black text-[#0D5C3A]">
-                      {initials(row.managerName || "Manager")}
-                    </span>
+                    <PersonFace
+                      name={row.managerName || "Manager"}
+                      src={row.managerAvatarUrl}
+                      size="sm"
+                    />
                     {row.managerName || "Unassigned"}
                   </span>
                 </td>

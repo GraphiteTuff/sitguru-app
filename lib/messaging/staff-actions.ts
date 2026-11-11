@@ -7,7 +7,6 @@ import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
 import { rememberChat } from "@/lib/messaging/chat-archive";
-import { isStaffChatPeer } from "@/lib/messaging/chat-library";
 import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -90,21 +89,7 @@ export async function saveStaffMessage(input: {
   const recipientId = String(input.recipientId || "");
 
   if (recipientId && recipientId !== who.userId) {
-    if (who.role === "intern" && recipientId !== who.intern?.managerUserId) {
-      const { data: recipient } = await supabaseAdmin
-        .from("profiles")
-        .select("email,role,account_type")
-        .eq("id", recipientId)
-        .maybeSingle();
-      const allowed = isStaffChatPeer({
-        email: String(recipient?.email || ""),
-        role: String(recipient?.role || ""),
-        accountType: String(recipient?.account_type || ""),
-      });
-      if (!allowed) {
-        return { ok: false as const, error: "You can message SitGuru Admin or your manager from here." };
-      }
-    }
+    // Desk chat: Managers and Interns may click any listed person to SitGuru-chat.
     const { data: mine } = await supabaseAdmin.from("conversation_participants").select("conversation_id").eq("user_id", who.userId).limit(100);
     const mineIds = (mine || []).map((row) => String(row.conversation_id || "")).filter(Boolean);
     if (mineIds.length) {
