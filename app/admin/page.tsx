@@ -156,27 +156,7 @@ export default async function AdminOperationsDashboard() {
     day: "numeric",
   }).format(new Date());
 
-  const [
-    petParents,
-    gurus,
-    bookableGurus,
-    pendingGurus,
-    activeAmbassadors,
-    unreadMessages,
-    upcomingBookings,
-    recentBookings,
-    paymentOptionBookings,
-    promoCreditBookings,
-    tipBookings,
-    payoutsReview,
-    stripeIssues,
-    pawPerksConflicts,
-    totalReviews,
-    publishedReviews,
-    pendingReviewModeration,
-    marketDensity,
-    contractorCounts,
-  ] = await Promise.all([
+  const settled = await Promise.allSettled([
     safeCount("profiles", [
       { column: "role", operator: "eq", value: "customer" },
     ]),
@@ -243,6 +223,48 @@ export default async function AdminOperationsDashboard() {
     loadMarketDensity(),
     contractorAttentionCounts(),
   ]);
+
+  const emptyCount: CountResult = { value: null, available: false };
+  const valueAt = <T,>(index: number, fallback: T): T => {
+    const item = settled[index];
+    return item?.status === "fulfilled" ? (item.value as T) : fallback;
+  };
+
+  const petParents = valueAt(0, emptyCount);
+  const gurus = valueAt(1, emptyCount);
+  const bookableGurus = valueAt(2, emptyCount);
+  const pendingGurus = valueAt(3, emptyCount);
+  const activeAmbassadors = valueAt(4, emptyCount);
+  const unreadMessages = valueAt(5, emptyCount);
+  const upcomingBookings = valueAt(6, emptyCount);
+  const recentBookings = valueAt(7, emptyCount);
+  const paymentOptionBookings = valueAt(8, emptyCount);
+  const promoCreditBookings = valueAt(9, emptyCount);
+  const tipBookings = valueAt(10, emptyCount);
+  const payoutsReview = valueAt(11, emptyCount);
+  const stripeIssues = valueAt(12, emptyCount);
+  const pawPerksConflicts = valueAt(13, emptyCount);
+  const totalReviews = valueAt(14, emptyCount);
+  const publishedReviews = valueAt(15, emptyCount);
+  const pendingReviewModeration = valueAt(16, emptyCount);
+  const marketDensity = valueAt(17, {
+    markets: [],
+    summary: {
+      marketCount: 0,
+      launchReady: 0,
+      needsPetParents: 0,
+      needsGurus: 0,
+      noDensity: 0,
+      mappedCount: 0,
+    },
+    issues: ["Market density temporarily unavailable"],
+  } as Awaited<ReturnType<typeof loadMarketDensity>>);
+  const contractorCounts = valueAt(18, {
+    hoursAwaitingApproval: 0,
+    awaitingPayment: 0,
+    needsCorrection: 0,
+    available: false,
+  });
 
   const contractorHoursCount: CountResult = {
     value: contractorCounts.hoursAwaitingApproval,

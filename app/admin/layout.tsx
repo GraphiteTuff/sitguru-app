@@ -12,7 +12,6 @@ import {
   ChevronDown,
   CalendarDays,
   CreditCard,
-  FileBarChart,
   FileSpreadsheet,
   Gauge,
   GraduationCap,
@@ -28,7 +27,6 @@ import {
   Megaphone,
   MessageCircle,
   PawPrint,
-  PieChart,
   Plus,
   Radio,
   Search,
@@ -374,9 +372,12 @@ function SidebarSection({
   const hasActive = items.some((item) => isActivePath(pathname, item.href));
 
   if (collapsed) {
+    // Icon rail: keep only the first few destinations per group so the
+    // collapsed HQ shell stays light and does not mount every route icon.
+    const railItems = items.slice(0, 4);
     return (
       <div className="mb-2 space-y-1">
-        {items.map((item) => {
+        {railItems.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
           return (
