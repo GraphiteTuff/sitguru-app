@@ -43,10 +43,10 @@ export const WORKSPACES: Record<AppRole, SitGuruWorkspaceDefinition> = {
   },
   admin: {
     role: 'admin',
-    label: 'SitGuru Admin',
+    label: 'Super Admin HQ',
     description:
-      'Manage SitGuru operations, users, active care, payouts, support, safety, growth, and platform activity.',
-    switcherDescription: 'Operations, accounts, payouts, and platform tools',
+      'Authorized Super Admin queues: contractor hours, payables, approvals, Manager oversight, and operations.',
+    switcherDescription: 'HQ queues, contractor hours, and operations',
     dashboardPath: '/admin-operations',
   },
 };

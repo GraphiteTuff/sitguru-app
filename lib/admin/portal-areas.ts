@@ -50,6 +50,8 @@ const PORTAL_AREA_PREFIXES: Record<AdminNavModule, readonly string[]> = {
   ],
   operations: [
     "/admin/dashboard",
+    "/admin/action-center",
+    "/admin/managers",
     "/admin/bookings",
     "/admin/petparents",
     "/admin/gurus",
@@ -67,6 +69,8 @@ const PORTAL_AREA_PREFIXES: Record<AdminNavModule, readonly string[]> = {
   ],
   financials: [
     "/admin/financials",
+    "/admin/financials/contractor-hours",
+    "/admin/financials/contractor-payments",
     "/admin/commissions",
     "/admin/payouts",
     "/admin/tax",

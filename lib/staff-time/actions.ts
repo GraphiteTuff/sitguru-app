@@ -60,6 +60,11 @@ function refreshStaffPaths() {
   revalidatePath("/admin/hr/people");
   revalidatePath("/admin/hr/people/payments");
   revalidatePath("/admin/hr");
+  revalidatePath("/admin/financials/contractor-hours");
+  revalidatePath("/admin/financials/contractor-payments");
+  revalidatePath("/admin/action-center");
+  revalidatePath("/admin/managers");
+  revalidatePath("/admin");
 }
 
 async function requireActor() {

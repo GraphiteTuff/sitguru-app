@@ -21,15 +21,20 @@ export type QueueItem = {
 export default function AdminPaymentQueue({
   items,
   notice,
+  mode = "all",
 }: {
   items: QueueItem[];
   notice?: { kind: "ok" | "error"; message: string } | null;
+  /** hours = approvals only; payments = ACH recording only; all = both */
+  mode?: "all" | "hours" | "payments";
 }) {
   const ready = items.filter((item) =>
     ["approved", "ready_for_payment", "processing"].includes(item.period.status),
   );
   const submitted = items.filter((item) => item.period.status === "submitted");
   const corrections = items.filter((item) => item.period.status === "needs_correction");
+  const showHours = mode === "all" || mode === "hours";
+  const showPayments = mode === "all" || mode === "payments";
 
   return (
     <div className="space-y-4">
@@ -45,8 +50,9 @@ export default function AdminPaymentQueue({
         </p>
       ) : null}
 
+      {showHours ? (
       <GrowthCard>
-        <h2 className="text-lg font-black text-slate-950">Time Approvals</h2>
+        <h2 className="text-lg font-black text-slate-950">Contractor Hours Approvals</h2>
         <p className="mt-1 text-sm font-semibold text-slate-600">
           Submitted payment periods awaiting founder review.
         </p>
@@ -106,12 +112,14 @@ export default function AdminPaymentQueue({
           ) : null}
         </div>
       </GrowthCard>
+      ) : null}
 
+      {showPayments ? (
       <GrowthCard>
-        <h2 className="text-lg font-black text-slate-950">Ready for Payment</h2>
+        <h2 className="text-lg font-black text-slate-950">Contractor Payments</h2>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          SitGuru calculates the amount. Record Business ACH after Graff Enterprises / SitGuru
-          bank payment — SitGuru does not send money.
+          SitGuru calculates the amount. Record Business ACH after Navy Federal / SitGuru
+          bank payment is confirmed — approving hours does not send money.
         </p>
         <div className="mt-4 space-y-4">
           {ready.map((item) => (
@@ -198,8 +206,9 @@ export default function AdminPaymentQueue({
           ) : null}
         </div>
       </GrowthCard>
+      ) : null}
 
-      {corrections.length ? (
+      {showHours && corrections.length ? (
         <GrowthCard>
           <h2 className="text-lg font-black text-slate-950">Needs Correction</h2>
           <ul className="mt-3 space-y-2 text-sm font-semibold text-slate-700">

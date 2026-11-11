@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMarketDensity } from "@/lib/admin/load-market-density";
 import MarketGrowthBoard from "@/components/admin/MarketGrowthBoard";
 import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
+import { contractorAttentionCounts } from "@/lib/staff-time/attention-counts";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,7 @@ export default async function AdminOperationsDashboard() {
     publishedReviews,
     pendingReviewModeration,
     marketDensity,
+    contractorCounts,
   ] = await Promise.all([
     safeCount("profiles", [
       { column: "role", operator: "eq", value: "customer" },
@@ -239,9 +241,29 @@ export default async function AdminOperationsDashboard() {
       },
     ]),
     loadMarketDensity(),
+    contractorAttentionCounts(),
   ]);
 
+  const contractorHoursCount: CountResult = {
+    value: contractorCounts.hoursAwaitingApproval,
+    available: contractorCounts.available,
+  };
+  const contractorPayablesCount: CountResult = {
+    value: contractorCounts.awaitingPayment,
+    available: contractorCounts.available,
+  };
+
   const attentionItems = [
+    {
+      label: "Contractor Hours Awaiting Approval",
+      value: contractorHoursCount,
+      href: "/admin/financials/contractor-hours",
+    },
+    {
+      label: "Contractor Payables",
+      value: contractorPayablesCount,
+      href: "/admin/financials/contractor-payments",
+    },
     {
       label: "Pending Gurus",
       value: pendingGurus,
@@ -466,6 +488,8 @@ export default async function AdminOperationsDashboard() {
       title: "Money",
       links: [
         ["Financials", "/admin/financials"],
+        ["Contractor Hours", "/admin/financials/contractor-hours"],
+        ["Contractor Payments", "/admin/financials/contractor-payments"],
         ["Payouts", "/admin/payouts"],
         ["Team Member Payments", "/admin/hr/people/payments"],
         ["Payment Gateway", "/admin/financials/payment-gateway"],
@@ -491,19 +515,96 @@ export default async function AdminOperationsDashboard() {
 
   return (
     <GrowthPageFrame
-      kicker={`Admin HQ Workplace · ${todayLabel}`}
+      kicker={`Super Admin HQ · ${todayLabel}`}
       title="Clear queues, then grow where the pack is dense."
-      detail="Daily workbench for people, bookings, messages, payouts, Trust & Safety, and market density."
+      detail="Contractor hours, approvals, people, bookings, messages, payouts, and market density — Manager Portal quality density at 100% zoom."
       action={
-        <Link
-          href="/admin/guru-approvals"
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
-        >
-          Guru Approvals
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/action-center"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-black text-green-950"
+          >
+            Action Center
+          </Link>
+          <Link
+            href="/admin/financials/contractor-hours"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/50 px-4 text-sm font-black !text-white"
+          >
+            Contractor Hours
+          </Link>
+        </div>
       }
     >
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <MetricCardView
+          card={{
+            label: "Hours Awaiting Approval",
+            value: formatCount(contractorHoursCount, "—"),
+            helper: "Manager service logs",
+            href: "/admin/financials/contractor-hours",
+            tone: "amber",
+          }}
+        />
+        <MetricCardView
+          card={{
+            label: "Contractor Payables",
+            value: formatCount(contractorPayablesCount, "—"),
+            helper: "Record ACH after bank pay",
+            href: "/admin/financials/contractor-payments",
+            tone: "sky",
+          }}
+        />
+        <MetricCardView
+          card={{
+            label: "Pending Gurus",
+            value: formatCount(pendingGurus, "—"),
+            helper: "Approvals queue",
+            href: "/admin/guru-approvals",
+            tone: "rose",
+          }}
+        />
+        <MetricCardView
+          card={{
+            label: "Unread Messages",
+            value: formatCount(unreadMessages, "—"),
+            helper: "Support & ops",
+            href: "/admin/messages",
+            tone: "violet",
+          }}
+        />
+        <MetricCardView
+          card={{
+            label: "Needs Attention",
+            value: needsAttentionCount.toLocaleString(),
+            helper: "Open Action Center",
+            href: "/admin/action-center",
+            tone: "rose",
+          }}
+        />
+        <MetricCardView
+          card={{
+            label: "Bookable Gurus",
+            value: formatCount(bookableGurus, "—"),
+            helper: "Live marketplace supply",
+            href: "/admin/gurus",
+            tone: "emerald",
+          }}
+        />
+      </div>
+
       <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/managers"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Manager Oversight
+        </Link>
+        <Link
+          href="/manager"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Manager Portal
+        </Link>
         <Link
           href="/admin/messages"
           className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
@@ -522,18 +623,6 @@ export default async function AdminOperationsDashboard() {
         >
           Market Growth Map
         </Link>
-        <Link
-          href="/admin/petparents"
-          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
-        >
-          Pet Parents
-        </Link>
-        <span className="rounded-full border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800">
-          {needsAttentionCount.toLocaleString()} need attention
-        </span>
-        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
-          {formatCount(bookableGurus, "—")} bookable Gurus
-        </span>
       </div>
 
         {attentionItems.length > 0 ? (

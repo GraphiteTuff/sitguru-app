@@ -48,6 +48,7 @@ const ICONS = {
   "Market Density": BarChart3,
   "Manager's Desk": LayoutDashboard,
   "My Time": Clock3,
+  "My Weekly Hours": Clock3,
   "My Payments": CreditCard,
   "My Team": Users,
   "Intern Team": Users,

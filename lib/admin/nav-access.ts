@@ -19,9 +19,16 @@ export const NAV_SECTION_MODULE: Record<string, AdminNavModule> = {
   "Social Media Manager": "social_media",
   "Growth Portal": "social_media",
   Operations: "operations",
+  "Overview & Work": "operations",
+  "People & Access": "operations",
+  "Marketplace & Care": "operations",
+  "Trust & Security": "operations",
   "Growth & Marketing": "growth_marketing",
+  "Community & Growth": "growth_marketing",
   Financials: "financials",
+  Finance: "financials",
   "Analytics & Admin": "analytics_admin",
+  "Platform & Settings": "analytics_admin",
 };
 
 const ALL_ON = Object.fromEntries(

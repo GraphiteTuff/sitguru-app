@@ -117,7 +117,9 @@ export default async function AdminPeoplePage({
                 New hourly rate
                 <input
                   name="hourlyRateDollars"
-                  defaultValue={rate ? (rate.hourlyRateCents / 100).toFixed(2) : "16.75"}
+                  defaultValue={rate ? (rate.hourlyRateCents / 100).toFixed(2) : ""}
+                  placeholder="Agreement rate"
+                  required
                   className="min-h-11 rounded-2xl border border-emerald-100 px-3 text-sm font-semibold text-slate-900"
                 />
               </label>

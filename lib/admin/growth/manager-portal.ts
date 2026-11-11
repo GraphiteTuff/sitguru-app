@@ -39,7 +39,7 @@ export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.growth, label: "Growth Home", match: "growth-home" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.campusGrowth, label: "Campus Growth", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.marketDensity, label: "Market Density", match: "prefix" as const, group: "My Manager Portal" },
-  { href: MANAGER_ROUTES.myTime, label: "My Time", match: "prefix" as const, group: "My Manager Portal" },
+  { href: MANAGER_ROUTES.myTime, label: "My Weekly Hours", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.payments, label: "My Payments", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.messages, label: "Messaging", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.results, label: "Live Results", match: "prefix" as const, group: "My Manager Portal" },

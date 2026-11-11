@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
   ClipboardCheck,
@@ -41,6 +41,12 @@ import {
   Images,
   FolderOpen,
   Lightbulb,
+  PanelLeftClose,
+  PanelLeft,
+  Inbox,
+  Clock3,
+  AlertTriangle,
+  Globe,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
@@ -53,6 +59,56 @@ import {
   type AdminNavAccess,
 } from "@/lib/admin/nav-access";
 import { isAdminPathAllowedForModules } from "@/lib/admin/portal-areas";
+import {
+  HQ_HEADER_LINKS,
+  HQ_NAV_SECTIONS,
+  isActiveAdminPath,
+  type HqNavIcon,
+} from "@/lib/admin/hq-nav";
+
+const HQ_ICON_MAP: Record<
+  HqNavIcon,
+  ComponentType<{ size?: number; className?: string }>
+> = {
+  home: Home,
+  inbox: Inbox,
+  clipboard: ClipboardCheck,
+  messages: MessageCircle,
+  audit: ClipboardList,
+  radio: Radio,
+  users: Users,
+  paw: PawPrint,
+  userPlus: UserPlus,
+  heart: HeartHandshake,
+  briefcase: BriefcaseBusiness,
+  grad: GraduationCap,
+  shield: ShieldCheck,
+  lifeBuoy: LifeBuoy,
+  calendar: CalendarDays,
+  reviews: ClipboardList,
+  disputes: AlertTriangle,
+  payments: CreditCard,
+  payouts: WalletCards,
+  megaphone: Megaphone,
+  link: Link2,
+  programs: ShieldCheck,
+  partners: HandCoins,
+  map: MapPin,
+  mail: Mail,
+  gauge: Gauge,
+  insights: Lightbulb,
+  finance: LineChart,
+  bank: Landmark,
+  card: CreditCard,
+  chart: BarChart3,
+  sheet: FileSpreadsheet,
+  wallet: WalletCards,
+  clock: Clock3,
+  settings: Settings,
+  website: Globe,
+  fraud: AlertTriangle,
+  security: ShieldCheck,
+};
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -148,168 +204,16 @@ const growthHeaderLinks = [
   { label: "Onboarding", href: "/admin/growth/onboarding" },
 ];
 
-const navSections = [
-  {
-    title: "Operations",
-    items: [
-      { label: "Dashboard", href: adminRoutes.dashboard, icon: Home },
-      { label: "Live Walks", href: adminRoutes.liveWalks, icon: Radio },
-      { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
-      { label: "Pet Parents", href: adminRoutes.petParents, icon: Users },
-      { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
-      { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
-      {
-        label: "Performance Ledger",
-        href: adminRoutes.ambassadorLedger,
-        icon: LineChart,
-      },
-      { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
-      {
-        label: "Internship Program",
-        href: adminRoutes.internship,
-        icon: BriefcaseBusiness,
-      },
-      {
-        label: "SitGuru University",
-        href: adminRoutes.universityTraining,
-        icon: GraduationCap,
-      },
-      {
-        label: "Academy Progress",
-        href: adminRoutes.universityProgress,
-        icon: ClipboardCheck,
-      },
-      {
-        label: "Trust & Safety",
-        href: adminRoutes.trustSafety,
-        icon: ShieldCheck,
-      },
-      { label: "Support", href: adminRoutes.support, icon: LifeBuoy },
-      { label: "Messages", href: adminRoutes.messages, icon: MessageCircle },
-    ],
-  },
-  {
-    title: "Growth & Marketing",
-    items: [
-      {
-        label: "Sales & Marketing",
-        href: adminRoutes.salesMarketing,
-        icon: Megaphone,
-      },
-      {
-        label: "Market Growth Map",
-        href: adminRoutes.marketGrowth,
-        icon: MapPin,
-      },
-      {
-        label: "Email Updates",
-        href: adminRoutes.emailUpdates,
-        icon: Mail,
-      },
-      {
-        label: "Growth & Referrals",
-        href: adminRoutes.referrals,
-        icon: Link2,
-      },
-      { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
-      { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
-      {
-        label: "Pet Events",
-        href: adminRoutes.communityEvents,
-        icon: CalendarDays,
-      },
-      {
-        label: "Pet Event Markets",
-        href: adminRoutes.communityMarkets,
-        icon: MapPin,
-      },
-      { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
-      {
-        label: "Insights",
-        href: adminRoutes.insights,
-        icon: MessageCircle,
-      },
-    ],
-  },
-  {
-    title: "Financials",
-    items: [
-      {
-        label: "Financial Overview",
-        href: adminRoutes.financials,
-        icon: LineChart,
-      },
-      { label: "Banking", href: adminRoutes.banking, icon: Landmark },
-      {
-        label: "Payment Gateway",
-        href: adminRoutes.paymentGateway,
-        icon: CreditCard,
-      },
-      {
-        label: "Profit & Loss",
-        href: adminRoutes.profitLoss,
-        icon: FileBarChart,
-      },
-      {
-        label: "Balance Sheet",
-        href: adminRoutes.balanceSheet,
-        icon: FileSpreadsheet,
-      },
-      { label: "Cash Flow", href: adminRoutes.cashFlow, icon: CreditCard },
-      {
-        label: "General Ledger",
-        href: adminRoutes.generalLedger,
-        icon: ClipboardList,
-      },
-      {
-        label: "Reconciliation",
-        href: adminRoutes.reconciliation,
-        icon: ShieldCheck,
-      },
-      { label: "Pro Forma", href: adminRoutes.proForma, icon: PieChart },
-      {
-        label: "Tax Center",
-        href: adminRoutes.taxReports,
-        icon: FileSpreadsheet,
-      },
-      { label: "Commissions", href: adminRoutes.commissions, icon: HandCoins },
-      { label: "Payouts", href: adminRoutes.payouts, icon: WalletCards },
-    ],
-  },
-  {
-    title: "Analytics & Admin",
-    items: [
-      {
-        label: "Reports & Exports",
-        href: adminRoutes.exports,
-        icon: BarChart3,
-      },
-      {
-        label: "Audit Trail",
-        href: adminRoutes.auditTrail,
-        icon: ClipboardList,
-      },
-      { label: "Settings", href: adminRoutes.settings, icon: Settings },
-    ],
-  },
-];
+const navSections = HQ_NAV_SECTIONS.map((section) => ({
+  title: section.title,
+  items: section.items.map((item) => ({
+    label: item.label,
+    href: item.href,
+    icon: HQ_ICON_MAP[item.icon] || Home,
+  })),
+}));
 
-const topHeaderLinks = [
-  { label: "Homepage", href: "/" },
-  { label: "Dashboard", href: adminRoutes.dashboard },
-  { label: "Live Walks", href: adminRoutes.liveWalks },
-  { label: "Bookings", href: adminRoutes.bookings },
-  { label: "Pet Parents", href: adminRoutes.petParents },
-  { label: "Gurus", href: adminRoutes.gurus },
-  { label: "Ambassadors", href: adminRoutes.ambassadors },
-  { label: "Human Resources", href: adminRoutes.hr },
-  { label: "Internship Program", href: adminRoutes.internship },
-  { label: "SitGuru University", href: adminRoutes.universityTraining },
-  { label: "Trust & Safety", href: adminRoutes.trustSafety },
-  { label: "Support", href: adminRoutes.support },
-  { label: "Messages", href: adminRoutes.messages },
-  { label: "Financials", href: adminRoutes.financials },
-];
+const topHeaderLinks = HQ_HEADER_LINKS;
 
 const mobileQuickLinks = [
   {
@@ -410,9 +314,7 @@ const mobileGrowthLinks = [
 ];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  if (href === "/admin") return pathname === "/admin";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return isActiveAdminPath(pathname, href);
 }
 
 function AdminLogo({ compact = false }: { compact?: boolean }) {
@@ -456,18 +358,46 @@ function SidebarSection({
   pathname,
   open,
   onToggle,
+  collapsed = false,
 }: {
   title: string;
   pathname: string;
   open: boolean;
   onToggle: () => void;
+  collapsed?: boolean;
   items: {
     label: string;
     href: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
+    icon: ComponentType<{ size?: number; className?: string }>;
   }[];
 }) {
   const hasActive = items.some((item) => isActivePath(pathname, item.href));
+
+  if (collapsed) {
+    return (
+      <div className="mb-2 space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = isActivePath(pathname, item.href);
+          return (
+            <Link
+              key={`${item.href}-${item.label}`}
+              href={item.href}
+              title={item.label}
+              aria-label={item.label}
+              className={
+                active
+                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-green-800 text-white shadow-sm"
+                  : "flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 ring-1 ring-[#edf2ec] transition hover:bg-white hover:text-green-800"
+              }
+            >
+              <Icon size={16} />
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="mb-1">
@@ -496,12 +426,12 @@ function SidebarSection({
 
             return (
               <Link
-                key={item.href}
+                key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={
                   active
-                    ? "group flex items-center gap-2 rounded-lg bg-green-800 px-2 py-1.5 text-[13px] font-black text-white shadow-sm transition hover:bg-green-900"
-                    : "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
+                    ? "group flex min-h-10 items-center gap-2 rounded-lg bg-green-800 px-2 py-1.5 text-[13px] font-black text-white shadow-sm transition hover:bg-green-900"
+                    : "group flex min-h-10 items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
                 }
               >
                 <span
@@ -514,7 +444,7 @@ function SidebarSection({
                   <Icon size={14} />
                 </span>
 
-                <span className="truncate">{item.label}</span>
+                <span className="min-w-0 truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -934,7 +864,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [workspace, setWorkspace] = useState<"full" | "growth">("full");
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [modules, setModules] = useState<AdminNavAccess | null>(null);
-  const [openSection, setOpenSection] = useState<string>("Operations");
+  const [openSection, setOpenSection] = useState<string>("Overview & Work");
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const onGrowthPortal = pathname.startsWith("/admin/growth");
   const isMessagesWorkspace = pathname.startsWith("/admin/messages");
   const isGrowthChrome =
@@ -987,10 +918,32 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("sitguru-admin-hq-nav-collapsed");
+      if (saved === "1") setNavCollapsed(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "sitguru-admin-hq-nav-collapsed",
+        navCollapsed ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [navCollapsed]);
+
+  useEffect(() => {
     const match = visibleNavSections.find((section) =>
       section.items.some((item) => isActivePath(pathname, item.href)),
     );
-    setOpenSection(match?.title ?? visibleNavSections[0]?.title ?? "Operations");
+    setOpenSection(
+      match?.title ?? visibleNavSections[0]?.title ?? "Overview & Work",
+    );
   }, [pathname, isGrowthChrome]);
 
   if (isAdminLoginPage) {
@@ -1000,16 +953,40 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <>
     <div className="min-h-dvh overflow-x-hidden bg-[#f7f8f4] text-slate-950">
-      <div className="grid min-h-dvh lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
+      <div
+        className={`grid min-h-dvh min-w-0 ${
+          navCollapsed && !isGrowthChrome
+            ? "lg:grid-cols-[72px_minmax(0,1fr)]"
+            : "lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[264px_minmax(0,1fr)]"
+        }`}
+      >
+        <aside className="hidden min-w-0 border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
           <div className="sticky top-0 flex h-dvh min-h-0 flex-col">
-            <div className="shrink-0 border-b border-[#e8eee5] px-3 py-2.5">
+            <div className="shrink-0 border-b border-[#e8eee5] px-2.5 py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <AdminLogo compact />
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
-                  {isGrowthChrome ? "Growth" : "Admin"}
-                </p>
+                {navCollapsed && !isGrowthChrome ? (
+                  <AdminLogo compact />
+                ) : (
+                  <AdminLogo compact />
+                )}
+                {!navCollapsed || isGrowthChrome ? (
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
+                    {isGrowthChrome ? "Growth" : "HQ"}
+                  </p>
+                ) : null}
               </div>
+              {!isGrowthChrome ? (
+                <button
+                  type="button"
+                  onClick={() => setNavCollapsed((value) => !value)}
+                  className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#e5ebe2] bg-white text-xs font-black text-green-900 transition hover:bg-green-50"
+                  aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+                  title={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+                >
+                  {navCollapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+                  {navCollapsed ? null : <span>Collapse</span>}
+                </button>
+              ) : null}
 
               {isGrowthChrome || (limitNav && !modules?.social_media) ? null : (
                 <Link
@@ -1032,16 +1009,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ) : null}
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 [scrollbar-width:thin] ${
+                navCollapsed && !isGrowthChrome ? "px-2" : "px-2.5"
+              }`}
+            >
               {visibleNavSections.map((section) => (
                 <SidebarSection
                   key={section.title}
                   title={section.title}
                   items={section.items}
                   pathname={pathname}
+                  collapsed={navCollapsed && !isGrowthChrome}
                   open={
                     visibleNavSections.length === 1 ||
-                    openSection === section.title
+                    openSection === section.title ||
+                    (navCollapsed && !isGrowthChrome)
                   }
                   onToggle={() =>
                     setOpenSection((current) =>

@@ -122,25 +122,45 @@ export default function AdminOperationsScreen() {
           </View>
 
           <View style={styles.hero}>
-            <Text style={styles.heroEyebrow}>Internal preview</Text>
-            <Text style={styles.title}>Admin Operations</Text>
+            <Text style={styles.heroEyebrow}>Super Admin HQ</Text>
+            <Text style={styles.title}>Authorized admin work</Text>
             <Text style={styles.subtitle}>
-              Monitor active care, booking requests, live walks, messages, payments, support, and
-              local growth from one operations view.
+              Open the same server-gated Super Admin queues used on sitguru.com. Native count
+              widgets stay empty until the mobile Bearer summary is fully wired — do not treat —
+              as live totals.
             </Text>
             <Text style={styles.notice}>
-              Live counts are not loaded. Values marked — are empty, not sample
-              operations data.
+              Deep links open the authenticated mobile web Admin HQ. Sign in on sitguru.com with
+              the same Super Admin account if the browser session is missing.
             </Text>
-            <BubblePressable
-              accessibilityRole="button"
-              onPress={() =>
-                Linking.openURL('https://www.sitguru.com/admin/financials/tax-reports')
-              }
-              style={styles.socialButton}
-            >
-              <Text style={styles.socialButtonText}>Tax Center</Text>
-            </BubblePressable>
+            <ActionRow
+              actions={[
+                {
+                  label: 'Action Center',
+                  url: 'https://www.sitguru.com/admin/action-center',
+                },
+                {
+                  label: 'Contractor Hours',
+                  url: 'https://www.sitguru.com/admin/financials/contractor-hours',
+                },
+                {
+                  label: 'Contractor Payments',
+                  url: 'https://www.sitguru.com/admin/financials/contractor-payments',
+                },
+                {
+                  label: 'Manager Oversight',
+                  url: 'https://www.sitguru.com/admin/managers',
+                },
+                {
+                  label: 'Manager Weekly Hours',
+                  url: 'https://www.sitguru.com/manager/my-time',
+                },
+                {
+                  label: 'Tax Center',
+                  url: 'https://www.sitguru.com/admin/financials/tax-reports',
+                },
+              ]}
+            />
           </View>
 
           <View style={styles.summaryGrid}>

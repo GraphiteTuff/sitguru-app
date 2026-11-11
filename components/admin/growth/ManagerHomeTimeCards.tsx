@@ -60,7 +60,7 @@ export default function ManagerHomeTimeCards({
               <div className="flex items-center gap-2 text-emerald-800">
                 <Clock3 size={16} />
                 <p className="text-[10px] font-black uppercase tracking-[0.14em]">
-                  My Time
+                  My Weekly Hours
                 </p>
               </div>
               <p className="mt-3 text-2xl font-black text-slate-950">{snap.weekLabel}</p>
@@ -73,9 +73,10 @@ export default function ManagerHomeTimeCards({
               </p>
               <Link
                 href={`${timeBase}/my-time`}
-                className="mt-3 inline-flex min-h-11 items-center text-sm font-black text-emerald-900"
+                className="mt-3 inline-flex min-h-11 items-center rounded-2xl px-3 text-sm font-black !text-white"
+                style={{ background: "#0D5C3A" }}
               >
-                Open My Time
+                Submit Weekly Hours
               </Link>
             </GrowthCard>
 
