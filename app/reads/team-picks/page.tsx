@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import TeamPickCard from "@/components/reads/TeamPickCard";
 import TrackPageView from "@/components/reads/TrackPageView";
+import { readsTeamFirstName } from "@/lib/reads/team";
 import { fetchTeamMembers, fetchTeamPicks } from "@/lib/reads/queries";
 import type { ReadsContentType } from "@/lib/reads/types";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Team Picks | SitGuru Reads & Listen",
   description:
-    "Database-driven recommendations from Jason, Danette, Ava, Ryan, and Lola.",
+    "Recommendations from Jason, Danette, Ava, Ryan, and Lola.",
   alternates: { canonical: "https://www.sitguru.com/reads/team-picks" },
 };
 
@@ -38,8 +39,8 @@ export default async function TeamPicksPage({ searchParams }: PageProps) {
         SitGuru Team Picks
       </h1>
       <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-        Recommendations from Jason Graff, Danette Graff, Ava Venezia, Ryan Manibo,
-        and Lola Uhl — stored in the database, not hard-coded in the page.
+        Recommendations from Jason, Danette, Ava, Ryan, and Lola — curated for
+        Pet Parents and Gurus.
       </p>
 
       <form className="mt-6 flex flex-wrap gap-2">
@@ -52,7 +53,7 @@ export default async function TeamPicksPage({ searchParams }: PageProps) {
           <option value="">All team members</option>
           {members.map((member) => (
             <option key={member.id} value={member.slug}>
-              {member.full_name}
+              {readsTeamFirstName(member.full_name)}
             </option>
           ))}
         </select>
@@ -78,7 +79,7 @@ export default async function TeamPicksPage({ searchParams }: PageProps) {
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {picks.map((pick) => (
-          <TeamPickCard key={pick.id} pick={pick} />
+          <TeamPickCard key={pick.id} pick={pick} facing />
         ))}
       </div>
     </div>

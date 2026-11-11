@@ -260,8 +260,8 @@ export default function ReadsStaffDashboard({
       <ActionFeedback state={feedback} />
 
       {(tab === "overview" || !tab || tab === "My Assignments") && (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">Quick actions</h2>
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">Quick actions</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <form
               className="space-y-3 rounded-2xl border border-slate-100 p-4"
@@ -270,7 +270,7 @@ export default function ReadsStaffDashboard({
                 void createDraft(new FormData(e.currentTarget));
               }}
             >
-              <p className="text-sm font-black text-[#0D5C3A]">Create draft</p>
+              <p className="text-sm font-black text-[#2563EB]">Create draft</p>
               <input
                 name="title"
                 required
@@ -296,7 +296,7 @@ export default function ReadsStaffDashboard({
               />
               <button
                 type="submit"
-                className="rounded-full bg-[#0D5C3A] px-4 py-2 text-sm font-black text-white"
+                className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-black text-white"
               >
                 Save draft
               </button>
@@ -309,7 +309,7 @@ export default function ReadsStaffDashboard({
                 void importYoutube(new FormData(e.currentTarget));
               }}
             >
-              <p className="text-sm font-black text-[#0D5C3A]">
+              <p className="text-sm font-black text-[#2563EB]">
                 Import YouTube (manual URL / ID)
               </p>
               <input
@@ -325,7 +325,7 @@ export default function ReadsStaffDashboard({
               />
               <button
                 type="submit"
-                className="rounded-full bg-[#E86A17] px-4 py-2 text-sm font-black text-white"
+                className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-black text-white"
               >
                 Import for review
               </button>
@@ -335,8 +335,8 @@ export default function ReadsStaffDashboard({
       )}
 
       {tab === "team-picks" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">Team Picks</h2>
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">Team Picks</h2>
           <form
             className="mt-4 grid gap-3 md:grid-cols-2"
             onSubmit={(e) => {
@@ -394,7 +394,7 @@ export default function ReadsStaffDashboard({
             />
             <button
               type="submit"
-              className="rounded-full bg-[#0D5C3A] px-4 py-2 text-sm font-black text-white"
+              className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-black text-white"
             >
               Save team pick
             </button>
@@ -403,8 +403,8 @@ export default function ReadsStaffDashboard({
       ) : null}
 
       {(tab === "partnerships" || tab === "escalations") && role !== "intern" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">
             {tab === "escalations" ? "Escalations" : "Partnership pipeline"}
           </h2>
           <div className="mt-4 space-y-3">
@@ -418,7 +418,7 @@ export default function ReadsStaffDashboard({
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-black text-[#163127]">{partner.name}</p>
+                    <p className="font-black text-[#0F2744]">{partner.name}</p>
                     <p className="text-sm font-semibold text-slate-600">
                       {partner.partner_type} · {partner.status}
                       {partner.organization ? ` · ${partner.organization}` : ""}
@@ -450,7 +450,7 @@ export default function ReadsStaffDashboard({
                           status: "active_partner",
                         })
                       }
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"
+                      className="rounded-full bg-[#2563EB] px-3 py-1.5 text-xs font-bold text-white"
                     >
                       Active partner
                     </button>
@@ -479,8 +479,8 @@ export default function ReadsStaffDashboard({
       ) : null}
 
       {tab === "analytics" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">Reads analytics</h2>
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">Reads analytics</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(analytics?.totals || {}).map(([name, count]) => (
               <div
@@ -490,7 +490,7 @@ export default function ReadsStaffDashboard({
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                   {name}
                 </p>
-                <p className="mt-2 text-2xl font-black text-[#163127]">
+                <p className="mt-2 text-2xl font-black text-[#0F2744]">
                   {count}
                 </p>
               </div>
@@ -506,8 +506,8 @@ export default function ReadsStaffDashboard({
       ) : null}
 
       {tab === "taxonomy" && role === "admin" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">Taxonomy</h2>
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">Taxonomy</h2>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {topics.map((topic) => (
               <li
@@ -523,8 +523,8 @@ export default function ReadsStaffDashboard({
       ) : null}
 
       {tab === "settings" && role === "admin" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">
             YouTube / integrations
           </h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
@@ -539,8 +539,8 @@ export default function ReadsStaffDashboard({
       {!["partnerships", "escalations", "analytics", "taxonomy", "settings", "team-picks"].includes(
         tab,
       ) || tab === "content" || tab === "submissions" || tab === "all" ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-[#163127]">
+        <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-[#0F2744]">
             {tab === "overview" ? "Recent content" : "Content queue"}
           </h2>
           <div className="mt-4 space-y-3">
@@ -551,10 +551,10 @@ export default function ReadsStaffDashboard({
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-orange-700">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                       {item.content_type} · {item.status.replaceAll("_", " ")}
                     </p>
-                    <p className="mt-1 text-lg font-black text-[#163127]">
+                    <p className="mt-1 text-lg font-black text-[#0F2744]">
                       {item.title}
                     </p>
                     <p className="mt-1 text-sm text-slate-600 line-clamp-2">
@@ -568,7 +568,7 @@ export default function ReadsStaffDashboard({
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void transition(item.id, "submitted")}
-                        className="rounded-full bg-[#0D5C3A] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                        className="rounded-full bg-[#2563EB] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                       >
                         Submit to Ava
                       </button>
@@ -607,7 +607,7 @@ export default function ReadsStaffDashboard({
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void transition(item.id, "published")}
-                        className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                        className="rounded-full bg-[#2563EB] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                       >
                         Publish
                       </button>
@@ -696,8 +696,8 @@ function Kpi({
     amber: "border-amber-200 bg-amber-50 text-amber-950",
     blue: "border-sky-200 bg-sky-50 text-sky-950",
     purple: "border-violet-200 bg-violet-50 text-violet-950",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    orange: "border-orange-200 bg-orange-50 text-orange-950",
+    emerald: "border-slate-200 bg-[#EFF6FF] text-[#0F2744]",
+    orange: "border-slate-200 bg-orange-50 text-orange-950",
   };
   return (
     <div className={`rounded-[1.25rem] border p-4 ${tones[tone]}`}>

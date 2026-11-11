@@ -36,7 +36,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
         eventName="topic_filter"
         metadata={{ topic: slug }}
       />
-      <h1 className="text-4xl font-black tracking-tight text-[#163127]">
+      <h1 className="text-4xl font-black tracking-tight text-[#0F2744]">
         {topic.name}
       </h1>
       <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600">

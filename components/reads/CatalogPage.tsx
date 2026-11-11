@@ -28,7 +28,7 @@ export default function CatalogPage({
       />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-700">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
             SitGuru Reads &amp; Listen
           </p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-[#163127]">
@@ -47,12 +47,12 @@ export default function CatalogPage({
             name="q"
             defaultValue={q}
             placeholder={`Search ${title.toLowerCase()}…`}
-            className="min-w-[220px] rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold"
+            className="min-w-[220px] rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
           />
           <select
             name="audience"
             defaultValue={audience}
-            className="rounded-full border border-emerald-200 bg-white px-3 py-2.5 text-sm font-semibold"
+            className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold"
             aria-label="Audience filter"
           >
             <option value="">All audiences</option>
@@ -75,7 +75,7 @@ export default function CatalogPage({
       </div>
 
       {!items.length ? (
-        <p className="mt-10 rounded-2xl border border-dashed border-emerald-200 bg-white p-8 text-center text-sm font-semibold text-slate-600">
+        <p className="mt-10 rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-600">
           No published {title.toLowerCase()} yet. Check back soon, or{" "}
           <Link href="/reads/partner" className="text-[#0D5C3A] underline">
             partner with SitGuru

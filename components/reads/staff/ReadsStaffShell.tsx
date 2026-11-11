@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -7,8 +8,10 @@ import {
   ADMIN_READS_BASE,
   INTERN_READS_BASE,
   MANAGER_READS_BASE,
+  READS_UI,
 } from "@/lib/reads/constants";
 import type { ReadsStaffRole } from "@/lib/reads/types";
+import { DESK_LOGO } from "@/lib/portal/desk-ui";
 
 const NAV: Record<
   Exclude<ReadsStaffRole, "none">,
@@ -74,37 +77,43 @@ export default function ReadsStaffShell({
   const items = NAV[role];
 
   return (
-    <div className="min-h-screen bg-[#f7fbf8] text-slate-950">
-      <header className="border-b border-emerald-900/10 bg-[#0D5C3A] text-white public-dark-section" data-brand-green>
+    <div className={`min-h-screen ${READS_UI.page}`}>
+      <header className={READS_UI.headerBar}>
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] !text-emerald-100">
-              Reads &amp; Media
-            </p>
-            <h1 className="text-2xl font-black !text-white">{title}</h1>
-            <p className="mt-1 text-sm font-semibold text-emerald-50">{subtitle}</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <Image
+              src={DESK_LOGO}
+              alt="SitGuru"
+              width={140}
+              height={44}
+              className="mt-0.5 h-9 w-auto object-contain object-left mix-blend-multiply"
+              priority
+            />
+            <div className="min-w-0 border-l border-slate-200 pl-3">
+              <p className={READS_UI.eyebrow}>Reads &amp; Media</p>
+              <h1 className={`text-2xl ${READS_UI.title}`}>{title}</h1>
+              <p className={`mt-1 text-sm ${READS_UI.body}`}>{subtitle}</p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/reads"
-              className="rounded-full border border-white/20 px-3 py-2 text-xs font-bold !text-white"
-            >
+            <Link href="/reads" className={READS_UI.secondaryBtn}>
               Public Reads
             </Link>
             <Link
               href="/admin/sales-marketing/content"
-              className="rounded-full border border-white/20 px-3 py-2 text-xs font-bold !text-white"
+              className={READS_UI.secondaryBtn}
             >
               Content Studio
             </Link>
             {role !== "admin" ? (
-              <Link
-                href="/admin"
-                className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold !text-white"
-              >
+              <Link href="/manager" className={READS_UI.primaryBtn}>
+                Manager Portal
+              </Link>
+            ) : (
+              <Link href="/admin" className={READS_UI.primaryBtn}>
                 Admin HQ
               </Link>
-            ) : null}
+            )}
           </div>
         </div>
         <nav
@@ -117,10 +126,8 @@ export default function ReadsStaffShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold ${
-                  active
-                    ? "bg-white text-[#0D5C3A]"
-                    : "bg-white/10 text-white hover:bg-white/20"
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  active ? READS_UI.navActive : READS_UI.navIdle
                 }`}
               >
                 {item.label}

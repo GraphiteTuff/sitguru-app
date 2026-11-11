@@ -50,7 +50,7 @@ export default async function PodcastDetailPage({ params }: PageProps) {
         eventName="podcast_view"
       >
         {item.podcast?.audio_embed_url ? (
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white p-3">
+          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-3">
             <iframe
               title={`${item.title} audio player`}
               src={item.podcast.audio_embed_url}

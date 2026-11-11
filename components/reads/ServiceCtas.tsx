@@ -7,7 +7,10 @@ export default function ServiceCtas({
 }) {
   const qs = `?utm_source=sitguru&utm_medium=reads&utm_campaign=${encodeURIComponent(source)}`;
   return (
-    <section className="mt-10 rounded-[1.75rem] border border-emerald-100 bg-[#0D5C3A] p-6 text-white public-dark-section sm:p-8" data-brand-green>
+    <section
+      className="rounded-[1.75rem] border border-emerald-900/10 bg-[#0D5C3A] p-6 text-white public-dark-section sm:p-8"
+      data-brand-green
+    >
       <h2 className="text-2xl font-black !text-white">Ready for trusted local care?</h2>
       <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-emerald-50">
         Learning is better with support. Find a Local Guru, become a Guru, or explore

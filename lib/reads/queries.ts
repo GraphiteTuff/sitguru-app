@@ -6,6 +6,7 @@ import {
   DEMO_TEAM_PICKS,
   DEMO_TOPICS,
 } from "./demo-data";
+import { readsTeamAvatar } from "./team";
 import type {
   ReadsContent,
   ReadsContentDetail,
@@ -249,6 +250,13 @@ export async function fetchFeaturedByType(
   );
 }
 
+function withTeamAvatar<T extends { slug?: string | null; avatar_url?: string | null; full_name?: string | null }>(
+  member: T,
+): T {
+  const avatar = readsTeamAvatar(member);
+  return avatar ? { ...member, avatar_url: avatar } : member;
+}
+
 export async function fetchTeamMembers(): Promise<ReadsTeamMember[]> {
   try {
     const supabase = await publicClient();
@@ -258,7 +266,7 @@ export async function fetchTeamMembers(): Promise<ReadsTeamMember[]> {
       .eq("is_active", true)
       .order("display_order", { ascending: true });
     if (error || !data?.length) return DEMO_TEAM;
-    return data as ReadsTeamMember[];
+    return (data as ReadsTeamMember[]).map(withTeamAvatar);
   } catch {
     return DEMO_TEAM;
   }
@@ -295,7 +303,7 @@ export async function fetchTeamPicks(filters?: {
       const contentRow = asSingle(row.content as never) as ContentRow | null;
       return {
         ...(row as ReadsTeamPick),
-        team_member: teamMember || undefined,
+        team_member: teamMember ? withTeamAvatar(teamMember) : undefined,
         content: contentRow ? mapDetail(contentRow) : undefined,
       };
     });

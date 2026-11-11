@@ -64,7 +64,7 @@ export default function YoutubeEmbed({
               alt=""
               className="absolute inset-0 h-full w-full object-cover opacity-90 transition group-hover:opacity-100"
             />
-            <span className="relative z-10 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#E86A17] text-white shadow-lg">
+            <span className="relative z-10 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#0D5C3A] text-white shadow-lg">
               <Play className="ml-1 h-7 w-7 fill-white" aria-hidden />
             </span>
           </button>
@@ -74,7 +74,7 @@ export default function YoutubeEmbed({
         href={watch}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-[#0D5C3A] transition hover:bg-emerald-50"
+        className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#0D5C3A] transition hover:bg-emerald-50"
         onClick={() => {
           void trackReadsEvent({
             eventName: "youtube_click",

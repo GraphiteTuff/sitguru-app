@@ -156,7 +156,7 @@ export default function PartnerForm() {
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex rounded-full bg-[#E86A17] px-5 py-3 text-sm font-black text-white transition hover:brightness-105 disabled:opacity-60"
+        className="inline-flex rounded-full bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white transition hover:brightness-105 disabled:opacity-60"
       >
         {busy ? "Submitting…" : "Become a Featured Partner"}
       </button>

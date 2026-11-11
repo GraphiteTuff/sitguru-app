@@ -1,13 +1,40 @@
+import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { ReadsContentType, ReadsDisclosureLabel } from "./types";
 
+/** Public facing Reads palette (mockup): forest green hero + orange/purple accents. */
 export const READS_BRAND = {
   green: "#0D5C3A",
   greenDeep: "#09462C",
   navy: "#163127",
   orange: "#E86A17",
-  cream: "#F7F4EE",
+  purple: "#6D28D9",
+  cream: "#F4F7FB",
   white: "#FFFFFF",
+  pageBg: "#F4F7FB",
 } as const;
+
+/** Staff Reads portals reuse Manager Desk tokens. */
+export const READS_UI = {
+  page: `${DESK_UI.pageBg} text-[#0F2744]`,
+  card: DESK_UI.card,
+  cardPad: `${DESK_UI.card} p-5`,
+  eyebrow: "text-[11px] font-black uppercase tracking-[0.14em] text-slate-400",
+  title: "font-black tracking-tight text-[#0F2744]",
+  body: "font-semibold text-slate-600",
+  link: DESK_UI.link,
+  primaryBtn:
+    "rounded-full bg-[#2563EB] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#1D4ED8]",
+  secondaryBtn:
+    "rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]",
+  chip: "rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-bold text-[#1D4ED8]",
+  input:
+    "w-full rounded-xl border-0 bg-[#EEF2F6] px-3 py-2.5 text-sm font-semibold text-[#0F2744] outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-[#2563EB]/25",
+  headerBar: "border-b border-slate-200/80 bg-white/90 backdrop-blur",
+  navIdle: "bg-[#EEF2F6] text-[#0F2744] hover:bg-[#DBEAFE]",
+  navActive: DESK_UI.sidebarActive,
+} as const;
+
+export const READS_HERO_IMAGE = "/images/booking-hero-pets.png";
 
 export const READS_FORMAT_NAV: Array<{
   href: string;

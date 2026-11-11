@@ -15,7 +15,7 @@ export default function DisclosureBadge({
       ? "border-amber-300 bg-amber-50 text-amber-900"
       : label === "partner_feature"
         ? "border-sky-300 bg-sky-50 text-sky-900"
-        : "border-emerald-300 bg-emerald-50 text-emerald-900";
+        : "border-blue-300 bg-emerald-50 text-emerald-800";
 
   return (
     <span

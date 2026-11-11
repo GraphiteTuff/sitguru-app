@@ -17,7 +17,7 @@ export default async function TopicsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <TrackPageView eventName="topic_filter" metadata={{ surface: "index" }} />
-      <h1 className="text-4xl font-black tracking-tight text-[#163127]">
+      <h1 className="text-4xl font-black tracking-tight text-[#0F2744]">
         Explore by Topic
       </h1>
       <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600">
@@ -28,9 +28,9 @@ export default async function TopicsPage() {
           <Link
             key={topic.id}
             href={`/reads/topics/${topic.slug}`}
-            className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="rounded-[1.5rem] border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <h2 className="text-xl font-black text-[#0D5C3A]">{topic.name}</h2>
+            <h2 className="text-xl font-black text-[#2563EB]">{topic.name}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {topic.description}
             </p>

@@ -44,10 +44,10 @@ export default async function ReadsSearchPage({ searchParams }: PageProps) {
         eventName="search"
         metadata={{ q, format, topic, featured, newest, teamPick }}
       />
-      <h1 className="text-4xl font-black tracking-tight text-[#163127]">
+      <h1 className="text-4xl font-black tracking-tight text-[#0F2744]">
         Search Reads &amp; Listen
       </h1>
-      <form className="mt-6 grid gap-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto_auto_auto]">
+      <form className="mt-6 grid gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto_auto_auto]">
         <label className="sr-only" htmlFor="reads-search">
           Search books, authors, podcasts, magazines, topics
         </label>
@@ -56,12 +56,12 @@ export default async function ReadsSearchPage({ searchParams }: PageProps) {
           name="q"
           defaultValue={q}
           placeholder="Search books, authors, podcasts, magazines, topics…"
-          className="rounded-full border border-emerald-200 px-4 py-2.5 text-sm font-semibold"
+          className="rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold"
         />
         <select
           name="format"
           defaultValue={format}
-          className="rounded-full border border-emerald-200 px-3 py-2.5 text-sm font-semibold"
+          className="rounded-full border border-slate-200 px-3 py-2.5 text-sm font-semibold"
           aria-label="Format"
         >
           <option value="all">All formats</option>
@@ -74,7 +74,7 @@ export default async function ReadsSearchPage({ searchParams }: PageProps) {
         <select
           name="topic"
           defaultValue={topic || ""}
-          className="rounded-full border border-emerald-200 px-3 py-2.5 text-sm font-semibold"
+          className="rounded-full border border-slate-200 px-3 py-2.5 text-sm font-semibold"
           aria-label="Topic"
         >
           <option value="">All topics</option>
@@ -86,7 +86,7 @@ export default async function ReadsSearchPage({ searchParams }: PageProps) {
         </select>
         <button
           type="submit"
-          className="rounded-full bg-[#0D5C3A] px-4 py-2.5 text-sm font-black text-white"
+          className="rounded-full bg-[#2563EB] px-4 py-2.5 text-sm font-black text-white"
         >
           Search
         </button>

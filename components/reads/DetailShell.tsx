@@ -45,7 +45,7 @@ export default function DetailShell({
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <article>
           <DisclosureBadge label={item.disclosure_label} />
-          <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-orange-700">
+          <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
             {item.content_type}
           </p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-[#163127]">
@@ -99,7 +99,7 @@ export default function DetailShell({
                 <Link
                   key={topic.id}
                   href={`/reads/topics/${topic.slug}`}
-                  className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900"
+                  className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"
                 >
                   {topic.name}
                 </Link>
@@ -161,7 +161,7 @@ export default function DetailShell({
                 href={item.book?.purchase_url || item.external_url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 inline-flex rounded-full border border-emerald-200 px-4 py-2 text-sm font-bold text-[#0D5C3A]"
+                className="mt-4 inline-flex rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-[#0D5C3A]"
               >
                 Official / purchase link
               </a>

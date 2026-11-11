@@ -13,7 +13,7 @@ export default function ReadsPartnerPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <TrackPageView eventName="partner_cta_click" metadata={{ surface: "form" }} />
-      <h1 className="text-4xl font-black tracking-tight text-[#163127]">
+      <h1 className="text-4xl font-black tracking-tight text-[#0F2744]">
         Become a Featured Partner
       </h1>
       <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-slate-600">

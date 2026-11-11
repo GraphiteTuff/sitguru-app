@@ -3,6 +3,7 @@
  * Reads content yet. Not permanent production endorsements of real authors.
  */
 
+import { READS_TEAM_AVATARS } from "@/lib/reads/team";
 import type {
   ReadsContentDetail,
   ReadsTeamMember,
@@ -68,7 +69,7 @@ export const DEMO_TEAM: ReadsTeamMember[] = [
     slug: "jason-graff",
     full_name: "Jason Graff",
     role_label: "Co-Founder",
-    avatar_url: null,
+    avatar_url: READS_TEAM_AVATARS["jason-graff"],
     display_order: 10,
     is_active: true,
   },
@@ -78,7 +79,7 @@ export const DEMO_TEAM: ReadsTeamMember[] = [
     slug: "danette-graff",
     full_name: "Danette Graff",
     role_label: "Co-Founder",
-    avatar_url: null,
+    avatar_url: READS_TEAM_AVATARS["danette-graff"],
     display_order: 20,
     is_active: true,
   },
@@ -88,7 +89,7 @@ export const DEMO_TEAM: ReadsTeamMember[] = [
     slug: "ava-venezia",
     full_name: "Ava Venezia",
     role_label: "Social Media & Community Growth Manager",
-    avatar_url: null,
+    avatar_url: READS_TEAM_AVATARS["ava-venezia"],
     display_order: 30,
     is_active: true,
   },
@@ -98,7 +99,7 @@ export const DEMO_TEAM: ReadsTeamMember[] = [
     slug: "ryan-manibo",
     full_name: "Ryan Manibo",
     role_label: "Intern — Penn State",
-    avatar_url: null,
+    avatar_url: READS_TEAM_AVATARS["ryan-manibo"],
     display_order: 40,
     is_active: true,
   },
@@ -108,7 +109,7 @@ export const DEMO_TEAM: ReadsTeamMember[] = [
     slug: "lola-uhl",
     full_name: "Lola Uhl",
     role_label: "Intern — Saint Joseph's University",
-    avatar_url: null,
+    avatar_url: READS_TEAM_AVATARS["lola-uhl"],
     display_order: 50,
     is_active: true,
   },

@@ -20,7 +20,7 @@ export default function ActionFeedback({
   if (state.status === "loading") {
     return (
       <div
-        className={`mt-2 inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 ${className}`}
+        className={`mt-2 inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 ${className}`}
         role="status"
         aria-live="polite"
       >
@@ -34,7 +34,7 @@ export default function ActionFeedback({
   if (state.status === "success") {
     return (
       <div
-        className={`mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 ${className}`}
+        className={`mt-2 rounded-xl border border-slate-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 ${className}`}
         role="status"
         aria-live="polite"
       >

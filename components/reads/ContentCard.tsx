@@ -70,7 +70,7 @@ export default function ContentCard({
       </Link>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <DisclosureBadge label={item.disclosure_label} />
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-orange-700">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
           {item.content_type}
         </p>
         <h3 className="text-lg font-black leading-snug text-[#163127]">
