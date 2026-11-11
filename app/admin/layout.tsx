@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   BarChart3,
+  BookOpen,
   ChevronDown,
   CalendarDays,
   CreditCard,
@@ -82,6 +83,7 @@ const adminRoutes = {
   auditTrail: "/admin/audit-trail",
   referrals: "/admin/referrals",
   salesMarketing: "/admin/sales-marketing",
+  readsMedia: "/admin/growth/reads",
   marketGrowth: "/admin/market-growth",
   emailUpdates: "/admin/email-updates",
   programs: "/admin/programs",
@@ -134,6 +136,11 @@ const navSections = [
         label: "Sales & Marketing",
         href: adminRoutes.salesMarketing,
         icon: Megaphone,
+      },
+      {
+        label: "Reads & Media",
+        href: adminRoutes.readsMedia,
+        icon: BookOpen,
       },
       {
         label: "Market Growth Map",
@@ -316,6 +323,11 @@ const mobileGrowthLinks = [
     label: "Sales & Marketing",
     href: adminRoutes.salesMarketing,
     icon: Megaphone,
+  },
+  {
+    label: "Reads & Media",
+    href: adminRoutes.readsMedia,
+    icon: BookOpen,
   },
   {
     label: "Market Growth Map",
@@ -646,6 +658,7 @@ function AdminFooter() {
       links: [
         { label: "Growth & Referrals", href: adminRoutes.referrals },
         { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
+        { label: "Reads & Media", href: adminRoutes.readsMedia },
         { label: "Email Updates", href: adminRoutes.emailUpdates },
         { label: "Programs", href: adminRoutes.programs },
         { label: "Partners", href: adminRoutes.partners },

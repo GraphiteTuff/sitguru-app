@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BarChart3,
+  BookOpen,
   CalendarDays,
   ClipboardCheck,
   ExternalLink,
@@ -37,6 +38,9 @@ const routes = {
   monthlyReview: "/admin/sales-marketing/monthly-review",
   outreach: "/admin/sales-marketing/outreach",
   content: "/admin/sales-marketing/content",
+  readsMedia: "/admin/growth/reads",
+  managerReads: "/manager/reads",
+  internReads: "/intern/content/reads",
   proofLibrary: "/admin/sales-marketing/proof-library",
   campaigns: "/admin/sales-marketing/campaigns",
   referrals: "/admin/referrals",
@@ -285,6 +289,15 @@ export default async function SalesMarketingAdminPage() {
       wiring: "live",
       value: number(data.metrics.contentItems),
       icon: <FileText size={20} />,
+    },
+    {
+      eyebrow: "Reads & Media",
+      title: "Reads & Listen Studio",
+      description:
+        "Books, magazines, podcasts, YouTube imports, Team Picks, and partnership pipeline for Ava, Ryan, and Lola.",
+      href: routes.readsMedia,
+      wiring: "live",
+      icon: <BookOpen size={20} />,
     },
     {
       eyebrow: "Campaigns",
