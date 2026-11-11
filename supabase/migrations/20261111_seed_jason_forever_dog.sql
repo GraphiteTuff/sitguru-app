@@ -103,6 +103,8 @@ ON CONFLICT (content_type, slug) DO UPDATE SET
   editorial_summary = EXCLUDED.editorial_summary,
   status = 'published',
   visibility = 'public',
+  featured = false,
+  disclosure_label = EXCLUDED.disclosure_label,
   external_url = EXCLUDED.external_url,
   tags = EXCLUDED.tags,
   published_at = COALESCE(public.reads_content.published_at, now()),
@@ -154,6 +156,8 @@ ON CONFLICT (content_type, slug) DO UPDATE SET
   editorial_summary = EXCLUDED.editorial_summary,
   status = 'published',
   visibility = 'public',
+  featured = false,
+  disclosure_label = EXCLUDED.disclosure_label,
   tags = EXCLUDED.tags,
   published_at = COALESCE(public.reads_content.published_at, now()),
   updated_at = now();
