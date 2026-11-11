@@ -8,6 +8,11 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  hasPrivilegedAdminAccess,
+  isEnvAllowlistedAdminEmail,
+} from "@/lib/admin/privileged-admin";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 
 export function createSupabaseAdminClient(): SupabaseClient {
   if (typeof window !== "undefined") {
@@ -90,24 +95,42 @@ export async function requireAdminUser(request: Request) {
     .from("profiles")
     .select("id, role, account_status")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (profileError || !profile) {
-    throw new Error("Unable to verify admin profile.");
-  }
+  const privileged = hasPrivilegedAdminAccess({
+    email: user.email,
+    role: profile?.role,
+  });
 
-  if (profile.role !== "admin") {
+  // HQ super users share a Pet Parent profile (role = customer). Email
+  // allowlists grant admin the same way proxy and getAdminIdentity do.
+  const emailBypass =
+    isHardcodedSuperUserEmail(user.email) ||
+    isEnvAllowlistedAdminEmail(user.email);
+
+  if (!privileged) {
+    if (profileError || !profile) {
+      throw new Error("Unable to verify admin profile.");
+    }
     throw new Error("Admin access required.");
   }
 
-  if (profile.account_status && profile.account_status !== "active") {
+  if (
+    !emailBypass &&
+    profile?.account_status &&
+    profile.account_status !== "active"
+  ) {
     throw new Error("Admin account is not active.");
   }
 
   return {
     supabaseAdmin: supabaseAdminClient,
     adminUser: user,
-    adminProfile: profile,
+    adminProfile: profile ?? {
+      id: user.id,
+      role: "super_admin",
+      account_status: "active",
+    },
   };
 }
 
