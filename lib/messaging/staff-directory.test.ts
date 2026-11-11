@@ -28,6 +28,10 @@ describe("staff directory test filters", () => {
     assert.equal(KNOWN_STAFF_CHAT_SEATS.some((seat) => seat.id === JASON_STAFF_USER_ID), true);
     assert.equal(KNOWN_STAFF_CHAT_SEATS.some((seat) => seat.id === DANETTE_STAFF_USER_ID), true);
     assert.equal(KNOWN_STAFF_CHAT_SEATS.some((seat) => seat.id === AVA_STAFF_USER_ID), true);
+    assert.deepEqual(
+      KNOWN_STAFF_CHAT_SEATS.filter((seat) => seat.detail === "Admin").map((seat) => seat.firstName),
+      ["Jason Graff", "Danette Graff"],
+    );
     assert.equal(staffAvatarFallback({ email: AVA_STAFF_EMAIL }), "/images/staff/ava-venezia.svg");
     assert.equal(staffAvatarFallback({ userId: AVA_STAFF_USER_ID }), "/images/staff/ava-venezia.svg");
     assert.equal(staffAvatarFallback({ email: JASON_STAFF_EMAIL }), "/images/sitguru-admin-avatar.jpg");

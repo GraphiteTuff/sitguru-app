@@ -1,11 +1,9 @@
 import { GROWTH_HIRE_ROLE } from "@/lib/admin/growth/hire";
-import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 import { listInterns } from "@/lib/internship/queries";
 import { excludeFromInternPortalList } from "@/lib/internship/team-roster";
 import {
   hideFromInternDirectory,
   isGrowthManagerSeat,
-  isLiveAgentSeat,
   sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
@@ -13,9 +11,7 @@ import { chatDisplayName } from "@/lib/messaging/chat-display-name";
 import {
   AVA_STAFF_EMAIL,
   AVA_STAFF_USER_ID,
-  DANETTE_STAFF_EMAIL,
   DANETTE_STAFF_USER_ID,
-  JASON_STAFF_EMAIL,
   JASON_STAFF_USER_ID,
   KNOWN_STAFF_CHAT_SEATS,
   staffAvatarFallback,
@@ -149,12 +145,12 @@ export async function loadSharedStaffDirectory(input: {
     else seatById.set(id, "manager");
   };
 
-  // Hard-include HQ supers + Ava so Staff never depends only on join coverage.
+  // HQ admins are only Jason + Danette. Ava (and growth eligibility) is Manager.
   markSeat(JASON_STAFF_USER_ID, "admin");
   markSeat(DANETTE_STAFF_USER_ID, "admin");
   markSeat(AVA_STAFF_USER_ID, "manager");
 
-  const [{ data: accessRows }, { data: roleRows }, { data: eligibilityRows }, { data: adminProfiles }] =
+  const [{ data: accessRows }, { data: roleRows }, { data: eligibilityRows }, { data: managerProfiles }] =
     await Promise.all([
       supabaseAdmin
         .from("admin_user_access")
@@ -168,10 +164,6 @@ export async function loadSharedStaffDirectory(input: {
           GROWTH_HIRE_ROLE,
           "social_growth_manager",
           "growth_manager",
-          "admin",
-          "founder",
-          "owner",
-          "super_admin",
         ])
         .limit(100),
       supabaseAdmin
@@ -185,7 +177,7 @@ export async function loadSharedStaffDirectory(input: {
           "id,email,first_name,full_name,last_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
         )
         .or(
-          `role.ilike.%admin%,role.ilike.%founder%,role.ilike.%owner%,role.ilike.%super%,signup_role.ilike.%social_community%,signup_role.ilike.%growth%,account_type.ilike.%social_community%,account_type.ilike.%growth%,email.eq.${AVA_STAFF_EMAIL},email.eq.${JASON_STAFF_EMAIL},email.eq.${DANETTE_STAFF_EMAIL},email.ilike.%@sitguru.com`,
+          `signup_role.ilike.%social_community%,signup_role.ilike.%growth%,account_type.ilike.%social_community%,account_type.ilike.%growth%,email.eq.${AVA_STAFF_EMAIL}`,
         )
         .limit(80),
     ]);
@@ -196,11 +188,6 @@ export async function loadSharedStaffDirectory(input: {
     const roleKey = text(row.role_key);
     const email = text(row.email);
     if (
-      isLiveAgentSeat({ email, role: roleKey }) ||
-      isHardcodedSuperUserEmail(email)
-    ) {
-      markSeat(id, "admin");
-    } else if (
       isGrowthManagerSeat({ email, role: roleKey, accountType: roleKey, signupRole: roleKey }) ||
       roleKey === GROWTH_HIRE_ROLE
     ) {
@@ -211,32 +198,19 @@ export async function loadSharedStaffDirectory(input: {
     const id = text(row.user_id);
     const role = text(row.role);
     if (!id) continue;
-    if (isLiveAgentSeat({ role }) || role === "super_admin" || role === "founder" || role === "owner") {
-      markSeat(id, "admin");
-    } else if (isGrowthManagerSeat({ role, signupRole: role })) {
+    if (isGrowthManagerSeat({ role, signupRole: role }) || role === GROWTH_HIRE_ROLE) {
       markSeat(id, "manager");
-    } else {
-      staffIds.add(id);
     }
   }
   for (const row of (eligibilityRows || []) as Record<string, unknown>[]) {
     const id = text(row.user_id);
     if (id) markSeat(id, "manager");
   }
-  for (const row of (adminProfiles || []) as Record<string, unknown>[]) {
+  for (const row of (managerProfiles || []) as Record<string, unknown>[]) {
     const id = text(row.id);
     const email = text(row.email);
     if (!id) continue;
     if (
-      isHardcodedSuperUserEmail(email) ||
-      isLiveAgentSeat({
-        email,
-        role: text(row.role) || text(row.signup_role),
-        accountType: text(row.account_type) || text(row.signup_role),
-      })
-    ) {
-      markSeat(id, "admin");
-    } else if (
       isGrowthManagerSeat({
         email,
         role: text(row.role),
@@ -269,14 +243,15 @@ export async function loadSharedStaffDirectory(input: {
     }
     const forced = seatById.get(id);
     const adminSeat =
-      forced === "admin" ||
-      isLiveAgentSeat({ email, role: role || signupRole, accountType }) ||
-      isHardcodedSuperUserEmail(email);
+      id === JASON_STAFF_USER_ID ||
+      id === DANETTE_STAFF_USER_ID ||
+      forced === "admin";
     const managerSeat =
-      forced === "manager" ||
-      isGrowthManagerSeat({ email, role, accountType, signupRole }) ||
-      email.toLowerCase() === AVA_STAFF_EMAIL ||
-      id === AVA_STAFF_USER_ID;
+      !adminSeat &&
+      (forced === "manager" ||
+        isGrowthManagerSeat({ email, role, accountType, signupRole }) ||
+        email.toLowerCase() === AVA_STAFF_EMAIL ||
+        id === AVA_STAFF_USER_ID);
     if (!adminSeat && !managerSeat) continue;
     const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === id);
     push({

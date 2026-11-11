@@ -67,76 +67,25 @@ async function loadProfilePhotoMap(userIds: string[]) {
   return map;
 }
 
-/** Admins tab — Jason, Danette, and other live agent seats with photos. */
+/** Admins tab — only Jason Graff and Danette Graff. */
 export async function loadAdminChatPeople(input: {
   actorUserId: string;
   query?: string;
 }) {
   const query = text(input.query).toLowerCase();
-  const { data } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id,email,first_name,last_name,full_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
-    )
-    .limit(120);
-
-  const people: StaffDirectoryPerson[] = [];
-  const seen = new Set<string>();
-
-  const push = (person: StaffDirectoryPerson) => {
-    if (!person.id || seen.has(person.id) || person.id === input.actorUserId) return;
-    if (!matchesQuery(person.firstName, query)) return;
-    seen.add(person.id);
-    people.push(person);
-  };
-
-  for (const row of (data || []) as Record<string, unknown>[]) {
-    const email = text(row.email);
-    const role = text(row.role) || text(row.signup_role);
-    const accountType = text(row.account_type);
-    if (
-      !isLiveAgentSeat({ email, role, accountType }) ||
-      isTestDirectoryPerson({
-        firstName: text(row.first_name),
-        fullName: text(row.full_name),
-        email,
-      })
-    ) {
-      continue;
-    }
-    const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === text(row.id));
-    push({
-      id: text(row.id),
-      firstName:
-        known?.firstName ||
-        chatDisplayName({
-          firstName: text(row.first_name),
-          lastName: text(row.last_name),
-          fullName: text(row.full_name),
-          email,
-        }),
-      avatarUrl:
-        resolvePetParentAvatarUrl(row) ||
-        staffAvatarFallback({ email, userId: text(row.id) }),
-      detail: "Admin",
-      canChat: true,
-    });
-  }
-
-  // Always surface Jason + Danette even if role filters missed them.
   const adminSeats = KNOWN_STAFF_CHAT_SEATS.filter((item) => item.detail === "Admin");
   const photoById = await loadProfilePhotoMap(adminSeats.map((seat) => seat.id));
-  for (const seat of adminSeats) {
-    push({
+  const people = adminSeats
+    .filter((seat) => seat.id !== input.actorUserId && matchesQuery(seat.firstName, query))
+    .map((seat) => ({
       id: seat.id,
       firstName: seat.firstName,
       avatarUrl: photoById.get(seat.id) || seat.avatarUrl,
-      detail: "Admin",
+      detail: "Admin" as const,
       canChat: true,
-    });
-  }
+    }));
 
-  return withPresence(people.slice(0, 40));
+  return withPresence(people);
 }
 
 export async function loadInternChatPeople(input: {
