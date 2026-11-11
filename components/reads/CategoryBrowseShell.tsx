@@ -76,7 +76,10 @@ export default function CategoryBrowseShell({
           metadata={{ surface: "category_browse", category: config.key }}
         />
 
-        <section className="relative overflow-hidden rounded-[1.75rem] bg-[#0D5C3A] text-white shadow-[0_24px_60px_rgba(13,92,58,0.28)]">
+        <section
+          data-brand-green
+          className="public-dark-section relative overflow-hidden rounded-[1.75rem] bg-[#0D5C3A] !text-white shadow-[0_24px_60px_rgba(13,92,58,0.28)]"
+        >
           <div className="absolute inset-0">
             <Image
               src={READS_HERO_IMAGE}
@@ -90,13 +93,13 @@ export default function CategoryBrowseShell({
           </div>
           <div className="relative grid gap-8 px-6 py-10 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-12">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F6C39A]">
+              <p className="text-xs font-black uppercase tracking-[0.2em] !text-[#F6C39A]">
                 {config.eyebrow}
               </p>
-              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight sm:text-5xl">
+              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight !text-white sm:text-5xl">
                 {config.title}
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/85 sm:text-base">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 !text-white/90 sm:text-base">
                 {config.description}
               </p>
               <form action={config.href} className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -136,8 +139,8 @@ export default function CategoryBrowseShell({
                       href={href}
                       className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
                         selected
-                          ? "bg-[#E86A17] text-white"
-                          : "bg-white/12 text-white hover:bg-white/20"
+                          ? "bg-[#E86A17] !text-white"
+                          : "bg-white/15 !text-white hover:bg-white/25"
                       }`}
                     >
                       {chip.label}
@@ -148,19 +151,19 @@ export default function CategoryBrowseShell({
             </div>
 
             {spotlight ? (
-              <aside className="rounded-[1.5rem] border border-white/15 bg-[#163127]/55 p-5 backdrop-blur">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#E86A17]">
+              <aside className="rounded-[1.5rem] border border-white/15 bg-[#163127]/70 p-5 backdrop-blur">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] !text-[#F6C39A]">
                   Featured spotlight
                 </p>
-                <h2 className="mt-2 text-2xl font-black leading-snug">
+                <h2 className="mt-2 text-2xl font-black leading-snug !text-white">
                   {spotlight.title}
                 </h2>
-                <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-white/80">
+                <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 !text-white/85">
                   {spotlight.editorial_summary ||
                     spotlight.description ||
                     spotlight.why_recommended}
                 </p>
-                <dl className="mt-4 space-y-1 text-xs font-bold uppercase tracking-[0.12em] text-white/65">
+                <dl className="mt-4 space-y-1 text-xs font-bold uppercase tracking-[0.12em] !text-white/70">
                   {spotlight.book?.author_name ? (
                     <div>Authors · {spotlight.book.author_name}</div>
                   ) : null}
@@ -179,7 +182,7 @@ export default function CategoryBrowseShell({
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
                     href={hrefForContent(spotlight)}
-                    className="rounded-full bg-[#E86A17] px-4 py-2.5 text-sm font-black text-white"
+                    className="rounded-full bg-[#E86A17] px-4 py-2.5 text-sm font-black !text-white"
                   >
                     View details
                   </Link>
@@ -188,7 +191,7 @@ export default function CategoryBrowseShell({
                       href={publisherUrl(spotlight)!}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-white/25 px-4 py-2.5 text-sm font-black text-white"
+                      className="rounded-full border border-white/35 bg-white/10 px-4 py-2.5 text-sm font-black !text-white"
                     >
                       Visit publisher
                     </a>

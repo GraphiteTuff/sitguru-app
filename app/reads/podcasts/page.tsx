@@ -76,32 +76,35 @@ export default async function Page({ searchParams }: PageProps) {
           {spotlight ? (
             <section className="mt-8 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-sm">
               <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="bg-[#0D5C3A] px-6 py-8 text-white sm:px-8">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F6C39A]">
+                <div
+                  data-brand-green
+                  className="public-dark-section bg-[#0D5C3A] px-6 py-8 !text-white sm:px-8"
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.2em] !text-[#F6C39A]">
                     New episode
                   </p>
-                  <h2 className="mt-3 text-3xl font-black tracking-tight">
+                  <h2 className="mt-3 text-3xl font-black tracking-tight !text-white">
                     {spotlight.title}
                   </h2>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-white/85">
+                  <p className="mt-3 text-sm font-semibold leading-6 !text-white/90">
                     {spotlight.editorial_summary || spotlight.description}
                   </p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <Link
                       href={`/reads/podcasts/${spotlight.slug}`}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#B7F071] px-5 py-2.5 text-sm font-black text-[#163127]"
+                      className="inline-flex items-center gap-2 rounded-full bg-[#B7F071] px-5 py-2.5 text-sm font-black !text-[#163127]"
                     >
                       <Play className="h-4 w-4" aria-hidden />
                       Start listening
                     </Link>
                     <Link
                       href="/reads/partner"
-                      className="rounded-full border border-white/25 px-5 py-2.5 text-sm font-black text-white"
+                      className="rounded-full border border-white/35 bg-white/10 px-5 py-2.5 text-sm font-black !text-white"
                     >
                       Podcast partner spotlight
                     </Link>
                   </div>
-                  <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-white/60">
+                  <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] !text-white/70">
                     {originals.length
                       ? `${originals.length} SitGuru original${originals.length === 1 ? "" : "s"}`
                       : "Local creators & approved shows"}
