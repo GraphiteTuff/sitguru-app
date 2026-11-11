@@ -166,7 +166,7 @@ export default function RecommendationBrowseShell({
                 {roster.filter((item) => !item.pick).length} placeholders
               </p>
             </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {roster.map((item) => (
                 <TeamPickCard
                   key={item.member.id}
