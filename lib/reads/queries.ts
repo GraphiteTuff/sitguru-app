@@ -111,6 +111,11 @@ export async function fetchPublishedContent(
         `title.ilike.%${filters.q}%,subtitle.ilike.%${filters.q}%,description.ilike.%${filters.q}%,editorial_summary.ilike.%${filters.q}%`,
       );
     }
+    if (filters.topic) {
+      const topicIds = await resolveTopicContentIds(filters.topic);
+      if (!topicIds.length) return filterDemo(filters);
+      query = query.in("id", topicIds);
+    }
 
     query = query
       .order(filters.newest ? "published_at" : "featured", {
@@ -128,7 +133,8 @@ export async function fetchPublishedContent(
       return filterDemo(filters);
     }
     if (!data.length) return filterDemo(filters);
-    return (data as ContentRow[]).map(mapDetail);
+    const mapped = (data as ContentRow[]).map(mapDetail);
+    return hydrateTopics(mapped);
   } catch {
     return filterDemo(filters);
   }
@@ -443,6 +449,59 @@ export async function fetchStaffKpis(options?: { createdBy?: string }) {
   };
 }
 
+async function resolveTopicContentIds(topicSlug: string) {
+  try {
+    const supabase = await publicClient();
+    const { data: topic } = await supabase
+      .from("reads_topics")
+      .select("id")
+      .eq("slug", topicSlug)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!topic?.id) return [] as string[];
+
+    const { data: links } = await supabase
+      .from("reads_content_topics")
+      .select("content_id")
+      .eq("topic_id", topic.id)
+      .limit(500);
+    return (links || []).map((row) => String(row.content_id));
+  } catch {
+    return [] as string[];
+  }
+}
+
+async function hydrateTopics(rows: ReadsContentDetail[]) {
+  if (!rows.length) return rows;
+  try {
+    const ids = rows.map((row) => row.id).filter((id) => !id.startsWith("demo-"));
+    if (!ids.length) return rows;
+
+    const supabase = await publicClient();
+    const { data } = await supabase
+      .from("reads_content_topics")
+      .select("content_id, reads_topics (*)")
+      .in("content_id", ids);
+    if (!data?.length) return rows;
+
+    const byContent = new Map<string, ReadsTopic[]>();
+    for (const row of data) {
+      const topic = asSingle(row.reads_topics as never) as ReadsTopic | null;
+      if (!topic) continue;
+      const list = byContent.get(String(row.content_id)) || [];
+      list.push(topic);
+      byContent.set(String(row.content_id), list);
+    }
+
+    return rows.map((row) => ({
+      ...row,
+      topics: byContent.get(row.id) || row.topics || [],
+    }));
+  } catch {
+    return rows;
+  }
+}
+
 export async function searchReads(filters: ReadsSearchFilters) {
   const [content, topics, teamPicks] = await Promise.all([
     fetchPublishedContent({ ...filters, limit: filters.limit || 36 }),
@@ -450,15 +509,14 @@ export async function searchReads(filters: ReadsSearchFilters) {
     filters.teamPick ? fetchTeamPicks() : Promise.resolve([]),
   ]);
 
-  const topicMatch = filters.topic
-    ? content.filter((c) =>
-        (c.topics || []).some((t) => t.slug === filters.topic) ||
-        c.tags?.includes(filters.topic || ""),
-      )
-    : content;
+  let results = content;
+  if (filters.teamPick) {
+    const pickIds = new Set(teamPicks.map((pick) => pick.content_id));
+    results = results.filter((item) => pickIds.has(item.id));
+  }
 
   return {
-    results: topicMatch,
+    results,
     topics,
     teamPicks,
   };

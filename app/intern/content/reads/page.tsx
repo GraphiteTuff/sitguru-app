@@ -36,7 +36,10 @@ export default async function InternReadsPage({ searchParams }: PageProps) {
     }),
     fetchTeamMembers(),
     fetchReadsTopics(),
-    summarizeReadsAnalytics({ sinceDays: 30 }),
+    summarizeReadsAnalytics({
+      sinceDays: 30,
+      createdBy: ownOnly ? access.identity.id : undefined,
+    }),
   ]);
 
   return (
@@ -52,11 +55,7 @@ export default async function InternReadsPage({ searchParams }: PageProps) {
         content={content}
         teamMembers={teamMembers}
         topics={topics}
-        analytics={
-          ownOnly
-            ? analytics
-            : analytics
-        }
+        analytics={analytics}
       />
     </ReadsStaffShell>
   );
