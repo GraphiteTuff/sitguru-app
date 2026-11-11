@@ -9,7 +9,12 @@ import FloatingActionStack from "@/components/FloatingActionStack";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import GuruLiveUpdatesBridge from "@/components/gurus/GuruLiveUpdatesBridge";
 import AIScoutCompanion from "@/components/officers/AIScoutCompanion";
+import CustomerBottomNav from "@/components/customer/CustomerBottomNav";
 import { getBotConfig } from "@/lib/companions/bot-config";
+import {
+  CUSTOMER_BOTTOM_NAV_CONTENT_PAD,
+  isPetParentBottomNavPath,
+} from "@/lib/customer/pet-parent-chrome";
 import {
   isGuruWorkspacePath,
   isPublicGuruOnboardingPath,
@@ -148,8 +153,14 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     bot.shouldRender &&
     (bot.variant === "scout" || bot.variant === "taco");
 
+  const shouldShowCustomerBottomNav = isPetParentBottomNavPath(pathname);
+  // /customer/* already pads via customer/layout — pad sibling routes only.
+  const needsBottomNavSpacer =
+    shouldShowCustomerBottomNav &&
+    !(pathname === "/customer" || pathname?.startsWith("/customer/"));
+
   const floatingControls = shouldShowRogueChat ? (
-    <FloatingActionStack>
+    <FloatingActionStack aboveBottomNav={shouldShowCustomerBottomNav}>
       <HomepageChatBubble />
     </FloatingActionStack>
   ) : shouldShowScoutOrTaco ? (
@@ -179,9 +190,18 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>
+        {needsBottomNavSpacer ? (
+          <div
+            className="pointer-events-none md:hidden"
+            style={{ height: CUSTOMER_BOTTOM_NAV_CONTENT_PAD }}
+            aria-hidden
+            data-customer-bottom-nav-spacer
+          />
+        ) : null}
         <Footer />
         {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
         {floatingControls}
+        {shouldShowCustomerBottomNav ? <CustomerBottomNav /> : null}
       </>
     );
   }
@@ -190,11 +210,20 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     <>
       <Header />
       <main className="site-main min-h-[70vh]">{children}</main>
+      {needsBottomNavSpacer ? (
+        <div
+          className="pointer-events-none md:hidden"
+          style={{ height: CUSTOMER_BOTTOM_NAV_CONTENT_PAD }}
+          aria-hidden
+          data-customer-bottom-nav-spacer
+        />
+      ) : null}
       <Footer />
       {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
       {/* Browser-safe Realtime: Guru status / pricing / photo → search + profiles */}
       <GuruLiveUpdatesBridge />
       {floatingControls}
+      {shouldShowCustomerBottomNav ? <CustomerBottomNav /> : null}
     </>
   );
 }

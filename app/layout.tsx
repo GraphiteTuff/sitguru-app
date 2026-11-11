@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
 
@@ -85,6 +85,12 @@ export const metadata: Metadata = {
       "Find trusted local Pet Gurus for walks, sitting, boarding, training, and more.",
     images: ["/apple-touch-icon.png"],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const organizationSchema = {
