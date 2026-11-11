@@ -323,6 +323,7 @@ export const DEMO_CONTENT: ReadsContentDetail[] = [
     content_type: "author",
     featured: false,
     feature_type: null,
+    disclosure_label: "none",
     description:
       "Integrative veterinarian and co-author of The Forever Dog, focused on proactive pet wellness and longevity.",
     editorial_summary:
@@ -352,6 +353,7 @@ export const DEMO_CONTENT: ReadsContentDetail[] = [
     content_type: "author",
     featured: false,
     feature_type: null,
+    disclosure_label: "none",
     description:
       "Pet-health educator and co-author of The Forever Dog, known for translating longevity science for everyday Pet Parents.",
     editorial_summary:

@@ -55,10 +55,15 @@ describe("reads public demo safety", () => {
       DEMO_CONTENT.some(
         (c) =>
           c.slug === "karen-shaw-becker" &&
-          c.person?.person_type === "veterinarian",
+          c.person?.person_type === "veterinarian" &&
+          c.disclosure_label === "none",
       ),
     );
-    assert.ok(DEMO_CONTENT.some((c) => c.slug === "rodney-habib"));
+    assert.ok(
+      DEMO_CONTENT.some(
+        (c) => c.slug === "rodney-habib" && c.disclosure_label === "none",
+      ),
+    );
   });
 
   it("exposes primary public navigation and CTAs", () => {
