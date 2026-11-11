@@ -76,6 +76,18 @@ export async function summarizeReadsAnalytics(options?: {
     Date.now() - sinceDays * 24 * 60 * 60 * 1000,
   ).toISOString();
 
+  let allowedContentIds: Set<string> | null = null;
+  if (options?.createdBy) {
+    const owned = await supabaseAdmin
+      .from("reads_content")
+      .select("id")
+      .eq("created_by", options.createdBy)
+      .limit(1000);
+    allowedContentIds = new Set(
+      (owned.data || []).map((row) => String(row.id)),
+    );
+  }
+
   const query = supabaseAdmin
     .from("reads_analytics_events")
     .select("event_name, content_id, content_type, created_at, metadata")
@@ -97,10 +109,17 @@ export async function summarizeReadsAnalytics(options?: {
     };
   }
 
+  const scoped = allowedContentIds
+    ? data.filter(
+        (row) =>
+          row.content_id && allowedContentIds!.has(String(row.content_id)),
+      )
+    : data;
+
   const totals: Record<string, number> = {};
   const byContent: Record<string, number> = {};
 
-  for (const row of data) {
+  for (const row of scoped) {
     const name = String(row.event_name || "");
     totals[name] = (totals[name] || 0) + 1;
     if (row.content_id) {
@@ -113,5 +132,5 @@ export async function summarizeReadsAnalytics(options?: {
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  return { totals, topContent, rows: data };
+  return { totals, topContent, rows: scoped };
 }

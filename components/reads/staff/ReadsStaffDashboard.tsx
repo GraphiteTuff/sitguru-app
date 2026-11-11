@@ -627,7 +627,7 @@ export default function ReadsStaffDashboard({
                                   "Content-Type": "application/json",
                                 },
                                 body: JSON.stringify({
-                                  status: item.status,
+                                  action: "feature",
                                   featured: !item.featured,
                                   feature_type: item.featured
                                     ? "none"

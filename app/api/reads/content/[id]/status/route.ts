@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireReadsStaffApi } from "@/lib/reads/access";
-import { transitionReadsStatus } from "@/lib/reads/workflow";
+import {
+  setReadsFeatured,
+  transitionReadsStatus,
+} from "@/lib/reads/workflow";
 import type { ReadsStatus } from "@/lib/reads/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -12,6 +15,17 @@ export async function POST(request: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await request.json();
+
+    if (body.action === "feature") {
+      const result = await setReadsFeatured(
+        auth.identity,
+        id,
+        Boolean(body.featured),
+        body.feature_type || null,
+      );
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     const toStatus = String(body.status || "") as ReadsStatus;
     if (!toStatus) {
       return NextResponse.json({ error: "status required" }, { status: 400 });
@@ -24,8 +38,6 @@ export async function POST(request: Request, { params }: Params) {
       body.note,
       {
         scheduled_at: body.scheduled_at,
-        featured: body.featured,
-        feature_type: body.feature_type,
       },
     );
     return NextResponse.json({ ok: true, ...result });

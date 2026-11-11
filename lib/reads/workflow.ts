@@ -184,13 +184,34 @@ async function syncTypeExtension(
   const table = tableByType[input.content_type];
   if (!table) return;
 
-  const extension =
-    input.book ||
-    input.publication ||
-    input.podcast ||
-    input.video ||
-    input.person ||
-    {};
+  let extension: Record<string, unknown> =
+    (input.book ||
+      input.publication ||
+      input.podcast ||
+      input.video ||
+      input.person ||
+      {}) as Record<string, unknown>;
+
+  // Ensure NOT NULL extension columns are populated for generic draft creates.
+  if (
+    (input.content_type === "magazine" ||
+      input.content_type === "publication") &&
+    !String(extension.publication_name || "").trim()
+  ) {
+    extension = {
+      ...extension,
+      publication_name: input.title.trim(),
+    };
+  }
+  if (
+    (input.content_type === "author" || input.content_type === "expert") &&
+    !String(extension.person_type || "").trim()
+  ) {
+    extension = {
+      ...extension,
+      person_type: input.content_type === "expert" ? "pet_industry_expert" : "author",
+    };
+  }
 
   const { error } = await supabaseAdmin.from(table).upsert({
     content_id: contentId,
@@ -199,12 +220,60 @@ async function syncTypeExtension(
   if (error) throw new Error(error.message);
 }
 
+export async function setReadsFeatured(
+  identity: ReadsIdentity,
+  contentId: string,
+  featured: boolean,
+  featureType?: string | null,
+) {
+  if (!identity.canPublish) {
+    throw new Error("Featuring content requires manager or admin access.");
+  }
+
+  const { data: existing, error } = await supabaseAdmin
+    .from("reads_content")
+    .select("id,status,featured,feature_type")
+    .eq("id", contentId)
+    .maybeSingle();
+  if (error || !existing) throw new Error("Content not found.");
+
+  const { error: updateError } = await supabaseAdmin
+    .from("reads_content")
+    .update({
+      featured,
+      feature_type: featured ? featureType || "homepage" : "none",
+      reviewed_by: identity.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", contentId);
+  if (updateError) throw new Error(updateError.message);
+
+  await writeAudit({
+    contentId,
+    identity,
+    action: featured ? "feature" : "unfeature",
+    fromStatus: existing.status,
+    toStatus: existing.status,
+    note: featured ? `Featured as ${featureType || "homepage"}` : "Unfeatured",
+    metadata: {
+      featured,
+      feature_type: featured ? featureType || "homepage" : "none",
+    },
+  });
+
+  return {
+    id: contentId,
+    featured,
+    feature_type: featured ? featureType || "homepage" : "none",
+  };
+}
+
 export async function transitionReadsStatus(
   identity: ReadsIdentity,
   contentId: string,
   toStatus: ReadsStatus,
   note?: string,
-  extras?: { scheduled_at?: string; featured?: boolean; feature_type?: string },
+  extras?: { scheduled_at?: string },
 ) {
   const { data: existing, error } = await supabaseAdmin
     .from("reads_content")
@@ -239,6 +308,10 @@ export async function transitionReadsStatus(
     throw new Error("Publishing requires manager or admin access.");
   }
 
+  if (toStatus === "archived" && !identity.canOverride) {
+    throw new Error("Archiving requires admin override access.");
+  }
+
   const update: Record<string, unknown> = {
     status: toStatus,
     review_note: note || existing.review_note,
@@ -255,12 +328,7 @@ export async function transitionReadsStatus(
   if (toStatus === "archived") {
     update.archived_at = new Date().toISOString();
   }
-  if (typeof extras?.featured === "boolean") {
-    update.featured = extras.featured;
-  }
-  if (extras?.feature_type) {
-    update.feature_type = extras.feature_type;
-  }
+  // Featured state must use setReadsFeatured() — do not piggyback here.
 
   const { error: updateError } = await supabaseAdmin
     .from("reads_content")
