@@ -105,6 +105,14 @@ export function routeFromSitGuruUrl(rawUrl: string): RouteTarget | null {
     };
   }
 
+  if (
+    path === 'guru-earnings' ||
+    path === 'earnings' ||
+    path === 'guru/dashboard/earnings'
+  ) {
+    return { pathname: '/guru-earnings' };
+  }
+
   if (path === 'rogue' || path === 'ai-companion' || path.startsWith('ai/')) {
     const companion =
       firstQuery(url, ['id', 'companion', 'chat']) ||

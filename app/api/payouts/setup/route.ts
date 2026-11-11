@@ -1101,27 +1101,27 @@ async function loadFinancialSetup(
             provider: "stripe",
             label: "Stripe",
             description:
-              "Connect Stripe before accepting your first paid SitGuru booking.",
+              "Quick secure setup when you’re ready to accept a paid booking.",
           },
           {
             provider: "paypal",
             label: "PayPal",
             description:
-              "Connect an eligible PayPal seller account before accepting your first paid SitGuru booking.",
+              "Quick secure PayPal setup when you’re ready to accept a paid booking.",
           },
           {
             provider: "set_up_later",
             label: "Set up later",
             description:
-              "Finish your profile, appear in search, and receive booking requests before financial onboarding.",
+              "Finish your profile, appear in search, and receive booking requests first.",
           },
         ]
       : [
           {
             provider: "stripe",
-            label: "Bank or debit card",
+            label: "Stripe",
             description:
-              "Get rewards sent to your bank or eligible debit card. Powered by Stripe.",
+              "Get rewards sent securely. Powered by Stripe.",
           },
           {
             provider: "paypal",
@@ -1190,21 +1190,21 @@ async function loadFinancialSetup(
       role === "guru"
         ? {
             headline: setupComplete
-              ? "Your Guru payout method is ready"
-              : "Set up payouts before accepting your first paid booking",
+              ? "You’re ready to earn"
+              : "Payouts when you’re ready",
             description:
-              "You can sign up, complete your Guru profile, appear in search, and receive booking requests before connecting Stripe or PayPal.",
+              "You can sign up, complete your Guru profile, appear in search, and receive booking requests first. Finish a quick secure payout setup when you’re ready to accept a paid booking.",
             readyMessage:
-              "This Guru account can accept paid SitGuru bookings.",
+              "You’re ready to accept paid SitGuru bookings.",
             blockedMessage:
-              "Connect and complete Stripe or PayPal payout setup before accepting the first paid booking.",
+              "Finish the quick secure payout setup before accepting your first paid booking.",
           }
         : {
             headline: setupComplete
-              ? "You’re ready to get paid"
+              ? "You’re ready to earn"
               : "Pick how you get paid",
             description:
-              "Choose bank or debit card, PayPal, or Venmo. You can switch later.",
+              "Choose Stripe, PayPal, or Venmo. You can switch later.",
             readyMessage:
               "Your Ambassador account is ready for approved reward payments.",
             blockedMessage:
@@ -1757,11 +1757,11 @@ export async function PATCH(req: NextRequest) {
         provider === "set_up_later"
           ? "Saved for later. You can finish payment setup anytime."
           : role === "guru" && provider === "stripe"
-            ? "Stripe selected. Finish the secure Stripe steps to get paid for bookings."
+            ? "Stripe selected. Finish the quick secure steps when you’re ready to accept paid bookings."
             : role === "guru" && provider === "paypal"
-              ? "PayPal selected. Finish the secure PayPal steps to get paid for bookings."
+              ? "PayPal selected. Finish the quick secure steps when you’re ready to accept paid bookings."
               : provider === "stripe"
-                ? "Bank or debit card selected. Finish Stripe setup before your first reward is sent."
+                ? "Stripe selected. Finish setup before your first reward is sent."
                 : destinationSaved
                   ? "Payment option saved. Complete verification before your first reward is sent."
                   : `${provider === "paypal" ? "PayPal" : "Venmo"} selected. Add and verify your account before your first reward is sent.`,

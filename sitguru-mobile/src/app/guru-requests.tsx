@@ -36,6 +36,8 @@ import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { sitguruApiFetch } from '@/lib/data/api';
+import { API_PATHS } from '@/lib/data/schema';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -239,15 +241,43 @@ export default function GuruRequestsScreen() {
             setUpdatingId(request.id);
 
             try {
-              const result = await supabase
-                .from(request.sourceTable)
-                .update({
-                  status: nextStatus,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', request.id);
+              const respond = await sitguruApiFetch<{
+                success?: boolean;
+                error?: string;
+                code?: string;
+                message?: string;
+                mobileEarningsPath?: string;
+              }>(API_PATHS.respondBooking(request.id), {
+                method: 'POST',
+                body: {
+                  action: nextStatus === 'accepted' ? 'accept' : 'decline',
+                },
+              });
 
-              if (result.error) throw result.error;
+              if (respond.status === 409 || respond.data?.code === 'PAYOUT_SETUP_REQUIRED') {
+                Alert.alert(
+                  'Quick payout setup needed',
+                  respond.data?.error ||
+                    respond.error ||
+                    'Finish your quick secure payout setup before accepting this paid booking.',
+                  [
+                    { text: 'Not now', style: 'cancel' },
+                    {
+                      text: 'Set up payouts',
+                      onPress: () => router.push('/guru-earnings'),
+                    },
+                  ],
+                );
+                return;
+              }
+
+              if (respond.error || respond.data?.success === false) {
+                throw new Error(
+                  respond.data?.error ||
+                    respond.error ||
+                    'SitGuru could not update this request.',
+                );
+              }
 
               setRequests((current) =>
                 current.map((item) =>
@@ -270,13 +300,15 @@ export default function GuruRequestsScreen() {
                   ? 'Request accepted'
                   : 'Request declined',
                 nextStatus === 'accepted'
-                  ? 'The booking is now in Upcoming care.'
+                  ? 'The booking is now in Upcoming care. The Pet Parent can finish payment next.'
                   : 'The request was moved out of your pending queue.',
               );
-            } catch {
+            } catch (error) {
               Alert.alert(
                 'Unable to update request',
-                'SitGuru could not update this request. Check the table permissions and status field, then try again.',
+                error instanceof Error
+                  ? error.message
+                  : 'SitGuru could not update this request. Please try again.',
               );
             } finally {
               setUpdatingId(null);

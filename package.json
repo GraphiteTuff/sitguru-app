@@ -9,6 +9,7 @@
     "lint": "eslint",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
+    "diagnose-payments": "tsx scripts/diagnose-payments.ts",
     "seed-social-baseline": "tsx scripts/seed-social-baseline.ts"
   },
   "dependencies": {
