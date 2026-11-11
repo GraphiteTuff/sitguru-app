@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -35,10 +37,11 @@ function formatPrice(rate?: number | null) {
 }
 
 async function getGuru(slug: string) {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("gurus")
     .select(
-      "id, slug, display_name, bio, city, state, service_city, service_state, hourly_rate, experience_years, is_verified, rating_avg, review_count"
+      "id, slug, display_name, bio, city, state, service_city, service_state, hourly_rate, experience_years, is_verified, rating_avg, review_count",
     )
     .or(`slug.eq.${slug},id.eq.${slug}`)
     .maybeSingle();

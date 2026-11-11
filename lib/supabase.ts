@@ -1,12 +1,10 @@
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error("Missing Supabase browser environment variables.");
-}
-
-export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
+/**
+ * Legacy browser Supabase entrypoint.
+ * Keep lazy — never throw at module evaluation or Next/Vercel page-data
+ * collection fails when env is not yet injected into the worker.
+ */
+export {
+  createClient,
+  getSupabaseBrowserClient,
+  supabase,
+} from "@/lib/supabase/client";
