@@ -22,6 +22,7 @@ import MobileAlertHosts from '@/components/mobile/MobileAlertHosts';
 import RootErrorBoundary from '@/components/RootErrorBoundary';
 import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
 import { AuthProvider } from '@/context/AuthContext';
+import { TabBarMotionProvider } from '@/context/TabBarMotionContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   openSitGuruDeepLink,
@@ -127,20 +128,22 @@ export default function RootLayout() {
         <RootErrorBoundary>
           <SitGuruPaymentsProvider>
             <AuthProvider>
-              <StatusBar
-                style={colorScheme === 'dark' ? 'light' : 'dark'}
-              />
+              <TabBarMotionProvider>
+                <StatusBar
+                  style={colorScheme === 'dark' ? 'light' : 'dark'}
+                />
 
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: '#0D5C3A',
-                  },
-                }}
-              />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: '#0D5C3A',
+                    },
+                  }}
+                />
 
-              <MobileAlertHosts />
+                <MobileAlertHosts />
+              </TabBarMotionProvider>
             </AuthProvider>
           </SitGuruPaymentsProvider>
         </RootErrorBoundary>

@@ -48,6 +48,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -233,6 +234,8 @@ const REALTIME_TABLES = [
 ];
 
 export default function AmbassadorDashboardScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { width } = useWindowDimensions();
   const { user, profile } = useAuth();
   const isWebPreview = Platform.OS === 'web';
@@ -510,6 +513,7 @@ export default function AmbassadorDashboardScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={[
                     styles.scrollContent,
                     isTablet && styles.scrollContentTablet,

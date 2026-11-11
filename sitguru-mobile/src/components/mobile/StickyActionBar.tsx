@@ -30,7 +30,7 @@ export default function StickyActionBar({
   style,
   embedded = false,
   aboveBottomNav = false,
-  bottomNavHeight = 64,
+  bottomNavHeight = 78,
 }: StickyActionBarProps) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();

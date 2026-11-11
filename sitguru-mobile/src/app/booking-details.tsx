@@ -33,6 +33,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { useBooking } from '@/hooks/data/useBookings';
 import {
@@ -227,6 +228,8 @@ const TOTAL_FIELDS = [
 ];
 
 export default function BookingDetailsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { bookingId, conversationId, guruId, petId, petName, viewerRole } =
     useLocalSearchParams<{
       bookingId?: string;
@@ -513,6 +516,7 @@ export default function BookingDetailsScreen() {
               {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
               <ScrollView
+              {...tabBarScroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
               >

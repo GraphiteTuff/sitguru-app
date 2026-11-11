@@ -40,6 +40,7 @@ import {
 
 import BubblePressable from '@/components/BubblePressable';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -819,6 +820,8 @@ function PhoneStatusBar({
 }
 
 export default function AmbassadorReferralAnalyticsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = getAppTheme(isDark ? 'dark' : 'light');
@@ -1191,6 +1194,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
       </View>
 
       <ScrollView
+              {...tabBarScroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

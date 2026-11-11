@@ -40,6 +40,7 @@ import { useKeyboardSafe } from "@/components/mobile/KeyboardSafeHost";
 import { SitGuruIcon } from "@/components/SitGuruIcon";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import SitGuruTabBar from "@/components/SitGuruTabBar";
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from "@/constants/fonts";
 import {
   setThemePreference,
@@ -710,6 +711,11 @@ export default function FindCareScreen() {
   const searchFieldRef = useRef<View>(null);
   const homeZipFieldRef = useRef<View>(null);
   const scrollOffsetRef = useRef(0);
+  const tabBarScroll = useFloatingTabBarScroll({
+    onScroll: (event) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+    },
+  });
   const keyboardHeightRef = useRef(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { revealFocusedInput } = useKeyboardSafe();
@@ -1492,6 +1498,7 @@ export default function FindCareScreen() {
               style={styles.keyboardView}
             >
             <ScrollView
+              {...tabBarScroll}
               ref={scrollRef}
               keyboardDismissMode={
                 Platform.OS === "ios" ? "interactive" : "on-drag"
@@ -1507,9 +1514,6 @@ export default function FindCareScreen() {
                   styles.mapScrollContentNative,
                 keyboardHeight > 0 && styles.scrollContentKeyboard,
               ]}
-              onScroll={(event) => {
-                scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-              }}
               scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
               scrollEnabled={activeView === "list"}

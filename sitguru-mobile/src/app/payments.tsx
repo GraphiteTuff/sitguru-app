@@ -50,6 +50,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -1162,6 +1163,8 @@ function StatusBadge({
 }
 
 export default function PaymentsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const params = useLocalSearchParams<{
     bookingId?: string;
     checkout?: string;
@@ -1840,6 +1843,7 @@ export default function PaymentsScreen() {
                 ) : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
