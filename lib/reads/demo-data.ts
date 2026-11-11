@@ -151,15 +151,53 @@ function baseContent(
   };
 }
 
+const FOREVER_DOG_COVER = "/images/reads/covers/the-forever-dog.png";
+const FOREVER_DOG_PURCHASE_URL = "https://www.amazon.com/dp/0063002604";
+const KAREN_SHAW_BECKER_URL =
+  "https://www.amazon.com/stores/Karen-Shaw-Becker/author/B08Z6DB717?ref=ap_rdr&shoppingPortalEnabled=true";
+
 export const DEMO_CONTENT: ReadsContentDetail[] = [
+  baseContent({
+    id: "demo-book-the-forever-dog",
+    slug: "the-forever-dog",
+    title: "The Forever Dog",
+    subtitle:
+      "Surprising New Science to Help Your Canine Companion Live Younger, Healthier & Longer",
+    content_type: "book",
+    featured: true,
+    feature_type: "book_of_the_month",
+    description:
+      "A #1 New York Times bestselling dog-care guide from Rodney Habib and Dr. Karen Shaw Becker (with Kristin Loberg) on helping dogs live younger, healthier, and longer.",
+    editorial_summary:
+      "Jason’s favorite book — practical longevity science for Pet Parents who want more healthy years with their dogs.",
+    why_recommended:
+      "Clear, research-backed habits Pet Parents can use to support canine healthspan.",
+    image_url: FOREVER_DOG_COVER,
+    thumbnail_url: FOREVER_DOG_COVER,
+    external_url: FOREVER_DOG_PURCHASE_URL,
+    tags: ["dogs", "health", "team-pick", "jason"],
+    audience: ["pet_parent", "guru"],
+    book: {
+      content_id: "demo-book-the-forever-dog",
+      author_name: "Rodney Habib & Dr. Karen Shaw Becker",
+      publisher: "Harper",
+      publication_date: "2021-10-12",
+      isbn: "978-0063002609",
+      page_count: 464,
+      language: "en",
+      cover_image_url: FOREVER_DOG_COVER,
+      purchase_url: FOREVER_DOG_PURCHASE_URL,
+    },
+    topics: [DEMO_TOPICS[2]],
+  }),
   baseContent({
     id: "demo-book-puppy-foundations",
     slug: "demo-puppy-foundations-handbook",
     title: "Demo: Puppy Foundations Handbook",
     subtitle: "A SitGuru sample title for development",
     content_type: "book",
-    featured: true,
-    feature_type: "book_of_the_month",
+    featured: false,
+    feature_type: null,
     description:
       "Demo placeholder summarizing positive puppy routines for new Pet Parents.",
     editorial_summary:
@@ -278,67 +316,132 @@ export const DEMO_CONTENT: ReadsContentDetail[] = [
     },
     topics: [DEMO_TOPICS[0]],
   }),
+  baseContent({
+    id: "demo-author-karen-shaw-becker",
+    slug: "karen-shaw-becker",
+    title: "Dr. Karen Shaw Becker",
+    content_type: "author",
+    featured: false,
+    feature_type: null,
+    description:
+      "Integrative veterinarian and co-author of The Forever Dog, focused on proactive pet wellness and longevity.",
+    editorial_summary:
+      "Co-author of Jason’s favorite book, The Forever Dog.",
+    tags: ["author", "health", "dogs"],
+    audience: ["pet_parent", "guru"],
+    external_url: KAREN_SHAW_BECKER_URL,
+    person: {
+      content_id: "demo-author-karen-shaw-becker",
+      person_type: "veterinarian",
+      credentials: "DVM",
+      organization: null,
+      biography:
+        "Dr. Karen Shaw Becker is an integrative veterinarian and co-author of The Forever Dog with Rodney Habib (with Kristin Loberg).",
+      website_url: KAREN_SHAW_BECKER_URL,
+      headshot_url: null,
+      social_links: { amazon_author: KAREN_SHAW_BECKER_URL },
+      partnership_status: "none",
+      upcoming_appearances: null,
+    },
+    topics: [DEMO_TOPICS[2]],
+  }),
+  baseContent({
+    id: "demo-author-rodney-habib",
+    slug: "rodney-habib",
+    title: "Rodney Habib",
+    content_type: "author",
+    featured: false,
+    feature_type: null,
+    description:
+      "Pet-health educator and co-author of The Forever Dog, known for translating longevity science for everyday Pet Parents.",
+    editorial_summary:
+      "Co-author of Jason’s favorite book, The Forever Dog.",
+    tags: ["author", "health", "dogs"],
+    audience: ["pet_parent", "guru"],
+    person: {
+      content_id: "demo-author-rodney-habib",
+      person_type: "author",
+      credentials: null,
+      organization: null,
+      biography:
+        "Rodney Habib is a pet-health educator and co-author of The Forever Dog with Dr. Karen Shaw Becker (with Kristin Loberg).",
+      website_url: null,
+      headshot_url: null,
+      social_links: {},
+      partnership_status: "none",
+      upcoming_appearances: null,
+    },
+    topics: [DEMO_TOPICS[2]],
+  }),
 ];
+
+/** Indices into DEMO_CONTENT for stable team-pick wiring. */
+const DEMO_FOREVER_DOG = DEMO_CONTENT[0];
+const DEMO_PUPPY_BOOK = DEMO_CONTENT[1];
+const DEMO_PODCAST = DEMO_CONTENT[3];
+const DEMO_VIDEO = DEMO_CONTENT[4];
+const DEMO_GUEST_AUTHOR = DEMO_CONTENT[5];
 
 export const DEMO_TEAM_PICKS: ReadsTeamPick[] = [
   {
-    id: "demo-pick-ava-book",
-    team_member_id: "demo-tm-ava",
-    content_id: "demo-book-puppy-foundations",
+    id: "demo-pick-jason-forever-dog",
+    team_member_id: "demo-tm-jason",
+    content_id: DEMO_FOREVER_DOG.id,
     recommendation_type: "favorite_book",
     quote:
-      "Demo quote: Clear, practical puppy routines Pet Parents can actually stick with.",
+      "This is my favorite book — science-backed habits that help dogs live younger, healthier, and longer.",
     display_order: 10,
     featured: true,
     is_active: true,
     published_at: new Date().toISOString(),
-    team_member: DEMO_TEAM[2],
-    content: DEMO_CONTENT[0],
+    team_member: DEMO_TEAM[0],
+    content: DEMO_FOREVER_DOG,
   },
   {
-    id: "demo-pick-ryan-podcast",
-    team_member_id: "demo-tm-ryan",
-    content_id: "demo-podcast-calm-homes",
-    recommendation_type: "favorite_podcast",
+    id: "demo-pick-ava-book",
+    team_member_id: "demo-tm-ava",
+    content_id: DEMO_PUPPY_BOOK.id,
+    recommendation_type: "favorite_book",
     quote:
-      "Demo quote: Great listen for families juggling work and restless pets.",
+      "Demo quote: Clear, practical puppy routines Pet Parents can actually stick with.",
     display_order: 20,
     featured: true,
     is_active: true,
     published_at: new Date().toISOString(),
-    team_member: DEMO_TEAM[3],
-    content: DEMO_CONTENT[2],
+    team_member: DEMO_TEAM[2],
+    content: DEMO_PUPPY_BOOK,
   },
   {
-    id: "demo-pick-lola-video",
-    team_member_id: "demo-tm-lola",
-    content_id: "demo-video-enrichment",
-    recommendation_type: "favorite_video",
-    quote: "Demo quote: Short enrichment ideas that feel doable on busy days.",
+    id: "demo-pick-ryan-podcast",
+    team_member_id: "demo-tm-ryan",
+    content_id: DEMO_PODCAST.id,
+    recommendation_type: "favorite_podcast",
+    quote:
+      "Demo quote: Great listen for families juggling work and restless pets.",
     display_order: 30,
     featured: true,
     is_active: true,
     published_at: new Date().toISOString(),
-    team_member: DEMO_TEAM[4],
-    content: DEMO_CONTENT[3],
+    team_member: DEMO_TEAM[3],
+    content: DEMO_PODCAST,
   },
   {
-    id: "demo-pick-jason-mag",
-    team_member_id: "demo-tm-jason",
-    content_id: "demo-mag-pet-wellness",
-    recommendation_type: "favorite_magazine",
-    quote: "Demo quote: Helpful wellness themes for local pet communities.",
+    id: "demo-pick-lola-video",
+    team_member_id: "demo-tm-lola",
+    content_id: DEMO_VIDEO.id,
+    recommendation_type: "favorite_video",
+    quote: "Demo quote: Short enrichment ideas that feel doable on busy days.",
     display_order: 40,
     featured: true,
     is_active: true,
     published_at: new Date().toISOString(),
-    team_member: DEMO_TEAM[0],
-    content: DEMO_CONTENT[1],
+    team_member: DEMO_TEAM[4],
+    content: DEMO_VIDEO,
   },
   {
     id: "demo-pick-danette-author",
     team_member_id: "demo-tm-danette",
-    content_id: "demo-author-guest",
+    content_id: DEMO_GUEST_AUTHOR.id,
     recommendation_type: "additional",
     quote: "Demo quote: Warm expert voices help Pet Parents feel supported.",
     display_order: 50,
@@ -346,7 +449,7 @@ export const DEMO_TEAM_PICKS: ReadsTeamPick[] = [
     is_active: true,
     published_at: new Date().toISOString(),
     team_member: DEMO_TEAM[1],
-    content: DEMO_CONTENT[4],
+    content: DEMO_GUEST_AUTHOR,
   },
 ];
 

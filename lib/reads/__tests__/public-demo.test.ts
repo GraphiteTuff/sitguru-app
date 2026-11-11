@@ -37,6 +37,30 @@ describe("reads public demo safety", () => {
     );
   });
 
+  it("wires Jason's favorite book to The Forever Dog with author metadata", () => {
+    const jasonPick = DEMO_TEAM_PICKS.find(
+      (p) => p.team_member?.slug === "jason-graff",
+    );
+    assert.ok(jasonPick);
+    assert.equal(jasonPick?.recommendation_type, "favorite_book");
+    assert.equal(jasonPick?.content?.slug, "the-forever-dog");
+    assert.equal(jasonPick?.content?.content_type, "book");
+    assert.equal(jasonPick?.content?.book?.publisher, "Harper");
+    assert.equal(jasonPick?.content?.book?.isbn, "978-0063002609");
+    assert.match(
+      jasonPick?.content?.book?.author_name || "",
+      /Karen Shaw Becker/,
+    );
+    assert.ok(
+      DEMO_CONTENT.some(
+        (c) =>
+          c.slug === "karen-shaw-becker" &&
+          c.person?.person_type === "veterinarian",
+      ),
+    );
+    assert.ok(DEMO_CONTENT.some((c) => c.slug === "rodney-habib"));
+  });
+
   it("exposes primary public navigation and CTAs", () => {
     assert.ok(READS_FORMAT_NAV.some((i) => i.href === "/reads/books"));
     assert.ok(READS_FORMAT_NAV.some((i) => i.href === "/reads/team-picks"));
