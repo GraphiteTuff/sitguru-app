@@ -39,9 +39,9 @@ CREATE POLICY reads_community_recs_public_read
 DROP POLICY IF EXISTS reads_community_recs_staff_all ON public.reads_community_recommendations;
 CREATE POLICY reads_community_recs_staff_all
   ON public.reads_community_recommendations
-  FOR ALL
-  USING (true)
-  WITH CHECK (true);
+  FOR ALL TO authenticated
+  USING (public.is_reads_staff())
+  WITH CHECK (public.is_reads_staff());
 
 COMMENT ON TABLE public.reads_community_recommendations IS
   'Guru and Pet Parent recommendations. Must be reviewed/approved before public publish. Team Picks remain in reads_team_picks.';
