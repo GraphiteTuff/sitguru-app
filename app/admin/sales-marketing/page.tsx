@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BookOpen,
   ClipboardCheck,
   FileText,
   Flag,
@@ -38,6 +39,9 @@ const routes = {
   monthlyReview: "/admin/sales-marketing/monthly-review",
   outreach: "/admin/sales-marketing/outreach",
   content: "/admin/sales-marketing/content",
+  readsMedia: "/admin/growth/reads",
+  managerReads: "/manager/reads",
+  internReads: "/intern/content/reads",
   proofLibrary: "/admin/sales-marketing/proof-library",
   campaigns: "/admin/sales-marketing/campaigns",
   referrals: "/admin/referrals",
@@ -245,6 +249,12 @@ export default async function SalesMarketingAdminPage() {
       label: "Content",
       detail: `${number(data.metrics.contentItems)} planner items`,
       icon: FileText,
+    },
+    {
+      href: routes.readsMedia,
+      label: "Reads & Media",
+      detail: "Books, podcasts, videos, Team Picks",
+      icon: BookOpen,
     },
     {
       href: routes.campaigns,

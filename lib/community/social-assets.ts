@@ -15,7 +15,7 @@ export function getBrandedSocialGraphicUrl(
     origin ||
     (typeof window !== "undefined" ? window.location.origin : "https://www.sitguru.com");
 
-  return `${base.replace(/\/$/, "")}/api/community/events/${encodeURIComponent(slug)}/social/${format}`;
+  return `${base.replace(/\/$/, "")}/api/community/events/social/${encodeURIComponent(slug)}/${format}`;
 }
 
 export function getEventSocialAssets(

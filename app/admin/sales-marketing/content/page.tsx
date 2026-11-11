@@ -430,13 +430,33 @@ export default async function SalesMarketingContentPage() {
         <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <Link
-                href="/admin/sales-marketing"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Back to Sales & Marketing
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/admin/sales-marketing"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back to Sales & Marketing
+                </Link>
+                <Link
+                  href="/admin/growth/reads"
+                  className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-900 transition hover:bg-orange-100"
+                >
+                  Reads & Media Content Studio
+                </Link>
+                <Link
+                  href="/manager/reads"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Manager Reads
+                </Link>
+                <Link
+                  href="/intern/content/reads"
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-900 transition hover:bg-sky-100"
+                >
+                  Intern Reads
+                </Link>
+              </div>
 
               <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
                 <Megaphone className="h-4 w-4" aria-hidden="true" />

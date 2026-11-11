@@ -18,8 +18,13 @@ export default function SiteChrome({
 
   const isAdminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const isGuruArea = pathname === "/guru" || pathname.startsWith("/guru/");
+  const isReadsStaffArea =
+    pathname === "/manager" ||
+    pathname.startsWith("/manager/") ||
+    pathname === "/intern" ||
+    pathname.startsWith("/intern/");
 
-  const hidePublicChrome = isAdminArea || isGuruArea;
+  const hidePublicChrome = isAdminArea || isGuruArea || isReadsStaffArea;
 
   return (
     <>

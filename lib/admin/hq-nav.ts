@@ -24,6 +24,7 @@ export type HqNavIcon =
   | "payments"
   | "payouts"
   | "megaphone"
+  | "book"
   | "link"
   | "programs"
   | "partners"
@@ -99,6 +100,7 @@ export const HQ_NAV_SECTIONS: HqNavSection[] = [
       { label: "Manager Portal", href: "/manager", icon: "briefcase" },
       { label: "Growth Workplace", href: "/admin/growth", icon: "megaphone" },
       { label: "Sales & Marketing", href: "/admin/sales-marketing", icon: "megaphone" },
+      { label: "Reads & Media", href: "/admin/growth/reads", icon: "book" },
       { label: "Referrals", href: "/admin/referrals", icon: "link" },
       { label: "Programs", href: "/admin/programs", icon: "programs" },
       { label: "Partners", href: "/admin/partners", icon: "partners" },
