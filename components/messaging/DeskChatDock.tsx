@@ -277,7 +277,7 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   }
 
   return (
-    <div className="desk-chat-dock fixed inset-x-0 bottom-0 z-[95] flex flex-col items-stretch px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:items-end sm:px-4 md:pb-[max(1.25rem,env(safe-area-inset-bottom))] xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
+    <div className="desk-chat-dock fixed inset-x-0 bottom-0 z-[95] flex flex-col items-end px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-4 xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
       {open ? (
         <section className="relative mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
           <button

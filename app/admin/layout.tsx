@@ -464,191 +464,124 @@ function MobileNav({
 }) {
   const allow = (href: string) =>
     !modules || href === "/" || isAdminPathAllowedForModules(href, modules);
-  if (growthOnly) {
-    const growthLinks = growthNavSections[0]?.items || [];
-    return (
-      <div className="border-t border-slate-200/80 bg-white px-3 py-3 lg:hidden">
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {growthLinks.map((item) => {
-            const Icon = item.icon;
-            const active = isActivePath(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={
-                  active
-                    ? `min-w-[152px] rounded-2xl p-3 ${DESK_UI.sidebarActive}`
-                    : `min-w-[152px] rounded-2xl border border-slate-200/80 bg-white p-3 text-[#0F2744] shadow-sm`
-                }
-              >
-                <span className="flex items-center gap-2 text-xs font-bold">
-                  <span
-                    className={
-                      active
-                        ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
-                        : "flex h-8 w-8 items-center justify-center rounded-xl bg-[#EEF2F6] text-[#2563EB]"
-                    }
-                  >
-                    <Icon size={16} />
-                  </span>
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+
+  const primaryLinks = growthOnly
+    ? (growthNavSections[0]?.items || []).slice(0, 6)
+    : [
+        ...mobileQuickLinks.filter((item) => item.featured && allow(item.href)),
+        ...topHeaderLinks
+          .filter((item) => allow(item.href))
+          .filter(
+            (item) =>
+              !mobileQuickLinks.some((quick) => quick.href === item.href) &&
+              item.href !== "/admin/messages",
+          )
+          .slice(0, 4)
+          .map((item) => ({
+            label: item.label,
+            href: item.href,
+            icon: Home,
+            description: "",
+            featured: false,
+          })),
+      ];
 
   return (
-    <div className="border-t border-slate-200/80 bg-white px-3 py-3 lg:hidden">
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {mobileQuickLinks.filter((item) => allow(item.href)).map((item) => {
+    <div className="border-t border-slate-200/80 bg-white px-3 py-2 lg:hidden">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {primaryLinks.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
-
+          const featured = "featured" in item ? Boolean(item.featured) : false;
           return (
             <Link
-              key={item.href}
+              key={`${item.href}-${item.label}`}
               href={item.href}
               className={
-                item.featured || active
-                  ? `min-w-[152px] rounded-2xl p-3 ${DESK_UI.sidebarActive}`
-                  : `min-w-[152px] rounded-2xl border border-slate-200/80 bg-white p-3 text-[#0F2744] shadow-sm`
+                featured || active
+                  ? `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold ${DESK_UI.sidebarActive}`
+                  : "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 py-2 text-[11px] font-bold text-[#0F2744]"
               }
             >
-              <span className="flex items-center gap-2 text-xs font-bold">
-                <span
-                  className={
-                    item.featured || active
-                      ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
-                      : "flex h-8 w-8 items-center justify-center rounded-xl bg-[#EEF2F6] text-[#2563EB]"
-                  }
-                >
-                  <Icon size={16} />
-                </span>
-                {item.label}
-              </span>
-
-              <span
-                className={
-                  item.featured || active
-                    ? "mt-1 block text-[10px] font-semibold leading-4 text-white/80"
-                    : "mt-1 block text-[10px] font-semibold leading-4 text-slate-500"
-                }
-              >
-                {item.description}
-              </span>
+              <Icon size={14} className="shrink-0 opacity-90" />
+              <span className="whitespace-nowrap">{item.label}</span>
             </Link>
           );
         })}
       </div>
 
-      <details className={`group mt-3 ${DESK_UI.card}`}>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#0F2744] marker:hidden">
-          <span className="flex items-center gap-2">
-            <Megaphone size={17} className="text-[#2563EB]" />
-            HR, University & Growth
-          </span>
+      {growthOnly ? null : (
+        <details className={`group mt-2 ${DESK_UI.card}`}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-black text-[#0F2744] marker:hidden">
+            <span className="flex items-center gap-2">
+              <Gauge size={16} className="text-[#2563EB]" />
+              More HQ
+            </span>
+            <ChevronDown
+              size={16}
+              className="text-[#2563EB] transition group-open:rotate-180"
+            />
+          </summary>
 
-          <ChevronDown
-            size={18}
-            className="text-[#2563EB] transition group-open:rotate-180"
-          />
-        </summary>
-
-        <div className="grid max-h-[48dvh] gap-2 overflow-y-auto border-t border-slate-100 p-3">
-          {mobileGrowthLinks.filter((item) => allow(item.href)).map((item) => {
-            const Icon = item.icon;
-            const active = isActivePath(pathname, item.href);
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={
-                  active
-                    ? `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${DESK_UI.sidebarActive}`
-                    : `flex items-center gap-2 rounded-2xl bg-[#EEF2F6] px-3 py-2.5 text-xs font-bold text-[#0F2744]`
-                }
-              >
-                <Icon size={15} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </details>
-
-      <details className={`group mt-3 ${DESK_UI.card}`}>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#0F2744] marker:hidden">
-          <span className="flex items-center gap-2">
-            <Gauge size={17} className="text-[#2563EB]" />
-            All admin sections
-          </span>
-
-          <ChevronDown
-            size={18}
-            className="text-[#2563EB] transition group-open:rotate-180"
-          />
-        </summary>
-
-        <div className="grid max-h-[58dvh] gap-4 overflow-y-auto border-t border-slate-100 p-3">
-          {navSections
-            .filter((section) => !modules || isNavSectionOn(section.title, modules))
-            .map((section) => (
-            <div key={section.title}>
+          <div className="grid max-h-[min(58dvh,28rem)] gap-4 overflow-y-auto border-t border-slate-100 p-3">
+            <div>
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                {section.title}
+                HR, University & Growth
               </p>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {section.items.filter((item) => allow(item.href)).map((item) => {
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {mobileGrowthLinks.filter((item) => allow(item.href)).map((item) => {
                   const Icon = item.icon;
                   const active = isActivePath(pathname, item.href);
-
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={
                         active
-                          ? `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${DESK_UI.sidebarActive}`
-                          : `flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] px-3 py-2.5 text-xs font-bold text-[#0F2744]`
+                          ? `flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${DESK_UI.sidebarActive}`
+                          : "flex items-center gap-2 rounded-2xl bg-[#EEF2F6] px-3 py-2 text-xs font-bold text-[#0F2744]"
                       }
                     >
-                      <Icon size={15} />
-                      <span className="truncate">{item.label}</span>
+                      <Icon size={14} />
+                      {item.label}
                     </Link>
                   );
                 })}
               </div>
             </div>
-          ))}
-        </div>
-      </details>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {topHeaderLinks.filter((item) => allow(item.href)).map((item) => {
-          const active = isActivePath(pathname, item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold shadow-sm ${
-                active
-                  ? DESK_UI.sidebarActive
-                  : "border border-slate-200/80 bg-white text-[#0F2744]"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
+            {navSections
+              .filter((section) => !modules || isNavSectionOn(section.title, modules))
+              .map((section) => (
+                <div key={section.title}>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                    {section.title}
+                  </p>
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {section.items.filter((item) => allow(item.href)).map((item) => {
+                      const Icon = item.icon;
+                      const active = isActivePath(pathname, item.href);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={
+                            active
+                              ? `flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${DESK_UI.sidebarActive}`
+                              : "flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] px-3 py-2 text-xs font-bold text-[#0F2744]"
+                          }
+                        >
+                          <Icon size={14} />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -1070,21 +1003,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className={`flex min-w-0 flex-col overflow-x-hidden ${isMessagesWorkspace ? "h-dvh min-h-0" : ""}`}>
           <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
-            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-2.5"}`}>
-              <div className="flex min-h-[4.25rem] items-center gap-3 xl:gap-4">
+            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-2"}`}>
+              <div className="flex min-h-14 items-center gap-2 sm:min-h-[3.75rem] sm:gap-3 xl:gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
-                    <AdminLogo />
-                    {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
-                      <Link
-                        href={adminRoutes.growth}
-                        className="inline-flex min-h-11 items-center gap-2 rounded-2xl px-3 text-xs font-black text-white"
-                        style={{ background: DESK_UI.teal }}
-                      >
-                        <Sparkles size={16} />
-                        Social Media
-                      </Link>
-                    )}
+                  <div className="shrink-0 lg:hidden">
+                    <AdminLogo compact />
                   </div>
 
                   <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1108,7 +1031,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   </nav>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
                   {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
                     <Link
                       href={adminRoutes.growth}
@@ -1119,7 +1042,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                       Social Media Manager
                     </Link>
                   )}
-                  <div className={`items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm ${isMessagesWorkspace ? "hidden lg:flex" : "flex"}`}>
+                  <div className={`items-center gap-1 rounded-2xl border border-slate-200/80 bg-white p-0.5 shadow-sm sm:gap-2 sm:p-1 ${isMessagesWorkspace ? "hidden lg:flex" : "hidden sm:flex"}`}>
                     <SearchBar />
 
                     {isGrowthChrome || (limitNav && !modules?.financials) ? null : (
@@ -1145,10 +1068,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     )}
                   </div>
 
+                  {/* Desk chat covers messaging on small screens — keep full Messages page on lg+. */}
                   {isGrowthChrome ? null : (
                   <Link
                     href={adminRoutes.messages}
-                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm transition hover:brightness-95 ${DESK_UI.primary}`}
+                    className={`relative hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm transition hover:brightness-95 lg:flex ${DESK_UI.primary}`}
                     aria-label="Admin messages"
                     title="Messages"
                   >
@@ -1163,21 +1087,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </div>
               </div>
             </div>
-
-            {isGrowthChrome || isMessagesWorkspace ? null : (
-              <MobileNav
-                pathname={pathname}
-                growthOnly={false}
-                modules={limitNav ? modules : null}
-              />
-            )}
           </header>
+
+          {isGrowthChrome || isMessagesWorkspace ? null : (
+            <MobileNav
+              pathname={pathname}
+              growthOnly={false}
+              modules={limitNav ? modules : null}
+            />
+          )}
 
           <main
             className={
               isMessagesWorkspace
                 ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                : "min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6 xl:px-6 2xl:px-7"
+                : "min-w-0 flex-1 overflow-x-hidden px-3 py-3 pb-28 sm:px-5 sm:py-4 sm:pb-24 lg:px-6 lg:pb-8 xl:px-6 2xl:px-7"
             }
           >
             <div

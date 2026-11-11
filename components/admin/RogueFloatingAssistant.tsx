@@ -380,7 +380,7 @@ export default function RogueFloatingAssistant() {
 
   const ui = (
     <div
-      className="pointer-events-none fixed bottom-4 right-[5.75rem] z-[80] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-[6.5rem]"
+      className="pointer-events-none fixed bottom-4 right-[4.75rem] z-[80] flex flex-row items-center justify-end gap-2 overflow-visible sm:right-[5.75rem] md:bottom-6 md:right-[6.5rem] md:gap-3"
       data-rogue-admin-dock
       style={
         {
@@ -394,7 +394,7 @@ export default function RogueFloatingAssistant() {
         {!open ? (
           <button
             type="button"
-            className="homepage-chat-tip"
+            className="homepage-chat-tip hidden md:inline-flex"
             style={{ maxWidth: "min(220px, calc(100vw - 10.5rem))" }}
             onClick={openPanel}
             aria-label="Open Rogue reporting terminal"

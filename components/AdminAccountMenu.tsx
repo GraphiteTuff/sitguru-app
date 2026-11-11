@@ -384,7 +384,7 @@ export default function AdminAccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full bg-[#2563EB] pl-1.5 pr-2.5 text-white shadow-sm transition hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 xl:max-w-[13rem] xl:pr-3"
+        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full bg-[#2563EB] pl-1.5 pr-1.5 text-white shadow-sm transition hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:pr-2.5 xl:max-w-[13rem] xl:pr-3"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open admin account menu"
@@ -400,7 +400,7 @@ export default function AdminAccountMenu() {
           />
         </span>
 
-        <span className="min-w-0 flex-1 text-left">
+        <span className="hidden min-w-0 flex-1 text-left sm:block">
           <span className="block truncate text-xs font-black leading-tight text-white">
             {account.displayName}
           </span>
@@ -410,7 +410,7 @@ export default function AdminAccountMenu() {
           </span>
         </span>
 
-        <span className="shrink-0 text-white/90">
+        <span className="hidden shrink-0 text-white/90 sm:block">
           {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </span>
       </button>

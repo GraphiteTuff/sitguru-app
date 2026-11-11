@@ -20,12 +20,12 @@ export function GrowthPageFrame({
 }) {
   const desk = variant === "desk";
   return (
-    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-4 overflow-x-hidden pb-6 sm:space-y-5 sm:pb-4">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-3 overflow-x-hidden pb-6 sm:space-y-5 sm:pb-4">
       <section
         className={
           desk
-            ? "overflow-hidden rounded-[1.5rem] border border-sky-100 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F5F3FF] p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
-            : "public-dark-section overflow-hidden rounded-[1.5rem] border border-emerald-100 p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7"
+            ? "overflow-hidden rounded-[1.25rem] border border-sky-100 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F5F3FF] p-3.5 shadow-sm sm:rounded-[1.75rem] sm:p-7"
+            : "public-dark-section overflow-hidden rounded-[1.25rem] border border-emerald-100 p-3.5 shadow-sm sm:rounded-[1.75rem] sm:p-7"
         }
         data-brand-green={desk ? undefined : true}
         style={desk ? undefined : { background: "#0D5C3A" }}
@@ -33,18 +33,18 @@ export function GrowthPageFrame({
         <p className={`text-[10px] font-black uppercase tracking-[0.24em] sm:text-xs ${desk ? "text-[#2563EB]" : "!text-white"}`}>
           {kicker}
         </p>
-        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mt-2 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <h1 className={`break-words text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl ${desk ? "text-[#0F2744]" : "!text-white"}`}>
+            <h1 className={`break-words text-xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl ${desk ? "text-[#0F2744]" : "!text-white"}`}>
               {title}
             </h1>
             {detail ? (
-              <p className={`mt-3 max-w-2xl text-sm font-semibold leading-6 ${desk ? "text-slate-600" : "!text-white/90"}`}>
+              <p className={`mt-2 max-w-2xl text-sm font-semibold leading-5 sm:mt-3 sm:leading-6 line-clamp-2 sm:line-clamp-none ${desk ? "text-slate-600" : "!text-white/90"}`}>
                 {detail}
               </p>
             ) : null}
           </div>
-          {action ? <div className="shrink-0">{action}</div> : null}
+          {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
         </div>
       </section>
       {children}

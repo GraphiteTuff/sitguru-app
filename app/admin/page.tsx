@@ -540,22 +540,22 @@ export default async function AdminOperationsDashboard() {
       variant="desk"
       kicker={`Super Admin HQ · ${todayLabel}`}
       title="Clear queues, then grow where the pack is dense."
-      detail="Contractor hours, approvals, people, bookings, messages, payouts, and market density — same desk look as Manager and Intern portals."
+      detail="Hours, approvals, people, messages, payouts, and market density — same desk as Manager and Intern."
       action={
-        <div className="flex flex-wrap gap-2">
+        <>
           <Link
             href="/admin/action-center"
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white sm:flex-none"
           >
             Action Center
           </Link>
           <Link
             href="/admin/financials/contractor-hours"
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-[#0F2744]"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-[#0F2744] sm:flex-none"
           >
             Contractor Hours
           </Link>
-        </div>
+        </>
       }
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
