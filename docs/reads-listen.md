@@ -11,9 +11,9 @@ podcasts, YouTube videos, authors/experts, Team Picks, and partnerships.
 - `/reads/podcasts`, `/reads/podcasts/[slug]`
 - `/reads/videos`, `/reads/videos/[slug]`
 - `/reads/authors`, `/reads/authors/[slug]`
-- `/reads/team-picks`
-- `/reads/guru-picks` (V2 placeholder)
-- `/reads/pet-parent-picks` (V2 placeholder)
+- `/reads/team-picks` — staff-curated; shows teammate who submitted; Manager/Admin review
+- `/reads/guru-picks` — registered Guru submissions; public only after review/approval (`reads_community_recommendations`)
+- `/reads/pet-parent-picks` — Pet Parent community submissions; public only after review/approval
 - `/reads/topics`, `/reads/topics/[slug]`
 - `/reads/search`
 - `/reads/partner`

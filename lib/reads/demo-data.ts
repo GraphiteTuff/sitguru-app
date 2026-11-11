@@ -236,12 +236,56 @@ export const DEMO_CONTENT: ReadsContentDetail[] = [
       publication_name: "Demo Pet Wellness Quarterly",
       publication_type: "health",
       logo_url: null,
-      website_url: null,
+      website_url: "https://www.sitguru.com/reads/partner",
       issue_label: "Sample Issue",
       issue_date: "2025-06-01",
       partnership_status: "none",
     },
     topics: [DEMO_TOPICS[2]],
+  }),
+  baseContent({
+    id: "demo-mag-dog-life",
+    slug: "demo-modern-dog-life",
+    title: "Demo: Modern Dog Life",
+    content_type: "magazine",
+    featured: true,
+    feature_type: null,
+    description: "Demo dog magazine for newsstand layout testing.",
+    editorial_summary: "Training, health, and dog lifestyle sample issue.",
+    tags: ["demo", "dogs", "training"],
+    publication: {
+      content_id: "demo-mag-dog-life",
+      publication_name: "Demo Modern Dog Life",
+      publication_type: "dog",
+      logo_url: null,
+      website_url: "https://www.sitguru.com/reads/partner",
+      issue_label: "Fall Sample",
+      issue_date: "2025-09-01",
+      partnership_status: "none",
+    },
+    topics: [DEMO_TOPICS[0]],
+  }),
+  baseContent({
+    id: "demo-mag-cat-care",
+    slug: "demo-cat-care-journal",
+    title: "Demo: Cat Care Journal",
+    content_type: "magazine",
+    featured: true,
+    feature_type: null,
+    description: "Demo cat magazine for newsstand layout testing.",
+    editorial_summary: "Cat care, behavior, and enrichment sample issue.",
+    tags: ["demo", "cats"],
+    publication: {
+      content_id: "demo-mag-cat-care",
+      publication_name: "Demo Cat Care Journal",
+      publication_type: "cat",
+      logo_url: null,
+      website_url: "https://www.sitguru.com/reads/partner",
+      issue_label: "Fall Sample",
+      issue_date: "2025-09-01",
+      partnership_status: "none",
+    },
+    topics: [DEMO_TOPICS[1]],
   }),
   baseContent({
     id: "demo-podcast-calm-homes",
@@ -375,12 +419,17 @@ export const DEMO_CONTENT: ReadsContentDetail[] = [
   }),
 ];
 
-/** Indices into DEMO_CONTENT for stable team-pick wiring. */
-const DEMO_FOREVER_DOG = DEMO_CONTENT[0];
-const DEMO_PUPPY_BOOK = DEMO_CONTENT[1];
-const DEMO_PODCAST = DEMO_CONTENT[3];
-const DEMO_VIDEO = DEMO_CONTENT[4];
-const DEMO_GUEST_AUTHOR = DEMO_CONTENT[5];
+function demoById(id: string) {
+  const found = DEMO_CONTENT.find((item) => item.id === id);
+  if (!found) throw new Error(`Missing demo content ${id}`);
+  return found;
+}
+
+const DEMO_FOREVER_DOG = demoById("demo-book-the-forever-dog");
+const DEMO_PUPPY_BOOK = demoById("demo-book-puppy-foundations");
+const DEMO_PODCAST = demoById("demo-podcast-calm-homes");
+const DEMO_VIDEO = demoById("demo-video-enrichment");
+const DEMO_GUEST_AUTHOR = demoById("demo-author-guest");
 
 export const DEMO_TEAM_PICKS: ReadsTeamPick[] = [
   {

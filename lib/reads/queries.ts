@@ -529,3 +529,79 @@ export async function searchReads(filters: ReadsSearchFilters) {
     teamPicks,
   };
 }
+
+export type CommunityRecommendationRow = {
+  id: string;
+  source: "guru" | "pet_parent";
+  quote: string;
+  submitter_display_name: string;
+  submitter_role_label: string;
+  status: string;
+  content?: ReadsContentDetail | null;
+};
+
+/**
+ * Public Guru / Pet Parent picks. Only `published` rows are returned (RLS + filter).
+ * Empty until community submissions are reviewed and approved.
+ */
+export async function fetchCommunityRecommendations(filters?: {
+  source?: "guru" | "pet_parent";
+  format?: ReadsContentType;
+  q?: string;
+}): Promise<CommunityRecommendationRow[]> {
+  try {
+    const supabase = await publicClient();
+    let query = supabase
+      .from("reads_community_recommendations")
+      .select(
+        `
+        id,
+        source,
+        quote,
+        submitter_display_name,
+        submitter_role_label,
+        status,
+        content:reads_content (${DETAIL_SELECT})
+      `,
+      )
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(48);
+
+    if (filters?.source) {
+      query = query.eq("source", filters.source);
+    }
+
+    const { data, error } = await query;
+    if (error || !data?.length) {
+      if (error && !tableMissing(error)) console.error(error.message);
+      return [];
+    }
+
+    return data
+      .map((row) => {
+        const contentRow = asSingle(row.content as never) as ContentRow | null;
+        return {
+          id: String(row.id),
+          source: row.source as "guru" | "pet_parent",
+          quote: String(row.quote || ""),
+          submitter_display_name: String(row.submitter_display_name || ""),
+          submitter_role_label: String(row.submitter_role_label || ""),
+          status: String(row.status || ""),
+          content: contentRow ? mapDetail(contentRow) : null,
+        };
+      })
+      .filter((row) => {
+        if (filters?.format && row.content?.content_type !== filters.format) {
+          return false;
+        }
+        if (filters?.q) {
+          const hay = `${row.quote} ${row.submitter_display_name} ${row.content?.title || ""}`.toLowerCase();
+          return hay.includes(filters.q.toLowerCase());
+        }
+        return true;
+      });
+  } catch {
+    return [];
+  }
+}

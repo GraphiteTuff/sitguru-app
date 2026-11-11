@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ExternalLink, Play } from "lucide-react";
 import DisclosureBadge from "@/components/reads/DisclosureBadge";
 import type { ReadsContentDetail } from "@/lib/reads/types";
 
@@ -31,9 +32,11 @@ function cover(item: ReadsContentDetail) {
 export default function ContentCard({
   item,
   compact = false,
+  variant = "default",
 }: {
   item: ReadsContentDetail;
   compact?: boolean;
+  variant?: "default" | "cover" | "episode";
 }) {
   const image = cover(item);
   const meta =
@@ -42,10 +45,60 @@ export default function ContentCard({
     item.publication?.publication_name ||
     item.person?.credentials ||
     item.content_type;
+  const publisher =
+    item.publication?.website_url ||
+    item.external_url ||
+    item.book?.purchase_url ||
+    null;
 
-  const mediaClass = compact
-    ? "aspect-[4/3]"
-    : "aspect-[3/4] sm:aspect-[4/5]";
+  if (variant === "cover") {
+    return (
+      <article className="group">
+        <Link href={hrefFor(item)} className="block">
+          <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-orange-50 shadow-sm">
+            {image ? (
+              <Image
+                src={image}
+                alt=""
+                fill
+                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                sizes="(max-width: 768px) 45vw, 220px"
+              />
+            ) : (
+              <div className="flex h-full items-end p-4">
+                <p className="text-sm font-black text-[#0D5C3A]">{item.title}</p>
+              </div>
+            )}
+          </div>
+          <h3 className="mt-3 text-sm font-black leading-snug text-[#163127] group-hover:text-[#0D5C3A]">
+            {item.title}
+          </h3>
+          {item.publication?.issue_label ? (
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              {item.publication.issue_label}
+            </p>
+          ) : null}
+        </Link>
+        {publisher ? (
+          <a
+            href={publisher}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#0D5C3A] underline-offset-2 hover:underline"
+          >
+            Visit publisher <ExternalLink className="h-3 w-3" aria-hidden />
+          </a>
+        ) : null}
+      </article>
+    );
+  }
+
+  const mediaClass =
+    variant === "episode"
+      ? "aspect-square"
+      : compact
+        ? "aspect-[4/3]"
+        : "aspect-[3/4] sm:aspect-[4/5]";
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-[0_10px_30px_rgba(13,92,58,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(13,92,58,0.12)]">
@@ -66,6 +119,11 @@ export default function ContentCard({
               <p className="text-sm font-black text-[#0D5C3A]">{item.title}</p>
             </div>
           )}
+          {variant === "episode" ? (
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-xs font-black text-white">
+              <Play className="h-3.5 w-3.5" aria-hidden /> Listen
+            </span>
+          ) : null}
         </div>
       </Link>
       <div className="flex flex-1 flex-col gap-2 p-4">
