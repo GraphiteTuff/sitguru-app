@@ -48,6 +48,60 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/reads`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/reads/books`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/reads/magazines`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/reads/podcasts`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/reads/videos`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/reads/authors`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/reads/team-picks`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/reads/topics`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/reads/partner`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.65,
+    },
   ];
 
   const helpIndex: MetadataRoute.Sitemap = helpHubPaths().map((path) => ({

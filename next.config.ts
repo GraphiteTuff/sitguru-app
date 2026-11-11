@@ -64,7 +64,30 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "img.youtube.com",
+        port: "",
+        pathname: "/**",
+      },
     ],
+  },
+
+  async rewrites() {
+    return [
+      {
+        // Preserve older social asset URLs after resolving Next.js
+        // dynamic-segment conflict between [id] and [slug].
+        source: "/api/community/events/:slug/social/:format",
+        destination: "/api/community/events/social/:slug/:format",
+      },
+    ];
   },
 
   async redirects() {
