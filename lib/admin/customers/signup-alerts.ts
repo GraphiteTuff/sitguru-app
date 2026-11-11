@@ -7,36 +7,97 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeEmail(value: unknown) {
+  return text(value).toLowerCase();
+}
+
 export type HqSignupRole = "pet_parent" | "guru" | "ambassador" | "both" | string;
+
+/**
+ * Stable fingerprint for one human signup so webhook + provision races and
+ * href variants (/gurus/id vs /account-lifecycle/userId) collapse to one alert.
+ */
+export function signupAlertFingerprint(input: {
+  type?: string;
+  userId?: string;
+  guruId?: string;
+  email?: string;
+  href?: string;
+}) {
+  const type = text(input.type) || "signup";
+  const userId = text(input.userId);
+  const guruId = text(input.guruId);
+  const email = normalizeEmail(input.email);
+  if (userId) return `${type}:user:${userId}`;
+  if (guruId) return `${type}:guru:${guruId}`;
+  if (email) return `${type}:email:${email}`;
+  return `${type}:href:${text(input.href)}`;
+}
 
 export async function notifyHqInbound(input: {
   type: string;
   title: string;
   body: string;
   href: string;
+  /** Subject account — used for cross-href / race dedupe. */
+  subjectUserId?: string;
+  subjectGuruId?: string;
+  subjectEmail?: string;
 }) {
   const type = text(input.type) || "signup";
   const title = text(input.title) || "New SitGuru signup";
   const body = text(input.body) || "Someone just joined SitGuru.";
   const href = text(input.href) || "/admin";
   const now = new Date().toISOString();
+  const fingerprint = signupAlertFingerprint({
+    type,
+    userId: input.subjectUserId,
+    guruId: input.subjectGuruId,
+    email: input.subjectEmail,
+    href,
+  });
 
   const adminIds = await listHqRecipientIds();
-  if (!adminIds.length) return { notified: 0 };
+  if (!adminIds.length) return { notified: 0, fingerprint };
 
   const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
   const { data: existing } = await supabaseAdmin
     .from("notifications")
-    .select("id, user_id, href, type")
-    .eq("type", type)
+    .select("id, user_id, href, type, body, title")
+    .in("type", [
+      type,
+      "guru_signup",
+      "pet_parent_signup",
+      "ambassador_signup",
+      "partner_application",
+      "career_application",
+      "ambassador_application",
+      "launch_signup",
+    ])
     .gte("created_at", since)
-    .limit(400);
+    .limit(800);
 
-  const already = new Set(
-    ((existing || []) as AnyRow[])
-      .filter((row) => text(row.href) === href)
-      .map((row) => text(row.user_id)),
-  );
+  const subjectUserId = text(input.subjectUserId);
+  const subjectEmail = normalizeEmail(input.subjectEmail);
+  const already = new Set<string>();
+
+  for (const row of (existing || []) as AnyRow[]) {
+    const recipient = text(row.user_id);
+    if (!recipient) continue;
+    const rowHref = text(row.href);
+    const rowBody = text(row.body).toLowerCase();
+    const sameHref = rowHref === href;
+    const sameSubjectUser =
+      Boolean(subjectUserId) &&
+      (rowHref.includes(subjectUserId) || rowBody.includes(subjectUserId));
+    const sameEmail =
+      Boolean(subjectEmail) &&
+      !subjectEmail.endsWith("@users.sitguru.internal") &&
+      rowBody.includes(subjectEmail);
+    if (sameHref || sameSubjectUser || sameEmail) {
+      already.add(recipient);
+    }
+  }
 
   const rows = adminIds
     .filter((userId) => !already.has(userId))
@@ -52,15 +113,15 @@ export async function notifyHqInbound(input: {
       updated_at: now,
     }));
 
-  if (!rows.length) return { notified: 0 };
+  if (!rows.length) return { notified: 0, fingerprint, deduped: true };
 
   const { error } = await supabaseAdmin.from("notifications").insert(rows);
   if (error) {
     console.warn("HQ inbound notification skipped:", error.message);
-    return { notified: 0 };
+    return { notified: 0, fingerprint };
   }
 
-  return { notified: rows.length };
+  return { notified: rows.length, fingerprint };
 }
 
 function signupCopy(role: HqSignupRole) {
@@ -143,6 +204,9 @@ export async function notifyHqNewSignup(input: {
     title: copy.title,
     body: `${name} just joined SitGuru as a ${copy.noun}. ${contact}`,
     href,
+    subjectUserId: input.userId,
+    subjectGuruId: input.guruId,
+    subjectEmail: input.email,
   });
 }
 
@@ -166,6 +230,7 @@ export async function notifyHqPartnerApplication(input: {
     title: `New ${kind} application`,
     body: `${who} applied as a ${kind}. ${contact}`,
     href,
+    subjectEmail: input.email,
   });
 }
 
@@ -201,6 +266,7 @@ export async function notifyHqCareerApplication(input: {
     title: isAmbassador ? "New Ambassador application" : `New ${label} application`,
     body: `${who} applied to ${label}. ${contact}`,
     href,
+    subjectEmail: input.email,
   });
 }
 
@@ -219,6 +285,7 @@ export async function notifyHqLaunchSignup(input: {
     title: "New launch waitlist signup",
     body: `${who} joined the launch list as ${interest}. ${contact}`,
     href: "/admin/sales-marketing/signup-leads",
+    subjectEmail: input.email,
   });
 }
 

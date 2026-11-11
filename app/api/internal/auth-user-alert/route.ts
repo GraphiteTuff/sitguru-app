@@ -818,18 +818,30 @@ export async function POST(request: NextRequest) {
   `;
 
   try {
-    const [emailResult, smsResult, inApp] = await Promise.all([
-      sendEmailAlert({ subject, html, text }),
-      sendSmsAlert(smsMessage, getSignupSmsNumbers(role)),
-      notifyHqNewSignup({
-        role,
-        userId: id,
-        guruId,
-        name,
-        email,
-        phone,
-      }),
-    ]);
+    // In-app first — if this signup was already notified (webhook race / second
+    // auth user with same email), skip SMS + email so HQ does not get doubles.
+    const inApp = await notifyHqNewSignup({
+      role,
+      userId: id,
+      guruId,
+      name,
+      email,
+      phone,
+    });
+
+    // When another path already wrote the HQ bell for this person/email,
+    // suppress SMS + email so Jason does not get a second ping.
+    const alreadyNotified = inApp?.deduped === true;
+
+    const [emailResult, smsResult] = alreadyNotified
+      ? [
+          { skipped: true as const, reason: "Duplicate signup alert suppressed" },
+          { skipped: true as const, reason: "Duplicate signup alert suppressed" },
+        ]
+      : await Promise.all([
+          sendEmailAlert({ subject, html, text }),
+          sendSmsAlert(smsMessage, getSignupSmsNumbers(role)),
+        ]);
 
     return NextResponse.json({
       ok: true,
@@ -849,6 +861,7 @@ export async function POST(request: NextRequest) {
       email: emailResult,
       sms: smsResult,
       inApp,
+      deduped: alreadyNotified,
     });
   } catch (error) {
     console.error("Signup alert failed:", error);

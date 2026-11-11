@@ -66,6 +66,43 @@ export async function lookupAuthUserByPhone(phoneE164: string) {
   };
 }
 
+/**
+ * When auth.users.phone is blank/mangled but profiles.phone already holds the
+ * number, reuse that account instead of minting phone.*@users.sitguru.internal.
+ */
+export async function lookupProfileUserByPhoneDigits(phoneE164: string) {
+  const admin = createSupabaseAdminClient();
+  const digits = phoneDigitsFromE164(phoneE164);
+  const last10 = digits.slice(-10);
+  if (last10.length !== 10) return null;
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id,email,phone")
+    .or(
+      `phone.ilike.%${last10}%,phone.ilike.%${digits}%,phone.eq.${phoneE164},phone.eq.+${digits}`,
+    )
+    .order("created_at", { ascending: true })
+    .limit(8);
+
+  if (error || !data?.length) return null;
+
+  const match = (data as Array<{ id?: string; email?: string | null; phone?: string | null }>).find(
+    (row) => {
+      const rowDigits = digitsOnly(String(row.phone || ""));
+      return rowDigits.endsWith(last10) || last10.endsWith(rowDigits.slice(-10));
+    },
+  );
+
+  if (!match?.id) return null;
+
+  return {
+    id: String(match.id),
+    email: match.email ? String(match.email) : null,
+    phone: match.phone ? String(match.phone) : null,
+  };
+}
+
 function syntheticEmailForPhone(phoneE164: string) {
   const digits = phoneDigitsFromE164(phoneE164);
   return `phone.${digits}@users.sitguru.internal`;
@@ -161,7 +198,9 @@ export async function issuePhoneLoginOtp(params: {
 }) {
   const admin = createSupabaseAdminClient();
   const phoneDigits = phoneDigitsFromE164(params.phoneE164);
-  const existing = await lookupAuthUserByPhone(params.phoneE164);
+  const existing =
+    (await lookupAuthUserByPhone(params.phoneE164)) ||
+    (await lookupProfileUserByPhoneDigits(params.phoneE164));
 
   if (!existing && !params.allowCreateUser) {
     return {
@@ -318,29 +357,59 @@ export async function verifyPhoneLoginOtp(params: {
         ? (row.metadata as PhoneOtpMetadata)
         : {};
 
-    const { data: created, error: createError } =
-      await admin.auth.admin.createUser({
-        phone: params.phoneE164,
-        phone_confirm: true,
-        email: syntheticEmailForPhone(params.phoneE164),
-        email_confirm: true,
-        user_metadata: {
-          ...metadata,
-          signup_method: metadata.signup_method || "phone",
+    // Prefer an existing email/Guru/Pet Parent profile that already has this
+    // phone (even if mangled) over creating a second auth user.
+    const reused =
+      (await lookupAuthUserByPhone(params.phoneE164)) ||
+      (await lookupProfileUserByPhoneDigits(params.phoneE164));
+
+    if (reused?.id) {
+      const { error: linkError } = await admin.auth.admin.updateUserById(
+        reused.id,
+        {
+          phone: params.phoneE164,
+          phone_confirm: true,
+          user_metadata: {
+            ...metadata,
+            signup_method: metadata.signup_method || "phone",
+          },
         },
-      });
+      );
+      if (linkError) {
+        return {
+          ok: false as const,
+          error:
+            linkError.message ||
+            "SitGuru found your account but could not attach this phone number.",
+        };
+      }
+      userId = reused.id;
+      email = reused.email;
+    } else {
+      const { data: created, error: createError } =
+        await admin.auth.admin.createUser({
+          phone: params.phoneE164,
+          phone_confirm: true,
+          email: syntheticEmailForPhone(params.phoneE164),
+          email_confirm: true,
+          user_metadata: {
+            ...metadata,
+            signup_method: metadata.signup_method || "phone",
+          },
+        });
 
-    if (createError || !created.user) {
-      return {
-        ok: false as const,
-        error:
-          createError?.message ||
-          "SitGuru could not create your account from this phone number.",
-      };
+      if (createError || !created.user) {
+        return {
+          ok: false as const,
+          error:
+            createError?.message ||
+            "SitGuru could not create your account from this phone number.",
+        };
+      }
+
+      userId = created.user.id;
+      email = created.user.email || syntheticEmailForPhone(params.phoneE164);
     }
-
-    userId = created.user.id;
-    email = created.user.email || syntheticEmailForPhone(params.phoneE164);
   } else {
     return {
       ok: false as const,

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { notifyHqNewSignup } from "@/lib/admin/customers/signup-alerts";
 import {
   emailForBlankProfile,
   resolveCanonicalContactEmail,
@@ -2132,18 +2131,12 @@ export async function POST(request: NextRequest) {
 
     // Notification failures never undo a successful signup. The hourly cron
     // job retries pending reminder rows.
+    // HQ signup alerts (email/SMS/in-app) are owned solely by
+    // /api/internal/auth-user-alert (Supabase auth.users webhook) so we do not
+    // double-notify when provisioning also completes.
     const reminder = await queueAndSendSignupNotice({
       userId,
       intent: requestedIntent,
-    });
-
-    void notifyHqNewSignup({
-      role: requestedIntent,
-      userId,
-      name: referredName || "A new SitGuru member",
-      email: referredEmail,
-    }).catch((error) => {
-      console.warn("HQ signup bell skipped:", error);
     });
 
     return NextResponse.json({
