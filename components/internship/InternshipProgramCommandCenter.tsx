@@ -274,7 +274,10 @@ export default async function InternshipProgramCommandCenter({
     return {
       key: person.key,
       name: person.fullName,
-      avatarUrl: intern?.avatarUrl || "",
+      avatarUrl:
+        intern?.avatarUrl ||
+        staffAvatarFallback({ email: intern?.email || plan?.contactEmail }) ||
+        "",
       roleTitle: "Social Media & Community Growth Intern",
       academicProgram: plan?.academicProgram || intern?.academicProgram || "Program pending",
       university: person.universityLabel,

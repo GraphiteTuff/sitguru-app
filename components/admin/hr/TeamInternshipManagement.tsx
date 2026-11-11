@@ -16,6 +16,7 @@ import {
 } from "@/lib/internship/team-roster";
 import SpringInternTable, { type InternTableRow } from "@/components/admin/hr/SpringInternTable";
 import { staffAccessPath } from "@/lib/admin/hr/staff-access";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { GraduationCap, Mail, ShieldCheck, UserRound, Users } from "lucide-react";
 
@@ -139,12 +140,19 @@ export default async function TeamInternshipManagement({
   });
   const managerActive = managerAccess.label === "Manager access active";
 
+  const avatarById = new Map(interns.map((intern) => [intern.id, intern.avatarUrl || ""]));
   const rows: InternTableRow[] = roster.map((person) => {
     const raw = person.recordId ? academicById.get(person.recordId) : null;
     const plan = SPRING_2027_CANDIDATE_PLANS.find((item) => item.key === person.key);
+    const internEmail =
+      person.emailLabel.includes("@") ? person.emailLabel : plan?.contactEmail || "";
     return {
       key: person.key,
       name: person.fullName,
+      avatarUrl:
+        (person.recordId ? avatarById.get(person.recordId) || "" : "") ||
+        staffAvatarFallback({ email: internEmail }) ||
+        "",
       roleTitle: "Social Media & Community Growth Intern",
       academicProgram: plan?.academicProgram || "Program pending",
       university: person.universityLabel,

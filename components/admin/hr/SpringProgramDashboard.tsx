@@ -19,6 +19,7 @@ import {
   type RosterAccountHint,
   type RosterInternRecord,
 } from "@/lib/internship/team-roster";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const primary =
@@ -165,13 +166,20 @@ export default async function SpringProgramDashboard({
     schools.set(name, (schools.get(name) || 0) + 1);
   }
 
+  const avatarById = new Map(interns.map((intern) => [intern.id, intern.avatarUrl || ""]));
   const rows: InternTableRow[] = roster.map((person) => {
     const raw = person.recordId ? academicById.get(person.recordId) : null;
     const plan = SPRING_2027_CANDIDATE_PLANS.find((item) => item.key === person.key);
     const status = person.recordId ? person.statusLabel : person.accountLabel;
+    const internEmail =
+      person.emailLabel.includes("@") ? person.emailLabel : plan?.contactEmail || "";
     return {
       key: person.key,
       name: person.fullName,
+      avatarUrl:
+        (person.recordId ? avatarById.get(person.recordId) || "" : "") ||
+        staffAvatarFallback({ email: internEmail }) ||
+        "",
       roleTitle: text(raw?.internship_title) || "Social Media & Community Growth Intern",
       university: displayUniversityName(person.universityLabel),
       academicProgram: plan?.academicProgram || "Program pending",

@@ -9,12 +9,16 @@ export const JASON_STAFF_EMAIL = "jason@sitguru.com";
 export const DANETTE_STAFF_USER_ID = "09df0bbd-6687-4ce9-b4b0-8120d90b1ef0";
 export const DANETTE_STAFF_EMAIL = "nette@sitguru.com";
 
+export const RYAN_INTERN_EMAIL = "rjm7578@psu.edu";
+export const RYAN_INTERN_AVATAR = "/images/staff/ryan-manibo.png";
+
 const HQ_ADMIN_AVATAR = "/images/sitguru-admin-avatar.jpg";
 
 const BY_EMAIL: Record<string, string> = {
   [AVA_STAFF_EMAIL]: "/images/staff/ava-venezia.svg",
   [JASON_STAFF_EMAIL]: HQ_ADMIN_AVATAR,
   [DANETTE_STAFF_EMAIL]: HQ_ADMIN_AVATAR,
+  [RYAN_INTERN_EMAIL]: RYAN_INTERN_AVATAR,
 };
 
 const BY_USER_ID: Record<string, string> = {

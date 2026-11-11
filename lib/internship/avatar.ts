@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import type { InternshipIntern } from "@/lib/internship/types";
 
 type ProfileAvatarRow = {
@@ -73,6 +74,7 @@ export async function attachInternAvatars(
       intern.avatarUrl ||
       (intern.userId ? byUserId.get(intern.userId) : "") ||
       byEmail.get(normalizeEmail(intern.email)) ||
+      staffAvatarFallback({ email: intern.email, userId: intern.userId }) ||
       "",
   }));
 }
@@ -111,5 +113,8 @@ export async function lookupProfileAvatarForUser(input: {
     if (url) return url;
   }
 
-  return internAvatarFromProfile(null, input.metadata);
+  return (
+    staffAvatarFallback({ email: input.email, userId: input.userId }) ||
+    internAvatarFromProfile(null, input.metadata)
+  );
 }

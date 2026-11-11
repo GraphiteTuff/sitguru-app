@@ -8,6 +8,8 @@ import {
   JASON_STAFF_EMAIL,
   JASON_STAFF_USER_ID,
   KNOWN_STAFF_CHAT_SEATS,
+  RYAN_INTERN_AVATAR,
+  RYAN_INTERN_EMAIL,
   staffAvatarFallback,
 } from "./staff-avatars";
 import { isTestDirectoryPerson, isTestInboxThread } from "./staff-directory";
@@ -31,5 +33,6 @@ describe("staff directory test filters", () => {
     assert.equal(staffAvatarFallback({ email: JASON_STAFF_EMAIL }), "/images/sitguru-admin-avatar.jpg");
     assert.equal(staffAvatarFallback({ userId: DANETTE_STAFF_USER_ID }), "/images/sitguru-admin-avatar.jpg");
     assert.equal(staffAvatarFallback({ email: DANETTE_STAFF_EMAIL }), "/images/sitguru-admin-avatar.jpg");
+    assert.equal(staffAvatarFallback({ email: RYAN_INTERN_EMAIL }), RYAN_INTERN_AVATAR);
   });
 });

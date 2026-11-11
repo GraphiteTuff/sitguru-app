@@ -322,6 +322,7 @@ export async function saveRyanManiboCandidate(formData: FormData) {
   const { error } = await supabaseAdmin.from("internship_interns").insert({
     full_name: "Ryan Manibo",
     email,
+    avatar_url: "/images/staff/ryan-manibo.png",
     student_email: "",
     phone: "",
     cohort_id: cohort.id,

@@ -160,7 +160,10 @@ export async function loadInternChatPeople(input: {
       return {
         id: chatId || `pending:${row.id}`,
         firstName: firstName(row.preferredName || row.fullName),
-        avatarUrl: row.avatarUrl || (chatId ? photoById.get(chatId) || "" : ""),
+        avatarUrl:
+          row.avatarUrl ||
+          (chatId ? photoById.get(chatId) || "" : "") ||
+          staffAvatarFallback({ email: row.email, userId: chatId || null }),
         detail: chatId ? "Intern" : "Intern · Invite pending",
         canChat: Boolean(chatId),
         email: row.email,

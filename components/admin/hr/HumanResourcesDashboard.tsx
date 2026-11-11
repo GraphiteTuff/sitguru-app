@@ -22,6 +22,7 @@ import { listGrowthHires } from "@/lib/admin/growth/hire";
 import { listInterns } from "@/lib/internship/queries";
 import { INTERNSHIP_ASSETS_BUCKET } from "@/lib/internship/portal";
 import { excludeFromInternPortalList, rosterStatusLabel } from "@/lib/internship/team-roster";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -245,7 +246,14 @@ export default async function HumanResourcesDashboard({
   function avatarFor(input: { userId?: string | null; email?: string | null; raw?: Record<string, unknown> | null; fallback?: string }) {
     const userId = text(input.userId);
     const email = text(input.email).toLowerCase();
-    return photoByUser.get(userId) || (email.includes("@") ? photoByEmail.get(email) : "") || uploadedAvatar(input.raw) || input.fallback || "";
+    return (
+      photoByUser.get(userId) ||
+      (email.includes("@") ? photoByEmail.get(email) : "") ||
+      uploadedAvatar(input.raw) ||
+      input.fallback ||
+      staffAvatarFallback({ email, userId }) ||
+      ""
+    );
   }
   const readinessById = new Map((readiness.data || []).map((row) => [text(row.id), text(row.microsoft_readiness)]));
   const mailboxByUser = new Map(
