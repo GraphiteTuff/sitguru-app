@@ -150,10 +150,18 @@ export async function getCustomerIntelligenceReportDigest(options?: {
         "id,customer_id,user_id,customer_email,customer_name,status,payment_status,total_amount,amount,subtotal_amount,source,utm_source,created_at,updated_at,start_time,booking_date",
         1000,
       ),
-      safeRows("launch_signups", "id,source,utm_source,platform,created_at", 1000),
-      safeRows("launch_waitlist", "id,source,utm_source,platform,created_at", 1000),
-      safeRows("referral_clicks", "id,source,utm_source,platform,created_at", 1000),
-      safeRows("network_click_events", "id,source,utm_source,platform,created_at", 1000),
+      safeRows("launch_waitlist", "id,source,utm_source,platform,created_at", 2000),
+      safeRows("launch_signups", "id,source,utm_source,platform,created_at", 2000),
+      safeRows(
+        "referral_clicks",
+        "id,utm_source,utm_medium,utm_campaign,landing_page,referrer,created_at",
+        2000,
+      ),
+      safeRows(
+        "network_click_events",
+        "id,source,medium,campaign,utm_source,platform,created_at",
+        2000,
+      ),
     ]);
 
   const customerMap = new Map<string, CustomerIntelligenceMetricCustomer>();
@@ -256,16 +264,27 @@ export async function getCustomerIntelligenceReportDigest(options?: {
     0,
   );
 
-  const socialSignupRows = [...launchSignups, ...launchWaitlist].filter((row) =>
+  const socialSignupRows = [...launchWaitlist, ...launchSignups].filter((row) =>
     isSocialAttributionSource(
       normalizeSource(getText(row, ["source", "utm_source", "platform"])),
     ),
   );
-  const socialClickRows = [...referralClicks, ...networkClicks].filter((row) =>
-    isSocialAttributionSource(
-      normalizeSource(getText(row, ["source", "utm_source", "platform"])),
-    ),
-  );
+  const socialClickRows = [...referralClicks, ...networkClicks].filter((row) => {
+    const hay = [
+      getText(row, ["source"]),
+      getText(row, ["utm_source"]),
+      getText(row, ["utm_medium"]),
+      getText(row, ["utm_campaign"]),
+      getText(row, ["medium"]),
+      getText(row, ["campaign"]),
+      getText(row, ["platform"]),
+      getText(row, ["landing_page"]),
+      getText(row, ["referrer"]),
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return isSocialAttributionSource(normalizeSource(hay));
+  });
 
   const platformMap = new Map<
     string,

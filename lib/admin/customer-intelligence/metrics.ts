@@ -263,7 +263,7 @@ export function buildCustomerIntelligenceDigest(input: {
     `- Repeat rate: ${input.metrics.repeatRate.toFixed(1)}% (${formatCustomerIntelligenceNumber(input.metrics.repeatCustomers)} repeat)`,
     `- Active last 30 days: ${formatCustomerIntelligenceNumber(input.metrics.activeCustomersLast30)}`,
     `- Avg bookings / Pet Parent: ${input.metrics.averageBookingsPerCustomer.toFixed(1)}`,
-    `- Review queue: ${formatCustomerIntelligenceNumber(input.metrics.reviewQueueRows)} incomplete / needs-review`,
+    `- Zero-spend / never-booked accounts: ${formatCustomerIntelligenceNumber(input.metrics.reviewQueueRows)} (not an admin_status queue — these Pet Parents have $0 spend and 0 bookings)`,
     `- Rows excluded: ${formatCustomerIntelligenceNumber(input.metrics.hiddenDemoRows)} demo+filtered · ${formatCustomerIntelligenceNumber(input.metrics.separatedAdminRows)} archive/spam/deleted`,
     ``,
     `## Social Attribution`,

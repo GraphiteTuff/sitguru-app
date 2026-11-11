@@ -69,7 +69,7 @@ const QUICK_CHIPS = [
     label: "Growth Analytics",
     period: "monthly" as const,
     prompt:
-      "Produce Growth Analytics: campaigns/CAC signals, referrals, programs (including Veterans & Military Families), partners, analytics MoM KPIs, and chat insight friction.",
+      "Produce Growth Analytics from LIVE snapshot + tools only: campaigns/CAC from real click and lead tables, referrals, programs (including Veterans & Military Families), partners, analytics calendar MoM KPIs, ambassadors active vs archived, gurus, bookings all-time vs MTD, and chat insight friction. Call fetchCustomerIntelligence and fetchLiveSocialFollowers. Never invent zeros for unavailable tables.",
   },
   {
     id: "customer_intelligence",

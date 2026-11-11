@@ -51,7 +51,7 @@ export type ModuleSnapshot = {
   group: "operations" | "growth" | "financials" | "analytics_admin";
   ok: boolean;
   summary: string;
-  metrics: Record<string, number | string | boolean | null>;
+  metrics: Record<string, number | string | boolean | null | undefined>;
   highlights: string[];
   sources: string[];
   errors: string[];
@@ -129,9 +129,61 @@ export function periodLabel(period: ReportPeriod, now = new Date()) {
   if (period === "daily") return `Today (${now.toISOString().slice(0, 10)})`;
   if (period === "weekly") return "Last 7 days";
   if (period === "monthly") {
-    return now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return `${now.toLocaleDateString("en-US", { month: "long", year: "numeric" })} (MTD)`;
   }
   return `Year ${now.getFullYear()}`;
+}
+
+/** Calendar-aware windows so MoM is prior calendar month MTD, not a sliding equal-ms window. */
+export function getComparablePeriodWindows(
+  periodStartIso: string,
+  now = new Date(),
+) {
+  const currentStart = new Date(periodStartIso);
+  if (Number.isNaN(currentStart.getTime())) {
+    const fallbackMs = 30 * 24 * 60 * 60 * 1000;
+    const start = new Date(now.getTime() - fallbackMs);
+    return {
+      currentStartIso: start.toISOString(),
+      currentEndIso: now.toISOString(),
+      priorStartIso: new Date(start.getTime() - fallbackMs).toISOString(),
+      priorEndIso: start.toISOString(),
+      compareMode: "sliding" as const,
+    };
+  }
+
+  const day = now.getDate();
+  const priorMonthStart = new Date(
+    currentStart.getFullYear(),
+    currentStart.getMonth() - 1,
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+  const daysInPriorMonth = new Date(
+    currentStart.getFullYear(),
+    currentStart.getMonth(),
+    0,
+  ).getDate();
+  const priorMtdEnd = new Date(
+    priorMonthStart.getFullYear(),
+    priorMonthStart.getMonth(),
+    Math.min(day, daysInPriorMonth),
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds(),
+  );
+
+  return {
+    currentStartIso: currentStart.toISOString(),
+    currentEndIso: now.toISOString(),
+    priorStartIso: priorMonthStart.toISOString(),
+    priorEndIso: priorMtdEnd.toISOString(),
+    compareMode: "calendar_mtd" as const,
+  };
 }
 
 function extractMissingColumn(message: string): string | null {
@@ -305,6 +357,60 @@ async function safeHeadCountBetween(
       message: error instanceof Error ? error.message : `${table} unavailable`,
     };
   }
+}
+
+/** Prefer the first existing table for head counts (e.g. launch_waitlist before launch_signups). */
+async function safeHeadCountCascade(
+  tables: string[],
+  sinceIso?: string | null,
+  dateColumn = "created_at",
+): Promise<SafeResult> {
+  const errors: string[] = [];
+  for (const table of tables) {
+    const result = await safeHeadCount(table, sinceIso, dateColumn);
+    if (result.ok) {
+      return {
+        ...result,
+        message: errors.length
+          ? `${result.message} (fallback after: ${errors.join(" | ")})`
+          : result.message,
+      };
+    }
+    errors.push(result.message);
+  }
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: errors.join(" | ") || "No tables available",
+  };
+}
+
+async function safeHeadCountBetweenCascade(
+  tables: string[],
+  startIso: string,
+  endIso: string,
+  dateColumn = "created_at",
+): Promise<SafeResult> {
+  const errors: string[] = [];
+  for (const table of tables) {
+    const result = await safeHeadCountBetween(table, startIso, endIso, dateColumn);
+    if (result.ok) {
+      return {
+        ...result,
+        message: errors.length
+          ? `${result.message} (fallback after: ${errors.join(" | ")})`
+          : result.message,
+      };
+    }
+    errors.push(result.message);
+  }
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: errors.join(" | ") || "No tables available",
+  };
 }
 
 function statusOf(row: AnyRow) {
@@ -646,51 +752,48 @@ async function modulePetParents(since: string): Promise<ModuleSnapshot> {
     "customers",
     "pets",
   ]);
-  const [profiles, customers, pets] = await Promise.all([
-    safeSelect("profiles", "id,role,created_at,account_status", 300, since),
-    safeSelectCascade([
-      {
-        table: "customers",
-        columns: "id,created_at,status",
-        limit: 300,
-        sinceIso: since,
-      },
-      {
-        table: "profiles",
-        columns: "id,created_at,role,account_type,account_status",
-        limit: 300,
-        sinceIso: since,
-      },
-    ]),
+  const [profiles, newProfiles, pets] = await Promise.all([
+    safeSelect(
+      "profiles",
+      "id,role,account_type,created_at,admin_status,account_status",
+      1000,
+    ),
+    safeHeadCount("profiles", since),
     safeHeadCount("pets"),
   ]);
   const parentish = profiles.rows.filter((row) => {
-    const role = asString(row.role).toLowerCase();
+    const role = `${asString(row.role)} ${asString(row.account_type)}`.toLowerCase();
+    if (/(guru|admin|ambassador|intern|manager)/.test(role)) return false;
     return (
-      !role ||
+      !role.trim() ||
       role.includes("parent") ||
       role.includes("customer") ||
+      role.includes("client") ||
+      role.includes("both") ||
       role === "user"
     );
   }).length;
-  const ok = profiles.ok || customers.ok || pets.ok;
+  const ok = profiles.ok || pets.ok;
 
   let intelligenceSummary = "";
-  let intelligenceMetrics: Record<string, number | string> = {};
+  let intelligenceMetrics: Record<string, number | string | null> = {};
   try {
     const { getCustomerIntelligenceReportDigest } = await import(
       "@/lib/admin/customer-intelligence/report"
     );
     const report = await getCustomerIntelligenceReportDigest();
-    intelligenceSummary = ` Customer Intelligence: ${number(report.metrics.totalCustomers)} visible Pet Parents · LTV avg ${money(report.metrics.averageLifetimeValue)} · repeat ${report.metrics.repeatRate.toFixed(1)}% · social customers ${number(report.metrics.socialCustomers)} · social revenue ${money(report.metrics.socialRevenue)}.`;
+    intelligenceSummary = ` Customer Intelligence (all-time registry): ${number(report.metrics.totalCustomers)} Pet Parents · total spend ${money(report.metrics.totalRevenue)} · LTV avg ${money(report.metrics.averageLifetimeValue)} · repeat ${report.metrics.repeatRate.toFixed(1)}% · zero-spend accounts ${number(report.metrics.reviewQueueRows)} · social clicks ${number(report.metrics.socialClicks)}.`;
     intelligenceMetrics = {
       ciPetParents: report.metrics.totalCustomers,
+      ciTotalSpend: report.metrics.totalRevenue,
       ciAverageLtv: report.metrics.averageLifetimeValue,
       ciRepeatRate: report.metrics.repeatRate,
       ciActive30d: report.metrics.activeCustomersLast30,
+      ciZeroSpendAccounts: report.metrics.reviewQueueRows,
       ciSocialCustomers: report.metrics.socialCustomers,
       ciSocialRevenue: report.metrics.socialRevenue,
       ciSocialClicks: report.metrics.socialClicks,
+      ciSocialSignups: report.metrics.socialSignups,
       ciTopSocialPlatform: report.metrics.topSocialPlatform,
     };
   } catch {
@@ -700,23 +803,21 @@ async function modulePetParents(since: string): Promise<ModuleSnapshot> {
   return finalize(
     snap,
     ok,
-    `Pet Parent signals: ${number(Math.max(parentish, customers.count))} parents/customers in period · ${number(pets.count)} pets total.${intelligenceSummary}`,
+    `Pet Parent registry: ${number(parentish)} role-matched profiles · ${number(newProfiles.count)} new profiles in period · ${number(pets.count)} pets.${intelligenceSummary}`,
     {
-      parentsInPeriod: Math.max(parentish, customers.count),
-      petsTotal: pets.count,
-      profilesInPeriod: profiles.count,
+      parentProfilesAllTime: profiles.ok ? parentish : null,
+      newProfilesInPeriod: newProfiles.ok ? newProfiles.count : null,
+      petsTotal: pets.ok ? pets.count : null,
       ...intelligenceMetrics,
     },
     [
-      `${number(Math.max(parentish, customers.count))} parent signals`,
-      `${number(pets.count)} pets`,
-      ...(intelligenceSummary
-        ? [
-            `${number(Number(intelligenceMetrics.ciSocialCustomers || 0))} social customers`,
-          ]
-        : []),
+      profiles.ok ? `${number(parentish)} parent profiles` : "profiles unavailable",
+      pets.ok ? `${number(pets.count)} pets` : "pets unavailable",
+      intelligenceMetrics.ciPetParents != null
+        ? `${number(Number(intelligenceMetrics.ciPetParents))} CI Pet Parents`
+        : "CI unavailable",
     ],
-    [profiles, customers, pets].filter((r) => !r.ok).map((r) => r.message),
+    [profiles, newProfiles, pets].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
@@ -777,19 +878,23 @@ async function moduleAmbassadors(): Promise<ModuleSnapshot> {
     "ambassador_leads",
   ]);
   const [ambassadors, leads] = await Promise.all([
-    safeSelect("ambassadors", "id,status,created_at,dashboard_enabled", 300),
-    safeSelect("ambassador_leads", "id,status,created_at,program", 300),
+    safeSelect("ambassadors", "id,status,created_at,dashboard_enabled", 500),
+    safeSelect("ambassador_leads", "id,status,created_at,program", 500),
   ]);
   const active = countWhere(ambassadors.rows, (r) =>
     ["active", "approved", "live"].includes(statusOf(r)),
   );
+  const archived = countWhere(ambassadors.rows, (r) =>
+    ["archived", "inactive", "rejected", "deleted"].includes(statusOf(r)),
+  );
   return finalize(
     snap,
     ambassadors.ok || leads.ok,
-    `${number(active)} active ambassadors · ${number(leads.count)} leads in pipeline.`,
+    `${number(active)} active ambassadors · ${number(archived)} archived · ${number(ambassadors.count)} total rows · ${number(leads.count)} leads in pipeline.`,
     {
       ambassadors: ambassadors.count,
       active,
+      archived,
       leads: leads.count,
     },
     [`${number(active)} active`, `${number(leads.count)} leads`],
@@ -1092,8 +1197,9 @@ async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
     "admin_marketing_campaigns",
     "admin_marketing_signup_leads",
     "admin_marketing_tasks",
+    "referral_clicks",
   ]);
-  const [campaigns, leads, tasks] = await Promise.all([
+  const [campaigns, leads, tasks, clicks, clicksMtd] = await Promise.all([
     safeSelectCascade([
       {
         table: "admin_marketing_campaigns",
@@ -1132,22 +1238,68 @@ async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
       },
     ]),
     safeSelect("admin_marketing_tasks", "id,status,created_at,needs_help", 200, since),
+    safeSelectCascade([
+      {
+        table: "referral_clicks",
+        columns: "id,utm_source,utm_medium,utm_campaign,created_at",
+        limit: 1000,
+      },
+      {
+        table: "referral_clicks",
+        columns: "id,utm_source,created_at",
+        limit: 1000,
+      },
+      {
+        table: "referral_clicks",
+        columns: "id,created_at",
+        limit: 1000,
+      },
+    ]),
+    safeHeadCount("referral_clicks", since),
   ]);
+
+  const activeCampaigns = countWhere(campaigns.rows, (row) =>
+    ["active", "running", "live", "published"].includes(statusOf(row)),
+  );
+  const socialClickRows = clicks.rows.filter((row) => {
+    const hay = `${asString(row.utm_source)} ${asString(row.utm_medium)} ${asString(row.utm_campaign)}`.toLowerCase();
+    return /facebook|instagram|tiktok|youtube|twitter|linkedin|social|\bfb\b|\big\b/.test(
+      hay,
+    );
+  }).length;
+
+  const notes = [campaigns, leads, tasks, clicks, clicksMtd]
+    .filter((r) => !r.ok)
+    .map((r) => r.message);
+
   return finalize(
     snap,
-    campaigns.ok || leads.ok || tasks.ok,
-    `${number(campaigns.count)} campaigns · ${number(leads.count)} signup leads · ${number(tasks.count)} marketing tasks.`,
+    campaigns.ok || leads.ok || tasks.ok || clicks.ok || clicksMtd.ok,
+    [
+      campaigns.ok
+        ? `${number(campaigns.count)} campaigns (${number(activeCampaigns)} active)`
+        : "campaigns unavailable",
+      leads.ok ? `${number(leads.count)} signup leads in period` : "signup leads unavailable",
+      tasks.ok ? `${number(tasks.count)} marketing tasks in period` : "tasks unavailable",
+      clicks.ok
+        ? `${number(clicks.count)} referral clicks all-time · ${number(socialClickRows)} social-utm · ${number(clicksMtd.count)} MTD`
+        : "referral clicks unavailable",
+    ].join(" · "),
     {
-      campaigns: campaigns.count,
-      signupLeads: leads.count,
-      tasks: tasks.count,
+      campaigns: campaigns.ok ? campaigns.count : null,
+      activeCampaigns: campaigns.ok ? activeCampaigns : null,
+      signupLeadsInPeriod: leads.ok ? leads.count : null,
+      tasksInPeriod: tasks.ok ? tasks.count : null,
+      referralClicksAllTime: clicks.ok ? clicks.count : null,
+      socialUtmClicksSampled: clicks.ok ? socialClickRows : null,
+      referralClicksInPeriod: clicksMtd.ok ? clicksMtd.count : null,
     },
     [
-      `${number(campaigns.count)} campaigns`,
-      `${number(leads.count)} leads`,
-      `${number(tasks.count)} tasks`,
+      campaigns.ok ? `${number(activeCampaigns)} active campaigns` : "campaigns unavailable",
+      clicks.ok ? `${number(clicks.count)} referral clicks` : "clicks unavailable",
+      leads.ok ? `${number(leads.count)} leads in period` : "leads unavailable",
     ],
-    [campaigns, leads, tasks].filter((r) => !r.ok).map((r) => r.message),
+    notes,
   );
 }
 
@@ -1225,12 +1377,16 @@ async function moduleGrowthReferrals(since: string): Promise<ModuleSnapshot> {
 async function modulePrograms(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("programs", "Programs", "growth", [
     "program_applications",
+    "ambassadors",
   ]);
-  const apps = await safeSelect(
-    "program_applications",
-    "id,program,program_key,status,created_at",
-    500,
-  );
+  const [apps, ambassadors] = await Promise.all([
+    safeSelect(
+      "program_applications",
+      "id,program,program_key,status,created_at",
+      500,
+    ),
+    safeSelect("ambassadors", "id,status,created_at", 500),
+  ]);
   const byProgram = {
     student: 0,
     community: 0,
@@ -1253,26 +1409,35 @@ async function modulePrograms(): Promise<ModuleSnapshot> {
     } else if (key.includes("ambassador")) byProgram.ambassador += 1;
     else byProgram.other += 1;
   }
+  const activeAmbassadors = countWhere(ambassadors.rows, (r) =>
+    ["active", "approved", "live"].includes(statusOf(r)),
+  );
   return finalize(
     snap,
-    apps.ok,
+    apps.ok || ambassadors.ok,
     apps.ok
-      ? `${number(apps.count)} applications · Veterans & Military Families: ${number(byProgram.veterans)} · SkillBridge: ${number(byProgram.skillbridge)}.`
-      : "Program applications unavailable.",
+      ? `${number(apps.count)} program applications · Ambassador apps ${number(byProgram.ambassador)} · active ambassadors ${number(activeAmbassadors)} · Veterans & Military Families apps ${number(byProgram.veterans)} · SkillBridge apps ${number(byProgram.skillbridge)}.`
+      : ambassadors.ok
+        ? `Program applications unavailable · ${number(activeAmbassadors)} active ambassadors of ${number(ambassadors.count)} total.`
+        : "Program applications unavailable.",
     {
-      applications: apps.count,
-      studentHire: byProgram.student,
-      communityHire: byProgram.community,
-      veteransMilitaryFamilies: byProgram.veterans,
-      skillbridgeInterest: byProgram.skillbridge,
-      ambassadorProgram: byProgram.ambassador,
+      applications: apps.ok ? apps.count : null,
+      studentHire: apps.ok ? byProgram.student : null,
+      communityHire: apps.ok ? byProgram.community : null,
+      veteransMilitaryFamilies: apps.ok ? byProgram.veterans : null,
+      skillbridgeInterest: apps.ok ? byProgram.skillbridge : null,
+      ambassadorProgramApps: apps.ok ? byProgram.ambassador : null,
+      activeAmbassadors: ambassadors.ok ? activeAmbassadors : null,
+      ambassadorsTotal: ambassadors.ok ? ambassadors.count : null,
     },
     [
-      `Student ${number(byProgram.student)}`,
-      `Community ${number(byProgram.community)}`,
-      `Veterans ${number(byProgram.veterans)}`,
+      apps.ok ? `Ambassador apps ${number(byProgram.ambassador)}` : "apps unavailable",
+      ambassadors.ok
+        ? `Active ambassadors ${number(activeAmbassadors)}`
+        : "ambassadors unavailable",
+      apps.ok ? `Veterans apps ${number(byProgram.veterans)}` : "veterans unavailable",
     ],
-    apps.ok ? [] : [apps.message],
+    [apps, ambassadors].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
@@ -1301,61 +1466,118 @@ async function modulePartners(): Promise<ModuleSnapshot> {
 async function moduleAnalytics(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("analytics", "Analytics", "growth", [
     "analytics_events",
-    "launch_signups",
+    "launch_waitlist",
     "bookings",
   ]);
 
-  const sinceMs = since && Date.parse(since) ? Date.parse(since) : NaN;
-  const periodMs = Number.isFinite(sinceMs)
-    ? Math.max(24 * 60 * 60 * 1000, Date.now() - sinceMs)
-    : 30 * 24 * 60 * 60 * 1000;
-  const currentStartIso = Number.isFinite(sinceMs)
-    ? new Date(sinceMs).toISOString()
-    : new Date(Date.now() - periodMs).toISOString();
-  const priorEndIso = currentStartIso;
-  const priorStartIso = new Date(
-    Date.parse(priorEndIso) - periodMs,
-  ).toISOString();
-
-  const momDelta = (current: number, prior: number) => {
+  const windows = getComparablePeriodWindows(since);
+  const momDelta = (current: number | null, prior: number | null) => {
+    if (current === null || prior === null) return null;
     if (!prior) return current ? 100 : 0;
     return Number((((current - prior) / prior) * 100).toFixed(1));
   };
 
-  const [events, launches, bookings, priorEvents, priorLaunches, priorBookings] =
-    await Promise.all([
-      safeHeadCount("analytics_events", since || currentStartIso),
-      safeHeadCount("launch_signups", since || currentStartIso),
-      safeHeadCount("bookings", since || currentStartIso),
-      safeHeadCountBetween("analytics_events", priorStartIso, priorEndIso),
-      safeHeadCountBetween("launch_signups", priorStartIso, priorEndIso),
-      safeHeadCountBetween("bookings", priorStartIso, priorEndIso),
-    ]);
+  const [
+    events,
+    waitlist,
+    bookings,
+    priorEvents,
+    priorWaitlist,
+    priorBookings,
+    lifetimeEvents,
+    lifetimeBookings,
+  ] = await Promise.all([
+    safeHeadCount("analytics_events", windows.currentStartIso),
+    safeHeadCountCascade(
+      ["launch_waitlist", "launch_signups"],
+      windows.currentStartIso,
+    ),
+    safeHeadCount("bookings", windows.currentStartIso),
+    safeHeadCountBetween(
+      "analytics_events",
+      windows.priorStartIso,
+      windows.priorEndIso,
+    ),
+    safeHeadCountBetweenCascade(
+      ["launch_waitlist", "launch_signups"],
+      windows.priorStartIso,
+      windows.priorEndIso,
+    ),
+    safeHeadCountBetween(
+      "bookings",
+      windows.priorStartIso,
+      windows.priorEndIso,
+    ),
+    safeHeadCount("analytics_events"),
+    safeHeadCount("bookings"),
+  ]);
+
+  const eventsMom = momDelta(
+    events.ok ? events.count : null,
+    priorEvents.ok ? priorEvents.count : null,
+  );
+  const waitlistMom = momDelta(
+    waitlist.ok ? waitlist.count : null,
+    priorWaitlist.ok ? priorWaitlist.count : null,
+  );
+  const bookingsMom = momDelta(
+    bookings.ok ? bookings.count : null,
+    priorBookings.ok ? priorBookings.count : null,
+  );
+
+  const summaryParts = [
+    events.ok
+      ? `${number(events.count)} tracked events MTD (prior MTD ${number(priorEvents.count)}${eventsMom === null ? "" : ` · ${eventsMom}%`})`
+      : "tracked events unavailable",
+    waitlist.ok
+      ? `${number(waitlist.count)} launch waitlist/signups MTD`
+      : "launch waitlist/signups unavailable (do not invent a zero)",
+    bookings.ok
+      ? `${number(bookings.count)} bookings MTD · ${number(lifetimeBookings.count)} bookings all-time`
+      : "bookings unavailable",
+  ];
 
   return finalize(
     snap,
-    events.ok || launches.ok || bookings.ok,
-    `Growth KPIs in period: ${number(events.count)} tracked events · ${number(launches.count)} launch signups · ${number(bookings.count)} bookings. MoM: events ${momDelta(events.count, priorEvents.count)}% · launches ${momDelta(launches.count, priorLaunches.count)}% · bookings ${momDelta(bookings.count, priorBookings.count)}%.`,
+    events.ok || waitlist.ok || bookings.ok,
+    summaryParts.join(" · "),
     {
-      events: events.count,
-      launchSignups: launches.count,
-      bookings: bookings.count,
-      priorEvents: priorEvents.count,
-      priorLaunchSignups: priorLaunches.count,
-      priorBookings: priorBookings.count,
-      eventsMomPct: momDelta(events.count, priorEvents.count),
-      launchesMomPct: momDelta(launches.count, priorLaunches.count),
-      bookingsMomPct: momDelta(bookings.count, priorBookings.count),
-      priorWindowStart: priorStartIso,
-      priorWindowEnd: priorEndIso,
+      eventsMtd: events.ok ? events.count : null,
+      launchWaitlistOrSignupsMtd: waitlist.ok ? waitlist.count : null,
+      bookingsMtd: bookings.ok ? bookings.count : null,
+      priorEventsMtd: priorEvents.ok ? priorEvents.count : null,
+      priorLaunchWaitlistOrSignupsMtd: priorWaitlist.ok ? priorWaitlist.count : null,
+      priorBookingsMtd: priorBookings.ok ? priorBookings.count : null,
+      eventsMomPct: eventsMom,
+      launchWaitlistMomPct: waitlistMom,
+      bookingsMomPct: bookingsMom,
+      lifetimeEvents: lifetimeEvents.ok ? lifetimeEvents.count : null,
+      lifetimeBookings: lifetimeBookings.ok ? lifetimeBookings.count : null,
+      compareMode: windows.compareMode,
+      priorWindowStart: windows.priorStartIso,
+      priorWindowEnd: windows.priorEndIso,
     },
     [
-      `${number(events.count)} events`,
-      `${number(launches.count)} launch signups`,
-      `${number(bookings.count)} bookings`,
-      `events MoM ${momDelta(events.count, priorEvents.count)}%`,
+      events.ok
+        ? `${number(events.count)} events MTD · MoM ${eventsMom ?? "n/a"}%`
+        : "events unavailable",
+      bookings.ok
+        ? `${number(lifetimeBookings.count)} bookings all-time`
+        : "bookings unavailable",
+      waitlist.ok
+        ? `${number(waitlist.count)} waitlist/signups MTD`
+        : "waitlist/signups unavailable",
     ],
-    [events, launches, bookings, priorEvents, priorLaunches, priorBookings]
+    [
+      events,
+      waitlist,
+      bookings,
+      priorEvents,
+      priorWaitlist,
+      priorBookings,
+      lifetimeEvents,
+      lifetimeBookings,
+    ]
       .filter((r) => !r.ok)
       .map((r) => r.message),
   );
@@ -2356,6 +2578,8 @@ export function resolveModulesForQuery(
       "chat_insights",
       "ambassadors",
       "pet_parents",
+      "gurus",
+      "bookings",
     ];
   }
   if (presetKey === "system_audit" || presetKey === "system-audit") {
@@ -2502,6 +2726,7 @@ function modulesToMarkdown(
     `# SitGuru Admin Snapshot`,
     `- Compiled at: ${compiledAt}`,
     `- Period: ${period}`,
+    `- Integrity rule: null / unavailable metrics are NOT zeros. Never invent CAC, MoM %, or queue sizes when Status is unavailable or Value is null.`,
     ``,
   ];
 
@@ -2513,18 +2738,18 @@ function modulesToMarkdown(
     if (metricEntries.length) {
       lines.push(`| Metric | Value |`);
       lines.push(`| --- | --- |`);
-      for (const [key, value] of metricEntries.slice(0, 12)) {
-        lines.push(`| ${key} | ${String(value)} |`);
+      for (const [key, value] of metricEntries.slice(0, 16)) {
+        lines.push(`| ${key} | ${value === null || value === undefined ? "unavailable" : String(value)} |`);
       }
     }
     if (mod.highlights.length) {
       lines.push(`Highlights:`);
-      for (const item of mod.highlights.slice(0, 6)) {
+      for (const item of mod.highlights.slice(0, 8)) {
         lines.push(`- ${item}`);
       }
     }
     if (mod.errors.length) {
-      lines.push(`Notes: ${mod.errors.slice(0, 2).join(" | ")}`);
+      lines.push(`Data gaps: ${mod.errors.slice(0, 4).join(" | ")}`);
     }
     lines.push(``);
   }
