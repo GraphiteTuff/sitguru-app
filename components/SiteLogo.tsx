@@ -6,25 +6,47 @@ type SiteLogoProps = {
   priority?: boolean;
   imageClassName?: string;
   wrapperClassName?: string;
+  variant?: "default" | "halloween";
 };
+
+const logos = {
+  default: {
+    src: "/images/sitguru-logo-cropped.png",
+    width: 1003,
+    height: 357,
+  },
+  halloween: {
+    src: "/images/sitguru-halloween-logo-footer.png",
+    width: 933,
+    height: 309,
+  },
+} as const;
 
 export default function SiteLogo({
   href = "/",
   priority = false,
   imageClassName = "",
   wrapperClassName = "",
+  variant = "default",
 }: SiteLogoProps) {
+  const logoFile = logos[variant];
   const logo = (
     <div
-      className={`flex shrink-0 items-center justify-start overflow-hidden ${wrapperClassName}`}
+      className={`flex shrink-0 items-center justify-start ${
+        variant === "halloween" ? "" : "overflow-hidden"
+      } ${wrapperClassName}`}
     >
       <Image
-        src="/images/sitguru-logo-cropped.png"
+        src={logoFile.src}
         alt="SitGuru logo"
-        width={1003}
-        height={357}
+        width={logoFile.width}
+        height={logoFile.height}
         priority={priority}
-        className={`h-full w-auto max-w-none object-contain ${imageClassName}`}
+        className={
+          variant === "halloween"
+            ? `h-auto w-full object-contain object-left ${imageClassName}`
+            : `h-full w-auto max-w-none object-contain ${imageClassName}`
+        }
       />
     </div>
   );
