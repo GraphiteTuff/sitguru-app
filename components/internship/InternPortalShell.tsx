@@ -201,7 +201,7 @@ export default function InternPortalShell({
           ) : null}
 
           <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
-          {showFullChrome ? <DeskChatDock mode="intern" /> : null}
+          {showFullChrome ? <DeskChatDock mode="intern" aboveBottomNav /> : null}
 
           {showFullChrome ? (
             <WebappBottomNav

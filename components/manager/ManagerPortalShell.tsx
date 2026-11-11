@@ -200,7 +200,7 @@ export default function ManagerPortalShell({
           </header>
 
           <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
-          <DeskChatDock />
+          <DeskChatDock aboveBottomNav />
           <WebappBottomNav
             label="Manager navigation"
             items={[

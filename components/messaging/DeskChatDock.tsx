@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { MessageCircle, Minus, Send, X } from "lucide-react";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
 import { deskInitials } from "@/lib/portal/desk-ui";
 
 const DESK_CHAT_OPEN_ATTR = "data-desk-chat-open";
@@ -71,7 +72,15 @@ function Face({
   );
 }
 
-export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | "intern" }) {
+export default function DeskChatDock({
+  mode = "manager",
+  /** Lift the FAB above WebappBottomNav so More stays tappable on phone. */
+  aboveBottomNav = false,
+}: {
+  mode?: "manager" | "intern";
+  aboveBottomNav?: boolean;
+}) {
+  useBrowserChromeInset();
   const audiences = mode === "intern" ? INTERN_AUDIENCES : MANAGER_AUDIENCES;
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"inbox" | "people">(mode === "intern" ? "people" : "inbox");
@@ -276,8 +285,25 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
     setOpen(false);
   }
 
+  // Keep the FAB clear of WebappBottomNav + iOS Safari chrome on phone.
+  // Inline style beats Tailwind purge on nested calc()/var() offsets.
+  const dockStyle = aboveBottomNav
+    ? ({
+        bottom:
+          "calc(5.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))",
+        paddingBottom: "0.5rem",
+      } as const)
+    : ({
+        bottom: 0,
+        paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+      } as const);
+
   return (
-    <div className="desk-chat-dock fixed inset-x-0 bottom-0 z-[95] flex flex-col items-end px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-4 xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
+    <div
+      className="desk-chat-dock fixed inset-x-0 z-[90] flex flex-col items-end px-3 sm:px-4 xl:!bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:!pb-0"
+      style={dockStyle}
+      data-desk-chat-above-nav={aboveBottomNav ? "true" : undefined}
+    >
       {open ? (
         <section className="relative mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
           <button

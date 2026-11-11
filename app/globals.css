@@ -772,6 +772,21 @@ body[data-desk-chat-open] [data-rogue-admin-dock] {
   display: none !important;
 }
 
+/* Manager/Intern phone: keep desk chat FAB above WebappBottomNav + Safari chrome */
+.desk-chat-dock[data-desk-chat-above-nav="true"] {
+  bottom: calc(
+    5.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+  ) !important;
+  padding-bottom: 0.5rem !important;
+}
+
+@media (min-width: 1280px) {
+  .desk-chat-dock[data-desk-chat-above-nav="true"] {
+    bottom: 1.5rem !important;
+    padding-bottom: 0 !important;
+  }
+}
+
 .guru-theme header {
   background: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid rgba(219, 232, 239, 0.95) !important;

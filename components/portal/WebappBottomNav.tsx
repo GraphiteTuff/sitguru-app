@@ -36,7 +36,7 @@ export default function WebappBottomNav({
   return (
     <>
       {moreOpen ? (
-        <div className="fixed inset-x-0 z-[60] px-3 xl:hidden" style={{ bottom: "calc(4.6rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
+        <div className="fixed inset-x-0 z-[97] px-3 xl:hidden" style={{ bottom: "calc(4.85rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
           <div className="max-h-[50vh] overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white p-2 shadow-[0_-8px_28px_rgba(15,23,42,0.08)]">
             {more.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -57,12 +57,13 @@ export default function WebappBottomNav({
         </div>
       ) : null}
       <nav
-        className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md xl:hidden"
+        className="pointer-events-auto fixed inset-x-0 z-[96] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md xl:hidden"
         style={{
           bottom: "var(--sg-chrome-bottom, 0px)",
           paddingBottom: "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
         }}
         aria-label={label}
+        data-webapp-bottom-nav
       >
         <div className="grid grid-cols-5 gap-0 px-1 pt-1">
           {items.map((item) => {
