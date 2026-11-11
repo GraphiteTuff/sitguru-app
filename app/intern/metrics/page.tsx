@@ -1,21 +1,34 @@
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
-import { getGrowthHomeStats, listGrowthContent } from "@/lib/admin/growth/data";
-import MetricsBoard from "@/components/portal/MetricsBoard";
+import { parseFiltersFromSearch } from "@/lib/growth-center-v2/date-range";
+import { loadGrowthCenterSnapshot } from "@/lib/growth-center-v2/snapshot";
+import GrowthCenterInsightsBoard from "@/components/growth-center-v2/GrowthCenterInsightsBoard";
 
 export const dynamic = "force-dynamic";
 
-export default async function InternMetricsPage() {
+export default async function InternMetricsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
-  const [stats, content] = await Promise.all([getGrowthHomeStats(), listGrowthContent()]);
+  const params = searchParams ? await searchParams : {};
+  const filters = parseFiltersFromSearch(params);
+  const snapshot = await loadGrowthCenterSnapshot({
+    audience: "intern",
+    filters,
+    internUserId: access.actor.id,
+  });
+  const exportQuery = new URLSearchParams();
+  exportQuery.set("preset", filters.preset);
+  exportQuery.set("platform", filters.platform);
+  exportQuery.set("audience", filters.audience);
+
   return (
-    <MetricsBoard
-      audience="intern"
-      stats={stats}
-      content={content.slice(0, 4).map((item) => ({
-        title: item.title,
-        detail: [item.platform, item.status].filter(Boolean).join(" · "),
-      }))}
+    <GrowthCenterInsightsBoard
+      snapshot={snapshot}
+      userId={access.actor.id}
+      exportHref={`/api/growth-center/v2/export?${exportQuery.toString()}`}
     />
   );
 }

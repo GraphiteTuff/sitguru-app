@@ -2097,6 +2097,25 @@ export async function POST(request: NextRequest) {
       intent: requestedIntent,
     });
 
+    // Growth Center 2.0 — first-party attributed signup event (idempotent).
+    try {
+      const { recordGrowthSignupAttribution } = await import(
+        "@/lib/growth-center-v2/attribution"
+      );
+      const tracking = getTrackingValues(body, metadata);
+      await recordGrowthSignupAttribution({
+        userId,
+        profileId: userId,
+        role: requestedIntent,
+        tracking: {
+          ...tracking,
+          referralCode: submittedReferralCode || null,
+        },
+      });
+    } catch (growthError) {
+      console.warn("Growth Center signup attribution skipped:", growthError);
+    }
+
     // Brand Ambassador performance ledger (cookie or submitted code)
     try {
       const { attributeSignupToAmbassador } = await import(

@@ -71,7 +71,8 @@ export default function GrowthPhoneBar({
         { suffix: "/my-time", label: "My Time", icon: ClipboardCheck, href: "" },
         { suffix: "/payments", label: "Payments", icon: ClipboardList, href: "" },
         { suffix: "/onboarding", label: "Onboarding", icon: ClipboardCheck, href: "" },
-        { suffix: suffixes.intelligence, label: "Insights", icon: Lightbulb, href: "" },
+        { suffix: "/insights", label: "Insights", icon: Lightbulb, href: "" },
+        { suffix: suffixes.intelligence, label: "Intelligence", icon: Lightbulb, href: "" },
         { suffix: suffixes.create, label: "Create", icon: Plus, href: "" },
         { suffix: suffixes.content, label: "Content", icon: FolderOpen, href: "" },
         { suffix: suffixes.events, label: "Events", icon: CalendarDays, href: "" },
@@ -84,6 +85,7 @@ export default function GrowthPhoneBar({
         { suffix: suffixes.gurus, label: "Gurus", icon: Users, href: "" },
         { suffix: suffixes.events, label: "Events", icon: CalendarDays, href: "" },
         { suffix: suffixes.partners, label: "Partners", icon: Handshake, href: "" },
+        { suffix: "/insights", label: "Insights", icon: Lightbulb, href: "" },
         { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3, href: "" },
       ];
   function targetOf(item: { suffix: string; href?: string }) {

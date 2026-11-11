@@ -13,6 +13,7 @@ export const WORKSPACE_QUERY_KEYS = {
   internDashboard: "intern-dashboard",
   managerDesk: "manager-desk",
   growthSnapshot: "growth-snapshot",
+  growthCenterV2: "growth-center-v2",
   onboardingStatus: "onboarding-status",
   helpContext: "help-context",
   messagingUnread: "messaging-unread",
@@ -27,11 +28,14 @@ export const WORKSPACE_REFRESH_PATHS = {
   internPortal: "/intern",
   managerDesk: "/intern/manage",
   managerPortal: "/manager",
+  managerInsights: "/manager/insights",
   internGrowth: "/intern/growth",
+  internInsights: "/intern/insights",
   internHelp: "/intern/help",
   internOnboarding: "/intern/onboarding",
   adminInternship: "/admin/internship",
   adminGrowth: "/admin/growth",
+  adminGrowthInsights: "/admin/growth/insights",
   adminMyTime: "/admin/growth/my-time",
   adminMyPayments: "/admin/growth/payments",
   adminHr: "/admin/hr",
@@ -64,12 +68,15 @@ export function pathsForManagerDesk() {
 export function pathsForGrowthWorkspace() {
   return [
     WORKSPACE_REFRESH_PATHS.adminGrowth,
+    WORKSPACE_REFRESH_PATHS.adminGrowthInsights,
     WORKSPACE_REFRESH_PATHS.adminMyTime,
     WORKSPACE_REFRESH_PATHS.adminMyPayments,
     WORKSPACE_REFRESH_PATHS.internGrowth,
+    WORKSPACE_REFRESH_PATHS.internInsights,
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.managerDesk,
     WORKSPACE_REFRESH_PATHS.managerPortal,
+    WORKSPACE_REFRESH_PATHS.managerInsights,
   ];
 }
 

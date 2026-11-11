@@ -6,8 +6,10 @@ import { MANAGER_PORTAL_SIDEBAR } from "./manager-portal";
 describe("manager flat routes", () => {
   it("places the new standalone features immediately after their existing peers", () => {
     const labels = MANAGER_PORTAL_SIDEBAR.map(item => item.label);
+    assert.equal(labels[labels.indexOf("Growth Home") + 1], "Insights");
     assert.equal(labels[labels.indexOf("Content Studio") + 1], "Community Studio");
     assert.equal(labels[labels.indexOf("Campus Growth") + 1], "Market Density");
+    assert.equal(MANAGER_ROUTES.insights, "/manager/insights");
     assert.equal(MANAGER_ROUTES.communityStudio, "/manager/community-studio");
     assert.equal(MANAGER_ROUTES.marketDensity, "/manager/market-density");
   });

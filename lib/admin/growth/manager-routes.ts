@@ -3,6 +3,7 @@
 export const MANAGER_ROUTES = {
   home: "/manager",
   growth: "/manager/growth",
+  insights: "/manager/insights",
   campusGrowth: "/manager/campus-growth",
   marketDensity: "/manager/market-density",
   communityStudio: "/manager/community-studio",
@@ -34,6 +35,7 @@ export const MANAGER_ROUTES = {
 export const MANAGER_MENU_WIRED = [
   { key: "home", label: "Home", href: MANAGER_ROUTES.home },
   { key: "growth", label: "Growth Home", href: MANAGER_ROUTES.growth },
+  { key: "insights", label: "Insights", href: MANAGER_ROUTES.insights },
   { key: "campusGrowth", label: "Campus Growth", href: MANAGER_ROUTES.campusGrowth },
   { key: "marketDensity", label: "Market Density", href: MANAGER_ROUTES.marketDensity },
   { key: "communityStudio", label: "Community Studio", href: MANAGER_ROUTES.communityStudio },

@@ -37,6 +37,7 @@ export const MANAGER_PORTAL_BRAND = {
 export const MANAGER_PORTAL_SIDEBAR = [
   { href: MANAGER_ROUTES.home, label: "Overview", match: "exact" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.growth, label: "Growth Home", match: "growth-home" as const, group: "My Manager Portal" },
+  { href: MANAGER_ROUTES.insights, label: "Insights", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.campusGrowth, label: "Campus Growth", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.marketDensity, label: "Market Density", match: "prefix" as const, group: "My Manager Portal" },
   { href: MANAGER_ROUTES.myTime, label: "My Weekly Hours", match: "prefix" as const, group: "My Manager Portal" },
@@ -67,6 +68,7 @@ export const MANAGER_PORTAL_SIDEBAR = [
 export const MANAGER_PORTAL_NAV = [
   { href: MANAGER_ROUTES.desk, label: "Desk" },
   { href: MANAGER_ROUTES.growth, label: "Growth" },
+  { href: MANAGER_ROUTES.insights, label: "Insights" },
   { href: MANAGER_ROUTES.messages, label: "Messages" },
   { href: MANAGER_ROUTES.team, label: "Team" },
   { href: MANAGER_ROUTES.results, label: "Results" },
@@ -75,6 +77,7 @@ export const MANAGER_PORTAL_NAV = [
 
 export const MANAGER_GROWTH_PREFIXES = [
   "/manager/growth",
+  "/manager/insights",
   "/manager/campaigns",
   "/manager/events",
   "/manager/analytics",

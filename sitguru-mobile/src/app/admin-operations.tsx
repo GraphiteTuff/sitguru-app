@@ -308,6 +308,7 @@ export default function AdminOperationsScreen() {
 
             <ActionRow
               actions={[
+                { label: 'Growth Insights', href: '/growth-insights' },
                 { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' },
                 { label: 'Guru Dashboard', href: '/guru-dashboard' },
                 { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },

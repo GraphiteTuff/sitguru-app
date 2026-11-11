@@ -16,6 +16,7 @@ export const INTERN_ROUTES = {
   results: "/intern/results",
   calendar: "/intern/calendar",
   metrics: "/intern/metrics",
+  insights: "/intern/insights",
   growth: INTERNSHIP_GROWTH_PATH,
   toolkit: "/intern/toolkit",
   campusGrowth: "/intern/campus-growth",
