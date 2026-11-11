@@ -100,6 +100,13 @@ const CARE_SEEKING =
 const PROVIDER_SIGNUP =
   /\b(want to register as|become a (guru|sitter|walker|trainer)|register as a)\b/i;
 
+/**
+ * Guru logistics / dashboard coaching — not Pet Parent care matching.
+ * Mentions of "walks", "visits", or "Guru" here must not trigger ZIP booking intake.
+ */
+const GURU_LOGISTICS_QUERY =
+  /\b(trail check|tracking the trail|assigned walks?|dashboard schedule|my schedule|safety checks?|route completion|cert(ification)? badges?|payout(s| cache| ready| setup)?|update (my )?guru profile|guru profile|how do i update|what is pawreport|pawreport live|sitguru university)\b/i;
+
 function clean(value: unknown) {
   return String(value || "").trim();
 }
@@ -162,6 +169,13 @@ function isMatchingFollowUp(lower: string): boolean {
   );
 }
 
+/** True when the message is Guru logistics coaching, not parent booking intake. */
+export function looksLikeGuruLogisticsQuery(rawText?: string | null): boolean {
+  const text = clean(rawText);
+  if (!text) return false;
+  return GURU_LOGISTICS_QUERY.test(text);
+}
+
 /** Join recent user turns so ZIP / time / services persist across chips. */
 export function joinRecentUserTexts(
   messages: Array<{ role?: string; content?: unknown }>,
@@ -213,13 +227,19 @@ export function parseCareMatchingIntake(
   const timeWindow = detectTimeWindow(text);
 
   const isProviderSignup = PROVIDER_SIGNUP.test(lower);
+  const isLogisticsQuery = looksLikeGuruLogisticsQuery(text);
+  // Service words alone ("walks", "visits") are not enough — Trail Check /
+  // schedule coaching also mention walks. Require a real care-seeking cue,
+  // and never treat Guru logistics questions as parent matching intake.
   const isCareSeeking =
     !isProviderSignup &&
-    (Boolean(service) ||
-      CARE_SEEKING.test(lower) ||
+    !isLogisticsQuery &&
+    (CARE_SEEKING.test(lower) ||
       GURU_ROLE_SYNONYM.test(lower) ||
       /\blooking for\b/.test(lower) ||
-      isMatchingFollowUp(lower));
+      isMatchingFollowUp(lower) ||
+      // Bare green-pill / short service taps still count when not logistics.
+      (Boolean(service) && text.split(/\s+/).length <= 6));
 
   const hasZip = Boolean(zip);
   const hasLocation = Boolean(zip || city || state);
@@ -255,6 +275,7 @@ export function parseCareMatchingIntake(
 }
 
 export function needsCareMatchingAsk(rawText?: string | null): boolean {
+  if (looksLikeGuruLogisticsQuery(rawText)) return false;
   const intake = parseCareMatchingIntake(rawText);
   if (intake.isProviderSignup) {
     return !intake.hasLocation || !intake.hasTime || !intake.hasServiceType;
