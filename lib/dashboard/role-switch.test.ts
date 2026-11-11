@@ -132,6 +132,22 @@ describe("founder personal marketplace roles", () => {
     assert.equal(resolveDashboardRoleFromPath("/manager"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/growth"), "growth");
     assert.equal(resolveDashboardRoleFromPath("/admin/hr"), "admin");
+
+    const hqTargets = getAuthorizedDashboardTargets({
+      authorizedRoles: [
+        "parent",
+        "guru",
+        "ambassador",
+        "intern",
+        "manager",
+        "growth",
+        "admin",
+      ],
+    });
+    const managerPortals = hqTargets.filter((item) => item.shortLabel === "Manager Portal");
+    assert.equal(managerPortals.length, 1);
+    assert.equal(managerPortals[0]?.path, "/manager");
+    assert.equal(hqTargets.some((item) => item.path === "/intern/manage"), false);
   });
 
   it("does not open a switcher for a single workspace", () => {

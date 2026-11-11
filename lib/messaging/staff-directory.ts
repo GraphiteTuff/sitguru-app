@@ -9,6 +9,7 @@ import {
   sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -71,6 +72,7 @@ function profileAvatar(row: Record<string, unknown>, extras?: Record<string, unk
       photo_url: text(extras?.ambassador_photo_path) || null,
       avatar_url: text(extras?.avatar_url) || null,
     }) ||
+    staffAvatarFallback({ email: text(row.email), userId: text(row.id) }) ||
     ""
   );
 }

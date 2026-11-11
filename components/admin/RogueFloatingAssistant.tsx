@@ -45,9 +45,9 @@ const HEADER_SUB_STYLE: CSSProperties = {
 const REPORTING_STATEMENT =
   "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
 
-/** Admin tip bubble — reporting-for-duty statement. */
+/** Admin tip bubble — short so it never covers the desk chat button. */
 const TIP_STATEMENT =
-  "Rogue reporting for duty. I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped!";
+  "Rogue ready. Tap for Daily Sync, Financials, Growth, or Audit.";
 
 const QUICK_CHIPS = [
   {
@@ -380,7 +380,7 @@ export default function RogueFloatingAssistant() {
 
   const ui = (
     <div
-      className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
+      className="pointer-events-none fixed bottom-4 right-[5.75rem] z-[80] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-[6.5rem]"
       data-rogue-admin-dock
       style={
         {
@@ -395,7 +395,7 @@ export default function RogueFloatingAssistant() {
           <button
             type="button"
             className="homepage-chat-tip"
-            style={{ maxWidth: "min(280px, calc(100vw - 6.5rem))" }}
+            style={{ maxWidth: "min(220px, calc(100vw - 10.5rem))" }}
             onClick={openPanel}
             aria-label="Open Rogue reporting terminal"
           >

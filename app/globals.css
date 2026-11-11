@@ -757,6 +757,21 @@ p {
   border-bottom: 1px solid #1e293b !important;
 }
 
+/* Desk chat panel chrome — never inherit .admin-theme header / p colors */
+.desk-chat-dock [data-desk-chat-header] {
+  background: #0d5c3a !important;
+  border-bottom: none !important;
+  color: #ffffff !important;
+}
+
+.desk-chat-dock [data-desk-chat-header] p {
+  color: #ffffff !important;
+}
+
+body[data-desk-chat-open] [data-rogue-admin-dock] {
+  display: none !important;
+}
+
 .guru-theme header {
   background: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid rgba(219, 232, 239, 0.95) !important;

@@ -9,6 +9,7 @@ import {
   mergeApprovedAdminSwitchRole,
   resolveAuthorizedRolesFromProfile,
   resolveDashboardRoleFromPath,
+  switchPortalRoles,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import { isAdminPathAllowedForModules } from "@/lib/admin/portal-areas";
@@ -18,12 +19,9 @@ import {
   ChevronDown,
   ChevronUp,
   Home,
-  LayoutDashboard,
   LogOut,
   MessageCircle,
   Settings,
-  ShieldCheck,
-  Megaphone,
   Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -365,13 +363,15 @@ export default function AdminAccountMenu() {
     router.refresh();
   }
 
-  const adminSwitchRoles: DashboardSwitchRole[] = isSitGuruSuperUser(account.email)
-    ? FOUNDER_ROLES
-    : switchRoles.length
-      ? switchRoles
-      : growthOnly
-        ? ["growth"]
-        : ["parent"];
+  const adminSwitchRoles: DashboardSwitchRole[] = switchPortalRoles(
+    isSitGuruSuperUser(account.email)
+      ? FOUNDER_ROLES
+      : switchRoles.length
+        ? switchRoles
+        : growthOnly
+          ? ["growth"]
+          : ["parent"],
+  );
 
   const canShowAdminLink = (href: string) => {
     if (isSitGuruSuperUser(account.email) || !modules) return true;
@@ -384,7 +384,7 @@ export default function AdminAccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full border border-green-800 bg-green-800 pl-1.5 pr-2.5 text-white shadow-sm transition hover:bg-green-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-green-100 xl:max-w-[13rem] xl:pr-3"
+        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full bg-[#2563EB] pl-1.5 pr-2.5 text-white shadow-sm transition hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 xl:max-w-[13rem] xl:pr-3"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open admin account menu"
@@ -418,23 +418,23 @@ export default function AdminAccountMenu() {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.75rem] border border-[#dce9df] bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
+          className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] max-h-[min(36rem,calc(100dvh-6rem))] w-80 overflow-y-auto overflow-x-hidden rounded-[1.75rem] border border-slate-200/80 bg-white text-left shadow-[0_22px_55px_rgba(15,39,68,0.18)]"
         >
-          <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
+          <div className="bg-gradient-to-r from-[#EFF6FF] via-white to-[#F0FDF4] p-5">
             <div className="flex items-center gap-4">
-              <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-white shadow-sm">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
                 <Image
                   src="/images/sitguru-admin-avatar.jpg"
                   alt="SitGuru Admin Avatar"
                   fill
-                  sizes="64px"
+                  sizes="56px"
                   priority
                   className="object-cover"
                 />
               </span>
 
               <div className="min-w-0">
-                <p className="truncate text-xl font-black leading-tight text-slate-950">
+                <p className="truncate text-lg font-black leading-tight text-[#0F2744]">
                   {account.displayName}
                 </p>
 
@@ -442,7 +442,7 @@ export default function AdminAccountMenu() {
                   {account.email}
                 </p>
 
-                <p className="mt-1 text-base font-black text-green-800">
+                <p className="mt-1 text-sm font-black text-[#2563EB]">
                   {visibleRoleLabel}
                 </p>
               </div>
@@ -454,42 +454,19 @@ export default function AdminAccountMenu() {
               currentRole={resolveDashboardRoleFromPath(pathname) || "admin"}
               authorizedRoles={adminSwitchRoles}
               onNavigate={() => setOpen(false)}
-              className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+              className="mb-1 rounded-2xl border border-sky-100 bg-[#EFF6FF] p-2"
             />
-            {canShowAdminLink("/admin/growth") ? (
-            <Link
-              href="/admin/growth"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
-            >
-              <Megaphone size={19} className="text-green-800" />
-              Growth Portal
-            </Link>
-            ) : null}
 
             {growthOnly ? null : (
               <>
-            {canShowAdminLink("/admin") ? (
-            <Link
-              href="/admin"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
-            >
-              <LayoutDashboard size={19} className="text-green-800" />
-              Dashboard
-            </Link>
-            ) : null}
-
             {canShowAdminLink("/admin/hr/growth-hire") ? (
             <Link
               href="/admin/hr/growth-hire"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
-              <Users size={19} className="text-green-800" />
+              <Users size={18} className="text-[#2563EB]" />
               Hire Social
             </Link>
             ) : null}
@@ -499,34 +476,10 @@ export default function AdminAccountMenu() {
               href="/admin/messages"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
-              <MessageCircle size={19} className="text-green-800" />
+              <MessageCircle size={18} className="text-[#2563EB]" />
               Messages
-            </Link>
-            ) : null}
-
-            {canShowAdminLink("/admin/petparents") ? (
-            <Link
-              href="/admin/petparents"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
-            >
-              <Users size={19} className="text-green-800" />
-              Pet Parents
-            </Link>
-            ) : null}
-
-            {canShowAdminLink("/admin/gurus") ? (
-            <Link
-              href="/admin/gurus"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
-            >
-              <ShieldCheck size={19} className="text-green-800" />
-              Gurus
             </Link>
             ) : null}
 
@@ -535,9 +488,9 @@ export default function AdminAccountMenu() {
               href="/admin/settings"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
-              <Settings size={19} className="text-green-800" />
+              <Settings size={18} className="text-[#2563EB]" />
               Settings
             </Link>
             ) : null}
@@ -548,9 +501,9 @@ export default function AdminAccountMenu() {
               href="/"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+              className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
             >
-              <Home size={19} className="text-green-800" />
+              <Home size={18} className="text-[#2563EB]" />
               Back to Homepage
             </Link>
 
@@ -559,9 +512,9 @@ export default function AdminAccountMenu() {
               role="menuitem"
               onClick={handleLogout}
               disabled={loggingOut}
-              className="mt-2 flex items-center gap-3 rounded-2xl bg-green-800 px-4 py-4 text-left text-base font-black text-white transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-2 flex items-center gap-3 rounded-2xl bg-[#2563EB] px-4 py-3.5 text-left text-sm font-black text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <LogOut size={20} />
+              <LogOut size={18} />
               {loggingOut ? "Logging out..." : "Log Out"}
             </button>
           </div>

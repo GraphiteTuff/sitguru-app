@@ -8,6 +8,7 @@ import { canEditRequirements, internshipActorKind } from "@/lib/internship/manag
 import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
 import { rememberChat } from "@/lib/messaging/chat-archive";
 import { isStaffChatPeer } from "@/lib/messaging/chat-library";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -116,9 +117,15 @@ export async function saveStaffMessage(input: {
         .maybeSingle();
       if (shared?.conversation_id) conversationId = String(shared.conversation_id);
     }
-    const { data: peer } = await supabaseAdmin.from("profiles").select("first_name, full_name, avatar_url, profile_photo_url").eq("id", recipientId).maybeSingle();
+    const { data: peer } = await supabaseAdmin
+      .from("profiles")
+      .select("first_name, full_name, email, avatar_url, profile_photo_url")
+      .eq("id", recipientId)
+      .maybeSingle();
     peerName = String(peer?.first_name || peer?.full_name || "").trim().split(/\s+/)[0] || "SitGuru";
-    peerAvatar = String(peer?.avatar_url || peer?.profile_photo_url || "");
+    peerAvatar =
+      String(peer?.avatar_url || peer?.profile_photo_url || "").trim() ||
+      staffAvatarFallback({ email: peer?.email, userId: recipientId });
   }
 
   if (conversationId && who.role === "intern") {

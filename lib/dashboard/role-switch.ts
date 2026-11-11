@@ -452,13 +452,15 @@ export function getAuthorizedDashboardTargets(options: {
   includeAdmin?: boolean;
 }): DashboardSwitchTarget[] {
   const includeAdmin = options.includeAdmin !== false;
-  const authorized = uniqueOrderedRoles([
+  const authorized = switchPortalRoles([
     ...(options.authorizedRoles || []),
     ...authorizedRolesFromAccessFlags(options.access),
   ]);
 
   return DASHBOARD_SWITCH_TARGETS.filter((target) => {
     if (target.id === "admin" && !includeAdmin) return false;
+    // Manager Portal (/manager) replaces Intern Team Desk when both are authorized.
+    if (target.id === "manager" && authorized.includes("growth")) return false;
     return authorized.includes(target.id);
   });
 }

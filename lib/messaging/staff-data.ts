@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { messageNeedsAttention } from "@/lib/messaging/mark-conversation-read";
 import { canAccessConversation, visibleMessage, type StaffActor } from "@/lib/messaging/staff-policy";
@@ -63,7 +64,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
   const { data: profiles } = senderIds.length
     ? await supabaseAdmin
         .from("profiles")
-        .select("id,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url")
+        .select("id,email,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url")
         .in("id", senderIds)
     : { data: [] };
   const people = new Map(
@@ -71,7 +72,9 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
       text(row.id),
       {
         firstName: text(row.first_name) || firstFrom(text(row.full_name)) || "SitGuru",
-        avatarUrl: resolvePetParentAvatarUrl(row),
+        avatarUrl:
+          resolvePetParentAvatarUrl(row) ||
+          staffAvatarFallback({ email: text(row.email), userId: text(row.id) }),
       },
     ]),
   );

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { MessageCircle, Send, X } from "lucide-react";
+import { MessageCircle, Minus, Send, X } from "lucide-react";
 import { deskInitials } from "@/lib/portal/desk-ui";
+
+const DESK_CHAT_OPEN_ATTR = "data-desk-chat-open";
 
 type Person = {
   id: string;
@@ -92,6 +94,13 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
   useEffect(() => {
     openThreadId.current = threadId;
   }, [threadId]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (open) document.body.setAttribute(DESK_CHAT_OPEN_ATTR, "1");
+    else document.body.removeAttribute(DESK_CHAT_OPEN_ATTR);
+    return () => document.body.removeAttribute(DESK_CHAT_OPEN_ATTR);
+  }, [open]);
 
   useEffect(() => {
     const beat = () => {
@@ -263,23 +272,67 @@ export default function DeskChatDock({ mode = "manager" }: { mode?: "manager" | 
       ? "Message Admin or Ava"
       : "Live alerts, staff, interns, pet parents, Gurus, Ambassadors";
 
+  function minimizeChat() {
+    setOpen(false);
+  }
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-stretch px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:items-end sm:px-4 md:pb-[max(1.25rem,env(safe-area-inset-bottom))] xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
+    <div className="desk-chat-dock fixed inset-x-0 bottom-0 z-[95] flex flex-col items-stretch px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))] sm:items-end sm:px-4 md:pb-[max(1.25rem,env(safe-area-inset-bottom))] xl:bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:pb-0">
       {open ? (
-        <section className="mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
-          <header className="public-dark-section flex items-center gap-2 px-3 py-3 !text-white" data-brand-green style={{ background: "#0D5C3A" }}>
+        <section className="relative mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
+          <button
+            type="button"
+            aria-label="Minimize chat"
+            title="Minimize"
+            onClick={minimizeChat}
+            className="absolute left-1/2 top-1.5 z-20 inline-flex h-7 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-black/15 text-white transition hover:bg-black/25"
+          >
+            <Minus size={16} strokeWidth={3} />
+          </button>
+          {/* div — not header — so .admin-theme header overrides cannot wipe the green bar */}
+          <div
+            className="public-dark-section flex items-center gap-2 px-3 pb-3 pt-8"
+            data-desk-chat-header
+            data-brand-green
+            style={{ background: "#0D5C3A", color: "#fff" }}
+          >
             {threadId ? (
-              <button type="button" className="shrink-0 text-sm font-bold !text-white" onClick={() => { setThreadId(""); setPeer(null); }}>Back</button>
+              <button
+                type="button"
+                className="shrink-0 rounded-full px-2 py-1 text-sm font-bold"
+                style={{ color: "#fff" }}
+                onClick={() => {
+                  setThreadId("");
+                  setPeer(null);
+                }}
+              >
+                Back
+              </button>
             ) : null}
-            {peer ? <Face name={peer.firstName} src={peer.avatarUrl} online={peer.online} /> : null}
+            {peer ? <Face name={peer.firstName} src={peer.avatarUrl} online={peer.online} /> : (
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm font-black text-white">
+                SG
+              </span>
+            )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black !text-white">{peer?.firstName || "Chat"}</p>
-              <p className="truncate text-[11px] font-semibold !text-white/80">{subtitle}</p>
+              <p className="truncate text-sm font-black" style={{ color: "#fff" }}>
+                {peer?.firstName || "Chat"}
+              </p>
+              <p className="truncate text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                {subtitle}
+              </p>
             </div>
-            <button type="button" aria-label="Close chat" className="shrink-0 rounded-full p-1 !text-white" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              aria-label="Close chat"
+              title="Close"
+              className="shrink-0 rounded-full p-1.5 transition hover:bg-white/15"
+              style={{ color: "#fff" }}
+              onClick={minimizeChat}
+            >
               <X size={18} />
             </button>
-          </header>
+          </div>
           {threadId ? (
             <>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#F4F7FB] px-3 py-3">
