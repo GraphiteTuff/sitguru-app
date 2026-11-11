@@ -11,6 +11,7 @@ import {
 } from "@/lib/reads/constants";
 import { READS_DEMO_BANNER } from "@/lib/reads/demo-data";
 import { fetchLandingBundle, fetchPublishedContent } from "@/lib/reads/queries";
+import { buildTeamPickRoster } from "@/lib/reads/team-roster";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function ReadsLandingPage() {
     fetchPublishedContent({ format: "podcast", limit: 4 }),
   ]);
   const relatedBook = data.bookOfTheMonth || books[0] || null;
-  const teamPreview = data.teamPicks.slice(0, 5);
+  const teamPreview = buildTeamPickRoster(data.team, data.teamPicks).slice(0, 5);
   const featured = data.featuredPodcast;
   const featuredCover = featured ? coverUrl(featured) : null;
   const relatedCover = relatedBook ? coverUrl(relatedBook) : null;
@@ -262,16 +263,26 @@ export default async function ReadsLandingPage() {
         </div>
 
         <div className="mb-6 flex gap-4 overflow-x-auto pb-2 md:hidden">
-          {teamPreview.map((pick) => (
-            <div key={`m-${pick.id}`} className="min-w-[96px]">
-              <TeamPickCard pick={pick} facing compact />
+          {teamPreview.map((item) => (
+            <div key={`m-${item.member.id}`} className="min-w-[96px]">
+              <TeamPickCard
+                member={item.member}
+                pick={item.pick}
+                facing
+                compact
+              />
             </div>
           ))}
         </div>
 
         <div className="hidden gap-4 md:grid md:grid-cols-3 xl:grid-cols-5">
-          {teamPreview.map((pick) => (
-            <TeamPickCard key={pick.id} pick={pick} facing />
+          {teamPreview.map((item) => (
+            <TeamPickCard
+              key={item.member.id}
+              member={item.member}
+              pick={item.pick}
+              facing
+            />
           ))}
         </div>
       </section>

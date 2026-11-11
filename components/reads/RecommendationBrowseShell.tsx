@@ -9,6 +9,7 @@ import {
   type ReadsCategoryConfig,
   type ReadsRecommendationSource,
 } from "@/lib/reads/category-config";
+import { buildTeamPickRoster } from "@/lib/reads/team-roster";
 import type { ReadsTeamMember, ReadsTeamPick } from "@/lib/reads/types";
 
 export type CommunityRecommendationCard = {
@@ -41,6 +42,9 @@ export default function RecommendationBrowseShell({
   const q = searchParams?.q || "";
   const format = searchParams?.format || "";
   const person = searchParams?.person || "";
+  const roster = buildTeamPickRoster(members, teamPicks).filter((item) =>
+    person ? item.member.slug === person : true,
+  );
 
   return (
     <div>
@@ -153,15 +157,26 @@ export default function RecommendationBrowseShell({
 
         {source === "team" ? (
           <section className="mt-8">
-            <h2 className="text-2xl font-black text-[#163127]">
-              {config.featuredHeading}
-            </h2>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-2xl font-black text-[#163127]">
+                {config.featuredHeading}
+              </h2>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                {roster.filter((item) => item.pick).length} live ·{" "}
+                {roster.filter((item) => !item.pick).length} placeholders
+              </p>
+            </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {teamPicks.map((pick) => (
-                <TeamPickCard key={pick.id} pick={pick} facing />
+              {roster.map((item) => (
+                <TeamPickCard
+                  key={item.member.id}
+                  member={item.member}
+                  pick={item.pick}
+                  facing
+                />
               ))}
             </div>
-            {!teamPicks.length ? (
+            {!roster.length ? (
               <p className="mt-8 rounded-2xl border border-dashed border-emerald-200 bg-white p-8 text-center text-sm font-semibold text-slate-600">
                 {config.emptyHint}
               </p>

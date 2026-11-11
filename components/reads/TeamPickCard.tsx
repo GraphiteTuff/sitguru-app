@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ReadsContentDetail, ReadsTeamPick } from "@/lib/reads/types";
+import type {
+  ReadsContentDetail,
+  ReadsTeamMember,
+  ReadsTeamPick,
+} from "@/lib/reads/types";
 import {
   readsTeamAvatar,
   readsTeamFirstName,
@@ -35,29 +39,116 @@ function cover(content?: ReadsContentDetail) {
   );
 }
 
-export default function TeamPickCard({
-  pick,
-  facing = false,
-  compact = false,
+function Avatar({
+  member,
+  sizeClass,
 }: {
-  pick: ReadsTeamPick;
-  /** Public facing pages: first name only + “Jason's Pick” labels. */
-  facing?: boolean;
-  compact?: boolean;
+  member?: ReadsTeamMember | null;
+  sizeClass: string;
 }) {
-  const member = pick.team_member;
-  const content = pick.content as ReadsContentDetail | undefined;
   const avatar = readsTeamAvatar({
     slug: member?.slug,
     avatar_url: member?.avatar_url,
     full_name: member?.full_name,
   });
   const firstName = readsTeamFirstName(member?.full_name);
+  const initial = firstName.slice(0, 1).toUpperCase() || "?";
+
+  return (
+    <div className={`relative overflow-hidden rounded-full bg-[#0D5C3A] ${sizeClass}`}>
+      {avatar ? (
+        <Image src={avatar} alt="" fill className="object-cover" sizes="64px" />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center text-lg font-black text-white">
+          {initial}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function TeamPickPlaceholderCard({
+  member,
+  facing = false,
+  compact = false,
+}: {
+  member: ReadsTeamMember;
+  facing?: boolean;
+  compact?: boolean;
+}) {
+  const firstName = readsTeamFirstName(member.full_name);
+  const title = facing ? readsTeamPickLabel(member.full_name) : member.full_name;
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center text-center opacity-90">
+        <span className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-dashed border-emerald-200 shadow-[0_8px_20px_rgba(15,39,68,0.08)]">
+          <Avatar member={member} sizeClass="h-16 w-16" />
+        </span>
+        <span className="mt-2 text-sm font-black text-[#163127]">{firstName}</span>
+        <span className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
+          Coming soon
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/80 shadow-[0_10px_30px_rgba(13,92,58,0.04)]">
+      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+        <Avatar member={member} sizeClass="h-12 w-12" />
+        <div className="min-w-0">
+          <p className="font-black text-[#163127]">{title}</p>
+          <p className="text-xs font-semibold text-slate-500">
+            {facing ? "Pick coming soon" : member.role_label}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
+        <div className="flex aspect-[3/4] max-h-48 items-center justify-center rounded-2xl border border-dashed border-emerald-100 bg-[#F4F7FB]">
+          <p className="px-4 text-center text-sm font-bold text-slate-500">
+            {firstName}&apos;s recommendation will land here after review.
+          </p>
+        </div>
+        <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+          Placeholder for {firstName}&apos;s Team Pick — staff curated and approved
+          before it goes live.
+        </p>
+      </div>
+    </article>
+  );
+}
+
+export default function TeamPickCard({
+  pick,
+  member,
+  facing = false,
+  compact = false,
+}: {
+  pick?: ReadsTeamPick | null;
+  member?: ReadsTeamMember | null;
+  /** Public facing pages: first name only + “Jason's Pick” labels. */
+  facing?: boolean;
+  compact?: boolean;
+}) {
+  const resolvedMember = member || pick?.team_member || null;
+  if (!pick && resolvedMember) {
+    return (
+      <TeamPickPlaceholderCard
+        member={resolvedMember}
+        facing={facing}
+        compact={compact}
+      />
+    );
+  }
+  if (!pick) return null;
+
+  const content = pick.content as ReadsContentDetail | undefined;
+  const firstName = readsTeamFirstName(resolvedMember?.full_name);
   const title = facing
-    ? readsTeamPickLabel(member?.full_name)
-    : member?.full_name || "Team pick";
+    ? readsTeamPickLabel(resolvedMember?.full_name)
+    : resolvedMember?.full_name || "Team pick";
   const image = cover(content);
-  const initial = firstName.slice(0, 1).toUpperCase();
 
   if (compact) {
     return (
@@ -66,13 +157,7 @@ export default function TeamPickCard({
         className="group flex flex-col items-center text-center"
       >
         <span className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-white shadow-[0_8px_20px_rgba(15,39,68,0.12)] ring-2 ring-[#0D5C3A]/15">
-          {avatar ? (
-            <Image src={avatar} alt="" fill className="object-cover" sizes="64px" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center bg-[#0D5C3A] text-lg font-black text-white">
-              {initial}
-            </span>
-          )}
+          <Avatar member={resolvedMember} sizeClass="h-16 w-16" />
         </span>
         <span className="mt-2 text-sm font-black text-[#163127]">{firstName}</span>
         {content?.title ? (
@@ -87,15 +172,7 @@ export default function TeamPickCard({
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-[0_10px_30px_rgba(13,92,58,0.06)]">
       <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-        <div className="relative h-12 w-12 overflow-hidden rounded-full bg-[#0D5C3A]">
-          {avatar ? (
-            <Image src={avatar} alt="" fill className="object-cover" sizes="48px" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-lg font-black text-white">
-              {initial}
-            </span>
-          )}
-        </div>
+        <Avatar member={resolvedMember} sizeClass="h-12 w-12" />
         <div className="min-w-0">
           <p className="font-black text-[#163127]">{title}</p>
           {facing ? (
@@ -104,7 +181,7 @@ export default function TeamPickCard({
             </p>
           ) : (
             <p className="text-xs font-semibold text-slate-500">
-              {member?.role_label}
+              {resolvedMember?.role_label}
             </p>
           )}
         </div>

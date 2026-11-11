@@ -543,6 +543,7 @@ export type CommunityRecommendationRow = {
 /**
  * Public Guru / Pet Parent picks. Only `published` rows are returned (RLS + filter).
  * Empty until community submissions are reviewed and approved.
+ * Format / search predicates are applied in the query before the limit window.
  */
 export async function fetchCommunityRecommendations(filters?: {
   source?: "guru" | "pet_parent";
@@ -551,6 +552,11 @@ export async function fetchCommunityRecommendations(filters?: {
 }): Promise<CommunityRecommendationRow[]> {
   try {
     const supabase = await publicClient();
+    const needsContentInner = Boolean(filters?.format || filters?.q);
+    const contentSelect = needsContentInner
+      ? `content:reads_content!inner (${DETAIL_SELECT})`
+      : `content:reads_content (${DETAIL_SELECT})`;
+
     let query = supabase
       .from("reads_community_recommendations")
       .select(
@@ -561,7 +567,7 @@ export async function fetchCommunityRecommendations(filters?: {
         submitter_display_name,
         submitter_role_label,
         status,
-        content:reads_content (${DETAIL_SELECT})
+        ${contentSelect}
       `,
       )
       .eq("status", "published")
@@ -571,6 +577,17 @@ export async function fetchCommunityRecommendations(filters?: {
     if (filters?.source) {
       query = query.eq("source", filters.source);
     }
+    if (filters?.format) {
+      query = query.eq("content.content_type", filters.format);
+    }
+    if (filters?.q) {
+      const term = filters.q.replace(/[%(),]/g, " ").trim();
+      if (term) {
+        query = query.or(
+          `quote.ilike.%${term}%,submitter_display_name.ilike.%${term}%,content.title.ilike.%${term}%`,
+        );
+      }
+    }
 
     const { data, error } = await query;
     if (error || !data?.length) {
@@ -578,29 +595,18 @@ export async function fetchCommunityRecommendations(filters?: {
       return [];
     }
 
-    return data
-      .map((row) => {
-        const contentRow = asSingle(row.content as never) as ContentRow | null;
-        return {
-          id: String(row.id),
-          source: row.source as "guru" | "pet_parent",
-          quote: String(row.quote || ""),
-          submitter_display_name: String(row.submitter_display_name || ""),
-          submitter_role_label: String(row.submitter_role_label || ""),
-          status: String(row.status || ""),
-          content: contentRow ? mapDetail(contentRow) : null,
-        };
-      })
-      .filter((row) => {
-        if (filters?.format && row.content?.content_type !== filters.format) {
-          return false;
-        }
-        if (filters?.q) {
-          const hay = `${row.quote} ${row.submitter_display_name} ${row.content?.title || ""}`.toLowerCase();
-          return hay.includes(filters.q.toLowerCase());
-        }
-        return true;
-      });
+    return data.map((row) => {
+      const contentRow = asSingle(row.content as never) as ContentRow | null;
+      return {
+        id: String(row.id),
+        source: row.source as "guru" | "pet_parent",
+        quote: String(row.quote || ""),
+        submitter_display_name: String(row.submitter_display_name || ""),
+        submitter_role_label: String(row.submitter_role_label || ""),
+        status: String(row.status || ""),
+        content: contentRow ? mapDetail(contentRow) : null,
+      };
+    });
   } catch {
     return [];
   }
