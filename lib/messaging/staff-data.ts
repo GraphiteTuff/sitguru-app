@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
+import { chatDisplayName } from "@/lib/messaging/chat-display-name";
+import {
+  KNOWN_STAFF_CHAT_SEATS,
+  staffAvatarFallback,
+} from "@/lib/messaging/staff-avatars";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 import { messageNeedsAttention } from "@/lib/messaging/mark-conversation-read";
 import { canAccessConversation, visibleMessage, type StaffActor } from "@/lib/messaging/staff-policy";
@@ -8,8 +12,17 @@ function text(value: unknown) {
   return String(value || "").trim();
 }
 
-function firstFrom(value: string) {
-  return value.split(/\s+/).filter(Boolean)[0] || "";
+function personLabel(row: Record<string, unknown>) {
+  const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === text(row.id));
+  return (
+    known?.firstName ||
+    chatDisplayName({
+      firstName: text(row.first_name),
+      lastName: text(row.last_name),
+      fullName: text(row.full_name),
+      email: text(row.email),
+    })
+  );
 }
 
 export async function loadStaffInbox(userId: string, founder: boolean, audience: StaffActor = founder ? "founder" : "growth") {
@@ -64,14 +77,14 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
   const { data: profiles } = senderIds.length
     ? await supabaseAdmin
         .from("profiles")
-        .select("id,email,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url")
+        .select("id,email,first_name,last_name,full_name,avatar_url,profile_photo_url,photo_url,image_url")
         .in("id", senderIds)
     : { data: [] };
   const people = new Map(
     ((profiles || []) as Record<string, unknown>[]).map((row) => [
       text(row.id),
       {
-        firstName: text(row.first_name) || firstFrom(text(row.full_name)) || "SitGuru",
+        firstName: personLabel(row),
         avatarUrl:
           resolvePetParentAvatarUrl(row) ||
           staffAvatarFallback({ email: text(row.email), userId: text(row.id) }),
@@ -92,7 +105,9 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
       const id = text(row.id);
       const type = text(row.conversation_type) || "internal_direct";
       const peer = people.get(peers.get(id)?.[0] || "");
-      const subjectName = peer?.firstName || firstFrom(text(row.subject)) || "Conversation";
+      const subjectName =
+        peer?.firstName ||
+        chatDisplayName({ fullName: text(row.subject), fallback: "Conversation" });
       return {
         id,
         subject: subjectName,
@@ -129,7 +144,12 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
             return {
               id: text(message.id),
               internal: text(message.visibility) === "internal_note",
-              author: person?.firstName || firstFrom(text(message.sender_name_snapshot)) || "SitGuru",
+              author:
+                person?.firstName ||
+                chatDisplayName({
+                  fullName: text(message.sender_name_snapshot),
+                  fallback: "SitGuru",
+                }),
               avatarUrl: person?.avatarUrl || "",
               body: message.deleted_at ? "Message removed" : text(message.body || message.content),
               createdAt: text(message.created_at),

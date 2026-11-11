@@ -7,7 +7,11 @@ import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import { canAccessConversation, canModerate, scanSensitive } from "@/lib/messaging/staff-policy";
 import { rememberChat } from "@/lib/messaging/chat-archive";
-import { staffAvatarFallback } from "@/lib/messaging/staff-avatars";
+import { chatDisplayName } from "@/lib/messaging/chat-display-name";
+import {
+  KNOWN_STAFF_CHAT_SEATS,
+  staffAvatarFallback,
+} from "@/lib/messaging/staff-avatars";
 import { findInternByAccount } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -77,10 +81,17 @@ export async function saveStaffMessage(input: {
   const visibility = who.role === "intern" ? "participant" : input.visibility === "internal_note" ? "internal_note" : "participant";
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("first_name, full_name, avatar_url, profile_photo_url")
+    .select("id, first_name, last_name, full_name, avatar_url, profile_photo_url")
     .eq("id", who.userId)
     .maybeSingle();
-  const firstName = String(profile?.first_name || profile?.full_name || "").trim().split(/\s+/)[0] || "SitGuru";
+  const knownSelf = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === who.userId);
+  const firstName =
+    knownSelf?.firstName ||
+    chatDisplayName({
+      firstName: profile?.first_name,
+      lastName: profile?.last_name,
+      fullName: profile?.full_name,
+    });
   const avatarUrl = String(profile?.avatar_url || profile?.profile_photo_url || "");
   const preview = (body || (media[0]?.name ? `Attached ${media[0].name}` : "Attachment")).slice(0, 140);
   let conversationId = String(input.conversationId || "");
@@ -104,10 +115,18 @@ export async function saveStaffMessage(input: {
     }
     const { data: peer } = await supabaseAdmin
       .from("profiles")
-      .select("first_name, full_name, email, avatar_url, profile_photo_url")
+      .select("id, first_name, last_name, full_name, email, avatar_url, profile_photo_url")
       .eq("id", recipientId)
       .maybeSingle();
-    peerName = String(peer?.first_name || peer?.full_name || "").trim().split(/\s+/)[0] || "SitGuru";
+    const knownPeer = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === recipientId);
+    peerName =
+      knownPeer?.firstName ||
+      chatDisplayName({
+        firstName: peer?.first_name,
+        lastName: peer?.last_name,
+        fullName: peer?.full_name,
+        email: peer?.email,
+      });
     peerAvatar =
       String(peer?.avatar_url || peer?.profile_photo_url || "").trim() ||
       staffAvatarFallback({ email: peer?.email, userId: recipientId });

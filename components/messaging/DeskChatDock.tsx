@@ -456,7 +456,7 @@ export default function DeskChatDock({
                       </button>
                     ))}
                   </div>
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by first name" className="mt-2 min-h-11 w-full rounded-full bg-[#F1F5F9] px-4 text-sm outline-none" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name" className="mt-2 min-h-11 w-full rounded-full bg-[#F1F5F9] px-4 text-sm outline-none" />
                   <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto">
                     {people.map((person) => {
                       const locked = person.canChat === false || person.id.startsWith("pending:");

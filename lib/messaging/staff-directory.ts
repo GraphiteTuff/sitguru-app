@@ -9,6 +9,7 @@ import {
   sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
+import { chatDisplayName } from "@/lib/messaging/chat-display-name";
 import {
   AVA_STAFF_EMAIL,
   AVA_STAFF_USER_ID,
@@ -33,10 +34,6 @@ export type StaffDirectoryPerson = {
 
 function text(value: unknown) {
   return String(value ?? "").trim();
-}
-
-function firstName(value: string) {
-  return value.split(/\s+/).filter(Boolean)[0] || "SitGuru";
 }
 
 /** Hide QA / placeholder seats from Staff and Inbox. */
@@ -284,12 +281,14 @@ export async function loadSharedStaffDirectory(input: {
     const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === id);
     push({
       id,
-      firstName: firstName(
+      firstName:
         known?.firstName ||
-          text(row.first_name) ||
-          text(row.full_name) ||
+        chatDisplayName({
+          firstName: text(row.first_name),
+          lastName: text(row.last_name),
+          fullName: text(row.full_name),
           email,
-      ),
+        }),
       avatarUrl: profileAvatar(row, ambassadorById.get(id)),
       detail: adminSeat ? "Admin" : "Manager",
       canChat: true,
@@ -302,9 +301,14 @@ export async function loadSharedStaffDirectory(input: {
     const row = profileById.get(seat.id);
     push({
       id: seat.id,
-      firstName: firstName(
-        seat.firstName || text(row?.first_name) || text(row?.full_name),
-      ),
+      firstName:
+        seat.firstName ||
+        chatDisplayName({
+          firstName: text(row?.first_name),
+          lastName: text(row?.last_name),
+          fullName: text(row?.full_name),
+          email: seat.email,
+        }),
       avatarUrl:
         profileAvatar(row || { email: seat.email, id: seat.id }, ambassadorById.get(seat.id)) ||
         seat.avatarUrl,
@@ -341,7 +345,11 @@ export async function loadSharedStaffDirectory(input: {
       const chatId = text(row.userId);
       push({
         id: chatId || `pending:${row.id}`,
-        firstName: firstName(row.preferredName || row.fullName),
+        firstName: chatDisplayName({
+          fullName: row.fullName,
+          preferredName: row.preferredName,
+          email: row.email,
+        }),
         avatarUrl: row.avatarUrl || "",
         detail: chatId ? "Intern" : "Intern · Invite pending",
         canChat: Boolean(chatId),

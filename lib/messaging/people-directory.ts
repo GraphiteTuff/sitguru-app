@@ -7,6 +7,7 @@ import {
   sortStaffDirectoryPeople,
 } from "@/lib/messaging/chat-library";
 import { mapUsersOnline } from "@/lib/messaging/presence";
+import { chatDisplayName } from "@/lib/messaging/chat-display-name";
 import {
   KNOWN_STAFF_CHAT_SEATS,
   staffAvatarFallback,
@@ -30,10 +31,6 @@ export type ChatAudience =
 
 function text(value: unknown) {
   return String(value ?? "").trim();
-}
-
-function firstName(value: string) {
-  return value.split(/\s+/).filter(Boolean)[0] || "SitGuru";
 }
 
 function matchesQuery(name: string, query: string) {
@@ -79,7 +76,7 @@ export async function loadAdminChatPeople(input: {
   const { data } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id,email,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
+      "id,email,first_name,last_name,full_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
     )
     .limit(120);
 
@@ -110,9 +107,14 @@ export async function loadAdminChatPeople(input: {
     const known = KNOWN_STAFF_CHAT_SEATS.find((seat) => seat.id === text(row.id));
     push({
       id: text(row.id),
-      firstName: firstName(
-        known?.firstName || text(row.first_name) || text(row.full_name) || email,
-      ),
+      firstName:
+        known?.firstName ||
+        chatDisplayName({
+          firstName: text(row.first_name),
+          lastName: text(row.last_name),
+          fullName: text(row.full_name),
+          email,
+        }),
       avatarUrl:
         resolvePetParentAvatarUrl(row) ||
         staffAvatarFallback({ email, userId: text(row.id) }),
@@ -159,7 +161,11 @@ export async function loadInternChatPeople(input: {
       const chatId = text(row.userId);
       return {
         id: chatId || `pending:${row.id}`,
-        firstName: firstName(row.preferredName || row.fullName),
+        firstName: chatDisplayName({
+          fullName: row.fullName,
+          preferredName: row.preferredName,
+          email: row.email,
+        }),
         avatarUrl:
           row.avatarUrl ||
           (chatId ? photoById.get(chatId) || "" : "") ||
@@ -219,12 +225,12 @@ export async function loadGuruChatPeople(input: {
   const people = rows
     .map((row) => {
       const id = text(row.user_id);
-      const name = firstName(
-        text(row.full_name) || text(row.name) || text(row.email),
-      );
       return {
         id,
-        firstName: name,
+        firstName: chatDisplayName({
+          fullName: text(row.full_name) || text(row.name),
+          email: text(row.email),
+        }),
         avatarUrl: getGuruProfilePhotoUrl(row) || photoById.get(id) || "",
         detail: "Guru",
         canChat: Boolean(id),
@@ -271,10 +277,12 @@ export async function loadAmbassadorChatPeople(input: {
   const people = rows
     .map((row) => {
       const id = text(row.user_id);
-      const name = firstName(text(row.full_name) || text(row.email));
       return {
         id,
-        firstName: name,
+        firstName: chatDisplayName({
+          fullName: text(row.full_name),
+          email: text(row.email),
+        }),
         avatarUrl:
           resolvePetParentAvatarUrl({
             profile_photo_url: text(row.ambassador_photo_url) || null,
@@ -309,7 +317,7 @@ export async function loadPetParentChatPeople(input: {
   const { data, error } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id,email,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
+      "id,email,first_name,last_name,full_name,avatar_url,profile_photo_url,photo_url,image_url,role,account_type,signup_role",
     )
     .limit(200);
   if (error) {
@@ -347,9 +355,12 @@ export async function loadPetParentChatPeople(input: {
     })
     .map((row) => ({
       id: text(row.id),
-      firstName: firstName(
-        text(row.first_name) || text(row.full_name) || text(row.email),
-      ),
+      firstName: chatDisplayName({
+        firstName: text(row.first_name),
+        lastName: text(row.last_name),
+        fullName: text(row.full_name),
+        email: text(row.email),
+      }),
       avatarUrl: resolvePetParentAvatarUrl(row),
       detail: "Pet Parent",
       canChat: true,
