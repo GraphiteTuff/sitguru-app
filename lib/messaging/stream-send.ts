@@ -461,9 +461,8 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
           text: policyAnswer,
         });
       }
-      return simulationDataStreamResponse(
-        stripDisallowedCompanionCtas(policyAnswer, viewer),
-      );
+      // Keep verified canonical paths in deterministic policy answers.
+      return simulationDataStreamResponse(policyAnswer);
     }
 
     let sessionState = emptyCompanionSessionState();

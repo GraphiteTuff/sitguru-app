@@ -37,8 +37,9 @@ const CASES = [
     companion: "taco",
     endpoint: "/api/ai/officer-stream",
     question: "Is there a $10 to $20 PetPerks reward?",
-    mustInclude: ["/petperks"],
-    mustNot: ["live teammate"],
+    mustInclude: ["/petperks", "can't verify"],
+    // Denial may quote the banned phrase; only fail if offered as a real reward.
+    mustNot: ["live teammate", "claim your $10 to $20"],
   },
   {
     id: "P-T-apply",

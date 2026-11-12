@@ -1,0 +1,74 @@
+{
+  "origin": "https://www.sitguru.com",
+  "passed": 5,
+  "total": 7,
+  "results": [
+    {
+      "id": "P-R-human",
+      "pass": true,
+      "status": 200,
+      "ttfr_ms": 491,
+      "missing": [],
+      "banned": [],
+      "reply": "I'm a SitGuru AI companion, not a person. I can't transfer this chat or confirm that a teammate was notified. For human assistance, email **support@sitguru.com** or visit * **."
+    },
+    {
+      "id": "P-R-fee",
+      "pass": true,
+      "status": 200,
+      "ttfr_ms": 114,
+      "missing": [],
+      "banned": [],
+      "reply": "SitGuru's booking flow currently shows **Marketplace Support — Free** during launch. No future per-booking amount, payer, or effective date is published in Help. See * ** or ask **support@sitguru.com** for clarification; I can't promise SitGuru is cheaper than another platform."
+    },
+    {
+      "id": "P-R-bg",
+      "pass": true,
+      "status": 200,
+      "ttfr_ms": 64,
+      "missing": [],
+      "banned": [],
+      "reply": "SitGuru describes required identity, safety, account, and payout trust steps before a Guru is bookable. I can't verify a platform-wide background-check, insurance, or safety guarantee from the currently published details. See * ** or ask **support@sitguru.com** for policy specifics."
+    },
+    {
+      "id": "P-T-petperks",
+      "pass": false,
+      "status": 200,
+      "ttfr_ms": 561,
+      "missing": [
+        "/petperks"
+      ],
+      "banned": [],
+      "reply": "I can't verify a general **$10 to $20 PetPerks reward**. The published terms instead describe **Give $10 Get $10** for an eligible referred Pet Parent booking and **$20** in credit for an eligible referred Guru after approval and a first paid booking. Rewards are conditional SitGuru credits, not guaranteed cash. See * **."
+    },
+    {
+      "id": "P-T-apply",
+      "pass": false,
+      "status": 200,
+      "ttfr_ms": 184,
+      "missing": [
+        "/programs/ambassadors/apply"
+      ],
+      "banned": [],
+      "reply": "Apply as a SitGuru Ambassador at * **. After approval, use your referral link and QR tools to share SitGuru and track qualifying activity in your dashboard. I can't submit an application in chat."
+    },
+    {
+      "id": "P-S-free",
+      "pass": true,
+      "status": 200,
+      "ttfr_ms": 3247,
+      "missing": [],
+      "banned": [],
+      "reply": "Yep, signing up is free. You just fill in your profile, finish the trust steps, and complete payout setup — once SitGuru approves you, Pet Parents can start booking you.\n\nReady to get started? [[cta:guru]]"
+    },
+    {
+      "id": "P-D-teammate",
+      "pass": true,
+      "status": 200,
+      "ttfr_ms": 65,
+      "missing": [],
+      "banned": [],
+      "reply": "I'm a SitGuru AI companion, not a person. I can't transfer this chat or confirm that a teammate was notified. For human assistance, email **support@sitguru.com** or visit * **."
+    }
+  ]
+}

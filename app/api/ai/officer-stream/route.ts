@@ -536,9 +536,8 @@ export async function POST(req: Request) {
         failureType: null,
         stateFields: [],
       });
-      return simulationDataStreamResponse(
-        stripDisallowedCompanionCtas(policyAnswer, viewer),
-      );
+      // Keep verified canonical paths (/programs/ambassadors/apply, /petperks, etc.).
+      return simulationDataStreamResponse(policyAnswer);
     }
 
     // Session recall / summarise / correct / start-over (current-turn first).
