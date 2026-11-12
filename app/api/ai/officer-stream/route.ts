@@ -32,6 +32,7 @@ import {
   resolveDelilahInstantFaqAnswer,
 } from "@/lib/ai/community-events-faqs";
 import { compileDelilahEventsSnapshot } from "@/lib/ai/delilah-events-snapshot";
+import { getCompanionPolicyAnswer } from "@/lib/ai/companion-response-policy";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -423,17 +424,24 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+    // Classify the CURRENT turn first. Prior care requests provide context for
+    // a new matching turn, but cannot hijack a fresh standalone FAQ.
+    const policyAnswer = getCompanionPolicyAnswer(officer, lastUserText);
+    if (policyAnswer) return simulationDataStreamResponse(policyAnswer);
+
     const careThread = joinRecentUserTexts(messages, lastUserText);
-    const scoutMatchingAsk =
-      officer === "scout"
-        ? buildCareMatchingAsk(careThread)
-        : null;
+    const isCurrentCareIntent =
+      officer === "scout" &&
+      (looksLikeGuruDirectoryQuery(lastUserText) ||
+        needsCareMatchingAsk(lastUserText));
+    const scoutMatchingAsk = isCurrentCareIntent
+      ? buildCareMatchingAsk(careThread)
+      : null;
     const lookupHint = inferLookupParamsFromChat(careThread);
     const scoutNeedsDirectory =
-      officer === "scout" &&
+      isCurrentCareIntent &&
       !scoutMatchingAsk &&
-      (looksLikeGuruDirectoryQuery(careThread) ||
-        Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
+      Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state);
 
     if (lastUserText) {
       try {
@@ -466,7 +474,7 @@ export async function POST(req: Request) {
     const instantFaq =
       officer === "delilah" ||
       scoutNeedsDirectory ||
-      needsCareMatchingAsk(careThread)
+      (isCurrentCareIntent && needsCareMatchingAsk(careThread))
         ? null
         : resolveOfficerInstantFaqAnswer({
             officer: officer as "scout" | "taco",
@@ -495,7 +503,7 @@ export async function POST(req: Request) {
         city: focus.city,
         state: focus.state,
         focus,
-        limit: 24,
+        limit: 200,
       }).catch(() => null);
       snapshotMarkdown = live?.markdownContext
         ? `${faqLayer}\n\n${live.markdownContext}`

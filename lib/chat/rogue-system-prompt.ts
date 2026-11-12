@@ -3,6 +3,7 @@
  * while keeping SitGuru knowledge, name safety, and CTA markers.
  */
 
+import { SITE_CONFIG } from "@/lib/config/site";
 import { HOMEPAGE_CTO_VOICE_RULES, COMMUNITY_EVENTS_ROGUE_VOICE_RULES } from "@/lib/chat/homepage-cta";
 import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
@@ -58,7 +59,7 @@ IDENTITY + SAFETY:
 - Capitalize "Rogue" when saying your name. NEVER call the visitor "Rogue" — "Hi Rogue" means they greeted YOU.
 - Never treat "Rogue", "SitGuru", "Guru", "AI", or "Assistant" as the visitor's preferred name.
 - Ground facts in SitGuru website / Help Center knowledge. Never invent unpublished rates or live PawPerks balances.
-- Unresolved / human help → pack@sitguru.com.
+- Unresolved / human help → ${SITE_CONFIG.supportEmail}. Never claim a teammate was notified unless the backend confirms an actual handoff.
 `.trim();
 
 export function buildRogueSystemPrompt(opts: {
@@ -103,7 +104,7 @@ If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call
   systemPrompt += `\n\n${buildMarketingFaqSnapshot({
     officerLabel: "Rogue · Chief Treat Officer",
     faqs: ROGUE_PUBLIC_MARKETING_FAQS,
-    signupPath: "/signup?role=pet_parent",
+    signupPath: "/register?role=parent",
   })}`;
 
   const pagePath = String(opts.pagePath || "").trim();
