@@ -1,12 +1,24 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2, MessageCircle, Plus, Search, Trash2 } from "lucide-react";
 import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
 import type { AdminInboxFilter, AdminInboxThread, AdminSelectedThread } from "./types";
 import AdminThreadChat from "./AdminThreadChat";
+
+const LIST_WIDTH_KEY = "sitguru.admin.messages.listWidth";
+const LIST_WIDTH_DEFAULT = 440;
+const LIST_WIDTH_MIN = 340;
+const LIST_WIDTH_MAX = 720;
+
+function readStoredListWidth() {
+  if (typeof window === "undefined") return LIST_WIDTH_DEFAULT;
+  const raw = Number(window.localStorage.getItem(LIST_WIDTH_KEY));
+  if (!Number.isFinite(raw)) return LIST_WIDTH_DEFAULT;
+  return Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, Math.round(raw)));
+}
 
 function initials(name: string) {
   return (
@@ -78,6 +90,9 @@ export default function AdminInboxWorkspace({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [pendingBulk, startBulk] = useTransition();
+  const [listWidth, setListWidth] = useState(LIST_WIDTH_DEFAULT);
+  const [isResizing, setIsResizing] = useState(false);
+  const splitRef = useRef<HTMLDivElement>(null);
 
   const allVisibleIds = useMemo(() => threads.map((thread) => thread.id), [threads]);
   const selectedCount = selectedIds.size;
@@ -86,12 +101,62 @@ export default function AdminInboxWorkspace({
   const someSelected = selectedCount > 0 && !allSelected;
 
   useEffect(() => {
+    setListWidth(readStoredListWidth());
+  }, []);
+
+  useEffect(() => {
     setSelectedIds((current) => {
       const visible = new Set(allVisibleIds);
       const next = new Set([...current].filter((id) => visible.has(id)));
       return next.size === current.size ? current : next;
     });
   }, [allVisibleIds]);
+
+  const clampListWidth = useCallback((next: number) => {
+    const shell = splitRef.current;
+    const maxFromShell = shell
+      ? Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, shell.clientWidth - 380))
+      : LIST_WIDTH_MAX;
+    return Math.min(maxFromShell, Math.max(LIST_WIDTH_MIN, Math.round(next)));
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    function onMove(event: PointerEvent) {
+      const shell = splitRef.current;
+      if (!shell) return;
+      const left = shell.getBoundingClientRect().left;
+      setListWidth(clampListWidth(event.clientX - left));
+    }
+
+    function onUp() {
+      setIsResizing(false);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [clampListWidth, isResizing]);
+
+  useEffect(() => {
+    if (isResizing) return;
+    try {
+      window.localStorage.setItem(LIST_WIDTH_KEY, String(listWidth));
+    } catch {
+      // Ignore quota / private mode failures.
+    }
+  }, [isResizing, listWidth]);
 
   function toggleId(id: string) {
     setSelectedIds((current) => {
@@ -140,33 +205,42 @@ export default function AdminInboxWorkspace({
     });
   }
 
+  const listStyle = {
+    ["--admin-inbox-list-width" as string]: `${listWidth}px`,
+  } as CSSProperties;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#F4F7FB]">
       {noticeSlot ? (
         <div className="shrink-0 px-3 pt-2 sm:px-4">{noticeSlot}</div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-white md:border-t md:border-slate-200">
+      <div
+        ref={splitRef}
+        className="flex min-h-0 flex-1 overflow-hidden bg-white md:border-t md:border-slate-200"
+        style={listStyle}
+      >
         <aside
-          className={`min-h-0 w-full shrink-0 flex-col border-slate-200 md:flex md:w-[min(100%,300px)] md:border-r lg:w-[320px] xl:w-[360px] ${
+          className={`min-h-0 w-full shrink-0 flex-col border-slate-200 md:w-[var(--admin-inbox-list-width)] md:min-w-[340px] md:max-w-[min(720px,58%)] md:flex ${
             showThreadPane ? "hidden md:flex" : "flex"
           }`}
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3 py-2.5 sm:px-4">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5 sm:px-4">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
                 SitGuru HQ
               </p>
-              <h1 className="truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">
+              <h1 className="whitespace-nowrap text-xl font-black tracking-tight text-slate-950">
                 Messages
               </h1>
             </div>
             <Link
               href={composeHref}
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0D5C3A] px-3.5 text-sm font-black text-white shadow-sm"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#0D5C3A] px-3.5 text-sm font-black text-white shadow-sm"
+              title="New message"
             >
               <Plus size={18} />
-              <span className="sm:inline">New</span>
+              New
             </Link>
           </div>
 
@@ -190,8 +264,8 @@ export default function AdminInboxWorkspace({
             </label>
           </form>
 
-          <div className="shrink-0 overflow-x-auto border-b border-slate-200 px-2 py-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-            <div className="flex min-w-max gap-1.5">
+          <div className="shrink-0 border-b border-slate-200 px-2 py-2">
+            <div className="flex flex-wrap gap-1.5">
               {displayFilters.map((filter) => {
                 const active = filter.key === activeFilter;
                 return (
@@ -220,7 +294,6 @@ export default function AdminInboxWorkspace({
             </div>
           </div>
 
-          {/* Email-style bulk bar: select-all checkbox + delete when anything is checked */}
           {canDelete && threads.length > 0 ? (
             <div
               className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 sm:px-4 ${
@@ -373,6 +446,37 @@ export default function AdminInboxWorkspace({
             </div>
           </details>
         </aside>
+
+        {/* Draggable divider — slide right for a wider inbox list */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize message list"
+          aria-valuemin={LIST_WIDTH_MIN}
+          aria-valuemax={LIST_WIDTH_MAX}
+          aria-valuenow={listWidth}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            setIsResizing(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              setListWidth((width) => clampListWidth(width - 24));
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              setListWidth((width) => clampListWidth(width + 24));
+            }
+          }}
+          className={`relative hidden w-1.5 shrink-0 cursor-col-resize touch-none bg-slate-200 transition hover:bg-emerald-500 md:block ${
+            isResizing ? "bg-emerald-500" : ""
+          }`}
+          title="Drag to resize"
+        >
+          <span className="absolute inset-y-0 -left-1 -right-1" />
+        </div>
 
         <div
           className={`min-h-0 min-w-0 flex-1 flex-col bg-[#F8FAFC] ${
