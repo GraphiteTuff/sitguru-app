@@ -15,6 +15,8 @@ import type {
   ReadsTopic,
 } from "@/lib/reads/types";
 
+const DEFAULT_HERO = READS_HERO_IMAGE;
+
 function hrefForContent(item: ReadsContentDetail) {
   const map: Record<string, string> = {
     book: "books",
@@ -46,6 +48,8 @@ export default function CategoryBrowseShell({
   spotlight = null,
   searchParams,
   cardVariant = "default",
+  heroImage = DEFAULT_HERO,
+  heroImageClassName = "object-cover opacity-35",
   extras,
 }: {
   config: ReadsCategoryConfig;
@@ -56,6 +60,8 @@ export default function CategoryBrowseShell({
   spotlight?: ReadsContentDetail | null;
   searchParams?: Record<string, string | undefined>;
   cardVariant?: "default" | "cover" | "episode";
+  heroImage?: string;
+  heroImageClassName?: string;
   extras?: ReactNode;
 }) {
   const q = searchParams?.q || "";
@@ -82,14 +88,14 @@ export default function CategoryBrowseShell({
         >
           <div className="absolute inset-0">
             <Image
-              src={READS_HERO_IMAGE}
+              src={heroImage}
               alt=""
               fill
               priority
-              className="object-cover opacity-35"
+              className={heroImageClassName}
               sizes="100vw"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#09462C] via-[#0D5C3A]/92 to-[#0D5C3A]/55" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#09462C] via-[#0D5C3A]/88 to-[#0D5C3A]/35" />
           </div>
           <div className="relative grid gap-8 px-6 py-10 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-12">
             <div>

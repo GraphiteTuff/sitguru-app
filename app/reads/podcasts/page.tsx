@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import CategoryBrowseShell from "@/components/reads/CategoryBrowseShell";
 import YoutubeEmbed from "@/components/reads/YoutubeEmbed";
 import { READS_CATEGORY_CONFIG } from "@/lib/reads/category-config";
 import { featuredFirst, filterBySegment } from "@/lib/reads/browse-filters";
+import { READS_PODCAST_HERO_IMAGE } from "@/lib/reads/constants";
 import { readSearchParam } from "@/lib/reads/page-search";
 import {
   fetchPublishedContent,
@@ -64,6 +66,8 @@ export default async function Page({ searchParams }: PageProps) {
       teamPicks={teamPicks}
       spotlight={spotlight}
       cardVariant="episode"
+      heroImage={READS_PODCAST_HERO_IMAGE}
+      heroImageClassName="object-cover object-[center_35%] opacity-55"
       searchParams={{
         q,
         audience,
@@ -75,7 +79,17 @@ export default async function Page({ searchParams }: PageProps) {
         <>
           {spotlight ? (
             <section className="mt-8 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-sm">
-              <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="relative min-h-[240px] overflow-hidden bg-[#163127] lg:min-h-full">
+                  <Image
+                    src={READS_PODCAST_HERO_IMAGE}
+                    alt=""
+                    fill
+                    className="object-cover object-[center_30%]"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0D5C3A]/80 via-transparent to-transparent" />
+                </div>
                 <div
                   data-brand-green
                   className="public-dark-section bg-[#0D5C3A] px-6 py-8 !text-white sm:px-8"

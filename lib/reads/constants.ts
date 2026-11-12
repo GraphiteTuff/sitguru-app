@@ -36,6 +36,10 @@ export const READS_UI = {
 
 export const READS_HERO_IMAGE = "/images/booking-hero-pets.png";
 
+/** Podcasts browse / listen hero (studio retriever). */
+export const READS_PODCAST_HERO_IMAGE =
+  "/images/reads/podcast-hero-retriever.png";
+
 export const READS_FORMAT_NAV: Array<{
   href: string;
   label: string;

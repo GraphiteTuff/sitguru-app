@@ -7,6 +7,7 @@ import TrackPageView from "@/components/reads/TrackPageView";
 import {
   READS_BRAND,
   READS_HERO_IMAGE,
+  READS_PODCAST_HERO_IMAGE,
   READS_SUPPORTING,
 } from "@/lib/reads/constants";
 import { READS_DEMO_BANNER } from "@/lib/reads/demo-data";
@@ -133,19 +134,13 @@ export default async function ReadsLandingPage() {
           <article className="overflow-hidden rounded-[1.75rem] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
             <div className="grid gap-0 sm:grid-cols-[160px_1fr]">
               <div className="relative min-h-[180px] bg-violet-100 sm:min-h-full">
-                {featuredCover ? (
-                  <Image
-                    src={featuredCover}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="200px"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-4 text-center text-sm font-black text-violet-800">
-                    SitGuru Pet Podcast
-                  </div>
-                )}
+                <Image
+                  src={featuredCover || READS_PODCAST_HERO_IMAGE}
+                  alt=""
+                  fill
+                  className="object-cover object-[center_30%]"
+                  sizes="200px"
+                />
               </div>
               <div className="p-5 sm:p-6">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">
