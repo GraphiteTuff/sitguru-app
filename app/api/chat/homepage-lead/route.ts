@@ -539,14 +539,37 @@ async function handleHomepageLeadPost(req: NextRequest) {
         text: policyAnswer,
       }).catch(() => null);
     }
-    const response = NextResponse.json({
-      ok: true,
-      conversationId,
-      guestId,
-      reply: policyAnswer,
-      aiAssistEnabled,
-      model: "verified-policy",
-    });
+    // Preserve the endpoint's existing JSON-or-SSE wire contract.
+    const response = wantStream
+      ? new NextResponse(
+          sseEncode({
+            type: "meta",
+            conversationId,
+            guestId,
+            model: "verified-policy",
+          }) +
+            sseEncode({
+              type: "done",
+              text: policyAnswer,
+              conversationId,
+              aiAssistEnabled,
+              model: "verified-policy",
+            }),
+          {
+            headers: {
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "Cache-Control": "no-cache, no-transform",
+            },
+          },
+        )
+      : NextResponse.json({
+          ok: true,
+          conversationId,
+          guestId,
+          reply: policyAnswer,
+          aiAssistEnabled,
+          model: "verified-policy",
+        });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {
         httpOnly: true,
