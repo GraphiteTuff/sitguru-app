@@ -15,6 +15,10 @@ describe("care matching interruptibility", () => {
       "How do payouts work?",
       "Can I keep Rover?",
       "Is Guru Academy required?",
+      "How do I become a Guru?",
+      "Do I need an account to book?",
+      "What services can I book?",
+      "How do I find a sitter?",
     ]) {
       assert.equal(isCurrentTurnCareIntent(q), false, q);
       assert.equal(needsCareMatchingAsk(q), false, q);
@@ -25,6 +29,11 @@ describe("care matching interruptibility", () => {
   it("still starts intake for an explicit care search", () => {
     const q = "I need dog walking in Harrisburg 17101";
     assert.equal(isCurrentTurnCareIntent(q), true);
+  });
+
+  it("starts provider intake only for ready-to-apply language", () => {
+    assert.equal(isCurrentTurnCareIntent("I want to become a Guru in Philly"), true);
+    assert.equal(isCurrentTurnCareIntent("How do I become a Guru?"), false);
   });
 
   it("does not let prior care context hijack a fresh FAQ turn", () => {

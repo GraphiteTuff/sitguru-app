@@ -52,6 +52,13 @@ describe("getCompanionPolicyAnswer", () => {
     assert.match(reply!.toLowerCase(), /can't verify/);
   });
 
+  it("answers become-a-Guru info without sticky intake cues", () => {
+    const reply = getCompanionPolicyAnswer("rogue", "How do I become a Guru?");
+    assert.ok(reply);
+    assert.match(reply!, /\/become-a-guru/);
+    assert.doesNotMatch(reply!.toLowerCase(), /matching_intake|city and state|zip/);
+  });
+
   it("returns the same Ambassador apply path for Taco signup asks", () => {
     const questions = [
       "How do I apply as an Ambassador?",

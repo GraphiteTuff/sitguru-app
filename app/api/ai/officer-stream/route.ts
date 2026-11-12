@@ -595,15 +595,7 @@ export async function POST(req: Request) {
       officer === "scout" &&
       surface === "public" &&
       isCurrentTurnCareIntent(lastUserText);
-    const scoutMatchingAsk = isCurrentCareIntent
-      ? buildCareMatchingAsk(careThread, viewer.firstName)
-      : null;
     const lookupHint = inferLookupParamsFromChat(careThread);
-    const scoutNeedsDirectory =
-      isCurrentCareIntent &&
-      !scoutMatchingAsk &&
-      (looksLikeGuruDirectoryQuery(careThread) ||
-        Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
 
     if (lastUserText) {
       try {
@@ -621,6 +613,30 @@ export async function POST(req: Request) {
       }
     }
 
+    // FAQ before sticky matching (Muse): answer known Scout/Taco/Delilah facts first.
+    const previewFaqRaw =
+      officer === "delilah"
+        ? resolveDelilahInstantFaqAnswer(lastUserText)
+        : resolveOfficerInstantFaqAnswer({
+            officer: officer as "scout" | "taco",
+            question: lastUserText,
+            surface,
+          });
+    const previewFaq = previewFaqRaw
+      ? stripDisallowedCompanionCtas(previewFaqRaw, viewer)
+      : null;
+
+    const scoutMatchingAsk =
+      !previewFaq && isCurrentCareIntent
+        ? buildCareMatchingAsk(careThread, viewer.firstName)
+        : null;
+    const scoutNeedsDirectory =
+      !previewFaq &&
+      isCurrentCareIntent &&
+      !scoutMatchingAsk &&
+      (looksLikeGuruDirectoryQuery(careThread) ||
+        Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
+
     if (scoutMatchingAsk) {
       return simulationDataStreamResponse(
         stripDisallowedCompanionCtas(scoutMatchingAsk, viewer),
@@ -628,17 +644,13 @@ export async function POST(req: Request) {
     }
 
     const blockFaqForMatching =
-      isCurrentCareIntent && needsCareMatchingAsk(careThread);
+      !previewFaq && isCurrentCareIntent && needsCareMatchingAsk(careThread);
     const instantFaqRaw =
       officer === "delilah"
-        ? resolveDelilahInstantFaqAnswer(lastUserText)
+        ? previewFaqRaw
         : scoutNeedsDirectory || blockFaqForMatching
           ? null
-          : resolveOfficerInstantFaqAnswer({
-              officer: officer as "scout" | "taco",
-              question: lastUserText,
-              surface,
-            });
+          : previewFaqRaw;
     const instantFaq = instantFaqRaw
       ? stripDisallowedCompanionCtas(instantFaqRaw, viewer)
       : null;
@@ -752,6 +764,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const companionTools = {
+      lookupGurus: lookupGurusTool,
+      ...(enriched?.tools || {}),
+    };
+
     try {
       if (officer === "scout" && scoutNeedsDirectory) {
         const generated = await generateText({
@@ -760,8 +777,8 @@ export async function POST(req: Request) {
           messages: messages.slice(-16),
           temperature: 0.45,
           maxTokens: 2800,
-          maxSteps: 3,
-          tools: { lookupGurus: lookupGurusTool },
+          maxSteps: 4,
+          tools: companionTools,
         });
         let assistantText = String(generated.text || "").trim();
         const markers: string[] = [];
@@ -826,12 +843,8 @@ export async function POST(req: Request) {
             actorName: viewer.firstName || bodyGuruName || "",
           });
         },
-        ...(officer === "scout"
-          ? {
-              tools: { lookupGurus: lookupGurusTool },
-              maxSteps: 3 as const,
-            }
-          : {}),
+        tools: companionTools,
+        maxSteps: 4 as const,
       });
 
       return result.toDataStreamResponse({

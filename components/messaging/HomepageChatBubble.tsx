@@ -1276,13 +1276,24 @@ export default function HomepageChatBubble() {
                 }
               }}
             />
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              aria-label="Send message"
-            >
-              Send
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={() => stop()}
+                aria-label="Stop generating"
+                className="rounded-full bg-slate-800 px-4 py-2 text-sm font-black text-white"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                aria-label="Send message"
+              >
+                Send
+              </button>
+            )}
           </form>
         </div>
       ) : null}

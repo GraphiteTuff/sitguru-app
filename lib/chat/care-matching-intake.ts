@@ -94,11 +94,30 @@ export type CareMatchingIntake = {
   missing: Array<"location" | "zip" | "service" | "time">;
 };
 
+/** Explicit care-seeking — not bare “need/find/book” inside informational FAQs. */
 const CARE_SEEKING =
-  /\b(looking for|need|find|book|search|who (can|does)|any (local )?(gurus?|sitters?)|also matching|i need care)\b/i;
+  /\b((i('m| am)? |we('re| are)? )?(looking for|need|want) (a |an |some )?(local )?(guru|sitter|walker|boarding|daycare|doggy day ?care|dog walks?|dog walking|pet sitting|house sitting|drop[- ]?ins?)|find (me )?(a |an )?(local )?(guru|sitter|walker)|book (a |an )?(guru|sitter|walker|visit|walk|drop[- ]?in)|search(ing)? for (a |an )?(guru|sitter|walker)|who (can|does) (watch|walk|sit|board)|any (local )?(gurus?|sitters?)( near| in| for| around)?|also matching|i need care|care near me|sitter near me|walker near me)\b/i;
 
+/** Ready-to-apply signup — not “How do I become a Guru?” info questions. */
 const PROVIDER_SIGNUP =
-  /\b(want to register as|become a (guru|sitter|walker|trainer)|register as a)\b/i;
+  /\b((i (want to|would like to|['’]d like to|am going to|['’]m going to|ready to) )(register|apply|sign up|become)|become a (guru|sitter|walker|trainer) (in|near|for|at|around)|register as a (guru|sitter|walker|trainer)|sign up as a (guru|sitter))\b/i;
+
+/** How/what/where FAQs should answer with Help/pages — not sticky ZIP intake. */
+function looksLikeInformationalFaq(text: string) {
+  const t = text.trim();
+  if (!t) return false;
+  if (/\b\d{5}\b/.test(t)) return false;
+  if (
+    /\b(near me|in my area|i need care|also matching|looking for a|book a|find me a)\b/i.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  return /^(how (do|can|does|to|much)|what (is|are|do|does|can)|where (do|can|is|are)|when (do|does|is|are|can)|why (do|does|is|are|can)|is |are |can i |do i |does |tell me |explain )\b/i.test(
+    t,
+  );
+}
 
 /**
  * Guru logistics / dashboard coaching — not Pet Parent care matching.
@@ -248,20 +267,22 @@ export function parseCareMatchingIntake(
   }
   const timeWindow = detectTimeWindow(text);
 
-  const isProviderSignup = PROVIDER_SIGNUP.test(lower);
+  const informationalFaq = looksLikeInformationalFaq(text);
+  const isProviderSignup = !informationalFaq && PROVIDER_SIGNUP.test(lower);
   const isLogisticsQuery = looksLikeGuruLogisticsQuery(text);
   // Service words or the bare word "guru/sitter" alone are NOT enough —
-  // standalone FAQs ("Free to apply?", "My rates", "Payments") must not
-  // enter ZIP intake. Require an explicit care-seeking cue or chip follow-up.
+  // standalone FAQs ("Free to apply?", "My rates", "Payments", "How do I…")
+  // must not enter ZIP intake. Require an explicit care-seeking cue or chip follow-up.
   const isCareSeeking =
     !isProviderSignup &&
     !isLogisticsQuery &&
+    !informationalFaq &&
     (CARE_SEEKING.test(lower) ||
       isMatchingFollowUp(lower) ||
       // Bare green-pill / short service taps still count when not logistics.
       (Boolean(service) &&
         text.split(/\s+/).length <= 6 &&
-        !/\b(free|rate|rates|payout|payment|fee|apply|application|rover|academy|university)\b/i.test(
+        !/\b(free|rate|rates|payout|payment|fee|apply|application|rover|academy|university|become|how|what|where)\b/i.test(
           lower,
         )));
 
@@ -330,6 +351,7 @@ export function isCurrentTurnCareIntent(rawText?: string | null): boolean {
   const text = clean(rawText);
   if (!text) return false;
   if (looksLikeGuruLogisticsQuery(text)) return false;
+  if (looksLikeInformationalFaq(text)) return false;
   return (
     needsCareMatchingAsk(text) ||
     looksLikeGuruDirectoryQuery(text) ||

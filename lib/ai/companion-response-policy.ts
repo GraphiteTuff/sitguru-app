@@ -76,6 +76,17 @@ export function getCompanionPolicyAnswer(
     return `**PetPerks:** Give $10, Get $10 in SitGuru care credit after a friend's first eligible paid booking completes. Refer a Guru to earn $20 credit after approval and their first eligible paid booking completes. These conditional credits are not cash or guaranteed earnings. See **${PETPERKS_PATH}**.`;
   }
 
+  // Informational Guru signup — do not trap in ZIP matching intake.
+  if (
+    (companion === "rogue" || companion === "scout") &&
+    /\b(how (do|can) i become a (guru|sitter|walker)|become a sitguru guru|start (as|as a) guru|guru (signup|sign[- ]?up|application)|apply (to be|as) a guru)\b/.test(
+      q,
+    ) &&
+    !/\b\d{5}\b|\bin (philly|philadelphia|[a-z]+,?\s*[a-z]{2})\b/i.test(q)
+  ) {
+    return `Creating a Guru profile is free. Open **/become-a-guru** to see the steps, then finish signup when you're ready — I can't submit the application in chat. [[cta:guru]]`;
+  }
+
   if (companion === "taco") {
     if (/\b(ambassador\/join)\b/.test(q)) {
       return `**/ambassador/join** is a redirect to the canonical Ambassador application: **${AMBASSADOR_APPLICATION_PATH}**. Your referral link and QR tools become available after approval.`;

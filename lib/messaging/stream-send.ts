@@ -483,17 +483,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     }
     sessionState = mergeSessionStateFromTurn(sessionState, lastUserText);
 
-    // Current-turn care intent only — prior ZIP/city context may feed a fresh
-    // matching ask, but cannot trap unrelated FAQs in location loops.
-    const matchingAsk = isCurrentTurnCareIntent(lastUserText)
-      ? buildCareMatchingAsk(careThread, clientFirstName)
-      : null;
-    if (matchingAsk) {
-      return simulationDataStreamResponse(
-        stripDisallowedCompanionCtas(matchingAsk, viewer),
-      );
-    }
-
+    // Known FAQ / marketing facts first (Muse): never trap info questions in ZIP intake.
     const communityFaq =
       isCommunityCompanionPath(pagePath) && lastUserText
         ? matchCommunityEventsFaq(lastUserText) ||
@@ -520,6 +510,17 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       communityFaq?.answer || exactParentFaq?.answer || "",
       viewer,
     );
+
+    // Current-turn care intent only — skipped when a FAQ already answered the turn.
+    const matchingAsk =
+      !factForVoice && isCurrentTurnCareIntent(lastUserText)
+        ? buildCareMatchingAsk(careThread, clientFirstName)
+        : null;
+    if (matchingAsk) {
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(matchingAsk, viewer),
+      );
+    }
 
     const assist = await settleCompanionTurn({
       question: lastUserText,
@@ -562,15 +563,17 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     let result;
     try {
+      const companionTools = {
+        lookupGurus: lookupGurusTool,
+        fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
+        ...(enriched?.tools || {}),
+      };
       const sharedModelConfig = {
         model: anthropic(getSitGuruAiModel()),
         messages,
         system: systemPrompt,
-        tools: {
-          lookupGurus: lookupGurusTool,
-          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
-        },
-        maxSteps: 3 as const,
+        tools: companionTools,
+        maxSteps: 4 as const,
       };
 
       // Care searches: generate fully so we can append exact [[guru_card:]]

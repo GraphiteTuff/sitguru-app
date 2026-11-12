@@ -103,12 +103,26 @@ function score(q, reply) {
   const failures = [];
 
   if (!r.trim()) failures.push("empty");
+  // Affirmative fake handoff only — honest "can't confirm a live teammate" is OK.
   if (
-    /live teammate|pack coordinator is on the way|connecting you with a real sitguru teammate|teammate will take over shortly/.test(
+    /(i (sent|passed|forwarded) it to a live teammate|sent it to a live teammate|pack coordinator is on the way|connecting you with a real sitguru teammate|teammate will take over shortly|they'll pick it up in chat)/.test(
+      rl,
+    ) &&
+    !/can('|no)?t confirm|cannot confirm|never claim|not (a |an )?(real )?teammate|no live teammate was/.test(
       rl,
     )
   ) {
     failures.push("fake_escalation");
+  }
+  if (
+    q.companion === "rogue" &&
+    /how do i|what (is|are)|do i need|payment|become a guru|sign up|account/i.test(
+      q.question,
+    ) &&
+    /\[\[\s*matching_intake\s*\]\]/i.test(r) &&
+    !/\b\d{5}\b|near me|i need (dog|pet|care|a walker|a sitter)/i.test(q.question)
+  ) {
+    failures.push("sticky_intake");
   }
   if (/pack@sitguru\.com/.test(rl)) failures.push("stale_pack_email");
   if (

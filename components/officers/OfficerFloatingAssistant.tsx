@@ -776,13 +776,24 @@ export default function OfficerFloatingAssistant({
                 }
               }}
             />
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              aria-label={`Send to ${displayName}`}
-            >
-              Send
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={() => stop()}
+                aria-label={`Stop ${displayName}`}
+                className="rounded-full bg-slate-800 px-4 py-2 text-sm font-black text-white"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                aria-label={`Send to ${displayName}`}
+              >
+                Send
+              </button>
+            )}
           </form>
 
           <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
