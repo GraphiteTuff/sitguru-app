@@ -117,9 +117,30 @@ export function normalizeCountyQuery(value: string) {
     .trim();
 }
 
+/** Philadelphia neighborhoods that must never resolve to Montgomery County. */
+const PHILADELPHIA_NEIGHBORHOODS = new Set(
+  [
+    "manayunk",
+    "fishtown",
+    "south philly",
+    "south philadelphia",
+    "university city",
+    "center city",
+    "northern liberties",
+    "kensington",
+    "roxborough",
+    "chestnut hill",
+    "germantown",
+    "mount airy",
+  ].map((s) => s.toLowerCase()),
+);
+
 function resolveCountyFromCity(city: string | null | undefined) {
   const needle = city?.trim().toLowerCase();
   if (!needle) return null;
+  if (PHILADELPHIA_NEIGHBORHOODS.has(needle) || needle === "philly") {
+    return "Philadelphia County";
+  }
   const seed = COMMUNITY_MARKET_SEEDS.find(
     (market) =>
       market.city.toLowerCase() === needle ||
@@ -137,14 +158,20 @@ export function getEventCountyLabel(
     partners?: { city?: string | null } | null;
   },
 ) {
+  // City / neighborhood truth wins over a mis-stamped county (e.g. Manayunk
+  // incorrectly labeled Montgomery County).
+  const cityCounty =
+    resolveCountyFromCity(event.city) ||
+    resolveCountyFromCity(event.partners?.city);
+  if (cityCounty === "Philadelphia County") return cityCounty;
+
   const stamped = event.featured_market_city?.trim();
   if (stamped && /county/i.test(stamped)) return stamped;
   if (stamped) {
     return resolveCountyFromCity(stamped) || stamped;
   }
   return (
-    resolveCountyFromCity(event.city) ||
-    resolveCountyFromCity(event.partners?.city) ||
+    cityCounty ||
     event.city?.trim() ||
     event.partners?.city?.trim() ||
     null

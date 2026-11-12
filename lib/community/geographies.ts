@@ -51,7 +51,15 @@ export type CommunityGeographyResolveResult = {
 
 /** Extra search aliases keyed by geography slug. */
 export const COMMUNITY_GEOGRAPHY_ALIASES: Record<string, string[]> = {
-  "philadelphia-county-pa": ["Philadelphia", "Philly", "Center City"],
+  "philadelphia-county-pa": [
+    "Philadelphia",
+    "Philly",
+    "Center City",
+    "Manayunk",
+    "Fishtown",
+    "South Philly",
+    "University City",
+  ],
   "new-york-county-ny": ["Manhattan", "NYC", "New York City"],
   "kings-county-ny": ["Brooklyn"],
   "queens-county-ny": ["Queens"],

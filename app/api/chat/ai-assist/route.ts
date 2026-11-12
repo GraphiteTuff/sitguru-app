@@ -214,8 +214,9 @@ export async function POST(req: NextRequest) {
           messageText: message,
           bookingId: state.bookingId,
         });
-        const notice =
-          "Thanks for flagging this — I'm connecting you with a real SitGuru teammate now. They'll take it from here.";
+        const notice = handoff.handedOff
+          ? `Got it — I've flagged this conversation for SitGuru support (ref ${conversationId.slice(0, 8)}). Email support@sitguru.com or visit /contact if you need to add details.`
+          : "I'm SitGuru AI — for a person on the team, email support@sitguru.com or visit /contact. I can't transfer this chat from here.";
         if (persist && userId) {
           await insertAiMessage({
             conversationId,
@@ -226,8 +227,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           ok: true,
           handedOff: handoff.handedOff,
+          handoffId: handoff.handedOff ? conversationId : undefined,
           reply: notice,
-          aiAssistEnabled: false,
+          aiAssistEnabled: !handoff.handedOff,
           triggers: earlyHandoff.triggers,
         });
       }
@@ -330,8 +332,8 @@ export async function POST(req: NextRequest) {
             if (earlyHandoff.shouldHandoff) {
               send({
                 type: "done",
-                text: "I want to get you a real SitGuru teammate for this. Please share your name and the best phone or email — or open sitguru.com/contact.",
-                handedOff: true,
+                text: "I'm SitGuru AI — for a person on the team, email support@sitguru.com or visit /contact. I can't transfer this chat from here.",
+                handedOff: false,
                 model: getSitGuruAiModel(),
               });
               controller.close();

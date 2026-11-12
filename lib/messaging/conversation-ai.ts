@@ -212,8 +212,7 @@ export async function runAiAssistIfEnabled(params: {
   });
 
   if (handoff.handedOff) {
-    const notice =
-      "Thanks for flagging this — I'm connecting you with a real SitGuru teammate now. They'll take it from here.";
+    const notice = `Got it — I've flagged this conversation for SitGuru support (ref ${params.conversationId.slice(0, 8)}). Email support@sitguru.com or visit /contact if you need to add details.`;
     await insertAiMessage({
       conversationId: params.conversationId,
       recipientUserId: params.recipientUserId,
@@ -222,6 +221,7 @@ export async function runAiAssistIfEnabled(params: {
     return {
       ran: true as const,
       handedOff: true as const,
+      handoffId: params.conversationId,
       reply: notice,
     };
   }

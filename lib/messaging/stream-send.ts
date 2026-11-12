@@ -40,11 +40,21 @@ import { shouldHoldForCompanion } from "@/lib/messaging/chat-library";
 import { rememberModelAnswer, settleCompanionTurn } from "@/lib/messaging/chat-archive";
 import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
+import { getCompanionPolicyAnswer } from "@/lib/ai/companion-response-policy";
+import { buildRetrievalPromptBlock } from "@/lib/ai/site-knowledge-index";
 import {
   buildCareMatchingAsk,
+  isCurrentTurnCareIntent,
   joinRecentUserTexts,
   needsCareMatchingAsk,
 } from "@/lib/chat/care-matching-intake";
+import {
+  applySessionMetaIntent,
+  emptyCompanionSessionState,
+  mergeSessionStateFromTurn,
+  parseSessionMetaIntent,
+  sessionStatePromptBlock,
+} from "@/lib/companions/session-state";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -409,7 +419,37 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         }
       : undefined;
 
-    const matchingAsk = buildCareMatchingAsk(careThread, clientFirstName);
+    // Policy invariants (fees, trust, human/AI) before sticky intake.
+    const policyAnswer = getCompanionPolicyAnswer("rogue", lastUserText);
+    if (policyAnswer) {
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(policyAnswer, viewer),
+      );
+    }
+
+    let sessionState = emptyCompanionSessionState();
+    if (clientFirstName) sessionState.name = clientFirstName;
+    for (const message of messages) {
+      if (message.role !== "user") continue;
+      sessionState = mergeSessionStateFromTurn(
+        sessionState,
+        messageContent(message),
+      );
+    }
+    const sessionIntent = parseSessionMetaIntent(lastUserText);
+    if (sessionIntent) {
+      const applied = applySessionMetaIntent(sessionState, sessionIntent);
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(applied.reply, viewer),
+      );
+    }
+    sessionState = mergeSessionStateFromTurn(sessionState, lastUserText);
+
+    // Current-turn care intent only — prior ZIP/city context may feed a fresh
+    // matching ask, but cannot trap unrelated FAQs in location loops.
+    const matchingAsk = isCurrentTurnCareIntent(lastUserText)
+      ? buildCareMatchingAsk(careThread, clientFirstName)
+      : null;
     if (matchingAsk) {
       return simulationDataStreamResponse(
         stripDisallowedCompanionCtas(matchingAsk, viewer),
@@ -468,6 +508,8 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       communityEvent,
       viewer,
     });
+    systemPrompt += `\n\n${sessionStatePromptBlock(sessionState)}`;
+    systemPrompt += `\n\n${buildRetrievalPromptBlock(lastUserText)}`;
     if (factForVoice) {
       systemPrompt += `\n\n${personableFactHint(factForVoice, clientFirstName)}`;
     }

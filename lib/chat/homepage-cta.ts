@@ -56,24 +56,26 @@ export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
   },
   {
     id: "parent",
-    href: "/register?role=parent",
+    href: "/signup?role=pet_parent",
     label: "Create Pet Parent Account",
     patterns: [
       /\[\[cta:parent\]\]/gi,
       /\[Create Pet Parent Account[^\]]*\](?:\([^)]*\))?/gi,
       /\[Set up an account[^\]]*\](?:\([^)]*\))?/gi,
+      /(?:^|\s)(?:https?:\/\/[^\s]+)?\/signup\?role=pet_parent(?:\s|$)/gi,
       /(?:^|\s)(?:https?:\/\/[^\s]+)?\/register\?role=parent(?:\s|$)/gi,
     ],
   },
   {
     id: "ambassador",
-    href: "/ambassador/join",
+    href: "/programs/ambassadors/apply",
     label: "🚀 Claim My Referral Code",
     patterns: [
       /\[\[cta:ambassador\]\]/gi,
       /\[Claim My Referral Code[^\]]*\](?:\([^)]*\))?/gi,
       /\[Become an Ambassador[^\]]*\](?:\([^)]*\))?/gi,
       /\[Join as Ambassador[^\]]*\](?:\([^)]*\))?/gi,
+      /(?:^|\s)(?:https?:\/\/[^\s]+)?\/programs\/ambassadors\/apply(?:\s|$)/gi,
       /(?:^|\s)(?:https?:\/\/[^\s]+)?\/ambassador\/join(?:\s|$)/gi,
     ],
   },
@@ -280,7 +282,7 @@ IDENTITY + SAFETY:
 - If visitor name is known: use it sparingly — never open every reply with "Hey {name}".
 - NEVER repeat the same opener/CTA wording back-to-back. Vary phrasing based on their latest message.
 - Ground facts in SitGuru website / Help Center knowledge. Never invent unpublished rates or a visitor's live PawPerks balance.
-- Unresolved / human help → pack@sitguru.com.
+- Unresolved / human help → support@sitguru.com or /contact. Never claim a live teammate was notified unless a handoff ID exists.
 
 GREETINGS & SMALL TALK:
 - Answer hi/hey/hello like live text: ask how they are; say you're doing great; keep it punchy.
@@ -311,5 +313,5 @@ Email / newsletter / subscribe / don’t miss out / email updates → append [[c
 Also append [[cta:social]] and occasionally [[cta:email]] after a helpful answer (not every turn) when inviting them to catch events, pics, and upcoming pack updates.
 
 Never invent other marker names. Never wrap markers in code fences.
-Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video · @SitGuruOfficial on all socials via [[cta:social]] · email updates via [[cta:email]]
+Canonical destinations: /become-a-guru · /signup?role=pet_parent · /programs/ambassadors/apply · /ambassador/onboarding-video · @SitGuruOfficial on all socials via [[cta:social]] · email updates via [[cta:email]]
 `.trim();

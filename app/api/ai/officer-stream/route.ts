@@ -32,6 +32,8 @@ import {
   resolveDelilahInstantFaqAnswer,
 } from "@/lib/ai/community-events-faqs";
 import { compileDelilahEventsSnapshot } from "@/lib/ai/delilah-events-snapshot";
+import { getCompanionPolicyAnswer } from "@/lib/ai/companion-response-policy";
+import { buildRetrievalPromptBlock } from "@/lib/ai/site-knowledge-index";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -53,9 +55,22 @@ import {
 } from "@/lib/gurus/guru-chat-snapshot";
 import {
   buildCareMatchingAsk,
+  isCurrentTurnCareIntent,
   joinRecentUserTexts,
   needsCareMatchingAsk,
 } from "@/lib/chat/care-matching-intake";
+import {
+  applySessionMetaIntent,
+  emptyCompanionSessionState,
+  mergeSessionStateFromTurn,
+  parseSessionMetaIntent,
+  sessionStatePromptBlock,
+  type CompanionSessionState,
+} from "@/lib/companions/session-state";
+import {
+  formatEventQueryForReply,
+  queryLivePetEvents,
+} from "@/lib/companions/events-tools";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -455,19 +470,80 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+
+    // Deterministic policy answers (fees, PetPerks, human/AI identity) win
+    // before any sticky intake or soft-escalation path.
+    const policyAnswer = getCompanionPolicyAnswer(
+      officer as "scout" | "taco" | "delilah",
+      lastUserText,
+    );
+    if (policyAnswer) {
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(policyAnswer, viewer),
+      );
+    }
+
+    // Session recall / summarise / correct / start-over (current-turn first).
+    let sessionState: CompanionSessionState = emptyCompanionSessionState();
+    if (viewer.firstName) sessionState.name = viewer.firstName;
+    for (const message of messages) {
+      if (message.role !== "user") continue;
+      sessionState = mergeSessionStateFromTurn(
+        sessionState,
+        messageContent(message),
+      );
+    }
+    const sessionIntent = parseSessionMetaIntent(lastUserText);
+    if (sessionIntent) {
+      const applied = applySessionMetaIntent(sessionState, sessionIntent);
+      return simulationDataStreamResponse(
+        stripDisallowedCompanionCtas(applied.reply, viewer),
+      );
+    }
+    sessionState = mergeSessionStateFromTurn(sessionState, lastUserText);
+
+    // Delilah: live county/date query tool instead of truncated digest alone.
+    if (
+      officer === "delilah" &&
+      /\b(events?|rsvp|what('s| is) (happening|on)|near me|this weekend|november|december|january|february|philadelphia|philly|manayunk)\b/i.test(
+        lastUserText,
+      )
+    ) {
+      const cityGuess =
+        sessionState.city ||
+        lastUserText.match(/\bin\s+([A-Za-z][A-Za-z .'-]{2,40})(?:\s|,|$)/i)?.[1] ||
+        null;
+      const liveEvents = await queryLivePetEvents({
+        city: cityGuess,
+        state: sessionState.state || "PA",
+        county: /\bphiladelphia|philly|manayunk\b/i.test(lastUserText)
+          ? "Philadelphia County"
+          : null,
+        limit: 25,
+      }).catch(() => null);
+      if (liveEvents) {
+        return simulationDataStreamResponse(
+          stripDisallowedCompanionCtas(
+            formatEventQueryForReply(liveEvents),
+            viewer,
+          ),
+        );
+      }
+    }
+
     const careThread = joinRecentUserTexts(messages, lastUserText);
-    // Parent care-matching ZIP intake belongs on public Scout (directory /
-    // matching) — never on the signed-in Guru dashboard logistics surface.
-    // Trail Check says "assigned walks", which previously hijacked every reply
-    // into "For Dog Walking… city/state or ZIP".
-    const scoutMatchingAsk =
-      officer === "scout" && surface === "public"
-        ? buildCareMatchingAsk(careThread, viewer.firstName)
-        : null;
-    const lookupHint = inferLookupParamsFromChat(careThread);
-    const scoutNeedsDirectory =
+    // Classify the CURRENT turn first. Prior care requests may supply ZIP/city
+    // context, but cannot hijack a fresh standalone FAQ ("Free to apply?").
+    const isCurrentCareIntent =
       officer === "scout" &&
       surface === "public" &&
+      isCurrentTurnCareIntent(lastUserText);
+    const scoutMatchingAsk = isCurrentCareIntent
+      ? buildCareMatchingAsk(careThread, viewer.firstName)
+      : null;
+    const lookupHint = inferLookupParamsFromChat(careThread);
+    const scoutNeedsDirectory =
+      isCurrentCareIntent &&
       !scoutMatchingAsk &&
       (looksLikeGuruDirectoryQuery(careThread) ||
         Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
@@ -495,7 +571,7 @@ export async function POST(req: Request) {
     }
 
     const blockFaqForMatching =
-      surface === "public" && needsCareMatchingAsk(careThread);
+      isCurrentCareIntent && needsCareMatchingAsk(careThread);
     const instantFaqRaw =
       officer === "delilah"
         ? resolveDelilahInstantFaqAnswer(lastUserText)
@@ -545,7 +621,8 @@ export async function POST(req: Request) {
         city: focus.city,
         state: focus.state,
         focus,
-        limit: 30,
+        // Full live catalog for model context — matching queries use events-tools.
+        limit: 200,
       }).catch(() => null);
       snapshotMarkdown = live?.markdownContext
         ? `${faqLayer}\n\n${live.markdownContext}`
@@ -599,6 +676,8 @@ export async function POST(req: Request) {
         viewer,
         pagePath,
       }),
+      sessionStatePromptBlock(sessionState),
+      buildRetrievalPromptBlock(lastUserText),
       instantFaq ? personableFactHint(instantFaq, preferredName) : "",
     ]
       .filter(Boolean)

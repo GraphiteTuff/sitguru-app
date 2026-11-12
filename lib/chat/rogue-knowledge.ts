@@ -17,7 +17,7 @@ PawPerks: earn on walks and redeem at checkout (~100 pts ≈ $1) — never inven
 PawReport Live: live GPS map, potty push alerts, and an email report when a walk ends.
 Social: Follow @SitGuruOfficial on Facebook, Instagram, TikTok, X, and YouTube for events, pics, and pack updates.
 Email: Invite visitors to subscribe for news, offers, and announcements ([[cta:email]]).
-Human help: pack@sitguru.com
+Human help: support@sitguru.com (never claim a live teammate was notified unless a handoff ID exists)
 `.trim();
 
 /** Score help articles against the latest user message for focused injection. */

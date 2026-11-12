@@ -58,7 +58,7 @@ const ONBOARDING_ROUTE_PREFIXES = [
 ] as const;
 
 const ONBOARDING_GREETING =
-  "Hey there! Ready to lead your local community? I am Taco, your personal Ambassador Advocate. Sign up today and I will fetch your personalized referral link, show you how to easily claim your $10 to $20 PetPerks rewards, and track your metrics right from your custom workspace dashboard!";
+  "Hey there! Ready to lead your local community? I am Taco, your personal Ambassador Advocate. Apply today and after approval I'll help you use your referral link and QR tools, explain published PetPerks credit terms, and track your outreach metrics from your Ambassador workspace.";
 
 const WORKSPACE_GREETING =
   "Hey! Taco here — your Ambassador Advocate. Let's grow the pack: referrals, link clicks, PetPerks rewards, and your dashboard metrics. Tap a chip or ask me anything!";
@@ -157,7 +157,7 @@ const WORKSPACE_CHIPS = [
 
 const REWARD_CALLOUTS = [
   "Personalized referral link + QR tools",
-  "$10–$20 PetPerks reward opportunities",
+  "Published PetPerks credit terms (Give $10 Get $10 / Refer a Guru $20)",
   "Live outreach & impact metrics",
   "Campus, community & pet-pro lanes",
 ] as const;
@@ -304,7 +304,7 @@ export default function AITacoCompanion({
       : WORKSPACE_GREETING;
   const chips = isOnboarding ? ONBOARDING_CHIPS : WORKSPACE_CHIPS;
   const tipText = isOnboarding
-    ? "Hey! I'm Taco — tap to chat. I'll help you claim PetPerks and grow your pack!"
+    ? "Hey! I'm Taco — tap to chat. I'll help with Ambassador apply, PetPerks terms, and growing your pack!"
     : ambassadorName
       ? `Hey ${ambassadorName.split(/\s+/)[0]}! I'm Taco — tap to chat about referrals and rewards.`
       : "Hey! I'm Taco — tap to chat about referrals, PetPerks, and your dashboard.";

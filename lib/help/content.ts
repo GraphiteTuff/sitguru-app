@@ -182,6 +182,11 @@ export const billingFaqs: HelpFaqItem[] = [
     answer:
       "Use the contact page or email support@sitguru.com. Include your name, account email, role, booking details if applicable, and a clear description of the issue.",
   },
+  {
+    question: "What is Marketplace Support / the booking fee?",
+    answer:
+      "SitGuru's booking flow currently shows Marketplace Support — Free during launch. No future per-booking amount, payer, or start date is published in Help. Review the checkout summary before paying, and email support@sitguru.com if a fee line looks unexpected.",
+  },
 ];
 
 export const paymentFlows: HelpStepBlock[] = [

@@ -102,7 +102,9 @@ function formatEventDetailLines(event: CommunityEventWithPartner): string[] {
 export async function compileDelilahEventsSnapshot(
   opts: DelilahEventsSnapshotOpts = {},
 ): Promise<{ markdownContext: string; count: number }> {
-  const limit = Math.min(Math.max(opts.limit ?? 24, 12), 40);
+  // Prefer events-tools for matched queries. Snapshot is secondary context —
+  // allow the full live catalog (was hard-capped at 40, which hid Dec–Feb).
+  const limit = Math.min(Math.max(opts.limit ?? 80, 12), 200);
 
   const scraped = await fetchDiscoveredHomepageEvents({
     limit: 80,

@@ -94,9 +94,6 @@ export type CareMatchingIntake = {
   missing: Array<"location" | "zip" | "service" | "time">;
 };
 
-const GURU_ROLE_SYNONYM =
-  /\b((pet|dog|cat|house)\s*[- ]?sitters?|sitters?|gurus?|caregivers?|handlers?)\b/i;
-
 const CARE_SEEKING =
   /\b(looking for|need|find|book|search|who (can|does)|any (local )?(gurus?|sitters?)|also matching|i need care)\b/i;
 
@@ -253,18 +250,20 @@ export function parseCareMatchingIntake(
 
   const isProviderSignup = PROVIDER_SIGNUP.test(lower);
   const isLogisticsQuery = looksLikeGuruLogisticsQuery(text);
-  // Service words alone ("walks", "visits") are not enough — Trail Check /
-  // schedule coaching also mention walks. Require a real care-seeking cue,
-  // and never treat Guru logistics questions as parent matching intake.
+  // Service words or the bare word "guru/sitter" alone are NOT enough —
+  // standalone FAQs ("Free to apply?", "My rates", "Payments") must not
+  // enter ZIP intake. Require an explicit care-seeking cue or chip follow-up.
   const isCareSeeking =
     !isProviderSignup &&
     !isLogisticsQuery &&
     (CARE_SEEKING.test(lower) ||
-      GURU_ROLE_SYNONYM.test(lower) ||
-      /\blooking for\b/.test(lower) ||
       isMatchingFollowUp(lower) ||
       // Bare green-pill / short service taps still count when not logistics.
-      (Boolean(service) && text.split(/\s+/).length <= 6));
+      (Boolean(service) &&
+        text.split(/\s+/).length <= 6 &&
+        !/\b(free|rate|rates|payout|payment|fee|apply|application|rover|academy|university)\b/i.test(
+          lower,
+        )));
 
   const hasZip = Boolean(zip);
   // Accept US ZIP, city+state, or state alone (PA / NJ / Texas) for area matching.
@@ -321,6 +320,22 @@ export function needsCareMatchingAsk(rawText?: string | null): boolean {
     return false;
   }
   return intake.nextStep !== "ready";
+}
+
+/**
+ * Classify the CURRENT user turn only. Prior care-seeking turns may supply
+ * ZIP/city context for a fresh matching ask, but must not hijack a standalone FAQ.
+ */
+export function isCurrentTurnCareIntent(rawText?: string | null): boolean {
+  const text = clean(rawText);
+  if (!text) return false;
+  if (looksLikeGuruLogisticsQuery(text)) return false;
+  return (
+    needsCareMatchingAsk(text) ||
+    looksLikeGuruDirectoryQuery(text) ||
+    parseCareMatchingIntake(text).isCareSeeking ||
+    parseCareMatchingIntake(text).isProviderSignup
+  );
 }
 
 export function hasMatchingIntakeMarker(raw?: string | null): boolean {

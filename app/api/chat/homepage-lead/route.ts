@@ -42,6 +42,7 @@ import {
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
 import { settleCompanionTurn } from "@/lib/messaging/chat-archive";
+import { getCompanionPolicyAnswer } from "@/lib/ai/companion-response-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -57,7 +58,7 @@ const AUDIENCE_HINT =
 
 /** Exact conversion copy when visitor wants to book / join without contact yet */
 const CONTACT_PROMPT =
-  "Happy to connect you with a Pack Coordinator. What is the best email or phone number to reach you?";
+  "I'm SitGuru AI — for a person on the team, email support@sitguru.com or visit /contact. I can't transfer this chat from here.";
 
 const PACK_PERSONA = "pack" as const;
 
@@ -533,36 +534,81 @@ async function handleHomepageLeadPost(req: NextRequest) {
     );
   }
 
-  const hasContact = Boolean(contact.email || contact.phone);
-  const hardTriggers = handoff.triggers.some((t) =>
-    ["safety", "manager_request", "explicit_human", "negative_sentiment"].includes(
-      t,
-    ),
-  );
+  // Verified policy answers beat contact / intake / soft-escalation paths.
+  const policyAnswer = getCompanionPolicyAnswer("rogue", message);
+  if (policyAnswer) {
+    if (adminUserId) {
+      await insertAiMessage({
+        conversationId,
+        recipientUserId: adminUserId,
+        text: policyAnswer,
+      }).catch(() => null);
+    }
+    const response = wantStream
+      ? new NextResponse(
+          sseEncode({
+            type: "meta",
+            conversationId,
+            guestId,
+            model: "verified-policy",
+          }) +
+            sseEncode({
+              type: "done",
+              text: policyAnswer,
+              conversationId,
+              aiAssistEnabled,
+              model: "verified-policy",
+            }),
+          {
+            headers: {
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "Cache-Control": "no-cache, no-transform",
+            },
+          },
+        )
+      : NextResponse.json({
+          ok: true,
+          conversationId,
+          guestId,
+          reply: policyAnswer,
+          aiAssistEnabled,
+          model: "verified-policy",
+        });
+    if (setGuestCookie) {
+      response.cookies.set(GUEST_COOKIE, guestId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
+  }
 
-  // Elevate when: hard human/safety, OR (intent/pending + contact shared)
-  const elevateNow =
-    aiAssistEnabled &&
-    (hardTriggers ||
-      (hasContact && (handoff.shouldHandoff || pendingContact)));
+  const hasContact = Boolean(contact.email || contact.phone);
+  const hardTriggers = handoff.shouldHandoff;
+
+  // Only elevate for hard safety / explicit human / negative sentiment —
+  // never for signup or booking intent (those stay in AI with honest links).
+  const elevateNow = aiAssistEnabled && hardTriggers;
 
   if (elevateNow) {
     await disableAiAssist({
       conversationId,
-      reason:
-        handoff.reason ||
-        (pendingContact
-          ? "Lead funnel: visitor shared contact for teammate follow-up."
-          : "Lead funnel elevation"),
+      reason: handoff.reason || "Lead funnel hard-trigger elevation",
       preview: message,
     });
     aiAssistEnabled = false;
 
+    // Honest escalation: AI + support path. Only mention a teammate when the
+    // conversation was actually elevated (disableAiAssist succeeded above).
+    const handoffId = conversationId.slice(0, 8);
     const notice = hasContact
-      ? `Wonderful — a human Pack Coordinator is on the way! ${
-          contact.email ? `Email on file: ${contact.email}. ` : ""
-        }${contact.phone ? `Phone on file: ${contact.phone}. ` : ""}We'll fetch your profile and get those tails wagging shortly.`
-      : "A human Pack Coordinator has been notified and will take over this chat with tail-wagging support shortly.";
+      ? `Got it — I've flagged this chat for SitGuru support (ref ${handoffId}). Email **support@sitguru.com** or visit **/contact** if you need to add details.${
+          contact.email ? ` Email on file: ${contact.email}.` : ""
+        }${contact.phone ? ` Phone on file: ${contact.phone}.` : ""}`
+      : `Got it — I've flagged this chat for SitGuru support (ref ${handoffId}). Email **support@sitguru.com** or visit **/contact** — I'm AI and can't join a live call from here.`;
 
     if (adminUserId) {
       await insertAiMessage({
@@ -575,6 +621,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
     const response = NextResponse.json({
       ok: true,
       handedOff: true,
+      handoffId: conversationId,
       conversationId,
       guestId,
       aiAssistEnabled: false,
@@ -595,16 +642,13 @@ async function handleHomepageLeadPost(req: NextRequest) {
     return response;
   }
 
-  // Intent without contact — ask for email/phone before elevating
-  if (aiAssistEnabled && handoff.shouldHandoff && !hasContact) {
-    await supabaseAdmin
-      .from("conversations")
-      .update({
-        ai_handoff_reason: `pending_contact:${handoff.reason || "lead_intent"}`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", conversationId);
-
+  // Soft human ask without elevation — honest AI + support email (no teammate claim).
+  if (
+    aiAssistEnabled &&
+    /\b(talk to (a )?(human|person|agent)|speak (to|with) (a )?(human|person)|real (person|human)|customer service|customer support)\b/i.test(
+      message,
+    )
+  ) {
     const reply = CONTACT_PROMPT;
     if (adminUserId) {
       await insertAiMessage({
@@ -616,7 +660,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
     const response = NextResponse.json({
       ok: true,
       handedOff: false,
-      awaitingContact: true,
+      awaitingContact: false,
       conversationId,
       guestId,
       aiAssistEnabled: true,
