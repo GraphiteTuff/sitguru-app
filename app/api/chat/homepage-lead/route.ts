@@ -28,6 +28,7 @@ import {
 import { HELP_ARTICLES, HELP_CATEGORIES } from "@/lib/help/articles";
 import { recordHomepageChatInsightAsync, recordGlobalChatInsightAsync } from "@/lib/chat/insights";
 import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
+import { getCompanionPolicyAnswer } from "@/lib/ai/companion-response-policy";
 import {
   SIMULATION_NAME_PROMPT,
   buildHomepageSimulationReply,
@@ -525,6 +526,37 @@ async function handleHomepageLeadPost(req: NextRequest) {
       "[homepage-lead] persist soft-failed:",
       error instanceof Error ? error.message : error,
     );
+  }
+
+  // Exact published policy answers take precedence over contact/intake triggers.
+  // "How do I sign up?" and "What is the booking fee?" are not human handoffs.
+  const policyAnswer = getCompanionPolicyAnswer("rogue", message);
+  if (policyAnswer) {
+    if (adminUserId) {
+      await insertAiMessage({
+        conversationId,
+        recipientUserId: adminUserId,
+        text: policyAnswer,
+      }).catch(() => null);
+    }
+    const response = NextResponse.json({
+      ok: true,
+      conversationId,
+      guestId,
+      reply: policyAnswer,
+      aiAssistEnabled,
+      model: "verified-policy",
+    });
+    if (setGuestCookie) {
+      response.cookies.set(GUEST_COOKIE, guestId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
   }
 
   const hasContact = Boolean(contact.email || contact.phone);
