@@ -111,15 +111,53 @@ export function isCompanionCtaAllowed(
   }
 }
 
+/**
+ * Verified public routes companions may cite verbatim (policy / tools).
+ * Everything else is still scrubbed so the model cannot invent deep links.
+ */
+export const COMPANION_CITABLE_ROUTES = [
+  "/programs/ambassadors/apply",
+  "/petperks",
+  "/signup?role=pet_parent",
+  "/become-a-guru",
+  "/help/billing/payments-and-payouts",
+  "/contact",
+  "/search",
+  "/events/host",
+  "/events",
+  "/help",
+  "/reads",
+  "/register?role=parent", // legacy; still cite if model emits it
+  "/ambassador/join", // legacy redirect alias
+] as const;
+
 /** Remove raw SitGuru paths and URLs from spoken chat. Buttons stay as markers. */
 export function stripCompanionRouteTalk(text: string) {
-  return String(text || "")
+  let out = String(text || "");
+  const saved: string[] = [];
+  // Protect citable routes (longest first) so policy answers keep canonical links.
+  const sorted = [...COMPANION_CITABLE_ROUTES].sort((a, b) => b.length - a.length);
+  for (const route of sorted) {
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "gi"), () => {
+      const token = `__SG_ROUTE_${saved.length}__`;
+      saved.push(route);
+      return token;
+    });
+  }
+
+  out = out
     .replace(/\[([^\]]+)\]\((?:https?:\/\/(?:www\.)?sitguru\.com)?\/[^)]+\)/gi, "$1")
     .replace(/https?:\/\/(?:www\.)?sitguru\.com[^\s)]*/gi, "")
     .replace(/(?:^|[\s(*_])\/[a-z][a-z0-9_\-]*(?:\/[a-z0-9_\-]+)*(?:\?[^\s)*]*)?/gi, " ")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.!?])/g, "$1")
     .trim();
+
+  for (let i = 0; i < saved.length; i += 1) {
+    out = out.replaceAll(`__SG_ROUTE_${i}__`, saved[i]!);
+  }
+  return out;
 }
 
 /** Strip signup markers the viewer should never see. */

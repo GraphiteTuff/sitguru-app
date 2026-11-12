@@ -7,7 +7,7 @@
       "id": "P-R-human",
       "pass": true,
       "status": 200,
-      "ttfr_ms": 491,
+      "ttfr_ms": 508,
       "missing": [],
       "banned": [],
       "reply": "I'm a SitGuru AI companion, not a person. I can't transfer this chat or confirm that a teammate was notified. For human assistance, email **support@sitguru.com** or visit * **."
@@ -16,7 +16,7 @@
       "id": "P-R-fee",
       "pass": true,
       "status": 200,
-      "ttfr_ms": 114,
+      "ttfr_ms": 142,
       "missing": [],
       "banned": [],
       "reply": "SitGuru's booking flow currently shows **Marketplace Support — Free** during launch. No future per-booking amount, payer, or effective date is published in Help. See * ** or ask **support@sitguru.com** for clarification; I can't promise SitGuru is cheaper than another platform."
@@ -25,7 +25,7 @@
       "id": "P-R-bg",
       "pass": true,
       "status": 200,
-      "ttfr_ms": 64,
+      "ttfr_ms": 119,
       "missing": [],
       "banned": [],
       "reply": "SitGuru describes required identity, safety, account, and payout trust steps before a Guru is bookable. I can't verify a platform-wide background-check, insurance, or safety guarantee from the currently published details. See * ** or ask **support@sitguru.com** for policy specifics."
@@ -34,7 +34,7 @@
       "id": "P-T-petperks",
       "pass": false,
       "status": 200,
-      "ttfr_ms": 561,
+      "ttfr_ms": 508,
       "missing": [
         "/petperks"
       ],
@@ -45,7 +45,7 @@
       "id": "P-T-apply",
       "pass": false,
       "status": 200,
-      "ttfr_ms": 184,
+      "ttfr_ms": 178,
       "missing": [
         "/programs/ambassadors/apply"
       ],
@@ -56,16 +56,16 @@
       "id": "P-S-free",
       "pass": true,
       "status": 200,
-      "ttfr_ms": 3247,
+      "ttfr_ms": 1282,
       "missing": [],
       "banned": [],
-      "reply": "Yep, signing up is free. You just fill in your profile, finish the trust steps, and complete payout setup — once SitGuru approves you, Pet Parents can start booking you.\n\nReady to get started? [[cta:guru]]"
+      "reply": "Yep, signing up is free. You just need to finish your profile and trust steps before Pet Parents can book you. [[cta:guru]]"
     },
     {
       "id": "P-D-teammate",
       "pass": true,
       "status": 200,
-      "ttfr_ms": 65,
+      "ttfr_ms": 82,
       "missing": [],
       "banned": [],
       "reply": "I'm a SitGuru AI companion, not a person. I can't transfer this chat or confirm that a teammate was notified. For human assistance, email **support@sitguru.com** or visit * **."
