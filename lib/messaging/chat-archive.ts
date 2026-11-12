@@ -328,30 +328,19 @@ export async function settleCompanionTurn(input: {
     }
     return { takeOver: false as const, reply: "" };
   }
-  const { decideCompanionAssist } = await import("@/lib/messaging/chat-library");
-  const decision = decideCompanionAssist({ question, faqAnswer: "" });
-  if (decision.kind !== "agent") {
-    void rememberChat({
-      source: "companion",
-      companion: input.companion,
-      actorUserId: input.actorUserId,
-      actorName: input.actorName,
-      actorRole: input.actorRole,
-      question,
-      pagePath: input.pagePath,
-      compilable: false,
-    });
-    return { takeOver: false as const, reply: "" };
-  }
-  await alertLiveAgent({
-    question,
+  // No FAQ hit: do NOT invent a live-teammate handoff. Continue to the model
+  // with retrieval. alertLiveAgent stays available for real safety handoffs only.
+  void rememberChat({
+    source: "companion",
     companion: input.companion,
-    pagePath: input.pagePath,
     actorUserId: input.actorUserId,
     actorName: input.actorName,
     actorRole: input.actorRole,
+    question,
+    pagePath: input.pagePath,
+    compilable: false,
   });
-  return { takeOver: true as const, reply: decision.reply };
+  return { takeOver: false as const, reply: "" };
 }
 
 export async function rememberModelAnswer(input: {

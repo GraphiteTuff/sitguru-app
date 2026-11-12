@@ -25,12 +25,22 @@ describe("companion FAQ or live agent", () => {
     assert.match(decision.reply, /Refunds stay/);
   });
 
-  it("sends an unanswered problem to the live agent", () => {
+  it("continues unanswered problems to the companion instead of faking a teammate", () => {
     const decision = decideCompanionAssist({
       question: "My Guru profile photo will not save after I crop it.",
     });
-    assert.equal(decision.kind, "agent");
+    assert.equal(decision.kind, "continue");
+    assert.equal(decision.reply, "");
+  });
+
+  it("can return the honest unverified fallback when requested", () => {
+    const decision = decideCompanionAssist({
+      question: "My Guru profile photo will not save after I crop it.",
+      preferHonestFallback: true,
+    });
+    assert.equal(decision.kind, "faq");
     assert.equal(decision.reply, LIVE_AGENT_REPLY);
+    assert.doesNotMatch(decision.reply.toLowerCase(), /live teammate/);
   });
 
   it("lets a greeting and a care search stay with the companion", () => {

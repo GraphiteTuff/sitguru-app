@@ -9,8 +9,9 @@ import {
   isHardcodedSuperUserEmail,
 } from "@/lib/admin/super-users";
 
+/** Honest no-hit fallback — never claims a teammate was contacted. */
 export const LIVE_AGENT_REPLY =
-  "I don't have a SitGuru answer for that yet. I sent it to a live teammate, and they'll pick it up in chat.";
+  "I could not verify that on SitGuru from the published Help and site pages. See **/help** or email **support@sitguru.com** for confirmation.";
 
 export type HelpAudience = "parent" | "guru" | "ambassador" | "all";
 
@@ -67,21 +68,32 @@ export function looksLikeHandoff(value: string) {
   const text = normalizeChatText(value);
   return (
     text.includes("sent it to a live teammate") ||
-    text.includes("live teammate") ||
+    text.includes("i sent it to a live teammate") ||
     text.includes("hit a snag")
   );
 }
 
+/**
+ * Route companion assists. Missing FAQ matches must NOT invent a live-teammate
+ * handoff — continue so retrieval + the model can answer, or use the honest
+ * unverified fallback only when explicitly requested by callers.
+ */
 export function decideCompanionAssist(input: {
   question: string;
   faqAnswer?: string | null;
+  /** When true, return the honest unverified fallback instead of continuing. */
+  preferHonestFallback?: boolean;
 }) {
   const faq = String(input.faqAnswer || "").trim();
   if (faq) return { kind: "faq" as const, reply: faq };
   if (!isSubstantiveQuestion(input.question) || shouldHoldForCompanion(input.question)) {
     return { kind: "continue" as const, reply: "" };
   }
-  return { kind: "agent" as const, reply: LIVE_AGENT_REPLY };
+  if (input.preferHonestFallback) {
+    return { kind: "faq" as const, reply: LIVE_AGENT_REPLY };
+  }
+  // Let the companion model + retrieval layer answer. Never auto-claim a teammate.
+  return { kind: "continue" as const, reply: "" };
 }
 
 function tokens(value: string) {
