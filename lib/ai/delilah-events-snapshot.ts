@@ -114,19 +114,21 @@ function formatEventDetailLines(event: CommunityEventWithPartner): string[] {
 export async function compileDelilahEventsSnapshot(
   opts: DelilahEventsSnapshotOpts = {},
 ): Promise<{ markdownContext: string; count: number }> {
-  const limit = Math.min(Math.max(opts.limit ?? 24, 6), 40);
+  // An FAQ about a December or February event must not fail because the
+  // model only received the first 24-40 upcoming rows.
+  const limit = Math.min(Math.max(opts.limit ?? 120, 6), 250);
 
   const [partnerEvents, discovered] = await Promise.all([
     fetchPublicEvents({
-      limit: Math.max(limit, 40),
+      limit: limit,
       city: opts.city,
       state: opts.state,
     }).catch(() => [] as CommunityEventWithPartner[]),
     fetchDiscoveredHomepageEvents({
-      limit: Math.max(Math.floor(limit / 2), 12),
+      limit: limit,
       city: opts.city,
       state: opts.state,
-      homepageEligibleOnly: true,
+      homepageEligibleOnly: false,
     }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
   ]);
 
