@@ -55,6 +55,10 @@ import {
   parseSessionMetaIntent,
   sessionStatePromptBlock,
 } from "@/lib/companions/session-state";
+import {
+  enrichCompanionTurn,
+  persistAssistantCompanionMessage,
+} from "@/lib/companions/enrich-turn";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -419,9 +423,44 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         }
       : undefined;
 
+    // Durable memory / authenticated context (soft-fail for guests).
+    let enriched: Awaited<ReturnType<typeof enrichCompanionTurn>> | null = null;
+    try {
+      enriched = await enrichCompanionTurn({
+        req,
+        body: body as unknown as Record<string, unknown>,
+        lastUserText,
+        companionFallback: "rogue",
+      });
+      if (enriched.directReply) {
+        await persistAssistantCompanionMessage({
+          conversation: enriched.conversation,
+          actor: enriched.actor,
+          companionId: enriched.companionId,
+          text: enriched.directReply,
+        });
+        return simulationDataStreamResponse(
+          stripDisallowedCompanionCtas(enriched.directReply, viewer),
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[stream-send] enrichCompanionTurn soft-failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
     // Policy invariants (fees, trust, human/AI) before sticky intake.
     const policyAnswer = getCompanionPolicyAnswer("rogue", lastUserText);
     if (policyAnswer) {
+      if (enriched) {
+        await persistAssistantCompanionMessage({
+          conversation: enriched.conversation,
+          actor: enriched.actor,
+          companionId: enriched.companionId,
+          text: policyAnswer,
+        });
+      }
       return simulationDataStreamResponse(
         stripDisallowedCompanionCtas(policyAnswer, viewer),
       );
@@ -509,6 +548,12 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       viewer,
     });
     systemPrompt += `\n\n${sessionStatePromptBlock(sessionState)}`;
+    if (enriched?.knowledgeBlock) {
+      systemPrompt += `\n\n${enriched.knowledgeBlock}`;
+    }
+    if (enriched?.contextBlock) {
+      systemPrompt += `\n\n${enriched.contextBlock}`;
+    }
     systemPrompt += `\n\n${buildRetrievalPromptBlock(lastUserText)}`;
     if (factForVoice) {
       systemPrompt += `\n\n${personableFactHint(factForVoice, clientFirstName)}`;

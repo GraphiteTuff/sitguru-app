@@ -1,0 +1,3316 @@
+{
+  "summary": {
+    "total": 400,
+    "byGate": {
+      "session_state_expected": 18,
+      "pending_live": 354,
+      "policy_intercept_expected": 19,
+      "taco_canonical_link_expected": 9
+    },
+    "hardGuardrailBanList": [
+      "live teammate / Pack Coordinator takeover claims",
+      "$10-$20 PetPerks",
+      "unpublished $2.99 as current",
+      "pack@sitguru.com"
+    ],
+    "canonicals": {
+      "SUPPORT": "support@sitguru.com",
+      "AMBASSADOR": "/programs/ambassadors/apply",
+      "PARENT": "/signup?role=pet_parent"
+    }
+  },
+  "results": [
+    {
+      "id": "R1",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What services can I book on SitGuru?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "R2",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "How do I find a pet sitter near me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R3",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Is joining SitGuru free for Pet Parents?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R4",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Do I need an account to browse Gurus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R5",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What is a Pet Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R6",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What is a PawReport?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R7",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "How do reviews work?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R8",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Can I message a Guru before booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R9",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Is there an iPhone / Android app?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R10",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What payment methods are accepted?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R11",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "When am I charged?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R12",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "When does the Guru get paid?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R13",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Can I tip a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R14",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What is PetPerks?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R15",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "How do I contact SitGuru support?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R16",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What is SitGuru Reads?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R17",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Is SitGuru the same as Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R18",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Do Gurus do background checks?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R19",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "Can I book a Guru for my cat?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R20",
+      "companion": "rogue",
+      "category": "FAQ",
+      "question": "What if a Guru cancels?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R21",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Walk me through booking a pet sitter, step by step.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R22",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "I want to book Amanda Costello in Philadelphia for pet sitting. How?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R23",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "What do I need to book: dates, pet, message?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R24",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I book for next weekend?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R25",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "How do I change or cancel a booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R26",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "How do I sign up as a Pet Parent?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R27",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "I don't want to create an account yet. Can I still look?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R28",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "What happens after I request a booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R29",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I book the same Guru again?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R30",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I book for two dogs?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R31",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I book boarding for a week?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R32",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I book a walk for tomorrow morning?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R33",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "How do I add my pet's details?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R34",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Where do I see my bookings?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R35",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I request a meet-and-greet first?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R36",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "I clicked Request to Book and it asked me to sign up. Is that normal?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R37",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "What is Step 2 of booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R38",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I pay with Venmo?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R39",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "Can I pay with cash?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R40",
+      "companion": "rogue",
+      "category": "Booking",
+      "question": "How do I leave a review?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R41",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "How much does a dog walk cost?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R42",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "How much is pet sitting per night?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R43",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Is there a $2.99 fee?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R44",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Who pays the $2.99 fee?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R45",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "When does the $2.99 fee start?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R46",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Is there a $5 booking fee?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R47",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Is there a 20% service fee like Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R48",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Is there a $50 booking fee?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R49",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Do Gurus set their own prices?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R50",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Why do some Gurus say \"Rates coming soon\"?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R51",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "How do I use a $10 PetPerks credit?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R52",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Can I get $10 oﬀ my first booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R53",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Is tax added at checkout?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R54",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "Do I pay the Guru directly?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R55",
+      "companion": "rogue",
+      "category": "Pricing",
+      "question": "What is \"Marketplace Support — Free\"?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R56",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a dog walker in Harrisburg, PA 17101.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R57",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a pet sitter in Philadelphia, PA.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R58",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a dog walker in Allentown, PA.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R59",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a pet sitter in King of Prussia, PA.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R60",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a sitter in Pittsburgh, PA.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R61",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a sitter in New Jersey.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R62",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a sitter in Colorado.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R63",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a sitter in Virginia.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R64",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "Find me a sitter in Michigan.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R65",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "What areas does SitGuru cover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R66",
+      "companion": "rogue",
+      "category": "Location",
+      "question": "How far will a Guru travel?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R67",
+      "companion": "rogue",
+      "category": "Service",
+      "question": "Do you have overnight boarding?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R68",
+      "companion": "rogue",
+      "category": "Service",
+      "question": "Do you have doggy day care?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R69",
+      "companion": "rogue",
+      "category": "Service",
+      "question": "Do you have drop-in visits?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R70",
+      "companion": "rogue",
+      "category": "Service",
+      "question": "Do you have training support?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R71",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Are Gurus background checked?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "R72",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Is my payment safe?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R73",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "What if something goes wrong during a booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R74",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Is SitGuru insured?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R75",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Can I trust a Guru with no reviews?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R76",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "What is in a PawReport?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R77",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Can I see a PawReport before booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R78",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "What is the cancellation policy?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R79",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "Can I get a refund?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R80",
+      "companion": "rogue",
+      "category": "Trust",
+      "question": "How do I report a problem with a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R81",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) What city did I say I live in?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "R82",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) What is my ZIP?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R83",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) What service do I need?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "R84",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) Can you find me a sitter for next weekend in my city?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R85",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R86",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) What service do I need?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "R87",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) Where do I live?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R88",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) Do I need weekends or weekdays?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R89",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup) Find me a walker — do not ask my city again.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R90",
+      "companion": "rogue",
+      "category": "Memory",
+      "question": "(after setup, then change) Actually I need boarding, not dog walking. What do I need now?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "R91",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Book me a dog walker in Harrisburg for next weekend right now, in this chat.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R92",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "I found a Guru named \"John Smith, Harrisburg, $5/night\" — is he real?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R93",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Is there a Guru called \"Super Sitter 3000\" in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R94",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Can you give me a Guru's phone number?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R95",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Can you book a flight / hotel for me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R96",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "What's the weather in Harrisburg tomorrow?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R97",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Tell me a joke about dogs.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R98",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "I want a free booking. Can you waive the fee?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R99",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Rover is cheaper, right?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "R100",
+      "companion": "rogue",
+      "category": "Edge",
+      "question": "Summarise what we've discussed, in 3 bullets.",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S1",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "How do I become a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S2",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Is it free to apply as a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S3",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "What services can I oﬀer?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S4",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Do I need professional experience?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S5",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I choose my schedule?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S6",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I choose my service area?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S7",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I set my own rates?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S8",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "What is Guru Academy?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S9",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "What is a PawReport?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S10",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "How do Pet Parents find me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S11",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Do I have to accept every request?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S12",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I message Pet Parents?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S13",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "How do reviews work for Gurus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S14",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "What is the Success Center?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S15",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "What is Scout's job?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S16",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Is SitGuru only in Pennsylvania?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S17",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can students be Gurus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S18",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I oﬀer training?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S19",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I oﬀer house sitting?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S20",
+      "companion": "scout",
+      "category": "FAQ",
+      "question": "Can I oﬀer medication help?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S21",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Walk me through becoming a Guru, step by step.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S22",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "What do I do first?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S23",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "What goes in my profile?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S24",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "What are the trust steps?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S25",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "When can I start accepting bookings?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S26",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "My profile says \"Rates coming soon\" — what does that mean?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S27",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "How long does approval take?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S28",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "I submitted my profile, now what?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S29",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I edit my rates later?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S30",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I edit my availability later?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S31",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I pause bookings?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S32",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "How do I add photos?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S33",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "What if I don't have professional photos?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S34",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Do I need a background check?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "S35",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "I failed a trust step — what next?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S36",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I be a Guru in two cities?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S37",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I oﬀer only dog walking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S38",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Can I oﬀer only weekends?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S39",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "How do I get my first booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S40",
+      "companion": "scout",
+      "category": "Onboarding",
+      "question": "Where is the Guru dashboard?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S41",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "How much do Gurus earn?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S42",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "How do I set my rates?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S43",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "What should I charge for dog walking in Allentown?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S44",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "What should I charge for pet sitting per night?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S45",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Is there a $2.99 fee for Gurus?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "S46",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Does SitGuru take 20% like Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S47",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Does SitGuru take 11%?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S48",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "How do I get paid?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S49",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "When do I get paid?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S50",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Can I get paid in cash?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S51",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Do I pay tax on my earnings?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S52",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Do I keep my tips?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S53",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "What is \"applicable platform charges\"?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S54",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Is there a monthly fee to be a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S55",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Can I charge diﬀerent rates for holidays?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S56",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Can I charge extra for two dogs?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S57",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "What is PetPerks for Gurus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S58",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Can I earn $20 for referring a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S59",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Is there a $10 to $20 PetPerks reward for Gurus?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "S60",
+      "companion": "scout",
+      "category": "Pricing",
+      "question": "Will SitGuru charge me $2.99 per booking in future?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "S61",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Do I have to leave Rover to join SitGuru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S62",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Can I keep using Facebook to find clients?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S63",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Is SitGuru trying to replace Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S64",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Why should I join SitGuru if I'm already on Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S65",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Can I copy my Rover reviews to SitGuru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S66",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Can I use my Rover profile photo?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S67",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Does SitGuru have more clients than Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S68",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Will Pet Parents find me on SitGuru if I'm in Harrisburg?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S69",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Can I list the same services on both?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S70",
+      "companion": "scout",
+      "category": "Rover",
+      "question": "Is SitGuru cheaper than Rover for sitters?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S71",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "What safety steps must I complete?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S72",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "What happens if a Pet Parent cancels?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S73",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "What is my cancellation policy?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S74",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "How does PawReport work for Gurus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S75",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "Do I have to send a PawReport?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S76",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "Is Guru Academy required?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S77",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "How do I get Certified Guru badge?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S78",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "What if a pet gets sick during care?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S79",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "Can I bring my own dog on a walk?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S80",
+      "companion": "scout",
+      "category": "Trust",
+      "question": "How do I handle a diﬃcult Pet Parent?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S81",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "What city will I serve?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S82",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "What service did I say?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S83",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S84",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "(after setup) Is dog walking in Harrisburg wide open?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S85",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "(after setup, then change) Actually I want to oﬀer pet sitting, not dog walking. What service now?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S86",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "What service?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "S87",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "Where?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S88",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S89",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "(after setup) How do I get paid for boarding?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S90",
+      "companion": "scout",
+      "category": "Memory",
+      "question": "(after setup) Do I have to leave Rover?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S91",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Set up my Guru profile right now, in this chat.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S92",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "What is my Guru approval status?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S93",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Generate my referral link now.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S94",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "I want to charge $1,000/night. Is that allowed?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S95",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Can you do my background check now?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "S96",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Is there a Guru named \"Super Sitter 3000\"?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S97",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Can you book me a client today?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S98",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Tell me how to make $5,000 a month on SitGuru.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S99",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "What is the weather in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "S100",
+      "companion": "scout",
+      "category": "Edge",
+      "question": "Summarise my Guru plan in 3 bullets.",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "T1",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "What is a SitGuru Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T2",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "How do I become an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T3",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Where do I sign up to be an Ambassador?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T4",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Is it free to be an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T5",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "What do Ambassadors do?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T6",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Do Ambassadors earn money?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T7",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "What is PetPerks?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T8",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "How do I get my referral link?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T9",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "How do I get my QR code?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T10",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Where do I track my referrals?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T11",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Can students be Ambassadors?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T12",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Can I be an Ambassador and a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T13",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Can I be an Ambassador in Colorado?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T14",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "What is the diﬀerence between Ambassador, Partner, and Aﬃliate?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T15",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Do I need social media to be an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T16",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "How many followers do I need?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T17",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "What is Taco's job?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T18",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Can I share on Facebook?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T19",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "Can I share on TikTok / Instagram?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T20",
+      "companion": "taco",
+      "category": "FAQ",
+      "question": "How do I contact SitGuru about Ambassadors?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T21",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Walk me through joining as an Ambassador.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T22",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "I applied, now what?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T23",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "How long does approval take?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T24",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Where is the application form?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T25",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Sign me up now, in this chat.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T26",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can you get me my referral link now?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T27",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "I lost my referral link — where is it?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T28",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can I change my referral link?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T29",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Do I need a Pet Parent account first?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T30",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can I apply as a business?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T31",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can a rescue apply as Ambassador?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T32",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "What information do I need to apply?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T33",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Is there an age limit?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T34",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can I be an Ambassador in two towns?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T35",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "How do I claim my tools?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T36",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "What is /ambassador/join?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T37",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "What is /programs/ambassadors/apply?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T38",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Which sign-up link is correct?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T39",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "I clicked Claim My Referral Code and it went somewhere else. Why?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T40",
+      "companion": "taco",
+      "category": "Signup",
+      "question": "Can I reapply if I was not approved?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T41",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "How does my referral link work?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T42",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "How does my QR code work?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T43",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I put my QR code on a flyer?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T44",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "How do I know if someone used my link?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T45",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I see how many people clicked?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T46",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I see how many bookings came from my link?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T47",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "My link isn't working — what do I do?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T48",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I share my link in a Facebook group?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T49",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I share my link on campus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T50",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Do I get credit if someone signs up but doesn't book?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T51",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Do I get credit if a Guru I refer signs up but doesn't book?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T52",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can I track PetPerks in the same dashboard?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T53",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Where is my Ambassador dashboard?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T54",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can you show me my metrics now?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T55",
+      "companion": "taco",
+      "category": "Tracking",
+      "question": "Can you fetch my link now?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T56",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "How much can I earn as an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T57",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Is it $10 to $20 in PetPerks rewards?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "T58",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Give $10 Get $10 — how does that work?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T59",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Refer a Guru Earn $20 — how does that work?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T60",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Are rewards cash?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T61",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Are rewards guaranteed?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T62",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "When do rewards unlock?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T63",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Can I earn $100 as an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T64",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Can I earn a free booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T65",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "What is PawPerks?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T66",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "What is the diﬀerence between PetPerks and PawPerks?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T67",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Can I use my credit on any service?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T68",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Do credits expire?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T69",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "Can I refer myself?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T70",
+      "companion": "taco",
+      "category": "Rewards",
+      "question": "I referred someone and didn't get credit — why?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T71",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "What city am I in?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "T72",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T73",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "What do I want to be?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T74",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "(after setup) Where do I sign up?",
+      "offline_gate": "taco_canonical_link_expected",
+      "notes": [
+        "Must emit /programs/ambassadors/apply"
+      ]
+    },
+    {
+      "id": "T75",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "(after setup) Can you get me my referral link?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T76",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "Where am I?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T77",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "What do I want to do?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T78",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T79",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "(after setup) How do I share on campus?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T80",
+      "companion": "taco",
+      "category": "Memory",
+      "question": "(after setup, then change) Actually I want to be a Guru, not an Ambassador. What now?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "T81",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Sign me up as an Ambassador right now.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T82",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Give me a referral link for \"Super Ambassador\".",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T83",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "My referral code is \"TACO123\" — is that real?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T84",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can you pay me $20 now?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T85",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can you make me a Facebook ad?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T86",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can you post to my Instagram?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T87",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "I want to be an Ambassador in London.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T88",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Is there an Ambassador in Harrisburg?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T89",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Tell me a joke about tacos.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T90",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "What's the weather in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T91",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can you book a pet sitter for me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T92",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can you RSVP me to an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T93",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "I sent it to a live teammate — who is that?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "T94",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Is Taco a real person?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T95",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can I talk to a human?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "T96",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "I want $10 to $20 PetPerks — where is that written?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "T97",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Rover pays ambassadors more, right?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T98",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Can I earn money without anyone booking?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "T99",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "Summarise my Ambassador plan in 3 bullets.",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "T100",
+      "companion": "taco",
+      "category": "Edge",
+      "question": "What are the top 3 things I should do first as an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D1",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "What pet events are near me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D2",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "How do I find events in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D3",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "How do I RSVP to an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D4",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Do I need an account to RSVP?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D5",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "How do I list / host a pet event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D6",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Is listing an event free?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D7",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "What kinds of events are on SitGuru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D8",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "What is the community map?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D9",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can I find pet-friendly restaurants?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D10",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can I find dog parks?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D11",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "What is Delilah's job?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D12",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "How many events are on SitGuru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D13",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Are events only in Pennsylvania?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D14",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can I search events by date?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D15",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can I save an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D16",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can I share an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D17",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "What if an event is cancelled?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D18",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Is SitGuru Reads the same as Events?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D19",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "Can Gurus list events?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D20",
+      "companion": "delilah",
+      "category": "FAQ",
+      "question": "How do I contact SitGuru about events?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D21",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What pet events are in Philadelphia, PA?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D22",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia this week (Nov 13)?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D23",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Nov 15?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D24",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Nov 20?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D25",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Nov 21?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D26",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Nov 29?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D27",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Dec 2?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D28",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Philadelphia on Dec 5?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D29",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "How far is Manayunk from Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D30",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "How far is Coplay from Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D31",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Is Whitehall in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D32",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Is Bethlehem in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D33",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Is Lancaster in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D34",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Is Shillington in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D35",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Is Hellertown in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D36",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Lehigh Valley?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D37",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Allentown?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D38",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in Harrisburg?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D39",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "What events are in New Jersey?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D40",
+      "companion": "delilah",
+      "category": "Geo",
+      "question": "Rank these by distance from Philadelphia: Manayunk, Coplay, Bethlehem, Lancaster.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D41",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is PK5K Running for the Rescue?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D42",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is Philly Pet Group Munch?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D43",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is Pints 4 Pets?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D44",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is Paint Your Pet in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D45",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is Read to a Therapy Dog?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D46",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "When is Low Cost Veterinary Care Workshop?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D47",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "What time is Philly Pet Group Munch?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D48",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "What time is PK5K?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D49",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "Are all events 6–9 AM?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D50",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "What events are this weekend Nov 14–15?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D51",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "What events are later this month?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D52",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "What events are in January–February?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D53",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "Is there a Santa Paws event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D54",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "Is there a Catsgiving event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D55",
+      "companion": "delilah",
+      "category": "Dates",
+      "question": "Is there a \"Pete the Cat's Groovy Bus Tour\"?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D56",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "How do I RSVP Yes to Philly Pet Group Munch on Nov 15?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D57",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "RSVP me Yes to Philly Pet Group Munch right now.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D58",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "RSVP me Maybe to Pints 4 Pets.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D59",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Can I change my RSVP?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D60",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Do I need an account to RSVP?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D61",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "How do I see who else is going?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D62",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "How do I list an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D63",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Where is the Create Event button?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D64",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Can I list an event in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D65",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Can I list an event as a Partner?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D66",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "How do I edit my event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D67",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "How do I cancel my event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D68",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Is there a fee to list an event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D69",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Can I host a meetup?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D70",
+      "companion": "delilah",
+      "category": "RSVP",
+      "question": "Can I host an adoption event?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D71",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "What city am I in?",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "D72",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "When do I want events?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D73",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D74",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "(after setup) What events this weekend in my city?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D75",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "(after setup) RSVP me to the Munch.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D76",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "Where am I?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D77",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "What do I want to do?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D78",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "What is my name?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D79",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "(after setup) How do I list it?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D80",
+      "companion": "delilah",
+      "category": "Memory",
+      "question": "(after setup, then change) Actually I want events in Philadelphia, not Allentown.",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "D81",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "List an event for me right now, in this chat.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D82",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "RSVP me Yes to a fake event \"Dog Party 3000\" in Philadelphia.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D83",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Is there an event \"Super Pet Fest\" in Philadelphia on Nov 99?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D84",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Give me the phone number for the event host.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D85",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Can you book a pet sitter for me?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D86",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Can you sign me up as a Guru?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D87",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Can you sign me up as an Ambassador?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D88",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "What's the weather in Philadelphia this weekend?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D89",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Tell me a joke about cats.",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D90",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Is Delilah a real person?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D91",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Can I talk to a live teammate?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "D92",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "I sent it to a live teammate — who is that?",
+      "offline_gate": "policy_intercept_expected",
+      "notes": [
+        "Covered by companion-response-policy"
+      ]
+    },
+    {
+      "id": "D93",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "What events are in London?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D94",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "What events are in Harrisburg on Nov 13?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D95",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "How far is Philadelphia from Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D96",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Summarise the Philadelphia events for this month in 3 bullets.",
+      "offline_gate": "session_state_expected",
+      "notes": [
+        "Covered by session-state recall/correct"
+      ]
+    },
+    {
+      "id": "D97",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "What is the best event in Philadelphia?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D98",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Can I bring my dog to Pints 4 Pets?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D99",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "Is there a pet event today?",
+      "offline_gate": "pending_live",
+      "notes": []
+    },
+    {
+      "id": "D100",
+      "companion": "delilah",
+      "category": "Edge",
+      "question": "What are the top 3 things I should do first on SitGuru Events?",
+      "offline_gate": "pending_live",
+      "notes": []
+    }
+  ]
+}

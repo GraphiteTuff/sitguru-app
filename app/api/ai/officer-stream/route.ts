@@ -71,6 +71,14 @@ import {
   formatEventQueryForReply,
   queryLivePetEvents,
 } from "@/lib/companions/events-tools";
+import {
+  enrichCompanionTurn,
+  persistAssistantCompanionMessage,
+} from "@/lib/companions/enrich-turn";
+import {
+  logCompanionTurn,
+  newCompanionRequestId,
+} from "@/lib/companions/turn-telemetry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -470,6 +478,36 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+    const requestId = newCompanionRequestId();
+    const turnStarted = Date.now();
+
+    // Durable memory / authenticated context (soft-fail for guests).
+    let enriched: Awaited<ReturnType<typeof enrichCompanionTurn>> | null = null;
+    try {
+      enriched = await enrichCompanionTurn({
+        req,
+        body: body as Record<string, unknown>,
+        lastUserText,
+        companionFallback: officer as "scout" | "taco" | "delilah",
+        requireDashboardAccess: surface !== "public",
+      });
+      if (enriched.directReply) {
+        await persistAssistantCompanionMessage({
+          conversation: enriched.conversation,
+          actor: enriched.actor,
+          companionId: enriched.companionId,
+          text: enriched.directReply,
+        });
+        return simulationDataStreamResponse(
+          stripDisallowedCompanionCtas(enriched.directReply, viewer),
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[officer-stream] enrichCompanionTurn soft-failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
 
     // Deterministic policy answers (fees, PetPerks, human/AI identity) win
     // before any sticky intake or soft-escalation path.
@@ -478,6 +516,26 @@ export async function POST(req: Request) {
       lastUserText,
     );
     if (policyAnswer) {
+      if (enriched) {
+        await persistAssistantCompanionMessage({
+          conversation: enriched.conversation,
+          actor: enriched.actor,
+          companionId: enriched.companionId,
+          text: policyAnswer,
+        });
+      }
+      logCompanionTurn({
+        requestId,
+        companion: companionKey,
+        intent: "policy",
+        sources: ["companion-response-policy"],
+        tool: null,
+        toolOk: null,
+        guardrail: "policy",
+        latencyMs: Date.now() - turnStarted,
+        failureType: null,
+        stateFields: [],
+      });
       return simulationDataStreamResponse(
         stripDisallowedCompanionCtas(policyAnswer, viewer),
       );
@@ -677,6 +735,8 @@ export async function POST(req: Request) {
         pagePath,
       }),
       sessionStatePromptBlock(sessionState),
+      enriched?.knowledgeBlock || "",
+      enriched?.contextBlock || "",
       buildRetrievalPromptBlock(lastUserText),
       instantFaq ? personableFactHint(instantFaq, preferredName) : "",
     ]
