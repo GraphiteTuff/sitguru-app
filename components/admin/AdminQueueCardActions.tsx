@@ -7,12 +7,15 @@ type AdminQueueCardActionsProps = {
   conversationId: string;
   threadSubject?: string;
   compact?: boolean;
+  /** Icon-only buttons for tight thread headers (mobile / narrow desktop). */
+  iconOnly?: boolean;
 };
 
 export default function AdminQueueCardActions({
   conversationId,
   threadSubject,
   compact = false,
+  iconOnly = false,
 }: AdminQueueCardActionsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -47,7 +50,6 @@ export default function AdminQueueCardActions({
     try {
       await postAction("/api/admin/messages/delete");
       setConfirmDeleteOpen(false);
-      // Hard navigation so Threads / Inquiry KPIs reload from the server.
       window.location.assign(
         `/admin/messages?compose_success=deleted&t=${Date.now()}`,
       );
@@ -75,17 +77,21 @@ export default function AdminQueueCardActions({
 
   const busy = pendingDelete || pendingArchive;
 
-  const buttonClass = compact
-    ? "inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-45"
-    : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45";
+  const buttonClass = iconOnly
+    ? "inline-flex h-10 w-10 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-45"
+    : compact
+      ? "inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-45"
+      : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45";
 
   return (
-    <div className={`flex w-full flex-col gap-2 ${compact ? "items-end" : ""}`}>
-      <div className={compact ? "flex gap-1.5" : "grid w-full gap-2 sm:grid-cols-2"}>
+    <div className={`flex w-full flex-col gap-2 ${compact || iconOnly ? "items-end" : ""}`}>
+      <div className={iconOnly || compact ? "flex gap-1.5" : "grid w-full gap-2 sm:grid-cols-2"}>
         <button
           type="button"
           onClick={handleArchive}
           disabled={busy}
+          title="Archive conversation"
+          aria-label="Archive conversation"
           className={`${buttonClass} border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100`}
         >
           {pendingArchive ? (
@@ -93,7 +99,7 @@ export default function AdminQueueCardActions({
           ) : (
             <Archive size={14} />
           )}
-          Archive
+          {iconOnly ? null : "Archive"}
         </button>
 
         <button
@@ -104,10 +110,11 @@ export default function AdminQueueCardActions({
           }}
           disabled={busy}
           title="Permanently delete this conversation and its messages"
+          aria-label="Delete conversation"
           className={`${buttonClass} border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100`}
         >
           <Trash2 size={14} />
-          Delete
+          {iconOnly ? null : "Delete"}
         </button>
       </div>
 
@@ -134,8 +141,7 @@ export default function AdminQueueCardActions({
                   id="delete-thread-title"
                   className="mt-1 text-xl font-black text-slate-950"
                 >
-                  Are you sure you want to permanently delete this message
-                  thread?
+                  Delete this conversation?
                 </h3>
               </div>
               <button
@@ -152,16 +158,16 @@ export default function AdminQueueCardActions({
             <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
               {threadSubject ? (
                 <>
-                  This will permanently remove{" "}
+                  This permanently removes{" "}
                   <span className="font-black text-slate-900">
                     “{threadSubject}”
                   </span>{" "}
-                  from the Message Center and KPIs. This cannot be undone.
+                  and every message in it. This cannot be undone.
                 </>
               ) : (
                 <>
-                  This will permanently remove the thread from the Message
-                  Center and KPIs. This cannot be undone.
+                  This permanently removes the thread and every message in it.
+                  This cannot be undone.
                 </>
               )}
             </p>
@@ -186,7 +192,7 @@ export default function AdminQueueCardActions({
                 ) : (
                   <Trash2 size={16} />
                 )}
-                Yes, delete forever
+                Delete forever
               </button>
             </div>
           </div>
