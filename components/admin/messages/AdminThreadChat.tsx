@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Paperclip, Send } from "lucide-react";
+import { ArrowLeft, Loader2, Paperclip, Send, Trash2 } from "lucide-react";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
 import { useVisualViewportInset } from "@/lib/hooks/use-visual-viewport-inset";
 import type { AdminChatMessage, AdminSelectedThread } from "./types";
@@ -52,9 +52,11 @@ function formatStamp(value?: string | null) {
 export default function AdminThreadChat({
   thread,
   inboxHref,
+  canDelete = false,
 }: {
   thread: AdminSelectedThread;
   inboxHref: string;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const keyboardInset = useVisualViewportInset();
@@ -65,6 +67,8 @@ export default function AdminThreadChat({
   const [media, setMedia] = useState<{ url: string; mimeType: string; name: string }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [optimistic, setOptimistic] = useState<AdminChatMessage[]>([]);
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(new Set());
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -73,11 +77,44 @@ export default function AdminThreadChat({
     ...optimistic.filter(
       (item) => !thread.messages.some((existing) => existing.id === item.id),
     ),
-  ];
+  ].filter((item) => !hiddenMessageIds.has(item.id));
 
   useEffect(() => {
     setOptimistic([]);
+    setHiddenMessageIds(new Set());
+    setDeletingMessageId(null);
   }, [thread.id]);
+
+  async function deleteMessage(messageId: string) {
+    if (!canDelete || !messageId || messageId.startsWith("local-") || deletingMessageId) {
+      return;
+    }
+    const confirmed = window.confirm("Permanently delete this message?");
+    if (!confirmed) return;
+    setDeletingMessageId(messageId);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/messages/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `Delete failed (${response.status}).`);
+      }
+      setHiddenMessageIds((current) => new Set(current).add(messageId));
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Message delete failed.");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  }
 
   useEffect(() => {
     const conversationId = thread.id.trim();
@@ -198,25 +235,15 @@ export default function AdminThreadChat({
             {thread.subtitle}
           </p>
         </div>
-        <div className="hidden shrink-0 sm:block">
-          <AdminQueueCardActions
-            compact
-            conversationId={thread.id}
-            threadSubject={thread.title}
-          />
-        </div>
-        <details className="relative shrink-0 sm:hidden">
-          <summary className="flex h-12 w-12 list-none items-center justify-center rounded-2xl text-lg font-black text-slate-500 [&::-webkit-details-marker]:hidden">
-            ···
-          </summary>
-          <div className="absolute right-0 z-20 mt-1 w-44 rounded-2xl border border-[#e5ebe2] bg-white p-2 shadow-lg">
+        {canDelete ? (
+          <div className="shrink-0">
             <AdminQueueCardActions
               compact
               conversationId={thread.id}
               threadSubject={thread.title}
             />
           </div>
-        </details>
+        ) : null}
       </header>
 
       <div
@@ -232,7 +259,7 @@ export default function AdminThreadChat({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-end gap-2 ${message.isAdmin ? "justify-end" : "justify-start"}`}
+                className={`group flex items-end gap-2 ${message.isAdmin ? "justify-end" : "justify-start"}`}
               >
                 {message.isAdmin ? null : (
                   <Avatar name={message.senderName} src={message.senderAvatar} />
@@ -258,13 +285,35 @@ export default function AdminThreadChat({
                       {file.name || "Open attachment"}
                     </a>
                   ))}
-                  <p
-                    className={`mt-1 text-[10px] font-bold ${
-                      message.isAdmin ? "text-white/70" : "text-slate-400"
-                    }`}
-                  >
-                    {message.senderName} · {formatStamp(message.createdAt)}
-                  </p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p
+                      className={`text-[10px] font-bold ${
+                        message.isAdmin ? "text-white/70" : "text-slate-400"
+                      }`}
+                    >
+                      {message.senderName} · {formatStamp(message.createdAt)}
+                    </p>
+                    {canDelete && !message.id.startsWith("local-") ? (
+                      <button
+                        type="button"
+                        onClick={() => deleteMessage(message.id)}
+                        disabled={deletingMessageId === message.id}
+                        title="Delete this message"
+                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                          message.isAdmin
+                            ? "bg-white/15 text-white hover:bg-white/25"
+                            : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                        }`}
+                      >
+                        {deletingMessageId === message.id ? (
+                          <Loader2 size={10} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={10} />
+                        )}
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}

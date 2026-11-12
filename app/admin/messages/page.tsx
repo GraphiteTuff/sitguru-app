@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
@@ -3344,6 +3345,9 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     redirect("/admin/login");
   }
 
+  const adminIdentity = await getAdminIdentity();
+  const canDeleteMessages = Boolean(adminIdentity?.isSuperUser);
+
   if (
     composeIntent?.recipientId &&
     composeIntent.threadType.startsWith("direct")
@@ -3984,6 +3988,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         selectedThreadId={selectedThreadId || undefined}
         selectedThread={selectedThread}
         composeOpen={Boolean(composeIntent)}
+        canDelete={canDeleteMessages}
         inboxHref={buildInboxHref({ filter: activeFilter, query: params.q })}
         composeHref="/admin/messages?threadType=internal&messageCategory=direct"
         noticeSlot={

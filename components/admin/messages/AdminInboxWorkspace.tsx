@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { MessageCircle, Plus, Search } from "lucide-react";
+import { Loader2, MessageCircle, Plus, Search, Trash2 } from "lucide-react";
 import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
 import type { AdminInboxFilter, AdminInboxThread, AdminSelectedThread } from "./types";
 import AdminThreadChat from "./AdminThreadChat";
@@ -50,6 +51,7 @@ export default function AdminInboxWorkspace({
   noticeSlot,
   inboxHref,
   composeHref,
+  canDelete = false,
 }: {
   threads: AdminInboxThread[];
   filters: AdminInboxFilter[];
@@ -63,6 +65,7 @@ export default function AdminInboxWorkspace({
   noticeSlot?: ReactNode;
   inboxHref: string;
   composeHref: string;
+  canDelete?: boolean;
 }) {
   const showThreadPane = Boolean(composeOpen || selectedThread);
   const listHiddenOnMobile = showThreadPane;
@@ -72,6 +75,62 @@ export default function AdminInboxWorkspace({
     if (filter.key !== "unread" || selectedUnreadCount <= 0) return filter;
     return { ...filter, count: Math.max(0, filter.count - 1) };
   });
+
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [pendingBulk, startBulk] = useTransition();
+
+  const allVisibleIds = useMemo(() => threads.map((thread) => thread.id), [threads]);
+  const selectedCount = selectedIds.size;
+
+  function toggleId(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((current) => {
+      if (current.size === allVisibleIds.length) return new Set();
+      return new Set(allVisibleIds);
+    });
+  }
+
+  function deleteSelected() {
+    if (!canDelete || selectedCount === 0 || pendingBulk) return;
+    const confirmed = window.confirm(
+      `Permanently delete ${selectedCount} conversation${selectedCount === 1 ? "" : "s"}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setBulkError(null);
+    startBulk(async () => {
+      try {
+        const response = await fetch("/api/admin/messages/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationIds: [...selectedIds] }),
+          cache: "no-store",
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          deleted?: number;
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Delete failed (${response.status}).`);
+        }
+        window.location.assign(
+          `/admin/messages?compose_success=deleted&t=${Date.now()}`,
+        );
+      } catch (err) {
+        setBulkError(err instanceof Error ? err.message : "Bulk delete failed.");
+      }
+    });
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#f7f8f4]">
@@ -92,13 +151,32 @@ export default function AdminInboxWorkspace({
                 Messages
               </h1>
             </div>
-            <Link
-              href={composeHref}
-              className="inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white shadow-sm"
-            >
-              <Plus size={18} />
-              <span className="sm:inline">New</span>
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectMode((open) => !open);
+                    setSelectedIds(new Set());
+                    setBulkError(null);
+                  }}
+                  className={`inline-flex min-h-12 items-center justify-center rounded-2xl border px-3 text-xs font-black ${
+                    selectMode
+                      ? "border-rose-300 bg-rose-50 text-rose-800"
+                      : "border-[#dfe7df] bg-white text-slate-700"
+                  }`}
+                >
+                  {selectMode ? "Cancel" : "Select"}
+                </button>
+              ) : null}
+              <Link
+                href={composeHref}
+                className="inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white shadow-sm"
+              >
+                <Plus size={18} />
+                <span className="sm:inline">New</span>
+              </Link>
+            </div>
           </div>
 
           <form
@@ -151,6 +229,38 @@ export default function AdminInboxWorkspace({
             </div>
           </div>
 
+          {canDelete && selectMode ? (
+            <div className="flex shrink-0 items-center gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 sm:px-4">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-xs font-black text-rose-900 underline"
+              >
+                {selectedCount === allVisibleIds.length && allVisibleIds.length > 0
+                  ? "Clear"
+                  : "Select all"}
+              </button>
+              <button
+                type="button"
+                onClick={deleteSelected}
+                disabled={pendingBulk || selectedCount === 0}
+                className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-rose-700 px-3 text-xs font-black text-white disabled:opacity-50"
+              >
+                {pendingBulk ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                Delete {selectedCount || ""}
+              </button>
+            </div>
+          ) : null}
+          {bulkError ? (
+            <p className="shrink-0 border-b border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 sm:px-4">
+              {bulkError}
+            </p>
+          ) : null}
+
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {threads.length === 0 ? (
               <div className="px-6 py-16 text-center">
@@ -166,14 +276,13 @@ export default function AdminInboxWorkspace({
               threads.map((thread) => {
                 const active = thread.id === selectedThreadId;
                 const unreadCount = active ? 0 : thread.unreadCount;
-                return (
-                  <Link
-                    key={thread.id}
-                    href={thread.href}
-                    className={`flex min-h-16 items-center gap-3 border-b border-[#f0f4ef] px-3 py-3 sm:px-4 ${
-                      active ? "bg-green-50" : "active:bg-[#f7faf6]"
-                    }`}
-                  >
+                const checked = selectedIds.has(thread.id);
+                const rowClass = `flex min-h-16 items-center gap-3 border-b border-[#f0f4ef] px-3 py-3 sm:px-4 ${
+                  active ? "bg-green-50" : "active:bg-[#f7faf6]"
+                }`;
+
+                const body = (
+                  <>
                     <div className="relative">
                       <Avatar name={thread.title} src={thread.avatar} />
                       {unreadCount > 0 ? (
@@ -217,13 +326,33 @@ export default function AdminInboxWorkspace({
                         Read
                       </span>
                     )}
+                  </>
+                );
+
+                if (canDelete && selectMode) {
+                  return (
+                    <label key={thread.id} className={`${rowClass} cursor-pointer`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleId(thread.id)}
+                        className="h-5 w-5 shrink-0 rounded border-slate-300 text-[#0D5C3A]"
+                      />
+                      {body}
+                    </label>
+                  );
+                }
+
+                return (
+                  <Link key={thread.id} href={thread.href} className={rowClass}>
+                    {body}
                   </Link>
                 );
               })
             )}
           </div>
 
-          <details className="hidden shrink-0 border-t border-[#e5ebe2] px-3 py-2 lg:block">
+          <details className="shrink-0 border-t border-[#e5ebe2] px-3 py-2" open={canDelete}>
             <summary className="cursor-pointer list-none text-xs font-black text-slate-500 [&::-webkit-details-marker]:hidden">
               Admin tools
             </summary>
@@ -234,7 +363,13 @@ export default function AdminInboxWorkspace({
               >
                 Export messages
               </Link>
-              <ClearAllMessagesForm />
+              {canDelete ? <ClearAllMessagesForm /> : null}
+              {canDelete ? (
+                <p className="text-[11px] font-semibold leading-5 text-slate-500">
+                  Open a thread for Archive / Delete, or use Select to wipe many at once.
+                  Individual bubbles also have a Delete control.
+                </p>
+              ) : null}
             </div>
           </details>
         </aside>
@@ -249,7 +384,11 @@ export default function AdminInboxWorkspace({
               {composeSlot}
             </div>
           ) : selectedThread ? (
-            <AdminThreadChat thread={selectedThread} inboxHref={inboxHref} />
+            <AdminThreadChat
+              thread={selectedThread}
+              inboxHref={inboxHref}
+              canDelete={canDelete}
+            />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 text-green-800">

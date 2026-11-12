@@ -1,29 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   clearAdminMessageCenter,
   hardDeleteConversation,
 } from "@/lib/messaging/admin-thread-purge";
 
-async function requireAdminUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+async function requireSuperAdminUser() {
+  const identity = await getAdminIdentity();
+  if (!identity) {
     return { ok: false as const, error: "Not signed in as admin." };
   }
-
-  return { ok: true as const, user };
+  if (!identity.isSuperUser) {
+    return { ok: false as const, error: "Super Admin only." };
+  }
+  return { ok: true as const, user: { id: identity.id, email: identity.email } };
 }
 
 export async function deleteAdminConversationAction(conversationId: string) {
-  const auth = await requireAdminUser();
+  const auth = await requireSuperAdminUser();
   if (!auth.ok) return auth;
 
   const id = String(conversationId || "").trim();
@@ -48,7 +45,7 @@ export async function deleteAdminConversationAction(conversationId: string) {
 }
 
 export async function archiveAdminConversationAction(conversationId: string) {
-  const auth = await requireAdminUser();
+  const auth = await requireSuperAdminUser();
   if (!auth.ok) return auth;
 
   const id = String(conversationId || "").trim();
@@ -81,7 +78,7 @@ export async function archiveAdminConversationAction(conversationId: string) {
 }
 
 export async function clearAllAdminMessageCenterAction(confirmation: string) {
-  const auth = await requireAdminUser();
+  const auth = await requireSuperAdminUser();
   if (!auth.ok) return auth;
 
   if (String(confirmation || "").trim() !== "CLEAR ALL") {

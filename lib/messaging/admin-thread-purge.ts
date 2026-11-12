@@ -181,6 +181,51 @@ export async function hardDeleteConversation(conversationId: string) {
   return { ok: true as const, mode: "hard" as const };
 }
 
+/** Permanently delete one message bubble (or soft-delete if hard delete is blocked). */
+export async function hardDeleteMessage(messageId: string) {
+  const id = asString(messageId);
+  if (!id) {
+    return { ok: false as const, error: "missing_message" };
+  }
+
+  const { error } = await supabaseAdmin.from("messages").delete().eq("id", id);
+  if (error) {
+    return softDeleteOrphanMessage(id);
+  }
+
+  const { data: still } = await supabaseAdmin
+    .from("messages")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (still?.id) {
+    return softDeleteOrphanMessage(id);
+  }
+
+  return { ok: true as const, mode: "hard" as const };
+}
+
+/** Bulk hard-delete conversations. Continues past individual failures. */
+export async function hardDeleteConversations(conversationIds: string[]) {
+  const ids = [...new Set(conversationIds.map(asString).filter(Boolean))];
+  let deleted = 0;
+  const errors: string[] = [];
+
+  for (const id of ids) {
+    const result = await hardDeleteConversation(id);
+    if (result.ok) deleted += 1;
+    else if (result.error) errors.push(`${id}: ${result.error}`);
+  }
+
+  return {
+    ok: errors.length === 0,
+    deleted,
+    requested: ids.length,
+    error: errors[0],
+  };
+}
+
 export type ClearAdminMessageCenterResult = {
   ok: boolean;
   conversationsDeleted: number;
