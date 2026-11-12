@@ -532,9 +532,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       holdForCompanion: shouldHoldForCompanion(careThread) || shouldForceGuruLookup(careThread),
     });
     if (assist.takeOver) {
-      return simulationDataStreamResponse(
-        stripDisallowedCompanionCtas(assist.reply, viewer),
-      );
+      const takeoverReply = stripDisallowedCompanionCtas(assist.reply, viewer);
+      // Belt-and-suspenders: never stream fake live-teammate takeover copy.
+      if (!/live teammate|sent it to a live/i.test(takeoverReply)) {
+        return simulationDataStreamResponse(takeoverReply);
+      }
     }
 
     let systemPrompt = buildRogueSystemPrompt({

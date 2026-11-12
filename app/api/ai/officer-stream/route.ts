@@ -655,9 +655,10 @@ export async function POST(req: Request) {
         shouldHoldForCompanion(lastUserText),
     });
     if (assist.takeOver) {
-      return simulationDataStreamResponse(
-        stripDisallowedCompanionCtas(assist.reply, viewer),
-      );
+      const takeoverReply = stripDisallowedCompanionCtas(assist.reply, viewer);
+      if (!/live teammate|sent it to a live/i.test(takeoverReply)) {
+        return simulationDataStreamResponse(takeoverReply);
+      }
     }
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;

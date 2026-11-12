@@ -295,6 +295,10 @@ export async function settleCompanionTurn(input: {
     const articles = await loadApprovedFaqArticles();
     faq = matchApprovedFaq(question, articles) || "";
   }
+  // Never take over with poisoned handoff copy (stale Help drafts / old LIVE_AGENT_REPLY).
+  if (faq && looksLikeHandoff(faq)) {
+    faq = "";
+  }
   if (faq) {
     void rememberChat({
       source: "companion",

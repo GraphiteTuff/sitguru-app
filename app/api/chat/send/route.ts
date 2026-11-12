@@ -6,7 +6,9 @@
 import { handleAuthenticatedAiSend } from "@/lib/messaging/stream-send";
 
 export const dynamic = "force-dynamic";
-export const runtime = "edge";
+// Node runtime required for companion memory, archive, and admin clients.
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   return handleAuthenticatedAiSend(req);
