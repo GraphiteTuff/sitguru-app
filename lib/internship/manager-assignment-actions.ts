@@ -229,7 +229,7 @@ export async function saveManagerAssignment(formData: FormData) {
         deliverables: value.deliverables,
         resources: value.resources,
         internUserId: intern.userId || "",
-        internName: intern.preferredName || intern.fullName,
+        internName: intern.fullName,
         managerName: actor.email,
         sitguruUrl: `/manager/assignments/${savedId}`,
       });
@@ -286,7 +286,7 @@ export async function retryManagerAssignmentSync(formData: FormData) {
       deliverables: brief.deliverables || [],
       resources: brief.resources || [],
       internUserId: intern.userId || "",
-      internName: intern.preferredName || intern.fullName,
+      internName: intern.fullName,
       managerName: actor.email,
       sitguruUrl: `/manager/assignments/${task.id}`,
     });
