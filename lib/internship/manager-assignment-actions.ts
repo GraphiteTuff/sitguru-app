@@ -129,11 +129,25 @@ export async function saveManagerAssignment(formData: FormData) {
   if (savedId) {
     const { data: current } = await supabaseAdmin
       .from("internship_tasks")
-      .select("id,intern_id,status")
+      .select("id,intern_id,status,student_notes,work_url,brief_payload")
       .eq("id", savedId)
       .maybeSingle();
     if (!current || current.intern_id !== intern.id) bounce("error", "That assignment is not on your team.");
-    const { error } = await supabaseAdmin.from("internship_tasks").update(payload).eq("id", savedId);
+    const priorBrief = current.brief_payload && typeof current.brief_payload === "object"
+      ? current.brief_payload as Record<string, unknown> : {};
+    const internWork = priorBrief.internWork;
+    const alreadyPublished = current.status !== "draft";
+    const updatedPayload = {
+      ...payload,
+      // Editing an assignment must never reset Lola's submitted or in-progress work.
+      status: alreadyPublished ? current.status : payload.status,
+      ...(internWork && typeof internWork === "object" ? {
+        student_notes: current.student_notes,
+        work_url: current.work_url,
+        brief_payload: { ...brief, internWork },
+      } : {}),
+    };
+    const { error } = await supabaseAdmin.from("internship_tasks").update(updatedPayload).eq("id", savedId);
     if (error) {
       console.warn("saveManagerAssignment update", error.message);
       bounce("error", "We couldn't create this assignment. Please try again.");
