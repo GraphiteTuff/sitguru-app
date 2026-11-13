@@ -1,4 +1,4 @@
-import { GROWTH_TEAMS_CHANNELS, routeAssignmentCategory } from "@/lib/admin/growth/work-routing";
+import { GROWTH_TEAMS_CHANNELS, routeAssignmentCategory, sharePointFolderName } from "@/lib/admin/growth/work-routing";
 import { graphRequest, readMicrosoftGraphConfig } from "@/lib/microsoft/graph";
 import { ensureInternAssignmentSharePointFolder, expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import {
