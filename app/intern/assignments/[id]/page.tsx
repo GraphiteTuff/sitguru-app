@@ -8,6 +8,7 @@ import { taskStatusLabel } from "@/lib/internship/labels";
 import { saveInternAssignmentProgress } from "@/lib/internship/intern-assignment-progress";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
 import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
+import { readMicrosoftGraphConfig } from "@/lib/microsoft/graph";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ export default async function InternAssignmentDetailPage({
   const expected = expectedInternAssignmentFolder(assigned.fullName, task.title);
   const folderUrl = sharePoint?.externalUrl || expected.url;
   const sharePointStatus = sharePoint?.status || "not_configured";
+  const canSaveToSharePoint = readMicrosoftGraphConfig().configured;
   const submittedUrl = String(work.sharePointDocumentUrl || "");
   const existingLolaDocument = expected.knownFolderId ? `${expected.url}/SitGuru%20Assignment%20Work.md` : "";
   const workDocumentUrl = submittedUrl || existingLolaDocument;
@@ -108,6 +110,11 @@ export default async function InternAssignmentDetailPage({
         <p className="mt-2 text-sm text-slate-600">
           Work is saved to a Markdown document in SitGuru's SharePoint intern folder. Save as you go, then submit to Ava.
         </p>
+        {!canSaveToSharePoint ? (
+          <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+            Saving and submitting are temporarily unavailable while SitGuru connects Microsoft 365. You can still read the assignment and open the SharePoint folder if you have permission. Please contact Ava for another way to submit your work.
+          </p>
+        ) : null}
         <form action={saveInternAssignmentProgress} className="mt-5 space-y-4">
           <input type="hidden" name="assignmentId" value={task.id} />
           <label className="block space-y-2">
@@ -138,7 +145,8 @@ export default async function InternAssignmentDetailPage({
                 type="submit"
                 name="intent"
                 value="save"
-                className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800"
+                disabled={!canSaveToSharePoint}
+                className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Save Work to SharePoint
               </button>
@@ -146,7 +154,8 @@ export default async function InternAssignmentDetailPage({
                 type="submit"
                 name="intent"
                 value="submit"
-                className="min-h-11 rounded-full bg-emerald-700 px-6 text-sm font-black text-white hover:bg-emerald-800"
+                disabled={!canSaveToSharePoint}
+                className="min-h-11 rounded-full bg-emerald-700 px-6 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Submit to Ava for Review
               </button>
