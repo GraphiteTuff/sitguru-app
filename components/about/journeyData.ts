@@ -155,7 +155,7 @@ export const journeyMilestones: readonly JourneyMilestone[] = [
     date: "Beyond 2027 · Vision",
     title: "Local communities, wider network",
     summary: "Strong local pet care communities connected through a growing SitGuru network.",
-    story: "SitGuru's long-term vision starts locally. As Pet Parents, Gurus, Ambassadors, and partners build relationships in their own neighborhoods, those communities can become part of a wider network of trusted pet care across the United States. This is a future ambition, not a claim of current coverage or announced launch dates.",
+    story: "SitGuru's long-term vision starts locally. As Pet Parents, Gurus, Ambassadors, and partners build relationships in their own neighborhoods, those communities can become part of a wider network of trusted pet care across the United States.",
     status: "planned",
     categories: ["team", "guru", "pet-parent", "programs"],
     icon: "future",
@@ -166,7 +166,7 @@ export const journeyMilestones: readonly JourneyMilestone[] = [
       "Build a wider SitGuru network without losing the personal, local experience",
     ],
     image: "/about/journey/future-us-vision.webp",
-    imageAlt: "Illustrative vision of local pet care communities connected into a wider U.S. network; not a map of actual coverage",
+    imageAlt: "Green United States map representing SitGuru’s vision of interconnected local pet care communities",
   },
 ];
 
