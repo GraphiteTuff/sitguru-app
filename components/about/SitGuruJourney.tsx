@@ -346,7 +346,7 @@ export default function SitGuruJourney() {
                 className={selected.id === "founded" ? styles.imageContain : styles.imageCover}
               />
             </div>
-            {selected.id === "beyond" && <p className={styles.dialogImageCaption}>Illustrative future expansion vision — not verified current coverage.</p>}
+            {selected.id === "beyond" && <p className={styles.dialogImageCaption}>Our vision: stronger local communities, connected through a wider network. This is an illustration, not a map of current coverage.</p>}
             {selected.id === "team-growth" && <p className={styles.dialogImageCaption}>Illustrative community scene — not portraits of SitGuru staff.</p>}
             <div className={styles.dialogBody}>
               <p id="journey-dialog-story" className={styles.dialogStory}>{selected.story}</p>
