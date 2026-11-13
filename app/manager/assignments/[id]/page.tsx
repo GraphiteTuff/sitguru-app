@@ -7,6 +7,7 @@ import { readAssignmentBrief } from "@/lib/internship/manager-assignment";
 import { findInternById } from "@/lib/internship/queries";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
+import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import { retryManagerAssignmentSync } from "@/lib/internship/manager-assignment-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { InternName } from "@/components/portal/PersonFace";
@@ -48,6 +49,9 @@ export default async function ManagerAssignmentDetailPage({
   const route = routeAssignmentCategory(brief.category || String(task.metric_affected || ""));
   const links = await listAssignmentIntegrations([String(task.id)]);
   const pick = (provider: string) => links.find((item) => item.provider === provider);
+  const isLola = intern.fullName.trim().toLowerCase() === "lola uhl";
+  const folderFallback = isLola ? expectedInternAssignmentFolder(intern.fullName, String(task.title)).url : "";
+  const filesLink = pick("sharepoint")?.externalUrl || folderFallback;
 
   return (
     <div className="space-y-4">
@@ -69,8 +73,8 @@ export default async function ManagerAssignmentDetailPage({
         </article>
         <article className={`${DESK_UI.card} p-4`}>
           <h2 className="font-black text-[#0F2744]">Project files</h2>
-          <p className="mt-1 text-sm font-semibold capitalize text-slate-600">{pick("sharepoint")?.status.replaceAll("_", " ") || "Not configured"}</p>
-          {pick("sharepoint")?.externalUrl ? <a href={pick("sharepoint")?.externalUrl} className="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-[#2563EB]">Open project folder</a> : null}
+          <p className="mt-1 text-sm font-semibold capitalize text-slate-600">{pick("sharepoint")?.status === "connected" ? "Connected" : filesLink ? "Folder found — sync pending" : "Not configured"}</p>
+          {filesLink ? <a href={filesLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-[#2563EB]">Open project folder</a> : null}
         </article>
         <article className={`${DESK_UI.card} p-4`}>
           <h2 className="font-black text-[#0F2744]">Microsoft Teams</h2>

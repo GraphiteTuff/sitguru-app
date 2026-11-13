@@ -1,5 +1,6 @@
 import { GROWTH_TEAMS_CHANNELS, routeAssignmentCategory, sharePointFolderName } from "@/lib/admin/growth/work-routing";
 import { graphRequest, readMicrosoftGraphConfig } from "@/lib/microsoft/graph";
+import { ensureInternAssignmentSharePointFolder, expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import {
   planTeamsChannel,
   resolveTeamsNotificationMode,
@@ -47,8 +48,11 @@ export async function syncPublishedAssignment(input: {
   const channel = GROWTH_TEAMS_CHANNELS[route.channelKey];
   const existing = await listAssignmentIntegrations([input.assignmentId]);
   const current = (provider: string) => existing.find((row) => row.provider === provider);
-  const folderUrlFallback = publicUrl("NEXT_PUBLIC_SITGURU_SHAREPOINT_GROWTH_URL");
-  const channelUrlFallback = publicUrl(channel.urlEnv);
+  const folderUrlFallback = expectedInternAssignmentFolder(input.internName, input.title).url;
+  const channelUrlFallback = publicUrl(channel.urlEnv) ||
+    (route.channelKey === "analytics-results"
+      ? "https://teams.cloud.microsoft/l/channel/19%3A6a3c6f8904244ca8b62e4f3a8bbbe042%40thread.tacv2/Analytics%20and%20Results?groupId=e338678f-1008-4dd8-8705-0669b1e76ef8&tenantId=6942aff2-2055-4354-a6de-38bfc2d65548&allowXTenantAccess=False"
+      : "");
   const plannerUrlFallback = publicUrl("NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL");
   const canva = canvaUrl(input.resources);
 
@@ -104,45 +108,28 @@ export async function syncPublishedAssignment(input: {
   }
 
   const identity = await microsoftIdentityStatus(input.internUserId);
-  const internFolder = sharePointFolderName(input.internName);
-  const assignmentFolder = sharePointFolderName(input.title);
-  let shareUrl = current("sharepoint")?.externalUrl || folderUrlFallback;
-  let shareStatus = "pending";
-  let shareId = current("sharepoint")?.externalId || "";
-  if (config.siteId && config.driveId && config.internsRootId && !shareId) {
-    const created = await graphRequest<{ id?: string; webUrl?: string }>({
-      method: "POST",
-      path: `/sites/${config.siteId}/drives/${config.driveId}/items/${config.internsRootId}/children`,
-      body: {
-        name: `${internFolder} - ${assignmentFolder}`,
-        folder: {},
-        "@microsoft.graph.conflictBehavior": "fail",
-      },
-      config,
-    });
-    if (created.ok) {
-      shareId = String(created.data.id || "");
-      shareUrl = String(created.data.webUrl || shareUrl);
-      shareStatus = "connected";
-    } else if (created.code === "needs_access") {
-      shareStatus = "needs_access";
-    } else {
-      shareStatus = created.code === "not_configured" ? "not_configured" : "error";
-    }
-  } else if (shareId) {
-    shareStatus = "connected";
-  } else {
-    shareStatus = "not_configured";
-  }
-  await upsertAssignmentIntegration({
+  // The canonical SharePoint location is Intern Projects / <intern> / <assignment>.
+  // Reuse existing folders (including Lola's verified folder); never make a flat
+  // "Lola - Assignment" folder in a different library.
+  const linkedFolder = await ensureInternAssignmentSharePointFolder({
     assignmentId: input.assignmentId,
-    provider: "sharepoint",
-    externalId: shareId,
-    externalParentId: config.internsRootId,
-    externalUrl: shareUrl,
-    status: shareStatus,
-    metadata: { internFolder, assignmentFolder },
+    internName: input.internName,
+    title: input.title,
   });
+  if (linkedFolder.status !== "connected") {
+    await upsertAssignmentIntegration({
+      assignmentId: input.assignmentId,
+      provider: "sharepoint",
+      externalUrl: linkedFolder.url,
+      status: linkedFolder.status,
+      lastError: linkedFolder.message,
+      metadata: {
+        internFolder: linkedFolder.internFolder,
+        assignmentFolder: linkedFolder.assignmentFolder,
+        statusMessage: linkedFolder.message,
+      },
+    });
+  }
 
   let plannerId = current("planner")?.externalId || "";
   let plannerUrl = current("planner")?.externalUrl || plannerUrlFallback;

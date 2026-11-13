@@ -81,7 +81,9 @@ async function accessToken(config: MicrosoftGraphConfig) {
 }
 
 export async function graphRequest<T>(input: {
-  method: "GET" | "POST" | "PATCH";
+  method: "GET" | "POST" | "PATCH" | "PUT";
+  contentType?: string;
+  rawBody?: string;
   path: string;
   body?: unknown;
   etag?: string;
@@ -106,11 +108,12 @@ export async function graphRequest<T>(input: {
       Accept: "application/json",
     };
     if (input.body) headers["Content-Type"] = "application/json";
+    if (input.rawBody !== undefined) headers["Content-Type"] = input.contentType || "text/plain; charset=utf-8";
     if (input.etag) headers["If-Match"] = input.etag;
     const response = await fetch(`https://graph.microsoft.com/v1.0${input.path}`, {
       method: input.method,
       headers,
-      body: input.body ? JSON.stringify(input.body) : undefined,
+      body: input.rawBody !== undefined ? input.rawBody : input.body ? JSON.stringify(input.body) : undefined,
     });
     const etag = response.headers.get("etag") || "";
     if (response.status === 412 || response.status === 409) {

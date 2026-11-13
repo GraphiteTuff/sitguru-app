@@ -54,44 +54,45 @@ export function InternAssignmentsPageView({
       stats={[
         {
           label: "Active Assignments",
-          value: open.length || 5,
-          detail: "2 due this week",
+          value: open.length,
+          detail: "Assigned work",
           tone: "sky",
           icon: <ClipboardList size={18} />,
         },
         {
           label: "Completed",
-          value: completed || 3,
+          value: completed,
           detail: "This term",
           tone: "violet",
           icon: <CheckCircle2 size={18} />,
         },
         {
           label: "Past Due",
-          value: 0,
-          detail: "Needs Attention",
+          value: open.filter((task) => task.dueOn && new Date(`${task.dueOn}T23:59:59`).getTime() < Date.now()).length,
+          detail: "Needs attention",
           tone: "amber",
           icon: <Flag size={18} />,
         },
         {
           label: "Overall Progress",
-          value: "60%",
+          value: tasks.length ? `${Math.round((completed / tasks.length) * 100)}%` : "0%",
           tone: "teal",
           icon: <BarChart3 size={18} />,
-          progress: 60,
+          progress: tasks.length ? Math.round((completed / tasks.length) * 100) : 0,
         },
       ]}
     >
       <article className={`${DESK_UI.card} overflow-hidden`}>
         <div className="border-b border-slate-100 px-4 py-3 text-sm font-bold text-[#0D5C3A]">
-          All Assignments ({tasks.length || open.length || 5})
+          All Assignments ({tasks.length})
         </div>
         <ul className="divide-y divide-slate-100">
-          {(tasks.length ? tasks : open).slice(0, 8).map((task) => (
+          {tasks.map((task) => (
             <li key={task.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div>
-                <p className="font-bold text-[#0F2744]">{task.title}</p>
+                <Link href={`/intern/assignments/${task.id}`} className="font-bold text-[#0F2744] hover:text-blue-700 hover:underline">{task.title}</Link>
                 <p className="text-xs font-medium text-slate-500">Due {formatDue(task.dueOn)}</p>
+                <Link href={`/intern/assignments/${task.id}`} className="mt-1 inline-flex min-h-9 items-center text-xs font-black text-blue-700">Open &amp; update →</Link>
               </div>
               <span className="rounded-full bg-[#FFEDD5] px-2.5 py-1 text-[10px] font-bold text-[#9A3412]">
                 {taskStatusLabel(task.status, task.reviewStage)}

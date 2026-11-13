@@ -111,7 +111,7 @@ export default function InternWorkHome({
             <tbody>
               {(open.length ? open : tasks).slice(0, 6).map((task) => (
                 <tr key={task.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-bold text-[#0F2744]">{task.title}</td>
+                  <td className="px-4 py-3 font-bold text-[#0F2744]"><Link href={`/intern/assignments/${task.id}`} className="hover:text-blue-700 hover:underline">{task.title}</Link></td>
                   <td className="px-4 py-3 font-bold text-[#DC2626]">{formatDue(task.dueOn)}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-[#FFEDD5] px-2.5 py-1 text-[10px] font-bold text-[#9A3412]">

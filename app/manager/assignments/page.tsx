@@ -6,6 +6,8 @@ import ManagerAssignmentsHome, {
 import { readAssignmentBrief } from "@/lib/internship/manager-assignment";
 import { listCohortMilestones } from "@/lib/internship/queries";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
+import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
+import { routeAssignmentCategory } from "@/lib/admin/growth/work-routing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,7 @@ function progressFor(status: string) {
   if (status === "submitted") return 80;
   if (status === "in_progress") return 45;
   if (status === "revision_requested") return 35;
-  if (status === "todo") return 10;
+  if (status === "todo") return 0;
   return 0;
 }
 
@@ -95,6 +97,7 @@ export default async function ManagerAssignmentsPage({
         .order("due_on", { ascending: true })
     : { data: [] };
   const names = new Map(interns.map((intern) => [intern.id, intern.name]));
+  const fullNames = new Map((people || []).map((person) => [String(person.id), String(person.full_name || "")]));
   const rows: ManagerAssignmentRow[] = (tasks || []).map((row) => {
     const brief = readAssignmentBrief(row.brief_payload);
     const status = String(row.status || "todo");
@@ -127,13 +130,20 @@ export default async function ManagerAssignmentsPage({
   for (const row of rows) {
     const mine = integrations.filter((item) => item.assignmentId === row.id);
     const pick = (provider: string) => mine.find((item) => item.provider === provider);
+    const internFullName = fullNames.get(row.internId) || row.intern;
+    const knownLola = internFullName.trim().toLowerCase() === "lola uhl";
+    const filesUrl = pick("sharepoint")?.externalUrl ||
+      (knownLola ? expectedInternAssignmentFolder(internFullName, row.title).url : "");
+    const analyticsUrl = "https://teams.cloud.microsoft/l/channel/19%3A6a3c6f8904244ca8b62e4f3a8bbbe042%40thread.tacv2/Analytics%20and%20Results?groupId=e338678f-1008-4dd8-8705-0669b1e76ef8&tenantId=6942aff2-2055-4354-a6de-38bfc2d65548&allowXTenantAccess=False";
+    const teamsUrl = pick("teams")?.externalUrl ||
+      (routeAssignmentCategory(row.category).channelKey === "analytics-results" ? analyticsUrl : "");
     links[row.id] = {
       planner: pick("planner")?.status.replaceAll("_", " ") || "Not configured",
-      files: pick("sharepoint")?.status.replaceAll("_", " ") || "Not configured",
-      teams: pick("teams")?.status === "connected" ? "Channel link" : pick("teams")?.status.replaceAll("_", " ") || "Not configured",
+      files: pick("sharepoint")?.status === "connected" ? "Connected" : filesUrl ? "Folder found - sync pending" : "Not configured",
+      teams: pick("teams")?.status === "connected" ? "Channel link" : teamsUrl ? "Channel found" : "Not configured",
       plannerUrl: pick("planner")?.externalUrl || "",
-      filesUrl: pick("sharepoint")?.externalUrl || "",
-      teamsUrl: pick("teams")?.externalUrl || "",
+      filesUrl,
+      teamsUrl,
     };
   }
   const ok = first(params.ok);
