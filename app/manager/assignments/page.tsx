@@ -97,6 +97,7 @@ export default async function ManagerAssignmentsPage({
         .order("due_on", { ascending: true })
     : { data: [] };
   const names = new Map(interns.map((intern) => [intern.id, intern.name]));
+  const fullNames = new Map((people || []).map((person) => [String(person.id), String(person.full_name || "")]));
   const rows: ManagerAssignmentRow[] = (tasks || []).map((row) => {
     const brief = readAssignmentBrief(row.brief_payload);
     const status = String(row.status || "todo");
@@ -129,9 +130,10 @@ export default async function ManagerAssignmentsPage({
   for (const row of rows) {
     const mine = integrations.filter((item) => item.assignmentId === row.id);
     const pick = (provider: string) => mine.find((item) => item.provider === provider);
-    const knownLola = row.intern.trim().toLowerCase() === "lola uhl";
+    const internFullName = fullNames.get(row.internId) || row.intern;
+    const knownLola = internFullName.trim().toLowerCase() === "lola uhl";
     const filesUrl = pick("sharepoint")?.externalUrl ||
-      (knownLola ? expectedInternAssignmentFolder(row.intern, row.title).url : "");
+      (knownLola ? expectedInternAssignmentFolder(internFullName, row.title).url : "");
     const analyticsUrl = "https://teams.cloud.microsoft/l/channel/19%3A6a3c6f8904244ca8b62e4f3a8bbbe042%40thread.tacv2/Analytics%20and%20Results?groupId=e338678f-1008-4dd8-8705-0669b1e76ef8&tenantId=6942aff2-2055-4354-a6de-38bfc2d65548&allowXTenantAccess=False";
     const teamsUrl = pick("teams")?.externalUrl ||
       (routeAssignmentCategory(row.category).channelKey === "analytics-results" ? analyticsUrl : "");
