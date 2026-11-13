@@ -152,7 +152,7 @@ export default function SitGuruTeam() {
               <h3>{person.name}</h3>
               <p className={styles.role}>{person.role}</p>
               {person.major ? (
-                <p className={styles.major}>Major: {person.major}</p>
+                <p className={styles.major}>{person.majorLabel ?? "Major"}: {person.major}</p>
               ) : (
                 <span className={styles.majorSpacer} aria-hidden="true" />
               )}
@@ -186,7 +186,7 @@ export default function SitGuruTeam() {
           </div>
           <h3>{peek.name}</h3>
           <p className={styles.peekRole}>{peek.role}</p>
-          {peek.major && <p className={styles.peekMajor}>Major: {peek.major}</p>}
+          {peek.major && <p className={styles.peekMajor}>{peek.majorLabel ?? "Major"}: {peek.major}</p>}
           <p className={styles.peekIntro}>{peek.intro}</p>
           <p className={styles.peekBio}>{peek.bio}</p>
           <ul className={styles.peekStrengths} aria-label={`${peek.name} key strengths`}>
@@ -216,7 +216,7 @@ export default function SitGuruTeam() {
                 <p className={styles.dialogEyebrow}>Meet the pack</p>
                 <h2 id="sitguru-person-name">{selected.name}</h2>
                 <p className={styles.dialogRole}>{selected.role}</p>
-                {selected.major && <p className={styles.dialogMajor}>Major: {selected.major}</p>}
+                {selected.major && <p className={styles.dialogMajor}>{selected.majorLabel ?? "Major"}: {selected.major}</p>}
               </div>
             </div>
             <div className={styles.dialogBody}>
@@ -224,7 +224,7 @@ export default function SitGuruTeam() {
               <p id="sitguru-person-bio">{selected.bio}</p>
               <h3>Strengths they bring</h3>
               <ul className={styles.strengthTags}>{selected.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
-              <h3>What they do at SitGuru</h3>
+              <h3>Their Role at SitGuru</h3>
               <ul>{selected.focus.map((item) => <li key={item}>{item}</li>)}</ul>
               <button type="button" className={styles.backButton} onClick={closeProfile}>Back to the team</button>
             </div>

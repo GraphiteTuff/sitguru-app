@@ -4,6 +4,7 @@ export type SitGuruTeamMember = {
   name: string;
   role: string;
   major?: string;
+  majorLabel?: "Major" | "Degree program";
   image: string | null;
   intro: string;
   bio: string;
@@ -68,10 +69,11 @@ export const sitguruTeam: readonly SitGuruTeamMember[] = [
     slug: "lalita",
     name: "Lalita Dhital",
     role: "Social Media Intern",
-    major: "Business",
+    major: "Bachelor of Business Science",
+    majorLabel: "Degree program",
     image: null,
     intro: "Bringing business insight, customer care, and team leadership to community growth.",
-    bio: "Lalita is pursuing a business degree at Penn State and brings a background in customer service, administrative coordination, business analysis, and team supervision. Her customer-first approach and organizational skills can support SitGuru’s community outreach, relationship-building, and growth initiatives. Her portrait will be added when available.",
+    bio: "Lalita’s academic background includes a Bachelor of Business Science program at Penn State. She brings experience in customer service, administrative coordination, business analysis, and team supervision. Her customer-first approach and organizational skills support SitGuru’s community outreach, relationship-building, and growth initiatives. Her portrait will be added when available.",
     focus: ["Community outreach support", "Customer-focused communication", "Research & organized project coordination"],
     strengths: ["Customer relationship building", "Business analysis", "Team leadership"],
   },
