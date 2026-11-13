@@ -31,7 +31,7 @@ function progressFor(status: string) {
   if (status === "submitted") return 80;
   if (status === "in_progress") return 45;
   if (status === "revision_requested") return 35;
-  if (status === "todo") return 10;
+  if (status === "todo") return 0;
   return 0;
 }
 
