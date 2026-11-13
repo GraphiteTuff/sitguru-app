@@ -46,7 +46,7 @@ export const journeyMilestones: readonly JourneyMilestone[] = [
       "Initial concepts for the platform and its community",
     ],
     image: "/about/journey/early-care-concept.webp",
-    imageAlt: "Illustrative scene of a pet caregiver smiling with a golden retriever outdoors",
+    imageAlt: "A pet caregiver smiling with a golden retriever outdoors",
   },
   {
     id: "founded",
@@ -105,7 +105,7 @@ export const journeyMilestones: readonly JourneyMilestone[] = [
       "Community outreach, campaigns, and intern assignments gain a shared direction",
     ],
     image: "/about/journey/team-community-illustration.webp",
-    imageAlt: "Illustration of a collaborative pet community meeting, not photographs of SitGuru team members",
+    imageAlt: "People collaborating on pet community campaigns with a dog and cat nearby",
     links: [{ label: "Meet the Team", href: "#meet-the-team" }],
   },
   {
