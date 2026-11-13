@@ -192,7 +192,7 @@ export default function SitGuruJourney() {
           <span className={styles.eyebrow}><PawPrint size={15} aria-hidden="true" /> Our Story, One Pawprint at a Time</span>
           <h2 id="journey-title">Our <span>Growth</span> Journey</h2>
           <p>
-            From an idea to a growing pet-care community — see the people,
+            From an idea to a growing pet care community — see the people,
             features, and moments that help SitGuru bring the pack together.
           </p>
           <div className={styles.statusLegend} aria-label="Milestone status key">
@@ -346,6 +346,8 @@ export default function SitGuruJourney() {
                 className={selected.id === "founded" ? styles.imageContain : styles.imageCover}
               />
             </div>
+            {selected.id === "beyond" && <p className={styles.dialogImageCaption}>Our vision: stronger local communities, connected through a wider network. This is an illustration, not a map of current coverage.</p>}
+            {selected.id === "team-growth" && <p className={styles.dialogImageCaption}>Illustrative community scene — not portraits of SitGuru staff.</p>}
             <div className={styles.dialogBody}>
               <p id="journey-dialog-story" className={styles.dialogStory}>{selected.story}</p>
               <h3>{selected.status === "planned" ? "What we're working toward" : "Milestone highlights"}</h3>
