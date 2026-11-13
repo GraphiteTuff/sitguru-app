@@ -1462,7 +1462,7 @@ async function correctGuruNameAction(formData: FormData) {
 
   const guruId = asTrimmedString(formData.get("guruId"));
   const fullName = asTrimmedString(formData.get("fullName"))
-    .replace(/\\s+/g, " ");
+    .replace(/\s+/g, " ");
   const parts = fullName.split(" ").filter(Boolean);
   const firstName = parts[0] || "";
   const lastName = parts.slice(1).join(" ");
