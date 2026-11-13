@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InternName } from "@/components/portal/PersonFace";
+import { adminInternAssignmentsPath } from "@/lib/internship/admin-preview";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import {
@@ -18,16 +19,11 @@ export default async function InternshipPortalAccessPage() {
   const cohort = await getActiveCohort();
   const interns = await listInterns(cohort?.id);
 
-  if (interns.length === 1) {
-    redirect(internPortalPreviewPath(interns[0].id));
-  }
-
   return (
     <main className="mx-auto max-w-6xl space-y-5 px-4 pb-8">
       <h1 className="text-3xl font-black text-slate-950">Intern Portal</h1>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
-        Open the student Intern Portal from Employer HQ. You will see the intern’s
-        Plan, Tasks, Campaigns, Metrics, and Review exactly as they do.
+        Select an intern to inspect their real assignments in a secure read-only preview. You can also open their existing student dashboard or employer review without signing in as the intern.
       </p>
 
       {interns.length ? (
@@ -55,10 +51,16 @@ export default async function InternshipPortalAccessPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link
+                  href={adminInternAssignmentsPath(intern.id)}
+                  className="inline-flex min-h-11 items-center rounded-2xl bg-blue-700 px-4 text-sm font-black !text-white hover:bg-blue-800"
+                >
+                  Preview assignments
+                </Link>
+                <Link
                   href={internPortalPreviewPath(intern.id)}
                   className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
                 >
-                  View intern portal
+                  Student dashboard
                 </Link>
                 <Link
                   href={`${INTERNSHIP_ADMIN_PATH}/interns/${intern.id}`}
