@@ -12,6 +12,7 @@ import {
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
 import { isPubliclyVisibleGuruProfile, asOptionalBoolean } from "@/lib/gurus/public-visibility";
+import { getGuruUrlMatchPriority, isSameGuruAccount } from "@/lib/gurus/profile-identity";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
 import {
   findAuthMetadataAvatarUrl,
@@ -405,6 +406,10 @@ function isIdentifierMatchForGuru(profile: GuruProfile | null, identifier: strin
   const requestedTokens = getIdentifierTokens(cleanedIdentifier);
   const candidates = getGuruSlugCandidates(profile);
   const idPrefixes = getGuruIdPrefixTokens(profile);
+
+  // A verified user-ID suffix is sufficient even if a Guru entered only
+  // a short first name (for example "La") during profile setup.
+  if (getGuruUrlMatchPriority(profile || {}, cleanedIdentifier) >= 2) return true;
 
   if (!requestedSlug || !requestedCompact || !candidates.length) return false;
 
@@ -1254,36 +1259,10 @@ function mergeAccountProfileAvatar(
 function isSameGuruIdentity(
   left: GuruProfile | null,
   right: GuruProfile | null,
-  identifier?: string | null,
+  _identifier?: string | null,
 ) {
-  if (!left || !right) return false;
-
-  const leftValues = [
-    left.id != null ? String(left.id) : "",
-    left.user_id || "",
-    left.profile_id || "",
-    left.email || "",
-  ]
-    .map((value) => String(value || "").trim().toLowerCase())
-    .filter(Boolean);
-
-  const rightValues = [
-    right.id != null ? String(right.id) : "",
-    right.user_id || "",
-    right.profile_id || "",
-    right.email || "",
-  ]
-    .map((value) => String(value || "").trim().toLowerCase())
-    .filter(Boolean);
-
-  if (leftValues.some((value) => rightValues.includes(value))) return true;
-
-  if (identifier && isIdentifierMatchForGuru(right, identifier)) return true;
-
-  const leftName = slugifyPublicIdentifier(getGuruName(left));
-  const rightName = slugifyPublicIdentifier(getGuruName(right));
-
-  return Boolean(leftName && rightName && leftName === rightName);
+  // A name or fuzzy slug is not enough to copy another account's photos.
+  return isSameGuruAccount(left, right);
 }
 
 async function findGuruUploadedPhotoFromSitGuruRows(
@@ -1872,8 +1851,11 @@ function normalizeGuruProfileFromBookingLookupRow(
 function scoreGuruProfileForPublicDisplay(guru: GuruProfile, identifier: string) {
   let score = 0;
 
-  if (getGuruImage(guru)) score += 1000;
+  // Match the exact stored slug or immutable user-ID prefix first.
+  // Photo quality must never outrank identity when resolving a public URL.
+  score += getGuruUrlMatchPriority(guru, identifier) * 10000;
   if (isIdentifierMatchForGuru(guru, identifier)) score += 300;
+  if (getGuruImage(guru)) score += 1000;
   if (String(guru.slug || "").trim()) score += 50;
   if (String(guru.email || "").trim()) score += 25;
   if (String(guru.bio || "").trim()) score += 25;
@@ -2186,9 +2168,12 @@ async function getPublicGuruProfile(
   const allGurus = await supabaseAdmin.from("gurus").select("*");
 
   if (!allGurus.error && Array.isArray(allGurus.data)) {
-    const match = (allGurus.data as GuruProfile[]).find((guru) =>
+    const matches = (allGurus.data as GuruProfile[]).filter((guru) =>
       isIdentifierMatchForGuru(guru, cleanedIdentifier),
     );
+    const match = matches.length
+      ? selectBestGuruProfileForPublicDisplay(matches, cleanedIdentifier)
+      : null;
 
     if (match) {
       return hydrateGuruProfilePhotoFields(match, cleanedIdentifier);
