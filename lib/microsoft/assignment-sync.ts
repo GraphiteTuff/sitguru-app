@@ -49,7 +49,10 @@ export async function syncPublishedAssignment(input: {
   const existing = await listAssignmentIntegrations([input.assignmentId]);
   const current = (provider: string) => existing.find((row) => row.provider === provider);
   const folderUrlFallback = expectedInternAssignmentFolder(input.internName, input.title).url;
-  const channelUrlFallback = publicUrl(channel.urlEnv);
+  const channelUrlFallback = publicUrl(channel.urlEnv) ||
+    (route.channelKey === "analytics-results"
+      ? "https://teams.cloud.microsoft/l/channel/19%3A6a3c6f8904244ca8b62e4f3a8bbbe042%40thread.tacv2/Analytics%20and%20Results?groupId=e338678f-1008-4dd8-8705-0669b1e76ef8&tenantId=6942aff2-2055-4354-a6de-38bfc2d65548&allowXTenantAccess=False"
+      : "");
   const plannerUrlFallback = publicUrl("NEXT_PUBLIC_SITGURU_PLANNER_GROWTH_URL");
   const canva = canvaUrl(input.resources);
 
