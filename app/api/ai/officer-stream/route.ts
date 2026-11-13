@@ -36,7 +36,6 @@ import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
-import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
   inferLookupParamsFromChat,
   looksLikeGuruDirectoryQuery,
@@ -46,6 +45,10 @@ import {
   joinRecentUserTexts,
   needsCareMatchingAsk,
 } from "@/lib/chat/care-matching-intake";
+import {
+  enrichCompanionTurn,
+  persistAssistantCompanionMessage,
+} from "@/lib/companions/enrich-turn";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -424,6 +427,52 @@ export async function POST(req: Request) {
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
     const careThread = joinRecentUserTexts(messages, lastUserText);
+
+    let enriched;
+    try {
+      enriched = await enrichCompanionTurn({
+        req,
+        body: body as Record<string, unknown>,
+        lastUserText,
+        companionFallback: officer,
+        requireDashboardAccess: surface === "dashboard",
+      });
+    } catch (enrichError) {
+      const status =
+        enrichError &&
+        typeof enrichError === "object" &&
+        "status" in enrichError &&
+        typeof (enrichError as { status?: unknown }).status === "number"
+          ? (enrichError as { status: number }).status
+          : 500;
+      return Response.json(
+        {
+          error:
+            enrichError instanceof Error
+              ? enrichError.message
+              : "Unable to authorize companion turn.",
+        },
+        { status },
+      );
+    }
+
+    if (enriched.directReply) {
+      void persistAssistantCompanionMessage({
+        conversation: enriched.conversation,
+        actor: enriched.actor,
+        companionId: enriched.companionId,
+        text: enriched.directReply,
+      });
+      return simulationDataStreamResponse(enriched.directReply);
+    }
+
+    // Prefer server-derived actor label when signed in.
+    if (enriched.actor.userId) {
+      actorLabel = `${enriched.audienceLabel}${
+        enriched.actor.email ? ` · ${enriched.actor.email}` : ""
+      }`;
+      if (enriched.actor.guruId) providerId = enriched.actor.guruId;
+    }
     const scoutMatchingAsk =
       officer === "scout"
         ? buildCareMatchingAsk(careThread)
@@ -537,19 +586,35 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString();
-    const system = buildOfficerSystemPrompt({
-      officerId: officer,
-      nowIso,
-      actorLabel,
-      snapshotMarkdown,
-      preset: preset || undefined,
-      surface,
-    });
+    const system = [
+      buildOfficerSystemPrompt({
+        officerId: officer,
+        nowIso,
+        actorLabel,
+        snapshotMarkdown,
+        preset: preset || undefined,
+        surface,
+      }),
+      "",
+      enriched.knowledgeBlock,
+      "",
+      enriched.contextBlock,
+    ].join("\n");
 
     if (!isSitGuruAiConfigured()) {
-      return simulationDataStreamResponse(
-        fallbackReport(officer, snapshotMarkdown, lastUserText, surface),
+      const fallback = fallbackReport(
+        officer,
+        snapshotMarkdown,
+        lastUserText,
+        surface,
       );
+      void persistAssistantCompanionMessage({
+        conversation: enriched.conversation,
+        actor: enriched.actor,
+        companionId: enriched.companionId,
+        text: fallback,
+      });
+      return simulationDataStreamResponse(fallback);
     }
 
     try {
@@ -561,7 +626,7 @@ export async function POST(req: Request) {
           temperature: 0.45,
           maxTokens: 2800,
           maxSteps: 3,
-          tools: { lookupGurus: lookupGurusTool },
+          tools: enriched.tools,
         });
         let assistantText = String(generated.text || "").trim();
         const markers: string[] = [];
@@ -579,7 +644,12 @@ export async function POST(req: Request) {
         ];
         for (const step of steps) {
           for (const toolResult of step.toolResults || []) {
-            if (toolResult.toolName !== "lookupGurus") continue;
+            if (
+              toolResult.toolName !== "lookupGurus" &&
+              toolResult.toolName !== "lookupGurusNearMe"
+            ) {
+              continue;
+            }
             const raw =
               typeof toolResult.result === "string"
                 ? toolResult.result
@@ -597,6 +667,12 @@ export async function POST(req: Request) {
           assistantText = `${assistantText} ${missing.join(" ")}`.trim();
         }
         if (assistantText) {
+          void persistAssistantCompanionMessage({
+            conversation: enriched.conversation,
+            actor: enriched.actor,
+            companionId: enriched.companionId,
+            text: assistantText,
+          });
           return simulationDataStreamResponse(assistantText);
         }
       }
@@ -607,12 +683,16 @@ export async function POST(req: Request) {
         messages: messages.slice(-16),
         temperature: 0.45,
         maxTokens: 1800,
-        ...(officer === "scout"
-          ? {
-              tools: { lookupGurus: lookupGurusTool },
-              maxSteps: 3 as const,
-            }
-          : {}),
+        tools: enriched.tools,
+        maxSteps: 3 as const,
+        onFinish: async ({ text }) => {
+          await persistAssistantCompanionMessage({
+            conversation: enriched.conversation,
+            actor: enriched.actor,
+            companionId: enriched.companionId,
+            text: String(text || "").trim(),
+          });
+        },
       });
 
       return result.toDataStreamResponse({

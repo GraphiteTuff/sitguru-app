@@ -36,6 +36,7 @@ import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
+import { useCompanionConversation } from "@/hooks/useCompanionConversation";
 import { X } from "lucide-react";
 
 const TACO_BRAND = "#0D5C3A";
@@ -290,7 +291,7 @@ export default function AITacoCompanion({
       ? `Hey ${ambassadorName.split(/\s+/)[0]}! I'm Taco — tap to chat about referrals and rewards.`
       : "Hey! I'm Taco — tap to chat about referrals, PetPerks, and your dashboard.";
 
-  const requestBody = {
+  const baseRequestBody = {
     officer: "taco" as const,
     companion: "taco" as const,
     pagePath: pathname || (isOnboarding ? "/ambassadors" : "/ambassador/dashboard"),
@@ -307,6 +308,7 @@ export default function AITacoCompanion({
     isLoading,
     error,
     setMessages,
+    stop,
   } = useChat({
     api: "/api/ai/officer-stream",
     initialMessages: [
@@ -316,10 +318,29 @@ export default function AITacoCompanion({
         content: greeting,
       },
     ],
-    body: requestBody,
+    body: baseRequestBody,
+  });
+
+  const greetingMessages = [
+    {
+      id: `taco-hello-${resolvedMode}-${ambassadorName || "guest"}`,
+      role: "assistant" as const,
+      content: greeting,
+    },
+  ];
+
+  const companionConversation = useCompanionConversation({
+    companionId: "taco",
+    setMessages,
+    greetingMessages,
   });
 
   useEffect(() => {
+    if (!companionConversation.authUserId) stop();
+  }, [companionConversation.authUserId, stop]);
+
+  useEffect(() => {
+    if (companionConversation.restoredMessages?.length) return;
     setMessages([
       {
         id: `taco-hello-${resolvedMode}-${ambassadorName || "guest"}`,
@@ -327,7 +348,25 @@ export default function AITacoCompanion({
         content: greeting,
       },
     ]);
-  }, [resolvedMode, ambassadorName, greeting, setMessages]);
+  }, [
+    resolvedMode,
+    ambassadorName,
+    greeting,
+    setMessages,
+    companionConversation.restoredMessages,
+  ]);
+
+  function tacoRequestOptions(extra?: Record<string, unknown>) {
+    const { clientMessageId } = companionConversation.beginTurn();
+    return {
+      body: {
+        ...baseRequestBody,
+        ...companionConversation.requestExtras,
+        clientMessageId,
+        ...(extra || {}),
+      },
+    };
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -399,7 +438,7 @@ export default function AITacoCompanion({
 
     await append(
       { role: "user", content: chip.prompt },
-      { body: { ...requestBody, preset: chip.id } },
+      tacoRequestOptions({ preset: chip.id }),
     );
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -410,7 +449,7 @@ export default function AITacoCompanion({
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!input.trim() || isLoading) return;
-    handleSubmit(event, { body: { ...requestBody } });
+    handleSubmit(event, tacoRequestOptions());
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
       40,
@@ -531,7 +570,7 @@ export default function AITacoCompanion({
                     {isAssistant ? (
                       <CompanionAssistantBubbleBody
                         content={message.content}
-                        ctaContext={{ pagePath: requestBody.pagePath }}
+                        ctaContext={{ pagePath: baseRequestBody.pagePath }}
                         socialSource="taco_companion_chat"
                       />
                     ) : (

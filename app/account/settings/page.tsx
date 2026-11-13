@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AdvancedAccountOptionsCard from "@/components/account/AdvancedAccountOptionsCard";
+import CompanionMemoriesPanel from "@/components/account/CompanionMemoriesPanel";
 
 export default function AccountSettingsPage() {
   return (
@@ -60,6 +61,8 @@ export default function AccountSettingsPage() {
               Review privacy preferences and account access settings.
             </p>
           </section>
+
+          <CompanionMemoriesPanel />
 
           <AdvancedAccountOptionsCard />
         </div>

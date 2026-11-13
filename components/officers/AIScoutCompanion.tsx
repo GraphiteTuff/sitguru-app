@@ -45,6 +45,7 @@ import {
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
+import { useCompanionConversation } from "@/hooks/useCompanionConversation";
 
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
@@ -212,7 +213,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     };
   }, []);
 
-  const requestBody = {
+  const baseRequestBody = {
     officer: "scout" as const,
     companion: "scout" as const,
     pagePath: pathname || (isPublic ? "/become-a-guru" : "/guru/dashboard"),
@@ -234,6 +235,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     isLoading,
     error,
     setMessages,
+    stop,
   } = useChat({
     api: "/api/ai/officer-stream",
     initialMessages: [
@@ -243,10 +245,36 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
         content: greeting,
       },
     ],
-    body: requestBody,
+    body: baseRequestBody,
+  });
+
+  const greetingMessages = [
+    {
+      id: isPublic
+        ? "scout-public-hello"
+        : `scout-hello-${user?.guruId || user?.id || "guest"}`,
+      role: "assistant" as const,
+      content: isPublic
+        ? PUBLIC_GREETING
+        : buildWorkspaceGreeting(user?.firstName || ""),
+    },
+  ];
+
+  const companionConversation = useCompanionConversation({
+    companionId: "scout",
+    setMessages,
+    greetingMessages,
   });
 
   useEffect(() => {
+    // Abort in-flight streams when the authenticated account changes.
+    if (!companionConversation.authUserId) {
+      stop();
+    }
+  }, [companionConversation.authUserId, stop]);
+
+  useEffect(() => {
+    if (companionConversation.restoredMessages?.length) return;
     if (isPublic) {
       setMessages([
         {
@@ -265,7 +293,26 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
         content: buildWorkspaceGreeting(user.firstName),
       },
     ]);
-  }, [isPublic, user?.id, user?.guruId, user?.firstName, setMessages]);
+  }, [
+    isPublic,
+    user?.id,
+    user?.guruId,
+    user?.firstName,
+    setMessages,
+    companionConversation.restoredMessages,
+  ]);
+
+  function scoutRequestOptions(extra?: Record<string, unknown>) {
+    const { clientMessageId } = companionConversation.beginTurn();
+    return {
+      body: {
+        ...baseRequestBody,
+        ...companionConversation.requestExtras,
+        clientMessageId,
+        ...(extra || {}),
+      },
+    };
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -335,7 +382,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
     await append(
       { role: "user", content: chip.prompt },
-      { body: { ...requestBody, preset: chip.id } },
+      scoutRequestOptions({ preset: chip.id }),
     );
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -346,7 +393,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!input.trim() || isLoading) return;
-    handleSubmit(event, { body: { ...requestBody } });
+    handleSubmit(event, scoutRequestOptions());
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
       40,
@@ -460,7 +507,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                     {isAssistant ? (
                       <ScoutAssistantBody
                         text={message.content}
-                        pagePath={requestBody.pagePath}
+                        pagePath={baseRequestBody.pagePath}
                       />
                     ) : (
                       message.content

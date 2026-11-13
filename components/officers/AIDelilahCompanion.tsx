@@ -34,6 +34,7 @@ import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
 } from "@/components/messaging/CompanionAssistantBubbleBody";
+import { useCompanionConversation } from "@/hooks/useCompanionConversation";
 import { X } from "lucide-react";
 
 const DELILAH_BRAND = "#0D5C3A";
@@ -117,7 +118,7 @@ export default function AIDelilahCompanion() {
   }, []);
 
   const storedEvent = readStoredCommunityEventCompanion();
-  const requestBody = {
+  const baseRequestBody = {
     officer: "delilah" as const,
     companion: "delilah" as const,
     pagePath: pathname || "/events",
@@ -142,6 +143,7 @@ export default function AIDelilahCompanion() {
     isLoading,
     error,
     setMessages,
+    stop,
   } = useChat({
     api: "/api/ai/officer-stream",
     initialMessages: [
@@ -151,8 +153,32 @@ export default function AIDelilahCompanion() {
         content: GREETING,
       },
     ],
-    body: requestBody,
+    body: baseRequestBody,
   });
+
+  const companionConversation = useCompanionConversation({
+    companionId: "delilah",
+    setMessages,
+    greetingMessages: [
+      { id: "delilah-hello", role: "assistant", content: GREETING },
+    ],
+  });
+
+  useEffect(() => {
+    if (!companionConversation.authUserId) stop();
+  }, [companionConversation.authUserId, stop]);
+
+  function delilahRequestOptions(extra?: Record<string, unknown>) {
+    const { clientMessageId } = companionConversation.beginTurn();
+    return {
+      body: {
+        ...baseRequestBody,
+        ...companionConversation.requestExtras,
+        clientMessageId,
+        ...(extra || {}),
+      },
+    };
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -224,7 +250,7 @@ export default function AIDelilahCompanion() {
 
     await append(
       { role: "user", content: chip.prompt },
-      { body: { ...requestBody, preset: chip.id } },
+      delilahRequestOptions({ preset: chip.id }),
     );
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
@@ -235,7 +261,7 @@ export default function AIDelilahCompanion() {
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!input.trim() || isLoading) return;
-    handleSubmit(event, { body: { ...requestBody } });
+    handleSubmit(event, delilahRequestOptions());
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
       40,

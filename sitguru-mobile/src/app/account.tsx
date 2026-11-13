@@ -845,6 +845,20 @@ export default function AccountScreen() {
                     />
                     <ActionRow
                       icon={
+                        <MessageCircle
+                          color={palette.primary}
+                          size={18}
+                          strokeWidth={2.3}
+                        />
+                      }
+                      label="Companion memories"
+                      onPress={() =>
+                        router.push('/companion-memories' as Href)
+                      }
+                      styles={styles}
+                    />
+                    <ActionRow
+                      icon={
                         <Settings
                           color={palette.primary}
                           size={18}
