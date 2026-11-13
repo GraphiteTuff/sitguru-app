@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import SitGuruTeam from "@/components/about/SitGuruTeam";
 import {
   ArrowRight,
   BadgeCheck,
@@ -623,27 +624,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
-          <div className="sr-only">
-            <h2>The People Behind SitGuru</h2>
-            <p>
-              Built by Pet Parents who believe care should feel more human.
-              SitGuru is locally owned and operated from Quakertown, PA, and is
-              being built by husband-and-wife founders Jason and Danette. Their
-              shared vision is to create a more trusted, thoughtful, and
-              community-centered experience for pet care — one where pets come
-              first, communication matters, and people who truly care can stand
-              out.
-            </p>
-          </div>
-          <Image
-            src="/about/people-behind-sitguru.png"
-            alt="The People Behind SitGuru graphic featuring founders Jason and Danette, their roles, and the SitGuru mission."
-            width={1600}
-            height={1000}
-            className="h-auto w-full rounded-[24px] border border-emerald-100"
-          />
-        </section>
+        <SitGuruTeam />
 
         <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="max-w-3xl">
