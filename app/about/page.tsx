@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SitGuruTeam from "@/components/about/SitGuruTeam";
+import SitGuruJourney from "@/components/about/SitGuruJourney";
 import {
   ArrowRight,
   BadgeCheck,
@@ -437,6 +438,8 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+
+        <SitGuruJourney />
 
         <section>
           <div className="mb-5 max-w-3xl">
