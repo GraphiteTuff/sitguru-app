@@ -14,5 +14,6 @@
       "path": "/api/cron/sync-google-community-events",
       "schedule": "30 6 * * *"
     }
-  ]
+  ],
+  "buildCommand": "npm run test:desks && npm run build"
 }
