@@ -106,7 +106,7 @@ export default async function InternAssignmentDetailPage({
       <section className={`${DESK_UI.card} p-5 sm:p-7`}>
         <h2 className="text-xl font-black text-slate-950">My assignment work</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Work is saved as a versioned Markdown document in the SitGuru SharePoint intern folder. Save as you go, then submit to Ava.
+          Work is saved to a Markdown document in SitGuru's SharePoint intern folder. Save as you go, then submit to Ava.
         </p>
         <form action={saveInternAssignmentProgress} className="mt-5 space-y-4">
           <input type="hidden" name="assignmentId" value={task.id} />
