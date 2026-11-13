@@ -49,7 +49,7 @@
 .meetButton:hover,.meetButton:focus-visible,.memberActive .meetButton { background:#15753a; color:white; transform:translateY(-2px); box-shadow:0 8px 22px rgba(35,135,46,.18); }
 .avatarButton:focus-visible,.meetButton:focus-visible,.peek button:focus-visible,.closeButton:focus-visible,.backButton:focus-visible { outline:3px solid #48a62a; outline-offset:4px; }
 .footnote { display:flex; align-items:center; justify-content:center; gap:6px; margin:36px 0 0; color:#477a44; font-size:12px; font-weight:750; }
-.peek { position:fixed; z-index:1000; width:340px; max-width:calc(100vw - 24px); padding:20px; border:1px solid #cfe7be; border-radius:24px; background:#fff; color:#06432d; box-shadow:0 24px 60px rgba(8,54,34,.22); animation:pop .18s ease-out; }
+.peek { position:fixed; z-index:1000; width:340px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow-y:auto; padding:20px; border:1px solid #cfe7be; border-radius:24px; background:#fff; color:#06432d; box-shadow:0 24px 60px rgba(8,54,34,.22); animation:pop .18s ease-out; }
 .peekTop { display:flex; align-items:center; justify-content:space-between; font-size:11px; text-transform:uppercase; font-weight:850; letter-spacing:.12em; color:#32862f; }
 .peekTop button { display:grid;place-items:center; width:32px;height:32px; border:0;background:#f1f8ed;border-radius:100%;color:#1d5739;cursor:pointer; }
 .peek h3 { font-size:23px; margin:3px 0 0; font-weight:850; }
@@ -57,6 +57,8 @@
 .peekMajor { margin:0 0 9px; color:#367a3f; font-size:12px; font-weight:800; }
 .peekIntro { font-size:13px; font-weight:800; margin:0 0 6px; }
 .peekBio { margin:0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; color:#3a5c4d; font-size:12px; line-height:1.55; }
+.peekStrengths { display:flex; flex-wrap:wrap; gap:5px; padding:0; margin:12px 0 0; list-style:none; }
+.peekStrengths li { padding:5px 8px; border-radius:999px; background:#eef9e8; color:#237236; font-size:10px; line-height:1.3; font-weight:800; }
 .readMore { display:inline-flex; align-items:center; gap:6px; margin-top:12px; border:0; background:transparent; font-size:13px; color:#086a36; font-weight:850; cursor:pointer; }
 .dialog { position:fixed; inset:0; margin:auto; border:1px solid #d1e9ca; border-radius:28px; padding:0; width:min(92vw,630px); max-height:min(88dvh,800px); overflow:auto; color:#113e2a; background:#fff; box-shadow:0 40px 100px rgba(2,35,20,.28); }
 .dialog::backdrop { background:rgba(1,33,23,.64); backdrop-filter:blur(4px); }
@@ -73,6 +75,7 @@
 .dialogBody p { font-size:15px;line-height:1.75;color:#3c574c; }
 .dialogBody ul { display:flex;flex-wrap:wrap;gap:9px;padding:0;margin:12px 0 24px;list-style:none; }
 .dialogBody li { border-radius:999px;background:#e9f6e2;color:#1d6438;padding:8px 12px;font-size:12px;font-weight:800; }
+.dialogBody .strengthTags li { background:#f0f8ff; color:#1b5b55; border:1px solid #cce8e3; }
 .backButton { display:inline-flex;justify-content:center;align-items:center;min-height:46px;border:0;border-radius:999px;background:#0d5c3a;color:#fff;font-size:13px;font-weight:850;padding:12px 20px;cursor:pointer; }
 @keyframes pop { from { opacity:0; transform:translateY(7px) scale(.98); } to {opacity:1;transform:none;} }
 @media (max-width:1199px) { .teamGrid { grid-template-columns:repeat(3,minmax(0,1fr));column-gap:20px;row-gap:24px;max-width:800px; } .member h3 {font-size:21px;min-height:auto;} .role {font-size:14px; min-height:3.2em;} .avatarButton{width:min(100%,180px);} .meetButton{font-size:12px;} }

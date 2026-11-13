@@ -10,7 +10,7 @@ import styles from "./SitGuruTeam.module.css";
 const HOVER_DELAY = 170;
 const LEAVE_DELAY = 270;
 const PEEK_WIDTH = 340;
-const PEEK_HEIGHT = 300;
+const PEEK_HEIGHT = 385;
 
 function Avatar({ person, large = false }: { person: SitGuruTeamMember; large?: boolean }) {
   return (
@@ -189,6 +189,9 @@ export default function SitGuruTeam() {
           {peek.major && <p className={styles.peekMajor}>Major: {peek.major}</p>}
           <p className={styles.peekIntro}>{peek.intro}</p>
           <p className={styles.peekBio}>{peek.bio}</p>
+          <ul className={styles.peekStrengths} aria-label={`${peek.name} key strengths`}>
+            {peek.strengths.map((strength) => <li key={strength}>{strength}</li>)}
+          </ul>
           <button type="button" className={styles.readMore} onClick={(event) => openProfile(peek.slug, event.currentTarget)}>
             Read full profile <ArrowRight size={16} aria-hidden="true" />
           </button>
@@ -219,6 +222,8 @@ export default function SitGuruTeam() {
             <div className={styles.dialogBody}>
               <h3>Get to know {selected.name.split(" ")[0]}</h3>
               <p id="sitguru-person-bio">{selected.bio}</p>
+              <h3>Strengths they bring</h3>
+              <ul className={styles.strengthTags}>{selected.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
               <h3>What they do at SitGuru</h3>
               <ul>{selected.focus.map((item) => <li key={item}>{item}</li>)}</ul>
               <button type="button" className={styles.backButton} onClick={closeProfile}>Back to the team</button>
