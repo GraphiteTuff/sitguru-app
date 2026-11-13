@@ -12,7 +12,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Magazines | SitGuru Reads & Listen",
+  title: "Magazines | SitGuru Reads & Listens",
   description:
     "Featured publications, dog and cat magazines, wellness titles, latest issues, and publisher links.",
   alternates: { canonical: "https://www.sitguru.com/reads/magazines" },

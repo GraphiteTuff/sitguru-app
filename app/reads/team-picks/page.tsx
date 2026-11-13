@@ -8,7 +8,7 @@ import type { ReadsContentType } from "@/lib/reads/types";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Team Picks | SitGuru Reads & Listen",
+  title: "Team Picks | SitGuru Reads & Listens",
   description:
     "Staff-curated recommendations from Jason, Danette, Ava, Ryan, and Lola — reviewed before publication.",
   alternates: { canonical: "https://www.sitguru.com/reads/team-picks" },

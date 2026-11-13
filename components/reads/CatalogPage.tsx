@@ -29,7 +29,7 @@ export default function CatalogPage({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-            SitGuru Reads &amp; Listen
+            SitGuru Reads &amp; Listens
           </p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-[#163127]">
             {title}

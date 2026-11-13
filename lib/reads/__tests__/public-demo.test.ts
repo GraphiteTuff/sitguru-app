@@ -7,6 +7,7 @@ import {
   isDemoContentId,
 } from "../demo-data";
 import { READS_FORMAT_NAV, READS_PRIMARY_CTAS } from "../constants";
+import { AVA_BOOK, AVA_BOOK_SLUG, createAvaBookPick, mergeAvaBook } from "../curated-ava-book";
 
 describe("reads public demo safety", () => {
   it("marks demo content clearly and includes required formats", () => {
@@ -64,6 +65,36 @@ describe("reads public demo safety", () => {
         (c) => c.slug === "rodney-habib" && c.disclosure_label === "none",
       ),
     );
+  });
+
+  it("publishes Ava's selected book with the user-provided bibliographic details", () => {
+    assert.equal(AVA_BOOK.slug, AVA_BOOK_SLUG);
+    assert.equal(AVA_BOOK.title, "The Other End of the Leash");
+    assert.equal(AVA_BOOK.book?.author_name, "Patricia B. McConnell, Ph.D.");
+    assert.equal(AVA_BOOK.book?.publisher, "Ballantine Books");
+    assert.equal(AVA_BOOK.book?.isbn, "9780345446787");
+    assert.equal(AVA_BOOK.book?.page_count, 272);
+    assert.equal(AVA_BOOK.book?.publication_date, "2003-04-29");
+    assert.equal(AVA_BOOK.image_url, "/images/reads/covers/the-other-end-of-the-leash-ava.webp");
+    assert.equal(AVA_BOOK.status, "published");
+    assert.equal(AVA_BOOK.disclosure_label, "sitguru_recommended");
+    assert.ok(!isDemoContentId(AVA_BOOK.id));
+    const ava = DEMO_TEAM.find((member) => member.slug === "ava-venezia");
+    assert.ok(ava);
+    const pick = createAvaBookPick(ava);
+    assert.equal(pick.recommendation_type, "favorite_book");
+    assert.equal(pick.content?.slug, AVA_BOOK_SLUG);
+    assert.equal(pick.quote, ""); // no quote fabricated on Ava's behalf
+  });
+
+  it("adds Ava's book to public listings without replacing Jason's featured pick", () => {
+    const books = DEMO_CONTENT.filter((item) => item.content_type === "book");
+    const result = mergeAvaBook(books, { format: "book" });
+    assert.equal(result[0]?.slug, "the-forever-dog");
+    assert.equal(result[1]?.slug, AVA_BOOK_SLUG);
+    assert.equal(mergeAvaBook(result, { format: "book" }).filter((i) => i.slug === AVA_BOOK_SLUG).length, 1);
+    assert.equal(mergeAvaBook(books, { format: "podcast" }).length, books.length);
+    assert.equal(mergeAvaBook(books, { format: "book", featured: true }).length, books.length);
   });
 
   it("exposes primary public navigation and CTAs", () => {

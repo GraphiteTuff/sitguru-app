@@ -21,7 +21,7 @@ export default function ReadsChrome({ children }: { children: ReactNode }) {
             <Link href="/reads" className="flex items-center gap-2">
               <span className="text-sm font-black tracking-tight !text-white sm:text-base">
                 SitGuru{" "}
-                <span style={{ color: READS_BRAND.orange }}>Reads &amp; Listen</span>
+                <span style={{ color: READS_BRAND.orange }}>Reads &amp; Listens</span>
               </span>
             </Link>
             <div className="flex items-center gap-2">

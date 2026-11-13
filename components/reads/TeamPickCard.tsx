@@ -207,6 +207,10 @@ export default function TeamPickCard({
           <blockquote className="mt-3 flex-1 rounded-2xl bg-[#f7f4ee] px-4 py-3 text-sm leading-6 text-slate-700">
             “{pick.quote}”
           </blockquote>
+        ) : content?.why_recommended ? (
+          <p className="mt-3 flex-1 rounded-2xl bg-[#f7f4ee] px-4 py-3 text-sm leading-6 text-slate-700">
+            {content.why_recommended}
+          </p>
         ) : null}
         <Link
           href={contentHref(pick)}
