@@ -29,6 +29,7 @@ type PageProps = {
     saved?: string;
     error?: string;
     emailed?: string;
+    name_saved?: string;
   }>;
 };
 
@@ -1447,6 +1448,114 @@ async function getApplicationEvents(guruId: string) {
   }
 }
 
+/**
+ * Owner-only repair for mismatched Guru/profile names.
+ * Never changes account identity, status, slug, booking or screening flags.
+ */
+async function correctGuruNameAction(formData: FormData) {
+  "use server";
+
+  const admin = await getAdminIdentity();
+  if (!admin?.id || !admin.isSuperUser) {
+    redirect("/admin/login");
+  }
+
+  const guruId = asTrimmedString(formData.get("guruId"));
+  const fullName = asTrimmedString(formData.get("fullName"))
+    .replace(/\\s+/g, " ");
+  const parts = fullName.split(" ").filter(Boolean);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ");
+
+  const errorRedirect = (message: string) =>
+    `/admin/gurus/${encodeURIComponent(guruId || "missing")}?error=${encodeURIComponent(message)}`;
+
+  if (!guruId || !/^[0-9a-f-]{36}$/i.test(guruId)) {
+    redirect(errorRedirect("Invalid Guru record."));
+  }
+  if (!firstName || !lastName || fullName.length > 120) {
+    redirect(errorRedirect("Enter the Guru's complete first and last name."));
+  }
+
+  const { data: guruRow, error: lookupError } = await supabaseAdmin
+    .from("gurus")
+    .select("id, user_id, profile_id, email")
+    .eq("id", guruId)
+    .maybeSingle();
+
+  if (lookupError || !guruRow) {
+    redirect(errorRedirect("Guru record not found. No changes were saved."));
+  }
+
+  const userId = asTrimmedString(guruRow.user_id) ||
+    asTrimmedString(guruRow.profile_id);
+  if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) {
+    redirect(errorRedirect("Cannot verify a linked login account. No changes were saved."));
+  }
+
+  const { data: authData, error: authError } =
+    await supabaseAdmin.auth.admin.getUserById(userId);
+  const authEmail = asTrimmedString(authData?.user?.email).toLowerCase();
+  const guruEmail = asTrimmedString(guruRow.email).toLowerCase();
+  if (authError || !authData?.user || (guruEmail && authEmail !== guruEmail)) {
+    redirect(errorRedirect("The Guru's login account could not be verified."));
+  }
+
+  // The auth user is the source for the profile FK, not the unrelated Guru row UUID.
+  const { error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      full_name: fullName,
+      display_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (profileError) {
+    redirect(errorRedirect("Profile name update failed: " + profileError.message.slice(0, 120)));
+  }
+
+  const { data: updatedGuru, error: guruError } = await supabaseAdmin
+    .from("gurus")
+    .update({
+      full_name: fullName,
+      display_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", guruId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (guruError || !updatedGuru) {
+    redirect(errorRedirect("Guru name update failed. Review the linked profile name."));
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      actor_id: admin.id,
+      actor_email: admin.email,
+      action: "guru_name_corrected",
+      area: "gurus",
+      target_type: "guru",
+      target_id: guruId,
+      metadata: { user_id: userId, corrected_name: fullName },
+    });
+  } catch {
+    // Keep the correction valid if the optional audit log schema is unavailable.
+  }
+
+  revalidatePath("/admin/gurus");
+  revalidatePath(`/admin/gurus/${guruId}`);
+  revalidatePath("/search");
+  revalidatePath("/guru", "layout");
+  redirect(`/admin/gurus/${encodeURIComponent(guruId)}?name_saved=1`);
+}
+
 async function waiveGuruScreeningAction(formData: FormData) {
   "use server";
 
@@ -1864,6 +1973,10 @@ export default async function AdminGuruDetailPage({
   const guruId = getGuruId(guru);
   const userId = getGuruUserId(guru);
   const name = getGuruName(guru, profile);
+  const authenticatedName = getAuthFullName(authUser);
+  const preferredNameForEdit = authenticatedName.length > name.length
+    ? authenticatedName : name;
+  const adminIdentity = await getAdminIdentity();
   const email = getGuruEmail(guru, profile, authUser);
   const phone = getGuruPhone(guru, profile);
 
@@ -2043,6 +2156,49 @@ export default async function AdminGuruDetailPage({
           </div>
         ) : null}
       </section>
+
+      {resolvedSearchParams.name_saved === "1" ? (
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 font-bold text-emerald-800">
+          Guru name corrected in the linked Guru and account profile records.
+        </div>
+      ) : null}
+
+      {adminIdentity?.isSuperUser ? (
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+            Owner name correction
+          </p>
+          <h2 className="mt-2 text-xl font-black text-slate-950">
+            Correct this Guru's name across SitGuru
+          </h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+            Current Guru name: <strong>{name}</strong>.
+            {" "}Authentication name: <strong>{authenticatedName || "Not provided"}</strong>.
+            This updates only the Guru and linked account profile names,
+            without changing approval, verification, payout, or booking settings.
+          </p>
+          <form action={correctGuruNameAction} className="mt-4 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="guruId" value={guruId} />
+            <label className="flex min-w-[240px] flex-1 flex-col gap-2 text-sm font-black text-slate-700">
+              Correct full name
+              <input
+                name="fullName"
+                type="text"
+                defaultValue={preferredNameForEdit}
+                required
+                maxLength={120}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-950"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-700"
+            >
+              Save corrected name
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
