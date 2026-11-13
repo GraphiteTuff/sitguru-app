@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
 import { InternAssignmentsPageView } from "@/components/internship/InternSectionPages";
@@ -10,9 +12,15 @@ export default async function InternAssignmentsPage() {
   if (!access.ok) return access.ui;
   const data = await loadInternSectionWorkspace();
   if (!data) {
+    // Admin HQ does not impersonate an intern's Supabase login.
+    // Redirect to an explicit, authorized intern picker instead of the
+    // misleading "Assignments unavailable" screen.
+    const admin = await getAdminIdentity();
+    if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
     return (
       <div className="mx-auto max-w-lg rounded-[1.75rem] border border-rose-100 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-black text-slate-950">Assignments unavailable</h1>
+        <h1 className="text-2xl font-black text-slate-950">No intern account connected</h1>
+        <p className="mt-3 text-sm font-semibold text-slate-600">Sign in with the SitGuru account assigned to your internship to view your work.</p>
       </div>
     );
   }
