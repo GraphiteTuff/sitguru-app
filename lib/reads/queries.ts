@@ -7,6 +7,7 @@ import {
   DEMO_TOPICS,
 } from "./demo-data";
 import { readsTeamAvatar } from "./team";
+import { AVA_BOOK, AVA_BOOK_ID, isAvaBook, mergeAvaBook, mergeAvaBookPick } from "./curated-ava-book";
 import type {
   ReadsContent,
   ReadsContentDetail,
@@ -135,7 +136,7 @@ export async function fetchPublishedContent(
     }
     if (!data.length) return filterDemo(filters);
     const mapped = (data as ContentRow[]).map(mapDetail);
-    return hydrateTopics(mapped);
+    return mergeAvaBook(await hydrateTopics(mapped), filters);
   } catch {
     return filterDemo(filters);
   }
@@ -160,7 +161,20 @@ function filterDemo(filters: ReadsSearchFilters): ReadsContentDetail[] {
       (r.topics || []).some((t) => t.slug === filters.topic),
     );
   }
-  return rows.slice(0, filters.limit || 48);
+  return mergeAvaBook(rows, filters).slice(0, filters.limit || 48);
+}
+
+async function curatedOrDemoBySlug(
+  type: ReadsContentType,
+  slug: string,
+): Promise<ReadsContentDetail | null> {
+  if (isAvaBook(type, slug)) {
+    return {
+      ...AVA_BOOK,
+      team_picks: await fetchTeamPicksForContent(AVA_BOOK_ID),
+    };
+  }
+  return DEMO_CONTENT.find((item) => item.content_type === type && item.slug === slug) || null;
 }
 
 export async function fetchContentBySlug(
@@ -180,11 +194,7 @@ export async function fetchContentBySlug(
 
     if (error || !data) {
       if (error && !tableMissing(error)) console.error(error.message);
-      return (
-        DEMO_CONTENT.find(
-          (item) => item.content_type === type && item.slug === slug,
-        ) || null
-      );
+      return curatedOrDemoBySlug(type, slug);
     }
 
     const detail = mapDetail(data as ContentRow);
@@ -193,11 +203,7 @@ export async function fetchContentBySlug(
     const teamPicks = await fetchTeamPicksForContent(detail.id);
     return { ...detail, related, topics, team_picks: teamPicks };
   } catch {
-    return (
-      DEMO_CONTENT.find(
-        (item) => item.content_type === type && item.slug === slug,
-      ) || null
-    );
+    return curatedOrDemoBySlug(type, slug);
   }
 }
 
@@ -272,6 +278,15 @@ export async function fetchTeamMembers(): Promise<ReadsTeamMember[]> {
   }
 }
 
+async function withApprovedAvaPick(picks: ReadsTeamPick[]): Promise<ReadsTeamPick[]> {
+  const members = await fetchTeamMembers();
+  const ava = members.find((member) =>
+    member.slug === "ava-venezia" ||
+    member.full_name.trim().toLowerCase() === "ava venezia",
+  ) || DEMO_TEAM.find((member) => member.slug === "ava-venezia");
+  return ava ? mergeAvaBookPick(picks, ava) : picks;
+}
+
 export async function fetchTeamPicks(filters?: {
   memberSlug?: string;
   format?: ReadsContentType;
@@ -293,7 +308,7 @@ export async function fetchTeamPicks(filters?: {
       .limit(100);
 
     if (error || !data?.length) {
-      return filterTeamPicks(DEMO_TEAM_PICKS, filters);
+      return filterTeamPicks(await withApprovedAvaPick(DEMO_TEAM_PICKS), filters);
     }
 
     const mapped = data.map((row) => {
@@ -307,9 +322,9 @@ export async function fetchTeamPicks(filters?: {
         content: contentRow ? mapDetail(contentRow) : undefined,
       };
     });
-    return filterTeamPicks(mapped, filters);
+    return filterTeamPicks(await withApprovedAvaPick(mapped), filters);
   } catch {
-    return filterTeamPicks(DEMO_TEAM_PICKS, filters);
+    return filterTeamPicks(await withApprovedAvaPick(DEMO_TEAM_PICKS), filters);
   }
 }
 
@@ -387,7 +402,7 @@ export async function fetchLandingBundle() {
       authors.find((a) => a.feature_type === "featured_author") ||
       authors[0] ||
       null,
-    isDemo: content.every((c) => c.id.startsWith("demo-")),
+    isDemo: content.some((c) => c.id.startsWith("demo-")),
   };
 }
 

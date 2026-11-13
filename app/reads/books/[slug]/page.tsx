@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import DetailShell from "@/components/reads/DetailShell";
 import { fetchContentBySlug } from "@/lib/reads/queries";
+import { AVA_BOOK_AUTHOR_BIO, AVA_BOOK_SLUG } from "@/lib/reads/curated-ava-book";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,14 @@ export default async function BookDetailPage({ params }: PageProps) {
         backHref="/reads/books"
         backLabel="All books"
         eventName="book_view"
-      />
+      >
+        {item.slug === AVA_BOOK_SLUG ? (
+          <section className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
+            <h2 className="text-xl font-black text-[#163127]">About the Author</h2>
+            <p>{AVA_BOOK_AUTHOR_BIO}</p>
+          </section>
+        ) : null}
+      </DetailShell>
     </>
   );
 }

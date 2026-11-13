@@ -7,7 +7,7 @@ import type { ReadsContentType } from "@/lib/reads/types";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Search | SitGuru Reads & Listen",
+  title: "Search | SitGuru Reads & Listens",
   description: "Search books, authors, podcasts, magazines, and topics.",
   alternates: { canonical: "https://www.sitguru.com/reads/search" },
 };
@@ -45,7 +45,7 @@ export default async function ReadsSearchPage({ searchParams }: PageProps) {
         metadata={{ q, format, topic, featured, newest, teamPick }}
       />
       <h1 className="text-4xl font-black tracking-tight text-[#0F2744]">
-        Search Reads &amp; Listen
+        Search Reads &amp; Listens
       </h1>
       <form className="mt-6 grid gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto_auto_auto]">
         <label className="sr-only" htmlFor="reads-search">

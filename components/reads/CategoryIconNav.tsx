@@ -33,7 +33,7 @@ export default function CategoryIconNav() {
 
   return (
     <nav
-      aria-label="Reads & Listen categories"
+      aria-label="Reads & Listens categories"
       className="border-b border-emerald-100 bg-white/90 backdrop-blur"
     >
       <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 py-3 sm:gap-2 sm:px-6 lg:px-8">

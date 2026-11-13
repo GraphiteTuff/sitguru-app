@@ -6,8 +6,8 @@ import { fetchReadsTopics } from "@/lib/reads/queries";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Topics | SitGuru Reads & Listen",
-  description: "Explore SitGuru Reads & Listen by educational topic.",
+  title: "Topics | SitGuru Reads & Listens",
+  description: "Explore SitGuru Reads & Listens by educational topic.",
   alternates: { canonical: "https://www.sitguru.com/reads/topics" },
 };
 

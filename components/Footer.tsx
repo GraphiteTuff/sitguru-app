@@ -31,7 +31,7 @@ const petParentLinks = [
   { label: "Sign Up Free", href: "/signup", featured: true },
   { label: "Pet Parent Login", href: "/customer/login" },
   { label: "Find Care", href: "/search" },
-  { label: "Reads & Listen", href: "/reads", featured: true },
+  { label: "Reads & Listens", href: "/reads", featured: true },
   { label: "My Pets", href: "/my-pets" },
   { label: "PetPerks", href: "/petperks", featured: true },
   { label: "Help Center", href: "/help" },
@@ -62,7 +62,7 @@ const companyLinks = [
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
   { label: "Careers", href: "/careers" },
-  { label: "Reads & Listen", href: "/reads" },
+  { label: "Reads & Listens", href: "/reads" },
   { label: "Help", href: "/help", featured: true },
   {
     label: "iOS & Android apps — coming soon",

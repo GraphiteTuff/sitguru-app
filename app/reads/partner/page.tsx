@@ -3,7 +3,7 @@ import PartnerForm from "@/components/reads/PartnerForm";
 import TrackPageView from "@/components/reads/TrackPageView";
 
 export const metadata: Metadata = {
-  title: "Partner with SitGuru | Reads & Listen",
+  title: "Partner with SitGuru | Reads & Listens",
   description:
     "Authors, publishers, podcasters, magazines, and pet experts — bring your work to the SitGuru community.",
   alternates: { canonical: "https://www.sitguru.com/reads/partner" },

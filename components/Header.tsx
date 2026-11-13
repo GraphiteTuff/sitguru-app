@@ -121,7 +121,7 @@ const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Find Care", href: PUBLIC_GURU_SEARCH_HREF },
   { label: "Pet Events", href: "/events" },
-  { label: "Reads & Listen", href: "/reads" },
+  { label: "Reads & Listens", href: "/reads" },
   { label: "Become a Guru", href: "/become-a-guru" },
   { label: "Programs", href: "/programs" },
   { label: "Ambassadors", href: "/ambassadors" },

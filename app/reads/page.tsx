@@ -96,7 +96,7 @@ export default async function ReadsLandingPage() {
               className="italic"
               style={{ color: READS_BRAND.orange, fontFamily: "Georgia, 'Times New Roman', serif" }}
             >
-              Reads &amp; Listen
+              Reads &amp; Listens
             </span>
           </h1>
           <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-emerald-50">

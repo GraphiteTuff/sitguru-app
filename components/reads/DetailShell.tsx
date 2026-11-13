@@ -127,6 +127,10 @@ export default function DetailShell({
                 <Row label="Published" value={item.book.publication_date} />
               ) : null}
               {item.book?.isbn ? <Row label="ISBN" value={item.book.isbn} /> : null}
+              {item.book?.page_count ? (
+                <Row label="Pages" value={String(item.book.page_count)} />
+              ) : null}
+              {item.book?.language ? <Row label="Language" value={item.book.language} /> : null}
               {item.publication?.publication_name ? (
                 <Row
                   label="Publication"
