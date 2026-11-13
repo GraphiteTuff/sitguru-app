@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
+  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" && \"$VERCEL_GIT_COMMIT_REF\" != \"fix/intern-assignment-workspace-20261113\" ]]'",
   "crons": [
     {
       "path": "/api/cron/profile-completion-reminders",
