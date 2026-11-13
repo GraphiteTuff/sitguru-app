@@ -151,6 +151,11 @@ export default function SitGuruTeam() {
               </button>
               <h3>{person.name}</h3>
               <p className={styles.role}>{person.role}</p>
+              {person.major ? (
+                <p className={styles.major}>Major: {person.major}</p>
+              ) : (
+                <span className={styles.majorSpacer} aria-hidden="true" />
+              )}
               <div className={styles.divider} aria-hidden="true"><span /><PawPrint size={19} fill="currentColor" /><span /></div>
               <button
                 type="button"
@@ -181,6 +186,7 @@ export default function SitGuruTeam() {
           </div>
           <h3>{peek.name}</h3>
           <p className={styles.peekRole}>{peek.role}</p>
+          {peek.major && <p className={styles.peekMajor}>Major: {peek.major}</p>}
           <p className={styles.peekIntro}>{peek.intro}</p>
           <p className={styles.peekBio}>{peek.bio}</p>
           <button type="button" className={styles.readMore} onClick={(event) => openProfile(peek.slug, event.currentTarget)}>
@@ -207,6 +213,7 @@ export default function SitGuruTeam() {
                 <p className={styles.dialogEyebrow}>Meet the pack</p>
                 <h2 id="sitguru-person-name">{selected.name}</h2>
                 <p className={styles.dialogRole}>{selected.role}</p>
+                {selected.major && <p className={styles.dialogMajor}>Major: {selected.major}</p>}
               </div>
             </div>
             <div className={styles.dialogBody}>

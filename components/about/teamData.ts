@@ -3,6 +3,7 @@ export type SitGuruTeamMember = {
   slug: string;
   name: string;
   role: string;
+  major?: string;
   image: string | null;
   intro: string;
   bio: string;
@@ -22,11 +23,11 @@ export const sitguruTeam: readonly SitGuruTeamMember[] = [
   {
     slug: "danette",
     name: "Danette Graff",
-    role: "Co-Founder & Head of Marketing",
+    role: "Co-Founder & Head of Customer Experience",
     image: "/about/team/danette-graff.webp",
-    intro: "Helping make SitGuru's brand and community feel personal.",
-    bio: "As SitGuru’s Co-Founder and Head of Marketing, Danette guides brand, marketing, social media, and outreach. She helps ensure the SitGuru community feels welcoming, pet-first, and personal.",
-    focus: ["Brand strategy", "Marketing", "Community outreach"],
+    intro: "Helping Pet Parents and Gurus feel supported, heard, and valued.",
+    bio: "As SitGuru’s Co-Founder and Head of Customer Experience, Danette supports Pet Parents and Gurus throughout their SitGuru journey. She answers questions, helps resolve concerns, and builds lasting relationships so every experience feels thoughtful, responsive, and centered on care.",
+    focus: ["Customer support", "Pet Parent & Guru relationships", "Customer satisfaction"],
   },
   {
     slug: "ava",
@@ -41,6 +42,7 @@ export const sitguruTeam: readonly SitGuruTeamMember[] = [
     slug: "ryan",
     name: "Ryan Manibo",
     role: "Social Media Intern",
+    major: "Advertising & Public Relations",
     image: "/about/team/ryan-manibo.webp",
     intro: "Bringing new perspectives to content and campus connections.",
     bio: "Ryan supports SitGuru’s social media, content research, and community outreach initiatives, including ideas for connecting with college campuses and student pet-care providers.",
@@ -50,6 +52,7 @@ export const sitguruTeam: readonly SitGuruTeamMember[] = [
     slug: "lola",
     name: "Lola Uhl",
     role: "Social Media Intern",
+    major: "Marketing",
     image: "/about/team/lola-uhl.webp",
     intro: "Sharing pet-centered stories and creative community ideas.",
     bio: "Lola contributes to SitGuru’s social media and community storytelling, helping create engaging pet-centered content and new ways to connect with Pet Parents and Gurus.",
@@ -59,6 +62,7 @@ export const sitguruTeam: readonly SitGuruTeamMember[] = [
     slug: "lalita",
     name: "Lalita Dhital",
     role: "Social Media Intern",
+    major: "To be confirmed",
     image: null,
     intro: "A new member of the SitGuru social media intern team.",
     bio: "Lalita is joining the SitGuru social media intern team. Her personal introduction and portrait will be added when approved.",

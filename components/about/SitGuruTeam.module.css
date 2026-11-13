@@ -40,6 +40,9 @@
 .avatarButton:hover,.memberActive .avatarButton,.avatarButton:focus-visible { transform:translateY(-5px) scale(1.055); filter:drop-shadow(0 8px 16px rgba(75,171,43,.16)); }
 .member h3 { min-height: 2.4em; margin: 16px 0 3px; font-size:clamp(14px,1.65vw,21px); font-weight:850; line-height:1.2; letter-spacing:-.025em; }
 .role { font-size:clamp(11px,1.13vw,15px); font-weight:650; line-height:1.35; min-height:3.5em; max-width:170px; margin:0 auto; color:#24463a; }
+.major,.majorSpacer { display:block; width:100%; max-width:180px; min-height:2.65em; margin:6px auto 0; font-size:clamp(11px,.95vw,13px); line-height:1.35; }
+.major { color:#367a3f; font-weight:800; }
+.majorSpacer { visibility:hidden; }
 .divider { width:100%; max-width:130px; display:flex; align-items:center; justify-content:center; gap:8px; color:#48a62a; margin:5px auto 12px; }
 .divider span { height:1.5px; flex:1; background:#79bd4b; }
 .meetButton { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:118px; max-width:100%; padding:9px 12px; border:1.5px solid #23872e; background:white; border-radius:999px; text-transform:uppercase; color:#07503b; font-size:clamp(10px,.87vw,13px); line-height:1.1; font-weight:850; letter-spacing:.02em; cursor:pointer; transition:transform .2s ease, background .2s ease,color .2s ease,box-shadow .2s ease; }
@@ -51,6 +54,7 @@
 .peekTop button { display:grid;place-items:center; width:32px;height:32px; border:0;background:#f1f8ed;border-radius:100%;color:#1d5739;cursor:pointer; }
 .peek h3 { font-size:23px; margin:3px 0 0; font-weight:850; }
 .peekRole { font-size:13px; font-weight:800; color:#2a9239; margin:3px 0 11px; }
+.peekMajor { margin:0 0 9px; color:#367a3f; font-size:12px; font-weight:800; }
 .peekIntro { font-size:13px; font-weight:800; margin:0 0 6px; }
 .peekBio { margin:0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; color:#3a5c4d; font-size:12px; line-height:1.55; }
 .readMore { display:inline-flex; align-items:center; gap:6px; margin-top:12px; border:0; background:transparent; font-size:13px; color:#086a36; font-weight:850; cursor:pointer; }
@@ -64,6 +68,7 @@
 .dialogEyebrow { color:#449c2d; text-transform:uppercase; letter-spacing:.15em; font-size:11px; font-weight:900; }
 .dialogIdentity h2 { font-size:clamp(24px,3vw,34px);letter-spacing:-.03em;line-height:1.12;font-weight:900;margin:4px 0 6px; }
 .dialogRole { font-size:15px;line-height:1.45;color:#3c8a42;font-weight:800; }
+.dialogMajor { margin:5px 0 0; color:#367a3f; font-size:13px; font-weight:800; }
 .dialogBody h3 { margin:24px 0 9px; font-size:18px;font-weight:850;color:#0c4a34; }
 .dialogBody p { font-size:15px;line-height:1.75;color:#3c574c; }
 .dialogBody ul { display:flex;flex-wrap:wrap;gap:9px;padding:0;margin:12px 0 24px;list-style:none; }
@@ -76,3 +81,5 @@
 @media (max-width:345px) { .teamGrid{grid-template-columns:1fr;} .member{max-width:260px;margin:0 auto;width:100%;}.role{min-height:auto;} }
 @media (max-width:640px) { .dialog {inset:auto 0 0;width:100%;max-width:100%;max-height:calc(100dvh - 14px);margin:0;border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom);} .dialogContent{padding:58px 22px 28px;} .dialogHeader{gap:16px;align-items:center;padding:0 0 18px;}.avatarLarge{flex-basis:110px;width:110px;} .dialogIdentity{padding-right:0;} .dialogIdentity h2{font-size:23px;} .dialogRole{font-size:13px;} .closeButton{top:10px;right:12px;} }
 @media (prefers-reduced-motion:reduce) { .avatarButton,.meetButton,.peek{transition:none;animation:none;} }
+
+@media (max-width:767px) { .major,.majorSpacer { font-size:11px; min-height:3.2em; } }
