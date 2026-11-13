@@ -125,14 +125,6 @@ export default function SitGuruTeam() {
       <PawPrint className={styles.pawDoodle} size={82} strokeWidth={2} aria-hidden="true" />
       <div className={styles.teamInner}>
         <header className={styles.heading}>
-          <Image
-            src="/about/team/sitguru-wordmark.webp"
-            alt="SitGuru"
-            width={360}
-            height={72}
-            className={styles.wordmark}
-            sizes="(max-width: 640px) 220px, 330px"
-          />
           <p className={styles.kicker}><span>Meet the Team</span></p>
           <h2 id="sitguru-team-heading">The Talent Behind <span>Your Success</span></h2>
           <p className={styles.tagline}>
