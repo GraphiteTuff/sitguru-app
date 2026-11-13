@@ -15,5 +15,5 @@
       "schedule": "30 6 * * *"
     }
   ],
-  "buildCommand": "npm run test:desks && npm run build"
+  "buildCommand": "npx tsx --test lib/internship/admin-preview.test.ts && npm run build"
 }
