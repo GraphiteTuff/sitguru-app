@@ -26,7 +26,7 @@ export default async function InternAssignmentDetailPage({
   const data = await loadInternSectionWorkspace();
   if (!data) notFound();
   const task = data.workspace.tasks.find((row) => row.id === id);
-  if (!task || task.internId !== data.workspace.intern.id || task.status === "draft") notFound();
+  if (!task || task.internId !== data.workspace.intern.id || String(task.status) === "draft") notFound();
 
   const search = searchParams ? await searchParams : {};
   const flash = (key: "ok" | "error") => {
