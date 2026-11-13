@@ -181,14 +181,6 @@ export default function SitGuruJourney() {
           />
         </div>
         <div className={styles.heroText}>
-          <Image
-            src="/images/brand/intern/sitguru-logo-vector.jpg"
-            alt="SitGuru — Trusted Pet Care Simplified"
-            width={290}
-            height={100}
-            sizes="(max-width: 640px) 170px, 250px"
-            className={styles.brandLogo}
-          />
           <span className={styles.eyebrow}><PawPrint size={15} aria-hidden="true" /> Our Story, One Pawprint at a Time</span>
           <h2 id="journey-title">Our <span>Growth</span> Journey</h2>
           <p>
