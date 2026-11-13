@@ -3,7 +3,7 @@
 export const READS_TEAM_AVATARS: Record<string, string> = {
   "jason-graff": "/images/staff/jason-graff.jpg",
   "danette-graff": "/images/staff/danette-graff.jpg",
-  "ava-venezia": "/images/staff/ava-venezia.jpg",
+  "ava-venezia": "/images/staff/ava-venezia-reads.webp",
   "ryan-manibo": "/images/staff/ryan-manibo.jpg",
   "lola-uhl": "/images/staff/lola-uhl.jpg",
 };
@@ -15,9 +15,14 @@ export function readsTeamAvatar(input: {
 }) {
   const slug = String(input.slug || "").trim().toLowerCase();
   if (slug && READS_TEAM_AVATARS[slug]) return READS_TEAM_AVATARS[slug];
+  const name = String(input.full_name || "").trim().toLowerCase();
+  // Always show Ava's approved portrait even when older Reads rows have
+  // a different slug or still reference the legacy initials placeholder.
+  if (name === "ava" || name.startsWith("ava ")) {
+    return READS_TEAM_AVATARS["ava-venezia"];
+  }
   const existing = String(input.avatar_url || "").trim();
   if (existing) return existing;
-  const name = String(input.full_name || "").trim().toLowerCase();
   if (name.startsWith("jason")) return READS_TEAM_AVATARS["jason-graff"];
   if (name.startsWith("danette") || name.startsWith("nette")) {
     return READS_TEAM_AVATARS["danette-graff"];

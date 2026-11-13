@@ -21,6 +21,29 @@ describe("reads team display helpers", () => {
     }
   });
 
+  it("shows Ava's real portrait instead of the old initials placeholder", () => {
+    assert.equal(
+      READS_TEAM_AVATARS["ava-venezia"],
+      "/images/staff/ava-venezia-reads.webp",
+    );
+    assert.equal(
+      readsTeamAvatar({
+        slug: "ava-venezia",
+        avatar_url: "/images/staff/ava-venezia.jpg",
+        full_name: "Ava Venezia",
+      }),
+      READS_TEAM_AVATARS["ava-venezia"],
+    );
+    assert.equal(
+      readsTeamAvatar({
+        slug: "ava",
+        avatar_url: "/images/staff/ava-venezia.jpg",
+        full_name: "Ava Venezia",
+      }),
+      READS_TEAM_AVATARS["ava-venezia"],
+    );
+  });
+
   it("uses first names only on facing labels", () => {
     assert.equal(readsTeamFirstName("Jason Graff"), "Jason");
     assert.equal(readsTeamFirstName("Danette Graff"), "Danette");
