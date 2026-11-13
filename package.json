@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:desks": "tsx --test lib/portal/desk-preservation.test.ts lib/dashboard/role-switch.test.ts lib/admin/growth/manager-routes.test.ts lib/internship/intern-routes.test.ts",
+    "test:desks": "tsx --test lib/portal/desk-preservation.test.ts lib/dashboard/role-switch.test.ts lib/admin/growth/manager-routes.test.ts lib/internship/intern-routes.test.ts lib/internship/admin-preview.test.ts",
     "build:isolated": "node scripts/safe-next.mjs build",
     "dev:fixture": "node scripts/safe-next.mjs dev",
     "test:local-smoke": "node scripts/local-smoke.mjs",
