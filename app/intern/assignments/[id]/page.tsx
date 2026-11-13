@@ -48,6 +48,8 @@ export default async function InternAssignmentDetailPage({
   const folderUrl = sharePoint?.externalUrl || expected.url;
   const sharePointStatus = sharePoint?.status || "not_configured";
   const submittedUrl = String(work.sharePointDocumentUrl || "");
+  const existingLolaDocument = expected.knownFolderId ? `${expected.url}/SitGuru%20Assignment%20Work.md` : "";
+  const workDocumentUrl = submittedUrl || existingLolaDocument;
   const comments = data.workspace.comments.filter((row) => row.itemType === "task" && row.itemId === task.id);
 
   return (
@@ -155,9 +157,9 @@ export default async function InternAssignmentDetailPage({
             </p>
           )}
         </form>
-        {submittedUrl ? (
-          <a href={submittedUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex break-all text-sm font-bold text-blue-700 underline">
-            Open saved work in SharePoint
+        {workDocumentUrl ? (
+          <a href={workDocumentUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex break-all text-sm font-bold text-blue-700 underline">
+            Open assignment work in SharePoint
           </a>
         ) : null}
       </section>
