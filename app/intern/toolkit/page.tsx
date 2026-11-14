@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
 import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import type { InternBrandCard } from "@/components/internship/InternBrandLibrary";
@@ -40,6 +41,15 @@ export default async function InternToolkitPage({
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
   const requested = first(params.tool);
+  if (requested === "brand") {
+    const next = new URLSearchParams();
+    for (const field of ["q", "category", "sort", "page"]) {
+      const value = first(params[field]).slice(0, 120);
+      if (value) next.set(field, value);
+    }
+    const qs = next.toString();
+    redirect(qs ? `/intern/toolkit/brand?${qs}` : "/intern/toolkit/brand");
+  }
   const notice = first(params.ok) || first(params.error);
   const noticeError = Boolean(first(params.error));
   const section = await loadInternSectionWorkspace();
