@@ -157,6 +157,9 @@ export async function reviewCampusOpportunity(formData: FormData) {
   const { data: row } = await supabaseAdmin.from("campus_growth_opportunities").select("id,intern_id,approval").eq("id", field(formData, "opportunityId")).maybeSingle();
   const intern = row?.intern_id ? await allowedIntern(String(row.intern_id), who) : null;
   if (!intern || !row?.id) bounce(path, "error", "That opportunity is not on your team.");
+  if (who.kind === "manager" && row.approval === "jason_review" && approval !== "jason_review") {
+    bounce(path,"error","This opportunity has been escalated to the CEO. Only authorized oversight may change its decision.");
+  }
   const reviewNote = field(formData, "reviewNote");
   if (approval === "approved" && reviewNote.length < 12) {
     bounce(path, "error", "Approval needs a written reason and confirmed permission evidence (12+ characters).");
