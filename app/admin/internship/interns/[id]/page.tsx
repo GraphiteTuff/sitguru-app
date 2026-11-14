@@ -97,7 +97,7 @@ export default async function InternshipInternDetailPage({
 
 
   return (
-    <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 px-3 pb-24 sm:px-5 lg:px-6">
+    <main className="admin-desk-surface mx-auto w-full max-w-7xl min-w-0 space-y-5 px-3 pb-24 sm:px-5 lg:px-6">
       <nav aria-label="Intern record navigation" className="flex flex-wrap items-center justify-between gap-2">
         <Link href="/admin/internship/interns" className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#DBEAFE] bg-white px-4 text-xs font-black text-[#0F2744] hover:bg-[#EFF6FF]">
           <ArrowLeft size={15} aria-hidden="true" /> Back to intern team
