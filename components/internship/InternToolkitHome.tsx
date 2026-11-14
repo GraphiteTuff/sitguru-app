@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -41,6 +42,7 @@ export default function InternToolkitHome({
   campaigns,
   initiatives,
   insight,
+  sharedAssets,
 }: {
   stats: GrowthHomeStats;
   weekLabel: string;
@@ -48,6 +50,7 @@ export default function InternToolkitHome({
   campaigns: GrowthCampaign[];
   initiatives: GrowthInitiative[];
   insight: GrowthIntelligenceEntry | null;
+  sharedAssets?: ReactNode;
 }) {
   const nextEvent = events[0] || null;
   const liveCampaigns = campaigns.filter((item) => item.status === "active");
@@ -60,6 +63,8 @@ export default function InternToolkitHome({
         subtitle="Quick tools, resources, and everything you need to be successful."
         icon={<Wrench size={22} />}
       />
+
+      {sharedAssets}
 
       <section aria-label="Quick tools" className={`${DESK_UI.card} p-4`}>
         <p className="text-sm font-black text-[#0F2744]">Quick tools</p>
