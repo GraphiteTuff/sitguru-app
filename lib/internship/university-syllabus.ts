@@ -182,7 +182,7 @@ export function syllabusAcademicPlanSummary(input: {
   courseCode: string;
 }) {
   const credits = input.credits != null && input.credits > 0 ? `${input.credits} planned credit${input.credits === 1 ? "" : "s"}` : "Credits pending";
-  const hours = input.requiredHours != null && input.requiredHours > 0 ? `${input.requiredHours} hours recorded` : "Hours pending";
+  const hours = input.requiredHours != null && input.requiredHours > 0 ? `${input.requiredHours} planned hours` : "Hours pending";
   const weeks = input.weeks != null && input.weeks > 0 ? `${input.weeks} weeks planned` : "Academic schedule pending";
   return [input.courseCode.trim() || "Course pending", credits, hours, weeks];
 }
