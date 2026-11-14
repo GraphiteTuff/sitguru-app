@@ -12,6 +12,7 @@ import CreateAssignmentDialog, {
   type AssignmentFormValue,
   type AssignmentInternOption,
   type AssignmentMilestoneOption,
+  type AssignmentProjectOption,
 } from "@/components/manager/CreateAssignmentDialog";
 import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";
 import { InternName } from "@/components/portal/PersonFace";
@@ -30,6 +31,7 @@ export default function ManagerAssignmentsHome({
   rows,
   interns,
   milestones,
+  projects,
   notice,
   initialOpen = false,
   links = {},
@@ -37,6 +39,7 @@ export default function ManagerAssignmentsHome({
   rows: ManagerAssignmentRow[];
   interns: AssignmentInternOption[];
   milestones: AssignmentMilestoneOption[];
+  projects: AssignmentProjectOption[];
   notice?: { kind: "ok" | "error"; message: string } | null;
   initialOpen?: boolean;
   links?: Record<string, { planner: string; files: string; teams: string; plannerUrl: string; filesUrl: string; teamsUrl: string }>;
@@ -235,6 +238,7 @@ export default function ManagerAssignmentsHome({
       <CreateAssignmentDialog
         interns={interns}
         milestones={milestones}
+        projects={projects}
         open={open}
         focusIntern={focusIntern}
         initial={editing}
