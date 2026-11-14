@@ -202,7 +202,7 @@ export default function CreateAssignmentDialog({
             </label>
 
             <fieldset>
-              <legend className="text-sm font-bold text-[#0F2744]">Deliverables *</legend>
+              <legend className="text-sm font-bold text-[#0F2744]">What should they turn in? *</legend>
               <div className="mt-2 space-y-2">
                 {form.deliverables.map((value, index) => (
                   <div key={index} className="flex gap-2">
@@ -223,7 +223,7 @@ export default function CreateAssignmentDialog({
                 ))}
               </div>
               <button type="button" onClick={() => patch({ deliverables: [...form.deliverables, ""] })} className="mt-2 text-sm font-bold text-[#2563EB]">
-                + Add Deliverable
+                + Add another item
               </button>
               {errors.deliverables ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.deliverables}</span> : null}
             </fieldset>
@@ -324,7 +324,7 @@ export default function CreateAssignmentDialog({
                 Save as Draft
               </button>
               <button name="intent" value="create" disabled={!publishCheck.ok || !interns.length} className="min-h-11 rounded-full bg-[#16A34A] px-4 text-sm font-bold !text-white disabled:cursor-not-allowed disabled:opacity-50">
-                {form.taskId ? "Save assignment" : "Create Assignment"}
+                {form.taskId ? "Save changes" : "Assign task"}
               </button>
             </div>
           </div>
