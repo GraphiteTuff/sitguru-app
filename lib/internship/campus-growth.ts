@@ -156,6 +156,24 @@ export function campusTrackingCode(input: { campus: string; intern: string; targ
   return [campusSlug(input.campus), campusSlug(input.intern), campusSlug(input.target), campusSlug(input.channel)].join("-").slice(0, 80);
 }
 
+/**
+ * Destination lookup is intentionally same-site and allowlisted.
+ * Campus link attribution should lead visitors to the right public audience,
+ * never silently send every link to the homepage or allow open redirects.
+ */
+export function campusDestinationForTarget(target:string) {
+  const paths:Record<string,string>={
+    pet_parent:"/pet-parents",
+    future_guru:"/become-a-guru",
+    petperks:"/petperks",
+    event:"/events",
+    partnership:"/partners",
+    social:"/community",
+    awareness:"/",
+  };
+  return paths[target] || "/";
+}
+
 export function campusTrackingPath(code: string) {
   return `/r/campus/${encodeURIComponent(code)}`;
 }
