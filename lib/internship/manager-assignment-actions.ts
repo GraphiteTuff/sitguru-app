@@ -136,15 +136,21 @@ export async function saveManagerAssignment(formData: FormData) {
     const priorBrief = current.brief_payload && typeof current.brief_payload === "object"
       ? current.brief_payload as Record<string, unknown> : {};
     const internWork = priorBrief.internWork;
+    const managerAutomation = priorBrief.managerAutomation;
     const alreadyPublished = current.status !== "draft";
     const updatedPayload = {
       ...payload,
-      // Editing an assignment must never reset Lola's submitted or in-progress work.
+      // Editing an assignment must not reset intern work or the manager's
+      // reminder schedule stored alongside the assignment instructions.
       status: alreadyPublished ? current.status : payload.status,
+      brief_payload: {
+        ...brief,
+        ...(managerAutomation && typeof managerAutomation === "object" ? { managerAutomation } : {}),
+        ...(internWork && typeof internWork === "object" ? { internWork } : {}),
+      },
       ...(internWork && typeof internWork === "object" ? {
         student_notes: current.student_notes,
         work_url: current.work_url,
-        brief_payload: { ...brief, internWork },
       } : {}),
     };
     const { error } = await supabaseAdmin.from("internship_tasks").update(updatedPayload).eq("id", savedId);
