@@ -253,11 +253,16 @@ export default function BrandKitManager({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-slate-600">
           {total} {total === 1 ? "file" : "files"}
-          {isSuperUser
-            ? ". Approved files lead the library. Drafts, pending review, and the archive stay in the status filter."
-            : ". Approved files are shown for the team. A Super Admin reviews drafts before they appear here."}
+          {capabilities.approve
+            ? ". Approved assets are visible to everyone. Use Pending review to approve intern submissions."
+            : ". Approved assets are shared across the team. New submissions go to Ava for review."}
         </p>
         <div className="flex flex-wrap gap-2">
+          {capabilities.approve ? (
+            <a href={libraryQuery({ status: "pending_review" }, baseHref)} className="inline-flex min-h-11 items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#1D4ED8]">
+              Pending Ava review
+            </a>
+          ) : null}
           {capabilities.upload ? (
             <button
               type="button"
@@ -302,7 +307,7 @@ export default function BrandKitManager({
             ))}
           </select>
         </label>
-        {isSuperUser ? (
+        {capabilities.approve ? (
           <label className="block">
             <span className="sr-only">Approval status</span>
             <select className={fieldClass} name="status" defaultValue={status || "active"}>
@@ -403,7 +408,7 @@ export default function BrandKitManager({
       {uploadOpen ? (
         <UploadDialog
           capabilities={capabilities}
-          isSuperUser={isSuperUser}
+          canApprove={capabilities.approve}
           onClose={() => setUploadOpen(false)}
           onDone={(message) => {
             setUploadOpen(false);
@@ -451,13 +456,13 @@ function Preview({ asset, compact }: { asset: BrandAssetRecord; compact?: boolea
 }
 
 function UploadDialog({
-  isSuperUser,
+  canApprove,
   onClose,
   onDone,
   onError,
 }: {
   capabilities: Capabilities;
-  isSuperUser: boolean;
+  canApprove: boolean;
   onClose: () => void;
   onDone: (message: string) => void;
   onError: (message: string) => void;
@@ -486,9 +491,9 @@ function UploadDialog({
       }
       pulse.succeed(pulseId, "Brand file saved.");
       onDone(
-        isSuperUser
-          ? "Saved. It stays a draft until you approve it."
-          : "Saved as a draft. It appears in the team library after a Super Admin approves it.",
+        canApprove
+          ? "Uploaded and approved automatically. The asset is now available to the team."
+          : "Asset submitted for Ava's review. It becomes available to the team after approval.",
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed.";
