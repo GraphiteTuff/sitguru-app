@@ -11,13 +11,13 @@ import {
   CAMPUS_TARGETS,
   campusApprovalView,
   campusExecutionAllowed,
-  campusTrackingPath,
 } from "@/lib/internship/campus-growth";
 import { saveCampusLead, saveCampusLink, saveCampusOpportunity, saveCampusResult } from "@/lib/internship/campus-growth-actions";
 import type { CampusCard, CampusLead, CampusLink, CampusMission, CampusOpportunity, CampusResult, CampusSourceHealth } from "@/lib/internship/campus-growth-data";
 import { campusQuestProgress } from "@/lib/internship/campus-quests";
 import CampusQuestBoard from "@/components/internship/CampusQuestBoard";
 import CampusIdeaDeck from "@/components/internship/CampusIdeaDeck";
+import CampusLinkShareCard from "@/components/internship/CampusLinkShareCard";
 
 export default function InternCampusGrowthHome({
   card,
@@ -100,13 +100,9 @@ export default function InternCampusGrowthHome({
         <section className="grid gap-3">
           <h2 className="text-lg font-black text-[#0F2744]">Event toolkit</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {links.length ? links.map((link) => (
-              <a key={link.id} href={`${campusTrackingPath(link.code)}?scan=1`} className="rounded-3xl bg-[#0F2744] p-5 text-white">
-                <p className="text-xs font-black uppercase tracking-wide !text-white/80">{link.target.replaceAll("_", " ")} · {link.channel}</p>
-                <p className="mt-2 text-2xl font-black !text-white">{link.campaign}</p>
-                <p className="mt-3 break-all text-sm font-semibold !text-white">{campusTrackingPath(link.code)}?scan=1</p>
-              </a>
-            )) : <p className="text-sm font-semibold text-slate-500">Create a tracking link before the event. Opening it counts a visit. It does not pay Ambassador rewards.</p>}
+            {links.length ? links.map(link => (
+              <CampusLinkShareCard key={link.id} link={link} showAtEvent/>
+            )) : <p className="text-sm font-semibold text-slate-500">Create an approved tracking link before the event. QR scans are not verified registrations and do not pay Ambassador rewards.</p>}
           </div>
           <Link href="/intern/messages" className="rounded-2xl bg-[#EFF6FF] px-4 py-4 text-center text-sm font-black text-[#1D4ED8]">Request Ava help</Link>
         </section>
@@ -163,7 +159,7 @@ export default function InternCampusGrowthHome({
           <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Create tracking link</button>
           <ul className="space-y-2 text-sm font-semibold">
             {links.map((link) => (
-              <li key={link.id} className="break-all rounded-xl bg-[#F8FAFC] px-3 py-2">{link.campaign} · {campusTrackingPath(link.code)}?scan=1</li>
+              <li key={link.id}><CampusLinkShareCard link={link}/></li>
             ))}
           </ul>
         </form>
