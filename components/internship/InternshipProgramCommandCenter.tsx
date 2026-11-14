@@ -89,7 +89,7 @@ const tools = [
   { href: "/admin/internship/universities", title: "Academic Requirements", detail: "Track credits, hours, and university approvals.", icon: GraduationCap },
   { href: "/admin/internship/timeline", title: "Projects & Milestones", detail: "Manage the 15-week program.", icon: BookOpenCheck },
   { href: "/admin/internship/time", title: "Hours & Progress", detail: "Monitor time tracking and completion.", icon: Clock3 },
-  { href: "/admin/internship/playbook", title: "Reports", detail: "Program status and university reporting.", icon: FileBarChart },
+  { href: "/admin/internship/playbook", title: "Program Syllabus", detail: "University-ready curriculum, measurable work, and academic guidance.", icon: FileBarChart },
 ] as const;
 
 export default async function InternshipProgramCommandCenter({
