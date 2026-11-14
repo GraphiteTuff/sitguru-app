@@ -5,7 +5,9 @@ import InternshipPlaybook from "@/components/internship/InternshipPlaybook";
 import InternshipSyllabusEnhancements, {
   type SyllabusAcademicRow,
 } from "@/components/internship/InternshipSyllabusEnhancements";
-import { getActiveCohort, listInterns, listUniversities } from "@/lib/internship/queries";
+import { getActiveCohort, getCohortDashboard, listInterns, listUniversities } from "@/lib/internship/queries";
+import { isValidFinalSection } from "@/lib/internship/syllabus-alignment";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +21,10 @@ export default async function InternshipPlaybookPage() {
   if (!actor?.canAccessAdmin) redirect("/admin/login");
 
   const cohort = await getActiveCohort();
-  const [interns, universities] = await Promise.all([
+  const [interns, universities, dashboard] = await Promise.all([
     listInterns(cohort?.id || undefined),
     listUniversities(),
+    cohort ? getCohortDashboard(cohort.id) : Promise.resolve(null),
   ]);
   const universityNames = new Map(
     universities.map((school) => [school.id, school.displayName || school.name]),
@@ -40,6 +43,24 @@ export default async function InternshipPlaybookPage() {
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  const internIds = academicRows.map((intern) => intern.id);
+  const assignmentsResult = internIds.length
+    ? await supabaseAdmin
+        .from("internship_tasks")
+        .select("id,title,intern_id,final_section,status")
+        .in("intern_id", internIds)
+        .neq("status", "draft")
+    : { data: [], error: null };
+  const internNames = new Map(academicRows.map((intern) => [intern.id, intern.fullName]));
+  const unmappedAssignments = (assignmentsResult.data || [])
+    .filter((task) => !isValidFinalSection(String(task.final_section || "")))
+    .map((task) => ({
+      id: String(task.id),
+      title: String(task.title || "Untitled assignment"),
+      internName: internNames.get(String(task.intern_id)) || "Intern",
+    }))
+    .sort((a, b) => a.internName.localeCompare(b.internName) || a.title.localeCompare(b.title));
+
   return (
     <main className="mx-auto w-full max-w-7xl space-y-5 px-3 pb-12 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -54,6 +75,9 @@ export default async function InternshipPlaybookPage() {
       <InternshipSyllabusEnhancements
         academicRows={academicRows}
         cohortName={cohort?.name || "Spring 2027"}
+        projects={dashboard?.projects || []}
+        unmappedAssignments={unmappedAssignments}
+        auditAvailable={!assignmentsResult.error && Boolean(cohort)}
       />
 
       <section id="program-full" className="scroll-mt-24 space-y-4 border-t border-slate-200 pt-7">
