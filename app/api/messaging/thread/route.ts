@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const { data: owned } = member?.user_id
     ? { data: member }
     : await supabaseAdmin.from("conversations").select("id").eq("id", id).or(`started_by_user_id.eq.${userId},assigned_user_id.eq.${userId}`).maybeSingle();
-  if (!owned) return NextResponse.json({ messages: [] }, { status: 403 });
+  if (!owned && !admin?.isSuperUser) return NextResponse.json({ messages: [] }, { status: 403 });
   const { data } = await supabaseAdmin
     .from("messages")
     .select("id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at")
