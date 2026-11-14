@@ -130,112 +130,96 @@ export function InternMilestonesPageView({
   workspace: InternshipWorkspaceData;
   hourSummary: HourSummary;
 }) {
-  const milestones = workspace.milestones || [];
-  const done = milestones.filter((m) => /complete|done/i.test(String(m.status || ""))).length;
-  const total = milestones.length || 6;
-  const required = hourSummary.requiredHours || 150;
+  const milestones = (workspace.milestones || []).filter(item =>
+    !item.universityId || item.universityId === workspace.intern.universityId
+  );
+  const done = milestones.filter(item => ["done", "complete", "completed", "approved"].includes(String(item.status || "").toLowerCase())).length;
+  const total = milestones.length;
+  const required = hourSummary.requiredHours;
+  const final = milestones.find(item => item.key === "closeout" || /final report|closeout/i.test(item.title));
+  const finalStatus = final
+    ? (["done", "complete", "completed", "approved"].includes(String(final.status || "").toLowerCase()) ? "Completed" :
+       ["in_progress", "active"].includes(String(final.status || "").toLowerCase()) ? "In progress" : "Scheduled")
+    : "Not scheduled";
 
   return (
     <InternSectionScaffold
       title="Milestones"
-      subtitle="Track your progress, celebrate achievements, and stay on target."
+      subtitle="Your SitGuru program dates and your university-specific milestones. Progress comes from recorded status, not estimated percentages."
       icon={<Flag size={22} />}
       stats={[
         {
           label: "Milestones Completed",
-          value: `${done || 3} / ${total}`,
+          value: done + " / " + total,
           tone: "green",
           icon: <Flag size={18} />,
-          progress: Math.round(((done || 3) / total) * 100),
+          progress: total > 0 ? Math.round(done / total * 100) : undefined,
         },
         {
-          label: "Total Internship Goal",
-          value: `${required} hours`,
+          label: "Internship Hour Goal",
+          value: required != null ? required + " hours" : "Not confirmed",
           tone: "sky",
           icon: <Clock3 size={18} />,
-          progress: Math.min(100, Math.round(hourSummary.progressPercent || 40)),
+          progress: required != null && required > 0 ? (hourSummary.progressPercent ?? 0) : undefined,
         },
         {
-          label: "Program Remaining",
-          value: `${hourSummary.internshipWeeks || 15} weeks`,
-          detail: "of your program",
+          label: "Academic Duration",
+          value: hourSummary.internshipWeeks ? hourSummary.internshipWeeks + " weeks" : "Not confirmed",
+          detail: "Your university's approved plan",
           tone: "violet",
           icon: <CalendarDays size={18} />,
         },
         {
           label: "Final Project",
-          value: "On Track",
-          detail: "Due Apr 30, 2027",
+          value: finalStatus,
+          detail: final?.dueOn ? "Target: " + formatDue(final.dueOn) : "No final milestone date recorded",
           tone: "amber",
           icon: <Sparkles size={18} />,
         },
       ]}
     >
       <section className="grid gap-4 xl:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5 xl:col-span-2`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Milestone Progress</h2>
-          <ol className="mt-4 space-y-3">
-            {(milestones.length
-              ? milestones
-              : [
-                  { id: "1", title: "Week 1 — Onboarding & Setup", status: "complete" },
-                  { id: "2", title: "Week 2–3 — Content Creation", status: "complete" },
-                  { id: "3", title: "Week 4–6 — Community Engagement", status: "complete" },
-                  { id: "4", title: "Week 7–9 — Growth Campaign", status: "in_progress" },
-                  { id: "5", title: "Week 10–12 — Analysis", status: "todo" },
-                  { id: "6", title: "Week 13–15 — Final Report", status: "todo" },
-                ]
-            ).map((item, index) => {
-              const status = String(item.status || "").toLowerCase();
-              const complete = /complete|done/.test(status);
-              const active = /progress|active/.test(status);
-              return (
-                <li key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 px-3 py-3">
-                  <span
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-                      complete
-                        ? "bg-[#DCFCE7] text-[#166534]"
-                        : active
-                          ? "bg-[#DBEAFE] text-[#1D4ED8]"
-                          : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {complete ? "✓" : index + 1}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-[#0F2744]">{item.title}</span>
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                      complete
-                        ? "bg-[#DCFCE7] text-[#166534]"
-                        : active
-                          ? "bg-[#DBEAFE] text-[#1D4ED8]"
-                          : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {complete ? "Complete" : active ? "In Progress" : "Not Started"}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+        <article className={DESK_UI.card + " p-4 sm:p-5 xl:col-span-2"}>
+          <h2 className="text-lg font-black text-[#0F2744]">Your Program Milestones</h2>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Shared SitGuru milestones appear alongside dates applicable to your own university, never another school's deadlines.</p>
+          {milestones.length ? (
+            <ol className="mt-4 space-y-3">
+              {milestones.map((item, index) => {
+                const status = String(item.status || "").toLowerCase();
+                const complete = ["done", "complete", "completed", "approved"].includes(status);
+                const active = ["in_progress", "active"].includes(status);
+                const blocked = status === "blocked";
+                return (
+                  <li key={item.id} className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-100 px-3 py-3">
+                    <span className={"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black " +
+                      (complete ? "bg-[#DCFCE7] text-[#166534]" : active ? "bg-[#DBEAFE] text-[#1D4ED8]" : "bg-slate-100 text-slate-500")}>
+                      {complete ? "✓" : index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-[#0F2744]">{item.title}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-600">
+                        {item.dueOn ? formatDue(item.dueOn) : "Date not scheduled"} · {item.universityName || "SitGuru employer calendar"}
+                      </p>
+                      {item.action ? <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{item.action}</p> : null}
+                    </div>
+                    <span className={"rounded-full px-2.5 py-1 text-[10px] font-black " +
+                      (complete ? "bg-[#DCFCE7] text-[#166534]" : active ? "bg-[#DBEAFE] text-[#1D4ED8]" : blocked ? "bg-[#FEE2E2] text-[#B91C1C]" : "bg-slate-100 text-slate-700")}>
+                      {complete ? "Completed" : active ? "In progress" : blocked ? "Blocked" : "Scheduled"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : <p className="mt-4 rounded-xl bg-[#F8FAFC] p-4 text-sm font-medium text-slate-600">No applicable milestone records are scheduled for your internship yet.</p>}
         </article>
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
+        <article className={DESK_UI.card + " p-4 sm:p-5"}>
+          <h2 className="text-lg font-black text-[#0F2744]">Related Work</h2>
           <div className="mt-4 grid gap-2">
-            <Link href="/intern/calendar" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-center text-sm font-bold text-[#1D4ED8]">
-              View Calendar
-            </Link>
-            <Link href="/intern/assignments" className="rounded-2xl bg-[#F5F3FF] px-3 py-3 text-center text-sm font-bold text-[#6D28D9]">
-              View Assignments
-            </Link>
-            <Link href="/intern/time" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
-              Log Hours
-            </Link>
-            <Link href="/intern/messages" className="rounded-2xl bg-[#FFF7ED] px-3 py-3 text-center text-sm font-bold text-[#C2410C]">
-              Message Manager
-            </Link>
+            <Link href="/intern/calendar" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-center text-sm font-bold text-[#1D4ED8]">View Calendar</Link>
+            <Link href="/intern/assignments" className="rounded-2xl bg-[#F5F3FF] px-3 py-3 text-center text-sm font-bold text-[#6D28D9]">View Assignments</Link>
+            <Link href="/intern/check-ins" className="rounded-2xl bg-[#FFF7ED] px-3 py-3 text-center text-sm font-bold text-[#C2410C]">Weekly Check-Ins</Link>
+            <Link href="/intern/time" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">Log Hours</Link>
+            <Link href="/intern/messages" className="rounded-2xl bg-[#F8FAFC] px-3 py-3 text-center text-sm font-bold text-[#0F2744]">Message Manager</Link>
           </div>
         </article>
       </section>
