@@ -7,7 +7,7 @@ import {
   ANALYTICS_RESULTS_SHAREPOINT_URL,
   ANALYTICS_RESULTS_TEAMS_URL,
 } from "@/lib/growth-center-v2/report-sharepoint";
-import { EMPTY_REPORT_REVIEW } from "@/lib/growth-center-v2/report-document";
+import { EMPTY_REPORT_REVIEW, WEEKLY_PULSE_PLATFORMS, normalizedReportReview } from "@/lib/growth-center-v2/report-document";
 import type { SavedGrowthReport } from "@/lib/growth-center-v2/report-document";
 import type { GrowthReportPeriod } from "@/lib/growth-center-v2/report-periods";
 import type { GrowthCenterSnapshot, MetricValue } from "@/lib/growth-center-v2/types";
@@ -52,7 +52,7 @@ export default function ManagerGrowthReportingCenter({
   canEdit: boolean;
   flash: { ok?: string; error?: string };
 }) {
-  const review = saved?.review || EMPTY_REPORT_REVIEW;
+  const review = normalizedReportReview(saved?.review || EMPTY_REPORT_REVIEW);
   const isSubmitted = saved?.status === "submitted";
   const editable = canEdit && !isSubmitted;
   const topMetrics = [
@@ -211,6 +211,106 @@ export default function ManagerGrowthReportingCenter({
         <form action={saveManagerGrowthReport} className="mt-5 space-y-4">
           <input type="hidden" name="period" value={period.cadence} />
           <input type="hidden" name="end" value={period.endDate} />
+          {period.cadence === "weekly" ? (
+            <section className="space-y-4 rounded-2xl border border-blue-100 bg-[#F7FAFE] p-4 sm:p-5">
+              <div>
+                <h3 className="text-xl font-black text-[#0F2744]">Weekly Social Media Pulse</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Ava can collect weekly platform figures from the interns and native social analytics. Manually reported counts
+                  are labeled separately from verified SitGuru KPIs. Leave a field empty if it cannot be measured.
+                </p>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                {WEEKLY_PULSE_PLATFORMS.map((platform) => {
+                  const row = review.weeklyPulse.platforms[platform.id];
+                  const tracked = snapshot.social.find((item) => item.platform === platform.id);
+                  const entries = [
+                    { key: "followers", title: "Total followers" },
+                    { key: "netGrowth", title: "Net growth this week (+/-)" },
+                    { key: "reach", title: "Reach" },
+                    { key: "impressions", title: "Impressions" },
+                    { key: "linkClicks", title: "Clicks to SitGuru" },
+                  ] as const;
+                  return (
+                    <article key={platform.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                      <h4 className="font-black text-[#0F2744]">{platform.label}</h4>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {tracked
+                          ? "SitGuru-tracked follower count: " + (tracked.followers == null ? "unavailable" : tracked.followers.toLocaleString("en-US")) + " · " + tracked.status.replaceAll("_", " ")
+                          : "No automatic connector; manually reported data only"}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {entries.map((entry) => (
+                          <label key={entry.key} className={entry.key === "linkClicks" ? "col-span-2" : ""}>
+                            <span className="block text-[11px] font-bold text-slate-600">{entry.title}</span>
+                            <input
+                              name={"pulse_" + platform.id + "_" + entry.key}
+                              defaultValue={row[entry.key]}
+                              readOnly={!editable}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={24}
+                              placeholder="Not supplied"
+                              className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 read-only:bg-slate-100"
+                            />
+                          </label>
+                        ))}
+                        <label className="col-span-2">
+                          <span className="block text-[11px] font-bold text-slate-600">Source / analytics evidence link</span>
+                          <input
+                            name={"pulse_" + platform.id + "_evidenceLink"}
+                            defaultValue={row.evidenceLink}
+                            readOnly={!editable}
+                            type="text"
+                            maxLength={700}
+                            placeholder="Optional source URL"
+                            className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 read-only:bg-slate-100"
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <p className="text-xs font-semibold text-slate-600">
+                Platform totals are counts per platform, not unique people. Reach and impressions cannot be treated
+                as unique cross-platform audience totals. Never interpret an empty field as zero.
+              </p>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {field("Top performing asset · post link or description", "pulse_topAssetLink", review.weeklyPulse.topAssetLink, "Link to the week's best post or describe the content.", editable)}
+                {field("Top asset metrics", "pulse_topAssetMetrics", review.weeklyPulse.topAssetMetrics, "Views, likes, shares and tracked clicks, including sources.", editable)}
+                {field("Why did the top asset work?", "pulse_topAssetWhy", review.weeklyPulse.topAssetWhy, "A brief interpretation; distinguish evidence from the hypothesis.", editable)}
+                <label className="block space-y-2">
+                  <span className="block text-sm font-black text-[#0F2744]">Content calendar health</span>
+                  <select name="pulse_calendarStatus" defaultValue={review.weeklyPulse.calendarStatus} disabled={!editable}
+                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900">
+                    <option value="not_reviewed">Not yet reviewed</option>
+                    <option value="fully_scheduled">Fully scheduled for next week</option>
+                    <option value="partially_scheduled">Partially scheduled</option>
+                    <option value="awaiting_assets">Awaiting assets or approvals</option>
+                  </select>
+                </label>
+                {field("Upcoming campaigns", "pulse_upcomingCampaigns", review.weeklyPulse.upcomingCampaigns, "Scheduled posts, outreach, campus pushes, and owners.", editable)}
+                {field("Resources and approval blockers", "pulse_resourceBlockers", review.weeklyPulse.resourceBlockers, "Missing assets, delayed approvals, access, or other constraints.", editable)}
+                <label className="block space-y-2">
+                  <span className="block text-sm font-black text-[#0F2744]">Community sentiment (qualitative)</span>
+                  <select name="pulse_communitySentiment" defaultValue={review.weeklyPulse.communitySentiment} disabled={!editable}
+                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900">
+                    <option value="not_measured">Not measured</option>
+                    <option value="positive">Generally positive</option>
+                    <option value="neutral">Generally neutral</option>
+                    <option value="negative">Generally negative</option>
+                    <option value="mixed">Mixed feedback</option>
+                  </select>
+                </label>
+                {field("Common community questions or DMs", "pulse_commonQuestions", review.weeklyPulse.commonQuestions, "Recurring signup, trust, account, booking or Guru questions.", editable)}
+                {field("Escalations for CEO / HQ", "pulse_escalations", review.weeklyPulse.escalations, "Serious complaints, bugs, partnership decisions, and urgent risks. Say None if clear.", editable)}
+                {field("Weekly discovery and learnings", "pulse_weeklyDiscovery", review.weeklyPulse.weeklyDiscovery, "What did content, outreach, and audience responses teach the team?", editable)}
+                {field("What should change next week?", "pulse_changeNextWeek", review.weeklyPulse.changeNextWeek, "An evidence-informed experiment with next steps.", editable)}
+                {field("Coaching hub notes for interns", "pulse_coachingNotes", review.weeklyPulse.coachingNotes, "Constructive insights and lessons Ava can use with Lola, Ryan, and future interns.", editable)}
+              </div>
+            </section>
+          ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
             {field("What worked?", "worked", review.worked, "Campaigns, outreach, or content supported by observed results.", editable)}
             {field("What did not work, and why?", "didntWork", review.didntWork, "Challenges, failed experiments, missing attribution, or blockers.", editable)}
