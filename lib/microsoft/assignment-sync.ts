@@ -161,15 +161,35 @@ export async function syncPublishedAssignment(input: {
     plannerStatus = "error";
     plannerError = "This assignment already references a Planner task, but synchronization could not be confirmed.";
   } else {
+    // Resolve a verified Microsoft 365 manager BEFORE creating the task.
+    // The intern may use a SitGuru-only email and must not be given an
+    // invented Microsoft assignee identity.
+    let managerEntraId = safePlannerAssignee(config.defaultPlannerManagerEntraId);
+    if (input.managerUserId) {
+      const { data: linked } = await (await import("@/lib/supabase/admin")).supabaseAdmin
+        .from("microsoft_user_links")
+        .select("status,entra_object_id")
+        .eq("user_id", input.managerUserId)
+        .maybeSingle();
+      const linkedId = safePlannerAssignee(String(linked?.entra_object_id || ""));
+      if (linkedId && linked?.status === "connected") managerEntraId = linkedId;
+    }
+    if (!managerEntraId) {
+      plannerStatus = "needs_access";
+      plannerError = "Link a Microsoft 365 manager before creating Planner tasks.";
+    } else {
     const task = await graphRequest<{ id?: string; "@odata.etag"?: string }>({
       method: "POST",
       path: "/planner/tasks",
-      body: plannerCreateBody({
-        title: input.title,
-        dueOn: input.dueOn,
-        planId: config.planId,
-        bucketId: config.readyBucketId,
-      }),
+      body: {
+        ...plannerCreateBody({
+          title: input.title,
+          dueOn: input.dueOn,
+          planId: config.planId,
+          bucketId: config.readyBucketId,
+        }),
+        ...plannerManagerAssignment(managerEntraId),
+      },
       config,
     });
     if (!task.ok) {
@@ -183,6 +203,7 @@ export async function syncPublishedAssignment(input: {
       plannerId = task.data.id;
       plannerUrl = `https://planner.cloud.microsoft/webui/plan/${encodeURIComponent(config.planId)}/task/${encodeURIComponent(plannerId)}`;
       plannerStatus = "connected";
+      managerAssigned = true;
       // Record the remote ID BEFORE additional Graph calls. If assignment
       // or description updates fail, a retry can safely reuse this task.
       await upsertAssignmentIntegration({
@@ -194,31 +215,6 @@ export async function syncPublishedAssignment(input: {
         status: "connected",
         metadata: { planId: config.planId, bucketId: config.readyBucketId, createdWith: "microsoft_graph_application" },
       });
-
-      // The manager is a verified Microsoft 365 account (when linked or
-      // explicitly configured), not the intern's SitGuru-only identity.
-      let managerEntraId = safePlannerAssignee(config.defaultPlannerManagerEntraId);
-      if (input.managerUserId) {
-        const { data: linked } = await (await import("@/lib/supabase/admin")).supabaseAdmin
-          .from("microsoft_user_links")
-          .select("status,entra_object_id")
-          .eq("user_id", input.managerUserId)
-          .maybeSingle();
-        const linkedId = safePlannerAssignee(String(linked?.entra_object_id || ""));
-        if (linkedId && linked?.status === "connected") managerEntraId = linkedId;
-      }
-      const assigned = plannerManagerAssignment(managerEntraId);
-      const etag = task.etag || task.data["@odata.etag"] || "";
-      if (assigned && etag) {
-        const assignmentResult = await graphRequest({
-          method: "PATCH",
-          path: `/planner/tasks/${encodeURIComponent(plannerId)}`,
-          etag,
-          body: assigned,
-          config,
-        });
-        managerAssigned = assignmentResult.ok;
-      }
 
       // Include the work instructions in Planner for Ava; the intern's
       // editable work remains exclusively in their SharePoint folder.
@@ -249,6 +245,7 @@ export async function syncPublishedAssignment(input: {
         }
       }
     }
+    } // Manager must have verified Microsoft 365 identity.
   }
   await upsertAssignmentIntegration({
     assignmentId: input.assignmentId,
