@@ -72,7 +72,7 @@ export default function ManagerGrowthReportingCenter({
     timeZone: "America/New_York",
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   });
-  const reportLink = saved?.sharePointUrl || ANALYTICS_RESULTS_SHAREPOINT_URL + "/01%20Weekly%20Reports";
+  const reportLink = saved?.sharePointUrl || ANALYTICS_RESULTS_SHAREPOINT_URL;
   const socialUnavailable = snapshot.social.filter((platform) => platform.status !== "connected");
   const csvHref = "/api/growth-center/v2/export?preset=custom&start=" +
     encodeURIComponent(period.startDate) + "&end=" + encodeURIComponent(period.endDate);
