@@ -95,7 +95,7 @@ export function brandSubmissionStatus(actor: BrandActor): "approved" | "pending_
 }
 
 /** One-time founder-directed backfill: Nov 13, 2026 Eastern, excludes future intern submissions. */
-export const BRAND_INITIAL_APPROVAL_CUTOFF_UTC = "2026-11-14T05:00:00.000Z";
+export const BRAND_INITIAL_APPROVAL_CUTOFF_UTC = "2026-11-14T03:00:00.000Z";
 
 
 export function isThirdPartyBrandCategory(value: string) {
