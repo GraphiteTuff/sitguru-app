@@ -10,6 +10,8 @@ import {
   brandPreviewKind,
   inspectBrandBytes,
   BRAND_UPLOAD_STATUS,
+  BRAND_INITIAL_APPROVAL_CUTOFF_UTC,
+  brandSubmissionStatus,
   brandAssetMatchesCategory,
   isBrandCategory,
   isBrandStatus,
@@ -97,6 +99,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
       isSuperUser: admin.isSuperUser,
       growthOnly: isGrowthOnlyRole(admin.role),
       intern: false,
+      brandApprover: admin.email.trim().toLowerCase() === "ava@sitguru.com" && admin.role === "social_community_manager",
     };
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -169,8 +172,9 @@ export async function listBrandAssets(input: {
   if (!editor && !input.actor.capabilities.viewApproved) {
     return { assets: [] as BrandAssetRecord[], error: "Not allowed.", page: 1, pages: 1, total: 0 };
   }
+  const reviewer = input.actor.capabilities.approve;
   const status = resolveBrandLibraryStatus({
-    isSuperUser: input.actor.isSuperUser,
+    isSuperUser: reviewer,
     status: input.status,
   });
   let query = supabaseAdmin
@@ -180,7 +184,7 @@ export async function listBrandAssets(input: {
     )
     .eq("verified", true)
     .limit(500);
-  if (!input.actor.isSuperUser) query = query.eq("approval_status", "approved");
+  if (!reviewer) query = query.eq("approval_status", "approved");
   else if (status !== "all" && status !== "active") query = query.eq("approval_status", status);
   else if (status === "active") query = query.neq("approval_status", "archived");
   const { data, error } = await query;
@@ -332,7 +336,7 @@ export async function saveBrandFile(input: {
     description: sanitizeBrandText(input.description, 2000),
     category: input.category,
     tags: sanitizeBrandTags(input.tags),
-    approval_status: BRAND_UPLOAD_STATUS,
+    approval_status: brandSubmissionStatus(input.actor),
     file_name: inspected.safeName,
     mime_type: inspected.mime,
     file_size: input.bytes.byteLength,
@@ -405,6 +409,7 @@ export async function verifyBrandUpload(input: { actor: ResolvedBrandActor; id: 
     .from("growth_brand_assets")
     .update({
       verified: true,
+      approval_status: brandSubmissionStatus(input.actor),
       mime_type: inspected.mime,
       file_size: length || row.file_size,
       updated_at: new Date().toISOString(),
@@ -487,7 +492,7 @@ export async function updateBrandAsset(input: {
   if (input.approvalStatus !== undefined) {
     if (!isBrandStatus(input.approvalStatus)) return { error: "Choose a valid status." };
     if (input.approvalStatus === "approved" && !input.actor.capabilities.approve) {
-      return { error: "A Super Admin approves brand files." };
+      return { error: "Only Ava or a Super Admin may approve brand files." };
     }
     if (input.approvalStatus === "archived" && !input.actor.capabilities.archive) {
       return { error: "You cannot archive this file." };
