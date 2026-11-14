@@ -112,7 +112,7 @@ export default async function InternshipInternsPage({
   const activeInterns = cohortInterns.filter((intern) => intern.status === "active").length;
   const awaitingUniversity = cohortInterns.filter((intern) => ["pending", "needs_information"].includes(intern.universityVerificationStatus || "")).length;
   const assignedManagers = cohortInterns.filter((intern) => Boolean(intern.managerUserId)).length;
-  const ryanExists = interns.some((intern) => /ryan\\s+manibo/i.test(intern.fullName));
+  const ryanExists = interns.some((intern) => /ryan\s+manibo/i.test(intern.fullName));
 
   return (
     <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 overflow-x-hidden px-3 pb-24 sm:px-5 lg:px-6">
