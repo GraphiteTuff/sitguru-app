@@ -183,6 +183,17 @@ export async function syncPublishedAssignment(input: {
       plannerId = task.data.id;
       plannerUrl = `https://planner.cloud.microsoft/webui/plan/${encodeURIComponent(config.planId)}/task/${encodeURIComponent(plannerId)}`;
       plannerStatus = "connected";
+      // Record the remote ID BEFORE additional Graph calls. If assignment
+      // or description updates fail, a retry can safely reuse this task.
+      await upsertAssignmentIntegration({
+        assignmentId: input.assignmentId,
+        provider: "planner",
+        externalId: plannerId,
+        externalParentId: config.planId,
+        externalUrl: plannerUrl,
+        status: "connected",
+        metadata: { planId: config.planId, bucketId: config.readyBucketId, createdWith: "microsoft_graph_application" },
+      });
 
       // The manager is a verified Microsoft 365 account (when linked or
       // explicitly configured), not the intern's SitGuru-only identity.
