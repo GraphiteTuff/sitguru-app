@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import BrandKitManager from "@/components/manager/BrandKitManager";
+import BrandStyleReference from "@/components/portal/BrandStyleReference";
 import InitialBrandApprovalControl from "@/components/manager/InitialBrandApprovalControl";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { SITGURU_SHAREPOINT_FOLDERS, sitguruSharePointFolderHref } from "@/lib/admin/growth/sharepoint-files";
@@ -42,6 +43,7 @@ export default async function AdminBrandKitPage({ searchParams }: {
       </div>
       {baseline.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{baseline.error}</p> : null}
       {actor?.isSuperUser ? <InitialBrandApprovalControl pendingCount={baseline.count} /> : null}
+      <BrandStyleReference />
       <BrandKitManager
         assets={listed.assets}
         total={listed.total}
