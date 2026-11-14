@@ -1,5 +1,6 @@
 import { GROWTH_TEAMS_CHANNELS, routeAssignmentCategory, sharePointFolderName } from "@/lib/admin/growth/work-routing";
 import { graphRequest, readMicrosoftGraphConfig } from "@/lib/microsoft/graph";
+import { plannerConfigurationReady, plannerCreateBody, plannerManagerAssignment, plannerAssignmentDescription, safePlannerAssignee } from "@/lib/microsoft/planner-automation";
 import { ensureInternAssignmentSharePointFolder, expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import {
   planTeamsChannel,
@@ -8,7 +9,6 @@ import {
 } from "@/lib/microsoft/teams-notify";
 import {
   listAssignmentIntegrations,
-  microsoftIdentityStatus,
   upsertAssignmentIntegration,
 } from "@/lib/microsoft/assignment-integrations";
 
@@ -41,6 +41,7 @@ export async function syncPublishedAssignment(input: {
   internUserId: string;
   internName: string;
   managerName: string;
+  managerUserId?: string;
   sitguruUrl: string;
 }) {
   const route = routeAssignmentCategory(input.category);
@@ -107,7 +108,7 @@ export async function syncPublishedAssignment(input: {
     return;
   }
 
-  const identity = await microsoftIdentityStatus(input.internUserId);
+  // Interns do not need a Microsoft 365 account to work inside SitGuru.
   // The canonical SharePoint location is Intern Projects / <intern> / <assignment>.
   // Reuse existing folders (including Lola's verified folder); never make a flat
   // "Lola - Assignment" folder in a different library.
@@ -131,44 +132,132 @@ export async function syncPublishedAssignment(input: {
     });
   }
 
-  const manuallyLinked = current("planner")?.status === "linked_manually";
-  let plannerId = current("planner")?.externalId || "";
-  let plannerUrl = current("planner")?.externalUrl || plannerUrlFallback;
-  let plannerStatus = manuallyLinked ? "linked_manually" : plannerId ? "connected" : "pending";
-  if (manuallyLinked) {
-    // Preserve the manager's explicit task link. Only a separately verified
-    // integration may promote this status to connected.
-  } else if (!plannerId && config.planId && identity === "connected") {
-    const task = await graphRequest<{ id?: string }>({
+  // Fail closed until Graph application consent, a specific plan/bucket and
+  // an explicit automation switch have been configured in Production.
+  const plannerReady = plannerConfigurationReady({
+    graphConfigured: config.configured,
+    enabled: config.plannerAutomationEnabled,
+    planId: config.planId,
+    bucketId: config.readyBucketId,
+  });
+  const existingPlanner = current("planner");
+  const manuallyLinked = existingPlanner?.status === "linked_manually";
+  let plannerId = existingPlanner?.externalId || "";
+  let plannerUrl = existingPlanner?.externalUrl || plannerUrlFallback;
+  let plannerStatus = manuallyLinked
+    ? "linked_manually"
+    : existingPlanner?.status === "connected" && plannerId
+      ? "connected" : "not_configured";
+  let plannerError = "";
+  let managerAssigned = Boolean(existingPlanner?.metadata?.managerAssigned);
+  let detailAdded = Boolean(existingPlanner?.metadata?.detailsSaved);
+
+  if (manuallyLinked || plannerStatus === "connected") {
+    // Never generate a second Planner task if this assignment has one already.
+  } else if (!plannerReady) {
+    plannerStatus = "not_configured";
+  } else if (plannerId) {
+    // A partially recorded external task needs investigation, not a duplicate POST.
+    plannerStatus = "error";
+    plannerError = "This assignment already references a Planner task, but synchronization could not be confirmed.";
+  } else {
+    const task = await graphRequest<{ id?: string; "@odata.etag"?: string }>({
       method: "POST",
       path: "/planner/tasks",
-      body: {
-        planId: config.planId,
-        bucketId: config.readyBucketId || undefined,
+      body: plannerCreateBody({
         title: input.title,
-        dueDateTime: input.dueOn ? `${input.dueOn}T23:59:59Z` : undefined,
-      },
+        dueOn: input.dueOn,
+        planId: config.planId,
+        bucketId: config.readyBucketId,
+      }),
       config,
     });
-    if (task.ok && task.data.id) {
-      plannerId = task.data.id;
-      plannerUrl = `https://planner.cloud.microsoft/webui/plan/${config.planId}/task/${plannerId}`;
-      plannerStatus = "connected";
+    if (!task.ok) {
+      plannerStatus = task.code === "needs_access" ? "needs_access" :
+        task.code === "not_configured" ? "not_configured" : "error";
+      plannerError = task.message;
+    } else if (!task.data.id) {
+      plannerStatus = "error";
+      plannerError = "Planner did not return a task ID.";
     } else {
-      plannerStatus = task.ok ? "error" : task.code === "needs_access" ? "needs_access" : "error";
+      plannerId = task.data.id;
+      plannerUrl = `https://planner.cloud.microsoft/webui/plan/${encodeURIComponent(config.planId)}/task/${encodeURIComponent(plannerId)}`;
+      plannerStatus = "connected";
+
+      // The manager is a verified Microsoft 365 account (when linked or
+      // explicitly configured), not the intern's SitGuru-only identity.
+      let managerEntraId = safePlannerAssignee(config.defaultPlannerManagerEntraId);
+      if (input.managerUserId) {
+        const { data: linked } = await (await import("@/lib/supabase/admin")).supabaseAdmin
+          .from("microsoft_user_links")
+          .select("status,entra_object_id")
+          .eq("user_id", input.managerUserId)
+          .maybeSingle();
+        const linkedId = safePlannerAssignee(String(linked?.entra_object_id || ""));
+        if (linkedId && linked?.status === "connected") managerEntraId = linkedId;
+      }
+      const assigned = plannerManagerAssignment(managerEntraId);
+      const etag = task.etag || task.data["@odata.etag"] || "";
+      if (assigned && etag) {
+        const assignmentResult = await graphRequest({
+          method: "PATCH",
+          path: `/planner/tasks/${encodeURIComponent(plannerId)}`,
+          etag,
+          body: assigned,
+          config,
+        });
+        managerAssigned = assignmentResult.ok;
+      }
+
+      // Include the work instructions in Planner for Ava; the intern's
+      // editable work remains exclusively in their SharePoint folder.
+      const detail = await graphRequest<{ "@odata.etag"?: string }>({
+        method: "GET",
+        path: `/planner/tasks/${encodeURIComponent(plannerId)}/details`,
+        config,
+      });
+      if (detail.ok) {
+        const detailEtag = detail.etag || detail.data["@odata.etag"] || "";
+        if (detailEtag) {
+          const savedDetails = await graphRequest({
+            method: "PATCH",
+            path: `/planner/tasks/${encodeURIComponent(plannerId)}/details`,
+            etag: detailEtag,
+            body: {
+              description: plannerAssignmentDescription({
+                assignmentId: input.assignmentId,
+                internName: input.internName,
+                description: input.description,
+                deliverables: input.deliverables,
+                sharePointUrl: linkedFolder.url,
+              }),
+            },
+            config,
+          });
+          detailAdded = savedDetails.ok;
+        }
+      }
     }
-  } else if (identity !== "connected") {
-    plannerStatus = "needs_access";
-  } else if (!config.planId) {
-    plannerStatus = "not_configured";
   }
   await upsertAssignmentIntegration({
     assignmentId: input.assignmentId,
     provider: "planner",
     externalId: plannerId,
+    externalParentId: config.planId,
     externalUrl: plannerUrl,
     status: plannerStatus,
-    metadata: { ...(manuallyLinked ? current("planner")?.metadata || {} : {}), bucket: "Ready to Start", priority: input.priority },
+    lastError: plannerError,
+    metadata: {
+      ...(manuallyLinked ? existingPlanner?.metadata || {} : {}),
+      planId: config.planId,
+      bucketId: config.readyBucketId,
+      bucket: "Ready to Start",
+      priority: input.priority,
+      managerAssigned,
+      detailsSaved: detailAdded,
+      automationEnabled: config.plannerAutomationEnabled,
+      createdWith: plannerId && !manuallyLinked ? "microsoft_graph_application" : "manual",
+    },
   });
 
   const teamsPlan = planTeamsChannel({
