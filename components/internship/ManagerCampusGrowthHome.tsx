@@ -26,6 +26,7 @@ import type {
 } from "@/lib/internship/campus-growth-data";
 import { campusQuestProgress } from "@/lib/internship/campus-quests";
 import CampusQuestBoard from "@/components/internship/CampusQuestBoard";
+import CampusLinkShareCard from "@/components/internship/CampusLinkShareCard";
 
 type Tab = "overview" | "opportunities" | "leads" | "tracking" | "missions";
 const TABS: Array<{ key: Tab; label: string; icon: typeof Flag }> = [
@@ -334,15 +335,8 @@ function TrackingTab({card,links,results,health}:{card:CampusCard;links:CampusLi
         </form>
         <h4 className="mt-5 text-sm font-black text-[#0F2744]">Links for this campus ({links.length})</h4>
         <div className="mt-3 space-y-3">
-          {links.length?links.map(link=>{
-            const href=campusTrackingPath(link.code)+(link.channel==="qr"?"?scan=1":"");
-            return <div key={link.id} className="min-w-0 rounded-xl border border-slate-200 bg-[#F8FAFC] p-3">
-              <p className="text-sm font-black text-[#0F2744]">{link.campaign||"Campus campaign"}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">{link.channel} · {link.target.replaceAll("_"," ")} · {health.visits?link.visits+" visits · "+link.scans+" QR events":"Tracking data unavailable"}</p>
-              <p className="mt-2 break-all rounded-lg bg-white p-2 text-xs font-bold text-[#2563EB]">https://www.sitguru.com{href}</p>
-              <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-10 items-center gap-1 text-xs font-black text-[#2563EB]">Open tracked link <ExternalLink size={14}/></a>
-            </div>;
-          }):<Empty title="No tracking links yet" detail="Create one for each approved outreach campaign. Links do not grant Ambassador or PetPerks rewards."/>}
+          {links.length?links.map(link=><CampusLinkShareCard key={link.id} link={health.visits?link:{...link,visits:0,scans:0}}/>):
+            <Empty title="No tracking links yet" detail="Create one for an approved outreach campaign. It will point to the right public SitGuru audience and can be downloaded as a QR graphic."/>}
         </div>
       </section>
       <section className={DESK_UI.card+" p-4 sm:p-5"}>
