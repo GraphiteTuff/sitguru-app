@@ -76,7 +76,7 @@ describe("brand kit permissions", () => {
     assert.equal(brandSubmissionStatus({
       canAccessAdmin: false, isSuperUser: false, growthOnly: false, intern: true,
     }), "pending_review");
-    assert.equal(BRAND_INITIAL_APPROVAL_CUTOFF_UTC, "2026-11-14T05:00:00.000Z");
+    assert.equal(BRAND_INITIAL_APPROVAL_CUTOFF_UTC, "2026-11-14T03:00:00.000Z");
   });
 });
 
