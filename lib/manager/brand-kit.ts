@@ -58,6 +58,8 @@ export type BrandActor = {
   isSuperUser: boolean;
   growthOnly: boolean;
   intern: boolean;
+  /** Named and verified Growth Manager Ava; cannot delete master assets. */
+  brandApprover?: boolean;
 };
 
 export type BrandCapabilities = {
@@ -86,6 +88,15 @@ const THIRD_PARTY_BRAND_CATEGORIES = new Set<BrandCategoryId>([
 
 /** New library files stay drafts until a Super Admin approves them. */
 export const BRAND_UPLOAD_STATUS = "draft" as const;
+
+/** A submitted, verified intern file waits for Ava. Ava's and the founder's files publish immediately. */
+export function brandSubmissionStatus(actor: BrandActor): "approved" | "pending_review" {
+  return actor.isSuperUser || actor.brandApprover ? "approved" : "pending_review";
+}
+
+/** One-time founder-directed backfill: Nov 13, 2026 Eastern, excludes future intern submissions. */
+export const BRAND_INITIAL_APPROVAL_CUTOFF_UTC = "2026-11-14T05:00:00.000Z";
+
 
 export function isThirdPartyBrandCategory(value: string) {
   return isBrandCategory(value) && THIRD_PARTY_BRAND_CATEGORIES.has(value);
@@ -123,10 +134,10 @@ export function brandKitCapabilities(actor: BrandActor | null): BrandCapabilitie
     // All authorized Admin/Manager/Intern seats see the same published assets.
     // Management permissions remain role-scoped and never follow from view access.
     viewApproved: editor || Boolean(actor?.canAccessAdmin) || Boolean(actor?.intern),
-    upload: editor,
+    upload: editor || Boolean(actor?.intern),
     edit: editor,
     archive: editor,
-    approve: Boolean(actor?.isSuperUser),
+    approve: Boolean(actor?.isSuperUser || actor?.brandApprover),
     delete: Boolean(actor?.isSuperUser),
   };
 }
