@@ -7,8 +7,7 @@ import {
   campusApprovalChangeAllowed,
   campusAttributionReward,
   campusMissionDraft,
-  campusTrackingCode,
-  campusSlug,
+  campusCampaignTrackingCode,
   CAMPUS_LEAD_STATUSES,
 } from "@/lib/internship/campus-growth";
 import { canReadPrivateInternRecord, internshipActorKind } from "@/lib/internship/manager-access";
@@ -260,19 +259,13 @@ export async function saveCampusLink(formData: FormData) {
   const campus = field(formData, "campus") || "campus";
   const target = field(formData, "target") || "awareness";
   const channel = field(formData, "channel") || "link";
-  const baseCode = campusTrackingCode({
+  const code = campusCampaignTrackingCode({
     campus,
-    intern: intern.preferredName || intern.fullName,
-    target,
-    channel,
+    intern:intern.preferredName || intern.fullName,
+    target,channel,
+    campaign:field(formData,"campaign") || "campaign",
+    nonce:crypto.randomUUID(),
   });
-  // Each separate campaign needs its own code. Preserve existing codes, which
-  // would otherwise collide when interns launch two QR/link experiments.
-  const code = [
-    baseCode.slice(0, 65),
-    campusSlug(field(formData,"campaign")||"campaign").slice(0,10),
-    crypto.randomUUID().slice(0,8),
-  ].join("-");
   const reward = campusAttributionReward();
   const { data, error } = await supabaseAdmin.from("campus_growth_links").insert({
     intern_id: intern.id,
