@@ -39,11 +39,19 @@ export async function readStoredGrowthReport(period: GrowthReportPeriod): Promis
   }
   const res = await graphRequest<SavedGrowthReport>({ method: "GET", path: graphRootPath(period) });
   if (!res.ok) {
-    return {
-      state: res.code === "needs_access" ? "connected" : "unavailable",
-      report: null,
-      url: fileUrl(period),
-    };
+    // Graph reports both 403 (access denied) and 404 (new report file) as
+    // needs_access. Only consider a missing report a healthy blank draft when
+    // the authorized application can read the existing Analytics root folder.
+    if (res.code === "needs_access") {
+      const folder = await graphRequest<DriveItem>({
+        method: "GET",
+        path: "/drives/" + encodeURIComponent(driveId()) + "/root:/" + encodeURIComponent("Analytics and Results"),
+      });
+      if (folder.ok && folder.data?.id && folder.data.folder) {
+        return { state: "connected", report: null, url: fileUrl(period) };
+      }
+    }
+    return { state: "unavailable", report: null, url: fileUrl(period) };
   }
   if (!res.data || res.data.schemaVersion !== 1 || !res.data.review ||
       (res.data.status !== "draft" && res.data.status !== "submitted")) {
