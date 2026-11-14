@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getGrowthReportPeriod, growthReportCronPeriods, growthReportFilters } from "./report-periods";
-import { EMPTY_REPORT_REVIEW, normalizedReportReview } from "./report-document";
+import { EMPTY_REPORT_REVIEW, emptyWeeklyPulse, normalizedReportReview, weeklyPulseMarkdown } from "./report-document";
 
 test("weekly reporting runs Monday through Sunday, including partial preview weeks", () => {
   const report = getGrowthReportPeriod({ cadence: "weekly", now: new Date("2026-11-14T22:00:00.000Z") });
@@ -48,4 +48,53 @@ test("review normalization limits manager text and preserves empty review", () =
   assert.equal(normalizedReportReview(null).worked, EMPTY_REPORT_REVIEW.worked);
   assert.equal(normalizedReportReview({ worked: "  Progress  " }).worked, "Progress");
   assert.equal(normalizedReportReview({ learned: "x".repeat(7000) }).learned.length, 6000);
+});
+
+
+test("pulse retains true zero separately from missing social metrics", () => {
+  const input = emptyWeeklyPulse();
+  input.platforms.instagram = {
+    followers: "1,250",
+    netGrowth: "+20",
+    reach: "0",
+    impressions: "",
+    linkClicks: "14",
+    evidenceLink: "https://instagram.com/",
+  };
+  input.platforms.nextdoor = {
+    followers: "",
+    netGrowth: "",
+    reach: "",
+    impressions: "",
+    linkClicks: "",
+    evidenceLink: "",
+  };
+  input.topAssetWhy = "Local student reach";
+  input.communitySentiment = "mixed";
+  const clean = normalizedReportReview({ weeklyPulse: input }).weeklyPulse;
+  assert.equal(clean.platforms.instagram.followers, "1250");
+  assert.equal(clean.platforms.instagram.netGrowth, "20");
+  assert.equal(clean.platforms.instagram.reach, "0");
+  assert.equal(clean.platforms.instagram.impressions, "");
+  assert.equal(clean.platforms.nextdoor.followers, "");
+  assert.equal(clean.communitySentiment, "mixed");
+  const markdown = weeklyPulseMarkdown(clean);
+  assert.match(markdown, /Instagram/);
+  assert.match(markdown, /Nextdoor/);
+  assert.match(markdown, /Not supplied/);
+  assert.match(markdown, /Top performing asset of the week/);
+  assert.match(markdown, /Coaching hub/);
+  assert.match(markdown, /Sum of supplied platform counts/);
+  assert.ok(markdown.indexOf("### Platform source references") > markdown.indexOf("Sum of supplied platform counts"));
+});
+
+test("pulse rejects invalid numeric manual metrics without converting missing values to zero", () => {
+  const input = emptyWeeklyPulse();
+  input.platforms.tiktok.netGrowth = "-13";
+  input.platforms.tiktok.followers = "unknown";
+  input.platforms.facebook.impressions = "-2";
+  const clean = normalizedReportReview({ weeklyPulse: input }).weeklyPulse;
+  assert.equal(clean.platforms.tiktok.netGrowth, "-13");
+  assert.equal(clean.platforms.tiktok.followers, "");
+  assert.equal(clean.platforms.facebook.impressions, "");
 });
