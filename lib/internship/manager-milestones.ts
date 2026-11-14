@@ -26,8 +26,8 @@ export function milestoneDisplayStatus(milestone: InternshipMilestone, today: st
   const status = String(milestone.status || "scheduled").toLowerCase();
   if (COMPLETED.has(status)) return "completed";
   if (BLOCKED.has(status)) return "blocked";
-  if (IN_PROGRESS.has(status)) return "in_progress";
   if (milestone.dueOn && milestone.dueOn < today) return "overdue";
+  if (IN_PROGRESS.has(status)) return "in_progress";
   return "scheduled";
 }
 
