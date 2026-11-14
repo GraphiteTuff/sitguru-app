@@ -2439,3 +2439,15 @@ div.homepage-chat-panel__header,
   object-fit: cover;
   object-position: 50% 22%;
 }
+
+/* Manager Desk palette for the admin intern and HR record redesigns.
+ * Admin HQ's default heading color uses !important, so keep this override
+ * scoped to desk-style management pages only. */
+.admin-theme .admin-desk-surface h1,
+.admin-theme .admin-desk-surface h2,
+.admin-theme .admin-desk-surface h3,
+.admin-theme .admin-desk-surface h4,
+.admin-theme .admin-desk-surface h5,
+.admin-theme .admin-desk-surface h6 {
+  color: #0f2744 !important;
+}
