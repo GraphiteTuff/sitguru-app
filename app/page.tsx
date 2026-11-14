@@ -156,7 +156,6 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
   { label: "Anna Fryer", fullName: "anna fryer" },
   { label: "Bethany Staab", fullName: "bethany staab" },
   { label: "Carol Detweiler", fullName: "carol detweiler" },
-  { label: "George Medina", fullName: "george medina" },
   { label: "Jazzy", firstName: "jazzy" },
   { label: "Latavea Tillman", fullName: "latavea tillman" },
   { label: "Marie Lao", fullName: "marie lao" },
@@ -166,6 +165,9 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
   { label: "Ru", firstName: "ru" },
   { label: "Vanessa Guedez", fullName: "vanessa guedez" },
 ];
+
+// Home carousel placement is separate from a Guru's public profile and search eligibility.
+const excludedHomepageCarouselGuruNames = new Set(["george medina"]);
 
 const zipCodeFallbackMap: Record<
   string,
@@ -2293,7 +2295,10 @@ export default function HomePage() {
         (guru) =>
           guru.is_active !== false &&
           guru.is_public !== false &&
-          hasGuruProfilePhoto(guru),
+          hasGuruProfilePhoto(guru) &&
+          !excludedHomepageCarouselGuruNames.has(
+            normalizeGuruDisplayName(getGuruName(guru)),
+          ),
       );
       const orderedGuruRows = orderHomepageGurus(liveGuruRows);
       const missingFeaturedGuruNames = featuredHomepageGuruTargets
