@@ -35,7 +35,7 @@ export default async function InternGrowthHomePage() {
     : {conversations:[]};
   const recentMessages=inbox.conversations.slice(0,3).map(conversation=>({
     author:conversation.messages[conversation.messages.length-1]?.author || conversation.subject,
-    preview:conversation.preview || conversation.messages[conversation.messages.length-1]?.body || "",
+    preview:conversation.messages[conversation.messages.length-1]?.body || "",
   }));
   const summary=buildInternGrowthSummary({workspace,recentMessages});
   return <InternGrowthWorkspaceHome {...summary}/>;
