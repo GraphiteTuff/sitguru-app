@@ -209,6 +209,68 @@ export async function listBrandAssets(input: {
   return { assets: page.assets, error: "", page: page.page, pages: page.pages, total: page.total };
 }
 
+/**
+ * Founder-approved, bounded historical backfill.
+ * Excludes unverified uploads, archived files, and every file submitted after
+ * the snapshot cutoff so newer intern work can never bypass Ava's review.
+ */
+export async function countInitialBrandAssetsToApprove(actor: ResolvedBrandActor) {
+  if (!actor.isSuperUser) return { count: 0, error: "Super Admin access required." };
+  const { count, error } = await supabaseAdmin
+    .from("growth_brand_assets")
+    .select("id", { count: "exact", head: true })
+    .eq("verified", true)
+    .in("approval_status", ["draft", "pending_review"])
+    .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC);
+  return { count: count || 0, error: error ? libraryError(error) : "" };
+}
+
+export async function approveInitialBrandAssets(actor: ResolvedBrandActor) {
+  if (!actor.isSuperUser) return { approved: 0, error: "Super Admin access required." };
+  let approved = 0;
+  // Bounded batches allow a safe retry, with a guard against unbounded work.
+  for (let batch = 0; batch < 40; batch += 1) {
+    const { data: pending, error: lookupError } = await supabaseAdmin
+      .from("growth_brand_assets")
+      .select("id,title")
+      .eq("verified", true)
+      .in("approval_status", ["draft", "pending_review"])
+      .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC)
+      .order("created_at", { ascending: true })
+      .limit(50);
+    if (lookupError) return { approved, error: libraryError(lookupError) };
+    if (!pending?.length) return { approved, error: "" };
+    const ids = pending.map((asset) => asset.id);
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("growth_brand_assets")
+      .update({
+        approval_status: "approved",
+        updated_at: new Date().toISOString(),
+        updated_by: actor.id,
+      })
+      .in("id", ids)
+      .eq("verified", true)
+      .in("approval_status", ["draft", "pending_review"])
+      .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC)
+      .select("id,title");
+    if (updateError) return { approved, error: libraryError(updateError) };
+    if (updated?.length) {
+      const { error: auditError } = await supabaseAdmin
+        .from("growth_brand_asset_events")
+        .insert(updated.map((asset) => ({
+          asset_id: asset.id,
+          asset_title: String(asset.title).slice(0, 180),
+          actor_id: actor.id,
+          action: "approval",
+          detail: "Founder-directed initial approval of existing verified assets through Nov 13, 2026",
+        })));
+      approved += updated.length;
+      if (auditError) return { approved, error: "Assets were approved, but their audit entries need reconciliation." };
+    }
+  }
+  return { approved, error: "Approval exceeded batch limit. Run again to finish remaining verified assets." };
+}
+
 export async function prepareBrandUpload(input: {
   actor: ResolvedBrandActor;
   fileName: string;
