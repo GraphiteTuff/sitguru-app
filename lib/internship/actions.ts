@@ -115,6 +115,11 @@ function refreshInternship(extra?: string) {
   revalidatePath("/admin/internship/playbook");
   revalidatePath("/admin/hr");
   revalidatePath("/intern", "layout");
+  revalidatePath("/intern/check-ins");
+  revalidatePath("/intern/growth");
+  revalidatePath("/manager/check-ins");
+  revalidatePath("/manager/insights");
+  revalidatePath("/admin/growth/insights");
   revalidatePath(INTERNSHIP_ONBOARDING_PATH);
   if (extra) revalidatePath(extra);
 }
@@ -999,20 +1004,21 @@ export async function saveScorecard(formData: FormData) {
 export async function saveWeeklyReview(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
+  const returnTo=mode==="intern"?"/intern/check-ins":workspacePath(internId,mode);
   await assertWorkspaceActor(internId, mode);
   const weekOf = text(formData, "weekOf");
   const finalSection = text(formData, "finalSection");
   const contributionAdded = text(formData, "contributionAdded");
   if (!finalSection) {
     bounce(
-      workspacePath(internId, mode),
+      returnTo,
       "error",
       "Choose which part of your report this helped.",
     );
   }
   if (!contributionAdded) {
     bounce(
-      workspacePath(internId, mode),
+      returnTo,
       "error",
       "Tell SitGuru what you finished this week.",
     );
@@ -1096,7 +1102,7 @@ export async function saveWeeklyReview(formData: FormData) {
         .select("id")
         .maybeSingle();
 
-  if (error) bounce(workspacePath(internId, mode), "error", error.message);
+  if (error) bounce(returnTo, "error", error.message);
 
   if (mode === "intern") {
     const intern = await findInternById(internId);
@@ -1118,9 +1124,9 @@ export async function saveWeeklyReview(formData: FormData) {
     }
   }
 
-  refreshInternship(workspacePath(internId, mode));
+  refreshInternship(returnTo);
   bounce(
-    workspacePath(internId, mode),
+    returnTo,
     "ok",
     mode === "supervisor"
       ? "Weekly work marked for the report."
