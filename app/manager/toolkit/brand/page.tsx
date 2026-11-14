@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BrandKitManager from "@/components/manager/BrandKitManager";
+import BrandStyleReference from "@/components/portal/BrandStyleReference";
 import { SITGURU_SHAREPOINT_FOLDERS, sitguruSharePointFolderHref } from "@/lib/admin/growth/sharepoint-files";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -43,6 +44,7 @@ export default async function ManagerBrandKitPage({
           Your SitGuru library of approved logos, graphics, and creative resources. SharePoint keeps the master files. This page is the team download library, and uploads are not copied there automatically.
         </p>
       </div>
+      <BrandStyleReference />
       <BrandKitManager
         assets={listed.assets}
         total={listed.total}

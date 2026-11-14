@@ -119,7 +119,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
   if (!intern?.userId) return null;
   // Match the Intern Portal gate: unpublished or unsigned intern accounts cannot download brand files.
   const onboarding = await getInternOnboarding(intern.id);
-  if (!internOnboardingComplete(onboarding)) return null;
+  const canSubmitAssets = internOnboardingComplete(onboarding);
   const actor: BrandActor = {
     canAccessAdmin: false,
     isSuperUser: false,
@@ -131,7 +131,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
     id: intern.userId,
     email: intern.email || "",
     name: intern.preferredName || intern.fullName || "Intern",
-    capabilities: brandKitCapabilities(actor),
+    capabilities: { ...brandKitCapabilities(actor), upload: canSubmitAssets },
   };
 }
 
@@ -159,6 +159,17 @@ function libraryError(error: { message?: string; code?: string } | null) {
   return error.message || "Brand Kit could not be loaded.";
 }
 
+function isInitialBrandLibraryAsset(row: {
+  approval_status?: string | null;
+  created_at?: string | null;
+}) {
+  return (
+    (row.approval_status === "draft" || row.approval_status === "pending_review") &&
+    Boolean(row.created_at) &&
+    String(row.created_at) <= BRAND_INITIAL_APPROVAL_CUTOFF_UTC
+  );
+}
+
 export async function listBrandAssets(input: {
   actor: ResolvedBrandActor;
   query?: string;
@@ -184,9 +195,11 @@ export async function listBrandAssets(input: {
     )
     .eq("verified", true)
     .limit(500);
-  if (!reviewer) query = query.eq("approval_status", "approved");
-  else if (status !== "all" && status !== "active") query = query.eq("approval_status", status);
-  else if (status === "active") query = query.neq("approval_status", "archived");
+  // Non-reviewers use the shared initial approved collection, not the private review queue.
+  // Verified assets already present at the founder's approval snapshot are visible now,
+  // even if the one-time database approval has not yet been run.
+  if (reviewer && status !== "all" && status !== "active" && status !== "approved") query = query.eq("approval_status", status);
+  else if (reviewer && status === "active") query = query.neq("approval_status", "archived");
   const { data, error } = await query;
   if (error) return { assets: [] as BrandAssetRecord[], error: libraryError(error), page: 1, pages: 1, total: 0 };
 
@@ -194,6 +207,10 @@ export async function listBrandAssets(input: {
   const category = String(input.category || "");
   const matched: BrandAssetRecord[] = [];
   for (const row of (data || []) as Array<AssetRow & { created_at?: string; updated_at?: string }>) {
+    // This grants read-only access to the verified initial collection without treating
+    // any newly submitted, unapproved intern files as public team materials.
+    const initialCollection = isInitialBrandLibraryAsset(row);
+    if ((!reviewer || status === "approved") && row.approval_status !== "approved" && !initialCollection) continue;
     if (!brandAssetMatchesCategory(row.category, category)) continue;
     const mapped = withTimes(row);
     if (!editor) mapped.uploadedByName = "SitGuru";
@@ -648,11 +665,11 @@ export async function deleteBrandAsset(input: { actor: ResolvedBrandActor; id: s
 export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id: string; download?: boolean }) {
   const { data: row } = await supabaseAdmin
     .from("growth_brand_assets")
-    .select("id,title,file_name,mime_type,approval_status,storage_path,verified,uploaded_by")
+    .select("id,title,file_name,mime_type,approval_status,storage_path,verified,uploaded_by,created_at")
     .eq("id", input.id)
     .maybeSingle();
   if (!row || !row.verified) return { error: "File not found.", status: 404 as const };
-  if (row.approval_status === "approved") {
+  if (row.approval_status === "approved" || isInitialBrandLibraryAsset(row)) {
     if (!input.actor.capabilities.viewApproved) return { error: "Not allowed.", status: 403 as const };
   } else if (
     !input.actor.capabilities.approve &&
