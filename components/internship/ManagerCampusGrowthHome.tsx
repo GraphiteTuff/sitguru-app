@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AlertCircle, ArrowRight, BarChart3, BookOpenCheck, CalendarDays, CheckCircle2,
@@ -11,12 +11,12 @@ import DeskPageHero from "@/components/manager/DeskPageHero";
 import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import {
-  CAMPUS_CHANNELS, CAMPUS_COACHING_PROMPTS, CAMPUS_GROWTH_PRINCIPLE, CAMPUS_LEAD_TYPES,
+  CAMPUS_CHANNELS, CAMPUS_COACHING_PROMPTS, CAMPUS_GROWTH_PRINCIPLE, CAMPUS_LEAD_STATUSES, CAMPUS_LEAD_TYPES,
   CAMPUS_OPPORTUNITY_TYPES, CAMPUS_PHASES, CAMPUS_TARGETS,
   campusApprovalView, campusTrackingPath,
 } from "@/lib/internship/campus-growth";
 import {
-  CAMPUS_LEAD_STATUSES, createCampusMission, reviewCampusOpportunity,
+  createCampusMission, reviewCampusOpportunity,
   saveCampusLead, saveCampusLink, saveCampusOpportunity, saveCampusPolicy,
   saveCampusResult, updateCampusLead,
 } from "@/lib/internship/campus-growth-actions";
@@ -83,7 +83,7 @@ function readableDate(value: string) {
     date.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
 }
 function compactNumber(value:number | null) { return value===null?"—":new Intl.NumberFormat("en-US").format(value); }
-function Label({children}:{children:React.ReactNode}) {return <span className="text-xs font-black uppercase tracking-wide text-[#0F2744]">{children}</span>;}
+function Label({children}:{children:ReactNode}) {return <span className="text-xs font-black uppercase tracking-wide text-[#0F2744]">{children}</span>;}
 const INPUT="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#0F2744] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#DBEAFE]";
 const BUTTON="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8]";
 const SECONDARY="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#1D4ED8] hover:bg-[#EFF6FF]";
@@ -340,7 +340,7 @@ function TrackingTab({card,links,results,health}:{card:CampusCard;links:CampusLi
               <p className="mt-2 break-all rounded-lg bg-white p-2 text-xs font-bold text-[#2563EB]">https://www.sitguru.com{href}</p>
               <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-10 items-center gap-1 text-xs font-black text-[#2563EB]">Open tracked link <ExternalLink size={14}/></a>
             </div>;
-          }):<Empty title="No tracking links yet" detail="Create one for each approved outreach campaign. Links do not grant Ambassador or PetPerks rewards."/ >}
+          }):<Empty title="No tracking links yet" detail="Create one for each approved outreach campaign. Links do not grant Ambassador or PetPerks rewards."/>}
         </div>
       </section>
       <section className={DESK_UI.card+" p-4 sm:p-5"}>
