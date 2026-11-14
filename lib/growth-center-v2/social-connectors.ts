@@ -54,7 +54,7 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
   try {
     const { data, error } = await supabaseAdmin
       .from("growth_social_connections")
-      .select("platform,status,account_label,last_synced_at,error_message")
+      .select("platform,status,account_label,last_synced_at,error_message,metadata")
       .limit(20);
     if (!error && Array.isArray(data)) connectionRows = data as AnyRow[];
   } catch {
@@ -79,13 +79,10 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
       (row) => text(row.platform).toLowerCase() === item.platform,
     );
     const metrics = metricRows.filter(
-      (row) => text(row.platform).toLowerCase() === item.platform,
+      (row) => text(row.platform).toLowerCase() === item.platform && text(row.entity_id) === "brand",
     );
-    const followers = metrics.reduce((sum, row) => sum + (num(row.current_followers) || 0), 0);
-    const baseline = metrics.reduce(
-      (sum, row) => sum + (num(row.baseline_followers) || 0),
-      0,
-    );
+    const followers = metrics.length ? num(metrics[0].current_followers) : null;
+    const baseline = metrics.length ? num(metrics[0].baseline_followers) : null;
     const latestSync = metrics
       .map((row) => text(row.updated_at))
       .filter(Boolean)
@@ -93,7 +90,9 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
       .at(-1) || null;
 
     if (conn) {
-      const statusRaw = text(conn.status).toLowerCase();
+      const metadata = conn.metadata && typeof conn.metadata === "object" && !Array.isArray(conn.metadata) ? conn.metadata as Record<string, unknown> : {};
+      const verified = item.platform === "facebook" && metadata.verified_source === "meta_graph_api" && Boolean(metadata.page_id);
+      const statusRaw = verified ? text(conn.status).toLowerCase() : text(conn.status).toLowerCase() === "connected" ? "manual" : text(conn.status).toLowerCase();
       const status =
         statusRaw === "connected"
           ? "connected"
@@ -108,8 +107,8 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
         status,
         accountLabel: text(conn.account_label) || null,
         lastSyncedAt: text(conn.last_synced_at) || latestSync,
-        followers: followers || null,
-        baselineFollowers: baseline || null,
+        followers: verified && metadata.follower_count_available === true ? followers : null,
+        baselineFollowers: verified && metadata.follower_count_available === true ? baseline : null,
         setupHint: text(conn.error_message) || item.setupHint,
       };
     }
@@ -122,11 +121,11 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
         accountLabel:
           metrics.map((row) => text(row.handle)).filter(Boolean).join(", ") ||
           "Manual / seeded metrics",
-        lastSyncedAt: latestSync,
-        followers: followers || null,
-        baselineFollowers: baseline || null,
+        lastSyncedAt: null,
+        followers: null,
+        baselineFollowers: null,
         setupHint:
-          "Showing seeded social_platform_metrics only — official API not connected.",
+          "Manual/seeded rows exist but are not verified API data. Connect an official provider to display live followers.",
       };
     }
 
