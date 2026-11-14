@@ -448,6 +448,7 @@ export default async function AdminReportsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <ActionLink href="/admin/growth/reports" label="Ava's Growth Reports" />
               <ActionLink href="/admin/analytics" label="Analytics" />
               <ActionLink href="/admin/audit-trail" label="Audit Trail" />
               <ActionLink href="/admin/financials/exports" label="Financial Exports" />
