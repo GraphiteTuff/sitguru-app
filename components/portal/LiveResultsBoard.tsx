@@ -117,6 +117,36 @@ export default function LiveResultsBoard({
         </article>
       </section>
 
+      <section className="rounded-2xl border border-sky-100 bg-[#EFF6FF] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-black text-[#0F2744]">Facebook Page analytics</h2>
+            <p className="text-xs font-semibold text-slate-600">Official SitGuru Facebook Page data only — separate from website referral visits.</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1D4ED8]">
+            {data.facebookPage?.status === "connected" ? "Meta API connected" : "Awaiting Meta API connection"}
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-2">
+          <div>
+            <p className="text-xs font-semibold text-slate-600">Page followers</p>
+            <p className="text-3xl font-black text-[#0F2744]">
+              {data.facebookPage?.status === "connected" && data.facebookPage.followers !== null
+                ? formatCount(data.facebookPage.followers ?? 0)
+                : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-600">{data.facebookPage?.accountLabel || "SitGuru Facebook Page"}</p>
+            <p className="text-xs text-slate-500">
+              {data.facebookPage?.status === "connected" && data.facebookPage.lastSyncedAt
+                ? "Last verified " + new Date(data.facebookPage.lastSyncedAt).toLocaleString()
+                : "No verified Page sync yet"}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>

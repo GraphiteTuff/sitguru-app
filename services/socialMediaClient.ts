@@ -339,6 +339,20 @@ export async function syncSocialMetricsBaseline(
   let updated = 0;
 
   for (const snapshot of snapshots) {
+    // Never write fallback values to the real metrics table. This cron is legacy;
+    // the Facebook-only verified sync uses /api/cron/facebook-page-metrics.
+    if (snapshot.source !== "live") {
+      results.push({
+        entityId: snapshot.entityId,
+        platform: snapshot.platform,
+        currentFollowers: snapshot.currentFollowers,
+        baselineFollowers: snapshot.currentFollowers,
+        delta: 0,
+        source: snapshot.source,
+        action: "skipped",
+      });
+      continue;
+    }
     const payload = {
       entity_id: snapshot.entityId,
       platform: snapshot.platform,

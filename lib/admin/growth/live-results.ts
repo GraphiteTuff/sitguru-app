@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { loadSocialConnectorStatus } from "@/lib/growth-center-v2/social-connectors";
 import {
   getGrowthHomeStats,
   listGrowthContent,
@@ -29,6 +30,7 @@ const SOCIAL_LABELS: Record<InternSocialPlatform, string> = {
 };
 
 export type LiveResultsData = {
+  facebookPage: { status: string; accountLabel: string | null; followers: number | null; lastSyncedAt: string | null } | null;
   capturedAt: string;
   marketLabel: string;
   reviewCount: number;
@@ -120,12 +122,13 @@ function inWeek(iso: string | null, start: string, end: string) {
 export async function loadLiveResults(): Promise<LiveResultsData> {
   const nowIso = new Date().toISOString();
   const thisStart = isoDaysAgo(7);
-  const [snapshot, stats, content, upcoming, socialWeeks] = await Promise.all([
+  const [snapshot, stats, content, upcoming, socialWeeks, connectors] = await Promise.all([
     loadInternSafeKpiSnapshot(),
     getGrowthHomeStats(),
     listGrowthContent(),
     listUpcomingGrowthEvents(40),
     socialWeekCounts(),
+    loadSocialConnectorStatus(),
   ]);
 
   const postsThisWeek = content.filter((item) =>
@@ -147,6 +150,7 @@ export async function loadLiveResults(): Promise<LiveResultsData> {
   );
 
   return {
+    facebookPage: connectors.find((item) => item.platform === "facebook") ?? null,
     capturedAt: snapshot.capturedAt,
     marketLabel: snapshot.marketLabel,
     reviewCount: stats.pendingReview,
