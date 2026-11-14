@@ -119,7 +119,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
   if (!intern?.userId) return null;
   // Match the Intern Portal gate: unpublished or unsigned intern accounts cannot download brand files.
   const onboarding = await getInternOnboarding(intern.id);
-  if (!internOnboardingComplete(onboarding)) return null;
+  const canSubmitAssets = internOnboardingComplete(onboarding);
   const actor: BrandActor = {
     canAccessAdmin: false,
     isSuperUser: false,
@@ -131,7 +131,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
     id: intern.userId,
     email: intern.email || "",
     name: intern.preferredName || intern.fullName || "Intern",
-    capabilities: brandKitCapabilities(actor),
+    capabilities: { ...brandKitCapabilities(actor), upload: canSubmitAssets },
   };
 }
 
