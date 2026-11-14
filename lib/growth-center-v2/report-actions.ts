@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireGrowthActor } from "@/lib/admin/growth/workplace";
+import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadGrowthCenterSnapshot } from "@/lib/growth-center-v2/snapshot";
 import { getGrowthReportPeriod, growthReportFilters } from "@/lib/growth-center-v2/report-periods";
 import { saveGrowthReportToMicrosoft365 } from "@/lib/growth-center-v2/report-sharepoint";
@@ -18,8 +18,8 @@ function go(period: string, end: string, kind: "ok" | "error", message: string):
 }
 
 export async function saveManagerGrowthReport(formData: FormData) {
-  const access = await requireGrowthActor();
-  if (!access.ok || access.actor.kind !== "manager" || access.actor.isSuperUser) {
+  const access = await requireGrowthWorkplace("manager");
+  if (!access.ok || access.actor.isSuperUser) {
     redirect("/manager/reports?error=Only+an+authorized+growth+manager+can+submit+reports");
   }
   const period = getGrowthReportPeriod({
