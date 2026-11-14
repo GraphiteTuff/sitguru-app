@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isRemovedGuruAccount, isRemovedGuruProfileIdentifier } from "@/lib/gurus/removed-account";
 import { buildBookingPetWriteCache } from "@/lib/bookings/load-booking-pets";
 import type { LivePetProfile } from "@/lib/bookings/booking-pet";
 
@@ -560,6 +561,9 @@ export async function POST(req: NextRequest) {
 
     const guruSlug = getFirstText(body, ["guruSlug", "slug", "guru_slug"]);
     const incomingGuruId = getFirstText(body, ["guruId", "guru_id"]);
+    if (isRemovedGuruProfileIdentifier(incomingGuruId) || isRemovedGuruProfileIdentifier(guruSlug)) {
+      return jsonError("This Guru is no longer available for bookings.", 404);
+    }
     const petName = getFirstText(body, ["petName", "pet_name"]);
     const incomingPetId = getFirstText(body, ["petId", "pet_id"]) || null;
 
@@ -728,6 +732,9 @@ export async function POST(req: NextRequest) {
       guruId: incomingGuruId,
       guruSlug,
     });
+    if (isRemovedGuruAccount(guru)) {
+      return jsonError("This Guru is no longer available for bookings.", 404);
+    }
 
     const resolvedGuruId =
       getFirstText(guru || {}, ["id", "profile_id", "user_id"]) || incomingGuruId;

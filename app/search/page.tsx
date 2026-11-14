@@ -21,6 +21,7 @@ import GuruSearchMatchBadge from "@/components/search/GuruSearchCard";
 import { trackEvent } from "@/lib/analytics/track";
 import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
 import { supabase } from "@/lib/supabase";
+import { isRemovedGuruAccount } from "@/lib/gurus/removed-account";
 import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
 
 type GuruRow = {
@@ -775,6 +776,7 @@ function isDemoSearchGuru(guru: GuruRow) {
 }
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
+  if (isRemovedGuruAccount(guru)) return false;
   return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
@@ -1954,7 +1956,7 @@ function SearchPageContent() {
         }
       }
 
-      guruRows = dedupeGuruRows(guruRows);
+      guruRows = dedupeGuruRows(guruRows).filter((guru) => !isRemovedGuruAccount(guru));
 
       const guruIds = Array.from(
         new Set(guruRows.flatMap((guru) => getGuruRateLookupIds(guru))),

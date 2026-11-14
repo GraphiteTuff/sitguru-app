@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isRemovedGuruAccount, isRemovedGuruProfileIdentifier } from "@/lib/gurus/removed-account";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import GuruProfileLiveRefresh from "@/components/gurus/GuruProfileLiveRefresh";
@@ -4300,7 +4301,10 @@ async function GuruDashboardView({
 export default async function GuruSlugPage({ params }: PageProps) {
   const resolvedParams = await params;
   const identifier = cleanIdentifier(resolvedParams.slug);
+  // A removed account may still have rows in search projections or aliases.
+  if (isRemovedGuruProfileIdentifier(identifier)) notFound();
   const publicGuruProfile = await getPublicGuruProfile(identifier);
+  if (isRemovedGuruAccount(publicGuruProfile)) notFound();
 
   if (!publicGuruProfile) {
     const suffix = identifier.replace(/-/g, "").slice(-8);

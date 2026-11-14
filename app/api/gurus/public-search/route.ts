@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { isRemovedGuruAccount } from "@/lib/gurus/removed-account";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -1348,6 +1349,7 @@ async function loadGuruRowsFromTable(
 
   const loadedRows = ((data || []) as GuruRow[])
     .filter((guru) => sourceRowLooksLikeGuru(tableName, guru))
+    .filter((guru) => !isRemovedGuruAccount(guru))
     .map((guru) => applyOverrideToGuru(guru, overrideMap));
   const displayRows = loadedRows.filter(shouldDisplaySearchGuru);
 
@@ -1379,11 +1381,13 @@ export async function GET(request: NextRequest) {
     const standaloneOverrideRows = overrides
       .map(overrideToStandaloneGuru)
       .map((guru) => applyOverrideToGuru(guru, overrideMap))
-      .filter(shouldDisplaySearchGuru);
+      .filter(shouldDisplaySearchGuru)
+      .filter((guru) => !isRemovedGuruAccount(guru));
 
     guruRows = [...guruRows, ...standaloneOverrideRows];
 
     const normalizedGurus = dedupeGuruRows(guruRows)
+      .filter((guru) => !isRemovedGuruAccount(guru))
       .map(normalizeGuruForPublicSearch)
       .sort((a, b) => {
         const rank = (guru: {

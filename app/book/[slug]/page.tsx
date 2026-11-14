@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isRemovedGuruAccount, isRemovedGuruProfileIdentifier } from "@/lib/gurus/removed-account";
 import BookGuruClient from "./BookGuruClient";
 
 export const dynamic = "force-dynamic";
@@ -404,8 +405,10 @@ async function getActualGuruCompletedBookingCount(guru: GuruRow) {
 
 export default async function BookGuruPage({ params }: PageProps) {
   const { slug } = await params;
+  if (isRemovedGuruProfileIdentifier(slug)) notFound();
 
   const guruProfile = await findGuruBySlugOrName(slug);
+  if (isRemovedGuruAccount(guruProfile)) notFound();
 
   if (!guruProfile?.id) {
     console.error("Book Guru page could not find matching Guru profile:", {
