@@ -237,6 +237,7 @@ export async function saveManagerAssignment(formData: FormData) {
         internUserId: intern.userId || "",
         internName: intern.fullName,
         managerName: actor.email,
+        managerUserId: intern.managerUserId || undefined,
         sitguruUrl: `/manager/assignments/${savedId}`,
       });
     } catch (error) {
@@ -294,6 +295,7 @@ export async function retryManagerAssignmentSync(formData: FormData) {
       internUserId: intern.userId || "",
       internName: intern.fullName,
       managerName: actor.email,
+        managerUserId: intern.managerUserId || undefined,
       sitguruUrl: `/manager/assignments/${task.id}`,
     });
   } catch (error) {

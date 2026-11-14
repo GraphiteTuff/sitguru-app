@@ -17,6 +17,8 @@ export type MicrosoftGraphConfig = {
   driveId: string;
   internsRootId: string;
   readyBucketId: string;
+  plannerAutomationEnabled: boolean;
+  defaultPlannerManagerEntraId: string;
   channelIds: Record<string, string>;
 };
 
@@ -39,6 +41,8 @@ export function readMicrosoftGraphConfig(): MicrosoftGraphConfig {
     driveId: env("SITGURU_SHAREPOINT_DRIVE_ID"),
     internsRootId: env("SITGURU_SHAREPOINT_INTERNS_ROOT_ID"),
     readyBucketId: env("SITGURU_PLANNER_BUCKET_READY_ID"),
+    plannerAutomationEnabled: env("SITGURU_PLANNER_AUTOMATION_ENABLED").toLowerCase() === "true",
+    defaultPlannerManagerEntraId: env("SITGURU_PLANNER_DEFAULT_MANAGER_ENTRA_ID"),
     channelIds: {
       "growth-strategy": env("SITGURU_TEAMS_CHANNEL_GROWTH_STRATEGY_ID"),
       "content-social": env("SITGURU_TEAMS_CHANNEL_CONTENT_SOCIAL_ID"),

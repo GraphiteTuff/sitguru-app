@@ -76,6 +76,8 @@ export type ManagerScheduleItem = {
   title: string;
   kind: ManagerScheduleKind;
   time: string;
+  /** Internal detail link, when this calendar item has an owned SitGuru record. */
+  href?: string;
 };
 
 function isoDate(value?: string | null) {

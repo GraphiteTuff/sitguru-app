@@ -204,7 +204,9 @@ export default function DeskCalendar({
               {(view === "day" ? byDate.get(selected) || [] : visible).map((event) => (
                 <li key={event.id} className="flex items-center justify-between rounded-2xl bg-[#F8FAFC] px-3 py-3">
                   <span>
-                    <span className="block text-sm font-bold text-[#0F2744]">{event.title}</span>
+                    {event.href ? (
+                      <Link href={event.href} className="block text-sm font-bold text-blue-700 hover:underline">{event.title}</Link>
+                    ) : <span className="block text-sm font-bold text-[#0F2744]">{event.title}</span>}
                     <span className="text-xs font-medium text-slate-500">{event.date}{event.time ? ` · ${event.time}` : ""}</span>
                   </span>
                   <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${KIND_STYLE[event.kind].chip}`}>{KIND_STYLE[event.kind].label}</span>
@@ -219,7 +221,7 @@ export default function DeskCalendar({
 
         <aside className="space-y-4">
           <Link href={manager ? "/manager/assignments" : "/intern/assignments"} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#2563EB] text-sm font-bold !text-white">
-            <Plus size={16} /> Add Event
+            <Plus size={16} /> {manager ? "Manage assignments" : "My assignments"}
           </Link>
           <article className={`${DESK_UI.card} p-4`}>
             <div className="flex items-center justify-between">
@@ -245,7 +247,9 @@ export default function DeskCalendar({
                 <li key={event.id} className="flex items-center justify-between gap-2 text-sm">
                   <span>
                     <span className="block text-[10px] font-black text-[#DC2626]">{event.date.slice(5)}</span>
-                    <span className="font-semibold text-[#0F2744]">{event.title}</span>
+                    {event.href ? (
+                      <Link href={event.href} className="font-semibold text-blue-700 hover:underline">{event.title}</Link>
+                    ) : <span className="font-semibold text-[#0F2744]">{event.title}</span>}
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${KIND_STYLE[event.kind].chip}`}>{KIND_STYLE[event.kind].label}</span>
                 </li>
@@ -262,7 +266,7 @@ export default function DeskCalendar({
           <ul className="mt-3 space-y-2">
             {todayEvents.map((event) => (
               <li key={event.id} className="rounded-2xl bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#0F2744]">
-                {event.time || "Today"} · {event.title}
+                {event.time || "Today"} · {event.href ? <Link href={event.href} className="text-blue-700 hover:underline">{event.title}</Link> : event.title}
               </li>
             ))}
             {!todayEvents.length ? <li className="text-sm font-medium text-slate-500">No desk items today.</li> : null}
@@ -273,7 +277,7 @@ export default function DeskCalendar({
           <ul className="mt-3 space-y-2">
             {visible.filter((event) => event.date >= today).slice(0, 4).map((event) => (
               <li key={event.id} className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-[#0F2744]">{event.title}</span>
+                {event.href ? <Link href={event.href} className="font-semibold text-blue-700 hover:underline">{event.title}</Link> : <span className="font-semibold text-[#0F2744]">{event.title}</span>}
                 <span className="text-xs font-bold text-slate-500">{event.date.slice(5)}</span>
               </li>
             ))}

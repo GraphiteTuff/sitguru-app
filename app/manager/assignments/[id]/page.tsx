@@ -7,6 +7,8 @@ import { readAssignmentBrief, isHttpUrl } from "@/lib/internship/manager-assignm
 import { findInternById } from "@/lib/internship/queries";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
+import { readMicrosoftGraphConfig } from "@/lib/microsoft/graph";
+import { plannerConfigurationReady } from "@/lib/microsoft/planner-automation";
 import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import { retryManagerAssignmentSync } from "@/lib/internship/manager-assignment-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -48,6 +50,13 @@ export default async function ManagerAssignmentDetailPage({
   ) {
     redirect("/manager/assignments");
   }
+  const plannerConfig = readMicrosoftGraphConfig();
+  const plannerAutoReady = plannerConfigurationReady({
+    graphConfigured: plannerConfig.configured,
+    planId: plannerConfig.planId,
+    bucketId: plannerConfig.readyBucketId,
+    enabled: plannerConfig.plannerAutomationEnabled,
+  });
   const brief = readAssignmentBrief(task.brief_payload);
   const route = routeAssignmentCategory(brief.category || String(task.metric_affected || ""));
   const links = await listAssignmentIntegrations([String(task.id)]);
@@ -128,6 +137,7 @@ export default async function ManagerAssignmentDetailPage({
         dueOn={String(task.due_on || "")}
         briefPayload={task.brief_payload}
         planner={pick("planner")}
+        plannerAutoReady={plannerAutoReady}
       />
       {work ? (
         <section className={`${DESK_UI.card} p-5 sm:p-6`}>

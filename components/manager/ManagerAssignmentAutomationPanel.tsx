@@ -3,6 +3,7 @@ import { DESK_UI } from "@/lib/portal/desk-ui";
 import { parseAssignmentReminderSettings, REMINDER_DAY_OPTIONS } from "@/lib/internship/assignment-reminder-rules";
 import { linkManagerPlannerTask, saveManagerAssignmentReminders } from "@/lib/internship/manager-assignment-reminder-actions";
 import type { AssignmentIntegration } from "@/lib/microsoft/assignment-integrations";
+import { retryManagerAssignmentSync } from "@/lib/internship/manager-assignment-actions";
 
 const REMINDER_LABELS: Record<number, string> = {
   7: "One week before",
@@ -17,11 +18,13 @@ export default function ManagerAssignmentAutomationPanel({
   dueOn,
   briefPayload,
   planner,
+  plannerAutoReady = false,
 }: {
   assignmentId: string;
   dueOn: string;
   briefPayload: unknown;
   planner?: AssignmentIntegration;
+  plannerAutoReady?: boolean;
 }) {
   const reminders = parseAssignmentReminderSettings(briefPayload);
   const manualLink = planner?.status === "linked_manually";
@@ -99,7 +102,9 @@ export default function ManagerAssignmentAutomationPanel({
           <h2 className="text-xl font-black text-[#0F2744]">Planner (optional)</h2>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Ava can track a task in Microsoft Planner if helpful. Interns can complete everything inside SitGuru — they don't need a separate Planner account.
+          {plannerAutoReady
+            ? "New assignments automatically get a Planner task for Ava. Interns still complete and submit their work entirely in SitGuru."
+            : "Interns can complete everything in SitGuru. Planner automation needs a shared plan and administrator authorization before it can run."}
         </p>
         <p className="mt-3 text-sm font-bold text-slate-700">
           {apiConnected ? "Microsoft task connected" : manualLink ? "Planner task linked (not verified)" : "No Planner task linked yet"}
@@ -108,6 +113,15 @@ export default function ManagerAssignmentAutomationPanel({
           <a href={href} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-10 items-center text-sm font-black text-blue-700 underline">
             Open the Planner task
           </a>
+        ) : null}
+        {plannerAutoReady && !manualLink && !apiConnected ? (
+          <form action={retryManagerAssignmentSync} className="mt-4">
+            <input type="hidden" name="taskId" value={assignmentId} />
+            <button type="submit" className="inline-flex min-h-11 items-center rounded-full bg-emerald-700 px-5 text-sm font-black !text-white hover:bg-emerald-800">
+              Create Planner task now
+            </button>
+            <p className="mt-2 text-xs text-slate-500">For existing assignments only. New work syncs automatically when the connection is ready.</p>
+          </form>
         ) : null}
         {!apiConnected ? (
           <details className="mt-4 rounded-xl border border-slate-200 px-3 py-3">
