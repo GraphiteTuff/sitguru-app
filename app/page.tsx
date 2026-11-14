@@ -166,6 +166,32 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
   { label: "Vanessa Guedez", fullName: "vanessa guedez" },
 ];
 
+// Order these featured Guru cards first, in the order requested. A first-name
+// target includes every matching Guru (e.g. multiple Ashleys), never duplicates.
+const prioritizedHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
+  { label: "Lola", firstName: "lola" },
+  { label: "Norah Wallace", fullName: "norah wallace" },
+  { label: "Olivia Goode", fullName: "olivia goode" },
+  { label: "Ru", firstName: "ru" },
+  { label: "Jennifer Kelly", fullName: "jennifer kelly" },
+  { label: "Ashley", firstName: "ashley" },
+  { label: "Victoria", firstName: "victoria" },
+  { label: "Kat Jourdan", fullName: "kat jourdan" },
+  { label: "Brianna", firstName: "brianna" },
+  { label: "Chloe", firstName: "chloe" },
+  { label: "Linda", firstName: "linda" },
+  { label: "James", firstName: "james" },
+];
+
+// Keep these Gurus last while retaining their public profiles and badges.
+const endingHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
+  { label: "Vanessa Guedez", fullName: "vanessa guedez" },
+  { label: "Jason", firstName: "jason" },
+  { label: "Carol Detweiler", fullName: "carol detweiler" },
+  { label: "Jazzy", firstName: "jazzy" },
+  { label: "Latavea Tillman", fullName: "latavea tillman" },
+];
+
 // Home carousel placement is separate from a Guru's public profile and search eligibility.
 const excludedHomepageCarouselGuruNames = new Set(["george medina"]);
 
@@ -425,10 +451,11 @@ function doesGuruMatchFeaturedTarget(
   return false;
 }
 
-function getFoundingGuruOrder(guru: Guru) {
-  return featuredHomepageGuruTargets.findIndex((target) =>
-    doesGuruMatchFeaturedTarget(guru, target),
-  );
+function getHomepageGuruOrder(
+  guru: Guru,
+  targets: FeaturedHomepageGuruTarget[],
+) {
+  return targets.findIndex((target) => doesGuruMatchFeaturedTarget(guru, target));
 }
 
 function orderHomepageGurus(gurus: Guru[]) {
@@ -436,19 +463,38 @@ function orderHomepageGurus(gurus: Guru[]) {
     .map((guru, originalIndex) => ({
       guru,
       originalIndex,
-      foundingOrder: getFoundingGuruOrder(guru),
+      promotedOrder: getHomepageGuruOrder(guru, prioritizedHomepageGuruTargets),
+      endingOrder: getHomepageGuruOrder(guru, endingHomepageGuruTargets),
+      foundingOrder: getHomepageGuruOrder(guru, featuredHomepageGuruTargets),
     }))
     .sort((left, right) => {
+      // Group 0: requested first; group 1: all other eligible Gurus;
+      // group 2: requested last. No cards are duplicated or omitted.
+      const group = (item: {
+        promotedOrder: number;
+        endingOrder: number;
+      }) => item.promotedOrder >= 0 ? 0 : item.endingOrder >= 0 ? 2 : 1;
+      const leftGroup = group(left);
+      const rightGroup = group(right);
+      if (leftGroup !== rightGroup) return leftGroup - rightGroup;
+
+      if (leftGroup === 0) {
+        return left.promotedOrder - right.promotedOrder ||
+          left.originalIndex - right.originalIndex;
+      }
+      if (leftGroup === 2) {
+        return left.endingOrder - right.endingOrder ||
+          left.originalIndex - right.originalIndex;
+      }
+
+      // Preserve existing Founding Guru prioritization for everyone else.
       const leftIsFounding = left.foundingOrder >= 0;
       const rightIsFounding = right.foundingOrder >= 0;
-
       if (leftIsFounding && rightIsFounding) {
         return left.foundingOrder - right.foundingOrder;
       }
-
       if (leftIsFounding) return -1;
       if (rightIsFounding) return 1;
-
       return left.originalIndex - right.originalIndex;
     })
     .map(({ guru }) => guru);
