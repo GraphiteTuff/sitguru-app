@@ -48,6 +48,8 @@ export async function saveManagerAssignment(formData: FormData) {
     title: field(formData, "title"),
     category: field(formData, "category"),
     milestoneId: field(formData, "milestoneId"),
+    projectId: field(formData, "projectId"),
+    finalSection: field(formData, "finalSection"),
     dueOn: field(formData, "dueOn"),
     priority: field(formData, "priority"),
     description: field(formData, "description"),
@@ -89,6 +91,17 @@ export async function saveManagerAssignment(formData: FormData) {
     if (!sameCohort || !sameSchool) bounce("error", "Choose a milestone from this intern's program.");
   }
 
+  if (value.projectId) {
+    const { data: project } = await supabaseAdmin
+      .from("internship_projects")
+      .select("id,cohort_id")
+      .eq("id", value.projectId)
+      .maybeSingle();
+    if (!project || String(project.cohort_id) !== intern.cohortId) {
+      bounce("error", "Choose a project from this intern's active cohort.");
+    }
+  }
+
   const file = fileOf(formData);
   if (file) {
     const blocked = internAllowedUpload(file);
@@ -98,6 +111,8 @@ export async function saveManagerAssignment(formData: FormData) {
   const brief = assignmentBrief(value, actor.id);
   const payload = {
     intern_id: intern.id,
+    project_id: value.projectId || null,
+    final_section: value.finalSection,
     title: value.title,
     due_on: value.dueOn || null,
     status: intent === "draft" ? "draft" : "todo",
