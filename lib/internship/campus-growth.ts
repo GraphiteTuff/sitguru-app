@@ -48,6 +48,8 @@ export const CAMPUS_APPROVALS = [
 
 export type CampusApproval = (typeof CAMPUS_APPROVALS)[number];
 
+export const CAMPUS_LEAD_STATUSES = ["New","Researching","Contacted","Interested","Follow Up","Converted","Not Interested","Closed"] as const;
+
 export const CAMPUS_LEAD_TYPES = [
   "Pet Parent",
   "Future Guru",
@@ -152,6 +154,39 @@ export function campusSlug(value: string) {
 
 export function campusTrackingCode(input: { campus: string; intern: string; target: string; channel: string }) {
   return [campusSlug(input.campus), campusSlug(input.intern), campusSlug(input.target), campusSlug(input.channel)].join("-").slice(0, 80);
+}
+
+/**
+ * Destination lookup is intentionally same-site and allowlisted.
+ * Campus link attribution should lead visitors to the right public audience,
+ * never silently send every link to the homepage or allow open redirects.
+ */
+/**
+ * Keep each campus campaign distinct. The randomized nonce is supplied by the
+ * server so two approved experiments never reuse the same tracking code.
+ */
+export function campusCampaignTrackingCode(input:{
+  campus:string; intern:string; target:string; channel:string;
+  campaign:string; nonce:string;
+}) {
+  const base=campusTrackingCode(input);
+  const campaign=campusSlug(input.campaign).slice(0,12);
+  const nonce=String(input.nonce).replace(/[^a-z0-9]/gi,"").toLowerCase().slice(0,8)||"new";
+  const suffix="-"+campaign+"-"+nonce;
+  return base.slice(0,80-suffix.length)+suffix;
+}
+
+export function campusDestinationForTarget(target:string) {
+  const paths:Record<string,string>={
+    pet_parent:"/pet-parents",
+    future_guru:"/become-a-guru",
+    petperks:"/petperks",
+    event:"/events",
+    partnership:"/partners",
+    social:"/community",
+    awareness:"/",
+  };
+  return paths[target] || "/";
 }
 
 export function campusTrackingPath(code: string) {

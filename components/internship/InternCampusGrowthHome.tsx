@@ -11,10 +11,13 @@ import {
   CAMPUS_TARGETS,
   campusApprovalView,
   campusExecutionAllowed,
-  campusTrackingPath,
 } from "@/lib/internship/campus-growth";
 import { saveCampusLead, saveCampusLink, saveCampusOpportunity, saveCampusResult } from "@/lib/internship/campus-growth-actions";
-import type { CampusCard, CampusLead, CampusLink, CampusMission, CampusOpportunity } from "@/lib/internship/campus-growth-data";
+import type { CampusCard, CampusLead, CampusLink, CampusMission, CampusOpportunity, CampusResult, CampusSourceHealth } from "@/lib/internship/campus-growth-data";
+import { campusQuestProgress } from "@/lib/internship/campus-quests";
+import CampusQuestBoard from "@/components/internship/CampusQuestBoard";
+import CampusIdeaDeck from "@/components/internship/CampusIdeaDeck";
+import CampusLinkShareCard from "@/components/internship/CampusLinkShareCard";
 
 export default function InternCampusGrowthHome({
   card,
@@ -22,6 +25,9 @@ export default function InternCampusGrowthHome({
   leads,
   links,
   missions,
+  results,
+  sourceHealth,
+  sourceIssues,
   eventMode = false,
   notice,
   error,
@@ -31,6 +37,9 @@ export default function InternCampusGrowthHome({
   leads: CampusLead[];
   links: CampusLink[];
   missions: CampusMission[];
+  results: CampusResult[];
+  sourceHealth: CampusSourceHealth;
+  sourceIssues: string[];
   eventMode?: boolean;
   notice: string;
   error: boolean;
@@ -54,22 +63,29 @@ export default function InternCampusGrowthHome({
         banner="intern"
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
+      <div id="campus-policy-form" className="scroll-mt-24 rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-xs font-semibold leading-5 text-[#1D4ED8]">
+        Follow your campus's published rules and ask Ava to document official permissions. Your university course requirements, assignments and formal internship hours remain separate from these optional Campus Quests.
+      </div>
       <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600">
         {card.campusName} · <InternName name={card.internName} src={card.avatarUrl} /> · Social Media & Community Growth Intern{card.semester ? ` · ${card.semester}` : ""}
       </p>
       <p className="rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm font-semibold leading-6 text-[#0F2744]">{CAMPUS_GROWTH_PRINCIPLE}</p>
       {notice ? <p className={`rounded-2xl px-4 py-3 text-sm font-bold ${error ? "bg-rose-50 text-rose-800" : "bg-[#ECFDF5] text-[#047857]"}`}>{notice}</p> : null}
+      {sourceIssues.length ? <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-950">
+        Some campus data is temporarily unavailable: {sourceIssues.join(", ")}. Badge progress and related counts are not estimated.
+      </p> : null}
+      <CampusQuestBoard progress={campusQuestProgress({card,opportunities,leads,links,missions,results,sourceHealth})} campusName={card.campusName} mode="intern" />
 
       <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          ["Opportunities", card.opportunities],
-          ["Mission", card.activeCampaigns],
-          ["QR scans", card.scans],
-          ["Visits", card.visits],
-          ["Leads", card.leads],
-          ["Pet Parents", card.petParents],
-          ["Guru applications", card.guruApplications],
-          ["Waiting on review", pending.length],
+          ["Opportunities", sourceHealth.opportunities ? card.opportunities : "—"],
+          ["Published missions", sourceHealth.missions ? card.activeCampaigns : "—"],
+          ["QR scan events", sourceHealth.visits ? card.scans : "—"],
+          ["Link visits", sourceHealth.visits ? card.visits : "—"],
+          ["Leads researched", sourceHealth.leads ? card.leads : "—"],
+          ["Reported Pet Parents", sourceHealth.results ? card.petParents : "—"],
+          ["Reported Guru applications", sourceHealth.results ? card.guruApplications : "—"],
+          ["Waiting on review", sourceHealth.opportunities ? pending.length : "—"],
         ].map(([label, value]) => (
           <article key={String(label)} className={`${DESK_UI.card} p-3`}>
             <p className="text-2xl font-black text-[#0F2744]">{value}</p>
@@ -78,17 +94,15 @@ export default function InternCampusGrowthHome({
         ))}
       </section>
 
+      {!eventMode ? <CampusIdeaDeck /> : null}
+
       {eventMode ? (
         <section className="grid gap-3">
           <h2 className="text-lg font-black text-[#0F2744]">Event toolkit</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {links.length ? links.map((link) => (
-              <a key={link.id} href={`${campusTrackingPath(link.code)}?scan=1`} className="rounded-3xl bg-[#0F2744] p-5 text-white">
-                <p className="text-xs font-black uppercase tracking-wide !text-white/80">{link.target.replaceAll("_", " ")} · {link.channel}</p>
-                <p className="mt-2 text-2xl font-black !text-white">{link.campaign}</p>
-                <p className="mt-3 break-all text-sm font-semibold !text-white">{campusTrackingPath(link.code)}?scan=1</p>
-              </a>
-            )) : <p className="text-sm font-semibold text-slate-500">Create a tracking link before the event. Opening it counts a visit. It does not pay Ambassador rewards.</p>}
+            {links.length ? links.map(link => (
+              <CampusLinkShareCard key={link.id} link={link} visitsAvailable={sourceHealth.visits} showAtEvent/>
+            )) : <p className="text-sm font-semibold text-slate-500">Create an approved tracking link before the event. QR scans are not verified registrations and do not pay Ambassador rewards.</p>}
           </div>
           <Link href="/intern/messages" className="rounded-2xl bg-[#EFF6FF] px-4 py-4 text-center text-sm font-black text-[#1D4ED8]">Request Ava help</Link>
         </section>
@@ -119,7 +133,7 @@ export default function InternCampusGrowthHome({
           <textarea name="rulesNotes" rows={2} placeholder="University rules you still need to confirm" className="rounded-xl border px-3 py-2 text-sm" />
           <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Submit idea to Ava</button>
         </form>
-        <form action={saveCampusLead} className={`${DESK_UI.card} grid content-start gap-2 p-4`}>
+        <form id="campus-leads-form" action={saveCampusLead} className={`${DESK_UI.card} grid content-start gap-2 p-4`}>
           <h2 className="font-black text-[#0F2744]">Add lead</h2>
           <input type="hidden" name="returnTo" value={eventMode ? "/intern/campus-growth/event" : "/intern/campus-growth"} />
           <input type="hidden" name="internId" value={card.internId} />
@@ -133,7 +147,7 @@ export default function InternCampusGrowthHome({
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
-        <form action={saveCampusLink} className={`${DESK_UI.card} grid gap-2 p-4`}>
+        <form id="campus-tracking-form" action={saveCampusLink} className={`${DESK_UI.card} grid gap-2 p-4`}>
           <h2 className="font-black text-[#0F2744]">Tracking link</h2>
           <p className="text-xs font-semibold text-slate-500">Business attribution only. This does not enroll you as an Ambassador or pay PetPerks rewards.</p>
           <input type="hidden" name="returnTo" value="/intern/campus-growth" />
@@ -145,14 +159,15 @@ export default function InternCampusGrowthHome({
           <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Create tracking link</button>
           <ul className="space-y-2 text-sm font-semibold">
             {links.map((link) => (
-              <li key={link.id} className="break-all rounded-xl bg-[#F8FAFC] px-3 py-2">{link.campaign} · {campusTrackingPath(link.code)}?scan=1</li>
+              <li key={link.id}><CampusLinkShareCard link={link} visitsAvailable={sourceHealth.visits}/></li>
             ))}
           </ul>
         </form>
-        <form action={saveCampusResult} className={`${DESK_UI.card} grid gap-2 p-4`}>
+        <form id="campus-results-form" action={saveCampusResult} className={`${DESK_UI.card} grid gap-2 p-4`}>
           <h2 className="font-black text-[#0F2744]">Record results</h2>
           <input type="hidden" name="returnTo" value="/intern/campus-growth" />
           <input type="hidden" name="internId" value={card.internId} />
+          <p className="text-xs font-semibold text-amber-900">Manually entered outcomes are unverified reports. Include your source and reporting period below.</p>
           <input name="petParents" inputMode="numeric" placeholder="Pet Parent registrations" className="min-h-11 rounded-xl border px-3 text-sm" />
           <input name="guruApplications" inputMode="numeric" placeholder="Future Guru applications" className="min-h-11 rounded-xl border px-3 text-sm" />
           <input name="bookings" inputMode="numeric" placeholder="Bookings, if known" className="min-h-11 rounded-xl border px-3 text-sm" />
@@ -162,7 +177,7 @@ export default function InternCampusGrowthHome({
         </form>
       </section>
 
-      <section className={`${DESK_UI.card} p-4`}>
+      <section id="review-queue" className={`${DESK_UI.card} p-4`}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-black text-[#0F2744]">Opportunities and rules</h2>
           <Link href="/intern/campus-growth/event" className="text-sm font-bold text-[#2563EB]">Event mode</Link>
@@ -176,14 +191,14 @@ export default function InternCampusGrowthHome({
                 <p className="font-black text-[#0F2744]">{row.title}</p>
                 <p className="font-semibold text-slate-600">{row.type} · {row.status}</p>
                 <span className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-bold ${view.tone}`}>{view.label}</span>
-                {campusExecutionAllowed(row.approval) ? <p className="mt-1 font-semibold text-[#166534]">You may proceed with this approved tactic.</p> : <p className="mt-1 font-semibold text-slate-500">Wait for review before you execute this.</p>}
+                {campusExecutionAllowed(row.approval) ? <p className="mt-1 font-semibold text-[#166534]">SitGuru approved this idea. Confirm any separate campus permission and supervisor instructions before publishing.</p> : <p className="mt-1 font-semibold text-slate-500">Wait for review before you execute this.</p>}
               </li>
             );
           })}
         </ul>
       </section>
 
-      <section className={`${DESK_UI.card} p-4`}>
+      <section id="campus-missions" className={`${DESK_UI.card} p-4`}>
         <h2 className="font-black text-[#0F2744]">Campus missions</h2>
         {missions.length ? missions.map((row) => (
           <p key={row.id} className="mt-2 text-sm font-semibold text-slate-700"><Link href="/intern/assignments" className="font-black text-[#2563EB]">{row.title}</Link> · due {row.dueOn || "not set"}</p>

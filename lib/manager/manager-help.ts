@@ -334,6 +334,22 @@ export const MANAGER_HELP_ARTICLES: ManagerHelpArticle[] = [
     "Do not infer milestone completion from an old due date or from hours logged. Recorded completion statuses must match evidence.",
     "The page shows no milestones or a wrong school.","Check that the active cohort has milestone records and that Ava is assigned to the correct intern with the correct university. Ask Admin to verify the official timeline and assignment."),
 
+  guide("campus-growth-manager","Campaigns & community","Run Ava's Campus Growth Command Center","Turn each assigned university into a playful but accountable outreach laboratory with Campus Quests, mission briefs, approvals, tracking links and evidence-backed results.","/manager/campus-growth",
+    ["campus growth command center","ava","intern","penn state","saint josephs","lola","ryan","missions","quests","campus badges","tracking","approval","university","leads","outreach"],
+    ["Open Campus Growth in the Manager's Desk. At the top, check real opportunities, pending approvals, missions, tracked visits and QR scan events. If a data source is unavailable, the number displays a dash instead of an invented zero.",
+     "Select the campus and assigned intern you want to coach. The five work areas now show only that student's opportunities, leads, tracking, results and assignments.",
+     "Use the optional Campus Quest Board to suggest a creative next step; badges come only from documented SitGuru records and do not award university credit or grant permission to advertise.",
+     "Start on Overview. Research the campus's written rules and save permission sources in Campus Rules; an intern from another university may have different allowed channels.",
+     "Under Opportunities & Approvals, research student clubs, campus events, student newsletters or local pet partners. Ava should record decisions and evidence before an intern executes an idea. University permissions are separate.",
+     "Use Intern Missions to create a real assignment with an owner, due date and evidence expectations. Select a challenge template or write your own. Drafts remain hidden; published work connects with assignments and the existing Microsoft workflow where configured.",
+     "Use Tracking & Results to create unique campaign links that lead to the right public Guru, Pet Parent or partner page. A link visit or QR scan is NOT a verified registration.",
+     "Record respectful outreach follow-ups under Leads. Manually entered Guru applications, Pet Parents and bookings are labeled Reported; use Growth Insights and verified platform conversions when possible.",
+     "Review intern check-ins, approve content through Content Studio and use the documented learning to build university-specific final reports."],
+    "Ava sees each student and campus as an actionable market project with honest evidence, permissions and academic reporting boundaries.",
+    "Can an intern earn a Campus Quest badge without Ava approving a campaign?","Yes, research and learning badges reflect saved work. A Green Light badge requires an actual recorded SitGuru approval, but it does not override university permission rules.",
+    "Recognize good experiments, empathy and research quality rather than comparing schools purely by raw signup counts.",
+    "The board shows no campuses, missing missions or dashes for KPIs.","Verify Ava's assigned manager account and intern university record in Admin Connection Health. For missing numbers, check the named Supabase data sources; never replace missing records with sample values."),
+
 ];
 
 export function managerHelpArticle(slug:string) {
