@@ -131,6 +131,15 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
       const subjectName =
         peer?.firstName ||
         chatDisplayName({ fullName: text(row.subject), fallback: "Conversation" });
+      const lastInternVisibleMessage = actor === "intern"
+        ? ((messages || []) as Record<string, unknown>[]).find(message =>
+            text(message.conversation_id) === id && text(message.visibility) !== "internal_note")
+        : null;
+      const safePreview = actor === "intern"
+        ? lastInternVisibleMessage
+          ? (lastInternVisibleMessage.deleted_at ? "Message removed" : text(lastInternVisibleMessage.body || lastInternVisibleMessage.content))
+          : ""
+        : text(row.last_message_preview);
       return {
         id,
         subject: subjectName,
@@ -139,7 +148,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
         fullSubject: text(row.subject) || "Conversation",
         typeLabel: type.replaceAll("_", " "),
         statusLabel: text(row.workflow_status) || "open",
-        preview: text(row.last_message_preview),
+        preview: safePreview,
         updatedAt: text(row.updated_at),
         unreadCount: ((messages || []) as Record<string, unknown>[])
           .filter((message) => text(message.conversation_id) === id)
