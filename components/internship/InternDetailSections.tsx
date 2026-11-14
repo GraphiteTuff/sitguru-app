@@ -55,6 +55,7 @@ export default function InternDetailSections({
   return (
     <div id="intern-record-sections" className="min-w-0 scroll-mt-24 space-y-4">
       <nav
+        role="tablist"
         aria-label="Intern record sections"
         className="w-full overflow-x-auto rounded-[1.25rem] border border-slate-200 bg-white p-2 shadow-[0_8px_24px_rgba(15,39,68,0.05)] [scrollbar-width:thin]"
       >
@@ -68,7 +69,8 @@ export default function InternDetailSections({
                 id={"intern-record-tab-" + item.id}
                 type="button"
                 aria-controls={"intern-record-panel-" + item.id}
-                aria-pressed={selected}
+                role="tab"
+                aria-selected={selected}
                 onClick={() => selectTab(item.id, item.hash)}
                 className={
                   "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-black transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB] sm:text-sm md:w-full " +
@@ -84,21 +86,22 @@ export default function InternDetailSections({
           })}
         </div>
       </nav>
-      {INTERN_RECORD_TABS.map((item) => (
-        <section
-          key={item.id}
-          id={"intern-record-panel-" + item.id}
-          aria-labelledby={"intern-record-tab-" + item.id}
-          hidden={active !== item.id}
-          className={active === item.id ? "min-w-0 space-y-4" : "hidden"}
-        >
-          <div className="px-1">
-            <h2 className="text-xl font-black tracking-tight text-[#0F2744] sm:text-2xl">{item.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-600">{item.description}</p>
-          </div>
-          {sections[item.id]}
-        </section>
-      ))}
+      {(() => {
+        const selected = INTERN_RECORD_TABS.find((item) => item.id === active) || INTERN_RECORD_TABS[0];
+        return (
+          <section
+            id={"intern-record-panel-" + selected.id}
+            aria-labelledby={"intern-record-tab-" + selected.id}
+            className="min-w-0 space-y-4"
+          >
+            <div className="px-1">
+              <h2 className="text-xl font-black tracking-tight text-[#0F2744] sm:text-2xl">{selected.title}</h2>
+              <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-600">{selected.description}</p>
+            </div>
+            {sections[active]}
+          </section>
+        );
+      })()}
     </div>
   );
 }
