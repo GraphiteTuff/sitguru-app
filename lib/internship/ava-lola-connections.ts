@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getInternOnboarding } from "@/lib/internship/queries";
 import { internOnboardingComplete, internOnboardingStatusLabel } from "@/lib/internship/onboarding";
-import { GROWTH_HIRE_ROLE } from "@/lib/admin/growth/hire";
+import { GROWTH_HIRE_ROLE, GROWTH_HIRE_TITLE } from "@/lib/admin/growth/hire";
 
 export type ConnectionCheck = {
   label: string;
@@ -139,8 +139,14 @@ export async function reconcileAvaLolaAccounts(actor: { id:string;email:string }
       if (roleError) throw Error("Ava manager role: "+roleError.message);
       changes.push("Verified Ava's Growth Manager role");
       const { data: current } = await supabaseAdmin.from("internship_staff_eligibility").select("can_manage_interns,can_supervise_interns,job_title").eq("user_id",avaId).maybeSingle();
-      if (current && !current.can_manage_interns) {
-        const { error } = await supabaseAdmin.from("internship_staff_eligibility").update({can_manage_interns:true,updated_by:actor.id,updated_at:now}).eq("user_id",avaId);
+      if (!current?.can_manage_interns) {
+        const { error } = await supabaseAdmin.from("internship_staff_eligibility").upsert({
+          user_id:avaId,
+          can_manage_interns:true,
+          can_supervise_interns:current?.can_supervise_interns===true,
+          job_title:String(current?.job_title||GROWTH_HIRE_TITLE),
+          updated_by:actor.id,updated_at:now,
+        },{onConflict:"user_id"});
         if (error) throw Error("Ava manager eligibility: "+error.message);
         changes.push("Enabled Ava's assigned intern management eligibility");
       }
@@ -159,6 +165,13 @@ export async function reconcileAvaLolaAccounts(actor: { id:string;email:string }
         const { error }=await supabaseAdmin.from("internship_interns").update({user_id:lolaId,updated_at:now}).eq("id",intern.id).is("user_id",null);
         if(error)throw Error("Lola login link: "+error.message);
         changes.push("Linked approved Lola internship to verified login");
+      }
+      if (!intern.portal_enabled) {
+        const { error }=await supabaseAdmin.from("internship_interns")
+          .update({portal_enabled:true,updated_at:now})
+          .eq("id",intern.id).eq("portal_enabled",false);
+        if(error)throw Error("Lola portal activation: "+error.message);
+        changes.push("Enabled Lola's approved Intern Portal without waiving onboarding");
       }
       const { error: roleError }=await supabaseAdmin.from("user_roles").upsert({user_id:lolaId,role:"intern",updated_at:now},{onConflict:"user_id,role"});
       if(roleError)throw Error("Lola intern role: "+roleError.message);
