@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { listBrandAssets, listOwnBrandSubmissions, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import BrandKitManager from "@/components/manager/BrandKitManager";
 import BrandStyleReference from "@/components/portal/BrandStyleReference";
@@ -15,9 +14,8 @@ export default async function InternSharedBrandKitPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const access = await requireGrowthWorkplace("intern");
-  if (!access.ok) return access.ui;
   const actor = await resolveBrandActor();
+  if (!actor) return <main className="mx-auto max-w-3xl px-4 py-12"><h1 className="text-xl font-black text-[#0F2744]">Intern Brand Kit access</h1><p className="mt-2 text-sm font-medium text-slate-600">Sign in with your assigned SitGuru intern account to view the shared asset library.</p><Link href="/intern/login" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white">Intern login</Link></main>;
   const params = searchParams ? await searchParams : {};
   const query = first(params.q);
   const category = first(params.category);
