@@ -4,7 +4,9 @@ import { InternCheckInsPageView } from "@/components/internship/InternSectionPag
 
 export const dynamic = "force-dynamic";
 
-export default async function InternCheckInsPage() {
+export default async function InternCheckInsPage({searchParams}:{
+  searchParams?:Promise<Record<string,string|string[]|undefined>>;
+}) {
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   const data = await loadInternSectionWorkspace();
@@ -15,7 +17,9 @@ export default async function InternCheckInsPage() {
       </div>
     );
   }
+  const params=searchParams?await searchParams:{};
+  const first=(v:string|string[]|undefined)=>Array.isArray(v)?v[0]||"":v||"";
   return (
-    <InternCheckInsPageView workspace={data.workspace} hourSummary={data.hourSummary} />
+    <InternCheckInsPageView workspace={data.workspace} hourSummary={data.hourSummary} notice={first(params.ok)} error={first(params.error)} />
   );
 }
