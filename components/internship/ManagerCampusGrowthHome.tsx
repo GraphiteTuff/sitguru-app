@@ -235,7 +235,7 @@ function OpportunitiesTab({card,opportunities}:{card:CampusCard;opportunities:Ca
         <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#2563EB]"/>
         <input type="search" placeholder="Search opportunities and organizations…" aria-label="Search campus opportunities" className={INPUT+" pl-10"} value={query} onChange={e=>setQuery(e.target.value)}/>
       </label>
-      <div className="mt-4 space-y-3">{list.length?list.map(o=><ReviewBox key={o.id} opportunity={o} card={card}/>):<Empty title="No matching opportunities" detail="Choose another filter, or add a new research opportunity on the right."/></div>
+      <div className="mt-4 space-y-3">{list.length?list.map(o=><ReviewBox key={o.id} opportunity={o} card={card}/>):<Empty title="No matching opportunities" detail="Choose another filter, or add a new research opportunity on the right."/>}</div>
     </section>
     <section className={DESK_UI.card+" p-4 sm:p-5 xl:sticky xl:top-24"}>
       <h3 className="text-lg font-black text-[#0F2744]">Add a campus opportunity</h3>
@@ -289,7 +289,7 @@ function LeadsTab({card,leads}:{card:CampusCard;leads:CampusLead[]}){
               <button type="submit" className={BUTTON}>Save status</button>
             </form>
           </article>
-        )):<Empty title="No matching leads" detail="Try another search or capture a new permission-based prospect."/></div>
+        )):<Empty title="No matching leads" detail="Try another search or capture a new permission-based prospect."/>}</div>
     </section>
     <section className={DESK_UI.card+" p-4 sm:p-5 xl:sticky xl:top-24"}>
       <h3 className="text-lg font-black text-[#0F2744]">Add a campus lead</h3>
