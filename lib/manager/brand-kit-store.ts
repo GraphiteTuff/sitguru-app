@@ -422,6 +422,12 @@ export async function saveBrandFile(input: {
     action: "created",
     detail: inspected.safeName,
   });
+  if (brandSubmissionStatus(input.actor) === "approved") {
+    await recordEvent({
+      assetId: id, title, actorId: input.actor.id,
+      action: "approval", detail: "Auto-approved because the creator is an authorized brand approver",
+    });
+  }
   return { error: "", id };
 }
 
@@ -486,6 +492,12 @@ export async function verifyBrandUpload(input: { actor: ResolvedBrandActor; id: 
     action: "created",
     detail: row.file_name,
   });
+  if (brandSubmissionStatus(input.actor) === "approved") {
+    await recordEvent({
+      assetId: row.id, title: row.title, actorId: input.actor.id,
+      action: "approval", detail: "Auto-approved after verified upload by an authorized brand approver",
+    });
+  }
   return { error: "", id: row.id };
 }
 
@@ -617,12 +629,16 @@ export async function deleteBrandAsset(input: { actor: ResolvedBrandActor; id: s
 export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id: string; download?: boolean }) {
   const { data: row } = await supabaseAdmin
     .from("growth_brand_assets")
-    .select("id,title,file_name,mime_type,approval_status,storage_path,verified")
+    .select("id,title,file_name,mime_type,approval_status,storage_path,verified,uploaded_by")
     .eq("id", input.id)
     .maybeSingle();
   if (!row || !row.verified) return { error: "File not found.", status: 404 as const };
-  const editor = input.actor.capabilities.viewLibrary;
-  if (!editor && (row.approval_status !== "approved" || !input.actor.capabilities.viewApproved)) {
+  if (row.approval_status === "approved") {
+    if (!input.actor.capabilities.viewApproved) return { error: "Not allowed.", status: 403 as const };
+  } else if (
+    !input.actor.capabilities.approve &&
+    !(input.actor.capabilities.edit && row.uploaded_by === input.actor.id)
+  ) {
     return { error: "Not allowed.", status: 403 as const };
   }
   const fileName = brandDownloadFileName(row.file_name);
