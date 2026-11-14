@@ -101,7 +101,7 @@ export default function InternCampusGrowthHome({
           <h2 className="text-lg font-black text-[#0F2744]">Event toolkit</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {links.length ? links.map(link => (
-              <CampusLinkShareCard key={link.id} link={link} showAtEvent/>
+              <CampusLinkShareCard key={link.id} link={link} visitsAvailable={sourceHealth.visits} showAtEvent/>
             )) : <p className="text-sm font-semibold text-slate-500">Create an approved tracking link before the event. QR scans are not verified registrations and do not pay Ambassador rewards.</p>}
           </div>
           <Link href="/intern/messages" className="rounded-2xl bg-[#EFF6FF] px-4 py-4 text-center text-sm font-black text-[#1D4ED8]">Request Ava help</Link>
@@ -159,7 +159,7 @@ export default function InternCampusGrowthHome({
           <button className="rounded-full bg-[#2563EB] px-4 py-2 text-sm font-bold !text-white">Create tracking link</button>
           <ul className="space-y-2 text-sm font-semibold">
             {links.map((link) => (
-              <li key={link.id}><CampusLinkShareCard link={link}/></li>
+              <li key={link.id}><CampusLinkShareCard link={link} visitsAvailable={sourceHealth.visits}/></li>
             ))}
           </ul>
         </form>
