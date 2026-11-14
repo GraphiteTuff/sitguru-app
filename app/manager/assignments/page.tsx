@@ -138,7 +138,7 @@ export default async function ManagerAssignmentsPage({
     const teamsUrl = pick("teams")?.externalUrl ||
       (routeAssignmentCategory(row.category).channelKey === "analytics-results" ? analyticsUrl : "");
     links[row.id] = {
-      planner: pick("planner")?.status.replaceAll("_", " ") || "Not configured",
+      planner: pick("planner")?.status === "linked_manually" ? "Linked manually (unverified)" : pick("planner")?.status.replaceAll("_", " ") || "Not configured",
       files: pick("sharepoint")?.status === "connected" ? "Connected" : filesUrl ? "Folder found - sync pending" : "Not configured",
       teams: pick("teams")?.status === "connected" ? "Channel link" : teamsUrl ? "Channel found" : "Not configured",
       plannerUrl: pick("planner")?.externalUrl || "",
