@@ -264,7 +264,12 @@ export default function InternshipSyllabusEnhancements({
           {academicRows.length ? (
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {academicRows.map((intern) => {
-                const [course, credits, hours, weeks] = syllabusAcademicPlanSummary(intern);
+                const [course, credits, hours, weeks] = syllabusAcademicPlanSummary({
+                  courseCode: intern.courseCode,
+                  credits: intern.credits,
+                  requiredHours: intern.requiredHours,
+                  weeks: intern.internshipWeeks ?? null,
+                });
                 const verification = intern.universityVerificationStatus || "pending";
                 return (
                   <article key={intern.id} className="rounded-2xl border border-slate-200 bg-white p-4">
