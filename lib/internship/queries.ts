@@ -456,6 +456,8 @@ export async function findInternByAccount(input: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  // Never let a second login claim an internship already bound to another auth identity.
+  if (data?.user_id && input.userId && data.user_id !== input.userId) return null;
   if (data) {
     return attachInternAvatar(mapIntern(data as Record<string, unknown>));
   }
@@ -469,6 +471,7 @@ export async function findInternByAccount(input: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (byWorkEmail?.user_id && input.userId && byWorkEmail.user_id !== input.userId) return null;
   return attachInternAvatar(byWorkEmail ? mapIntern(byWorkEmail as Record<string, unknown>) : null);
 }
 
