@@ -85,13 +85,14 @@ export default function InternshipSyllabusEnhancements({
 }) {
   return (
     <div className="space-y-5">
-      <header id="program-overview" className="scroll-mt-24 overflow-hidden rounded-[1.7rem] border border-[#10374D] bg-[#102D41] text-white shadow-lg">
+      {/* Admin HQ globally forces all header backgrounds white; use a section for the intentionally navy syllabus hero. */}
+      <section id="program-overview" aria-labelledby="program-syllabus-title" className="scroll-mt-24 overflow-hidden rounded-[1.7rem] border border-[#10374D] bg-[#102D41] text-white shadow-lg">
         <div className="relative grid gap-6 px-5 py-7 sm:px-8 sm:py-10 lg:grid-cols-[1.5fr_1fr]">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.19em] text-emerald-200">
               SitGuru · {cohortName} · Program standard
             </p>
-            <h1 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-white sm:text-4xl">
+            <h1 id="program-syllabus-title" className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-white sm:text-4xl">
               Social Media & Community Growth Internship Syllabus
             </h1>
             <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-100 sm:text-base">
@@ -121,7 +122,7 @@ export default function InternshipSyllabusEnhancements({
             ))}
           </div>
         </div>
-      </header>
+      </section>
 
       <nav aria-label="Syllabus sections" className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3">
         {jumpLinks.map((item) => (
