@@ -214,6 +214,25 @@ export async function listBrandAssets(input: {
  * Excludes unverified uploads, archived files, and every file submitted after
  * the snapshot cutoff so newer intern work can never bypass Ava's review.
  */
+/** An intern may view the status of their own submissions, never another intern's work. */
+export async function listOwnBrandSubmissions(actor: ResolvedBrandActor) {
+  if (!actor.intern) return [] as Array<{ id: string; title: string; status: string; submittedAt: string }>;
+  const { data, error } = await supabaseAdmin
+    .from("growth_brand_assets")
+    .select("id,title,approval_status,created_at")
+    .eq("uploaded_by", actor.id)
+    .eq("verified", true)
+    .order("created_at", { ascending: false })
+    .limit(25);
+  if (error) return [] as Array<{ id: string; title: string; status: string; submittedAt: string }>;
+  return (data || []).map((row) => ({
+    id: String(row.id),
+    title: String(row.title),
+    status: String(row.approval_status),
+    submittedAt: String(row.created_at || ""),
+  }));
+}
+
 export async function countInitialBrandAssetsToApprove(actor: ResolvedBrandActor) {
   if (!actor.isSuperUser) return { count: 0, error: "Super Admin access required." };
   const { count, error } = await supabaseAdmin
