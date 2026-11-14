@@ -152,7 +152,7 @@ export default function ManagerDeskHome({
   ].slice(0, 5);
 
   return (
-    <div className="space-y-4 pb-28 lg:pb-8">
+    <div className="w-full min-w-0 max-w-full space-y-4 pb-28 lg:pb-8">
       <DeskPageHero
         icon={<PawPrint size={22} />}
         title={desk.viewingAs ? `${desk.viewingAs}'s Desk` : "Manager's Desk"}
@@ -172,7 +172,7 @@ export default function ManagerDeskHome({
         <span className="text-2xl font-black text-[#0D5C3A]">{pendingContent}</span>
       </Link>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           tone="sky"
           icon={<Users size={18} />}
@@ -225,8 +225,8 @@ export default function ManagerDeskHome({
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+      <section className="grid min-w-0 gap-4 xl:grid-cols-3">
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <Head title="Interns Overview" href={href("/manager/team")} />
           <ul className="mt-4 space-y-3">
             {cards.slice(0, 5).map((card) => {
@@ -264,7 +264,7 @@ export default function ManagerDeskHome({
           </ul>
         </article>
 
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <Head title="Review Queue" href={href("/manager/check-ins")} icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
           <ul className="mt-4 space-y-2">
             {queueRows.map((item, index) => {
@@ -314,7 +314,7 @@ export default function ManagerDeskHome({
           </ul>
         </article>
 
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
               <BarChart3 size={18} className="text-[#2563EB]" /> Team Progress
@@ -350,8 +350,8 @@ export default function ManagerDeskHome({
         </article>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+      <section className="grid min-w-0 gap-4 xl:grid-cols-3">
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <Head title="Assignments & Deadlines" href={href("/manager/assignments")} icon={<ClipboardList size={18} className="text-[#2563EB]" />} />
           <ul className="mt-4 space-y-3">
             {assignments.map((row) => (
@@ -373,7 +373,7 @@ export default function ManagerDeskHome({
           </ul>
         </article>
 
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Action href={href("/manager/check-ins")} label="Review Check-ins" tone="bg-[#EFF6FF] text-[#1D4ED8]" icon={<FileText size={18} />} />
@@ -383,7 +383,7 @@ export default function ManagerDeskHome({
           </div>
         </article>
 
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+        <article className={`${DESK_UI.card} min-w-0 p-4 sm:p-5`}>
           <Head title="Recent Activity" href={href("/manager/team")} icon={<PawPrint size={18} className="text-[#EA580C]" />} />
           <ul className="mt-4 space-y-3">
             {activity.map((item) => (

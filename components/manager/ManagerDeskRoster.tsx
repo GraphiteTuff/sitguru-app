@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Search } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
 
 export type DeskRosterRow = {
@@ -44,20 +44,21 @@ export default function ManagerDeskRoster({ rows }: { rows: DeskRosterRow[] }) {
   });
 
   return (
-    <section className={`${DESK_UI.card} overflow-hidden`}>
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-4">
+    <section className={`${DESK_UI.card} min-w-0 max-w-full overflow-hidden`}>
+      <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 px-3 py-4 sm:px-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
           <h2 className="text-lg font-black text-[#0F2744]">All Interns</h2>
-          <div className="flex gap-4 text-sm font-bold">
+          <div className="flex min-w-0 flex-wrap gap-2 text-sm font-bold" aria-label="Intern roster status">
             {TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
+                aria-pressed={tab === item.id}
                 className={
                   tab === item.id
-                    ? "border-b-2 border-[#2563EB] pb-2 text-[#2563EB]"
-                    : "pb-2 text-slate-500"
+                    ? "min-h-10 rounded-full bg-[#EFF6FF] px-3 text-[#2563EB] ring-1 ring-blue-200"
+                    : "min-h-10 rounded-full px-3 text-slate-500 hover:bg-slate-100"
                 }
               >
                 {item.label} ({counts[item.id]})
@@ -65,18 +66,75 @@ export default function ManagerDeskRoster({ rows }: { rows: DeskRosterRow[] }) {
             ))}
           </div>
         </div>
-        <label className="relative block w-full sm:w-56">
+        <label className="relative block w-full min-w-0 lg:w-56 lg:shrink-0">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search interns..."
-            className="min-h-10 w-full rounded-full bg-[#F1F5F9] pl-8 pr-3 text-sm font-medium text-[#0F2744] outline-none"
+            className="min-h-11 w-full min-w-0 rounded-full bg-[#F1F5F9] pl-8 pr-3 text-base font-medium text-[#0F2744] outline-none focus:ring-2 focus:ring-blue-200 lg:text-sm"
           />
         </label>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-[880px] w-full text-left text-sm">
+      {/* Mobile/tablet: full-width cards instead of a 880px table spilling off-screen. */}
+      <div className="grid min-w-0 gap-3 p-3 lg:hidden">
+        {visible.map((row) => (
+          <article key={row.id} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3 shadow-sm sm:p-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <Face name={row.name} src={row.avatarUrl} />
+              <div className="min-w-0 flex-1">
+                <h3 className="break-words text-base font-black text-[#0F2744]">{row.name}</h3>
+                <p className="mt-0.5 break-words text-sm font-medium text-slate-600">{row.role}</p>
+              </div>
+              <span className="max-w-[44%] shrink-0">
+                <StatusPill label={row.status} attention={row.attention} />
+              </span>
+            </div>
+            <dl className="grid min-w-0 grid-cols-2 gap-2">
+              <div className="min-w-0 rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                <dt className="text-[11px] font-semibold text-slate-500">Hours this week</dt>
+                <dd className="mt-1 break-words text-sm font-black text-[#0F2744]">{row.hoursThisWeek}</dd>
+              </div>
+              <div className="min-w-0 rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                <dt className="text-[11px] font-semibold text-slate-500">Approved / required hours</dt>
+                <dd className="mt-1 break-words text-sm font-black text-[#0F2744]">{row.totalHours}</dd>
+              </div>
+            </dl>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-600">Progress</span>
+                <span className="text-xs font-black text-[#0F2744]">{row.progress}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-[#22C55E]" style={{ width: String(row.progress) + "%" }} />
+              </div>
+            </div>
+            <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
+              <div className="min-w-0">
+                <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Current assignment</dt>
+                <dd className="mt-0.5 break-words text-sm font-semibold text-[#0F2744]">{row.assignment}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Next deadline</dt>
+                <dd className="mt-0.5 break-words text-sm font-semibold text-[#DC2626]">{row.deadline}</dd>
+              </div>
+            </dl>
+            <Link
+              href={"/intern/manage?intern=" + encodeURIComponent(row.id)}
+              className="inline-flex min-h-11 w-full items-center justify-between rounded-xl border border-blue-200 bg-white px-3 text-sm font-black text-[#2563EB] active:bg-blue-50"
+            >
+              <span>Open {row.name.split(" ")[0]}’s intern workspace</span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </Link>
+          </article>
+        ))}
+        {!visible.length ? (
+          <p className="rounded-xl bg-[#F8FAFC] p-5 text-center text-sm font-medium text-slate-500">No interns in this list yet.</p>
+        ) : null}
+      </div>
+      {/* Desktop keeps the full table. Overflow remains inside the table region. */}
+      <div className="hidden min-w-0 max-w-full overflow-x-auto lg:block" role="region" aria-label="Intern roster table" tabIndex={0}>
+        <table className="w-full min-w-[880px] text-left text-sm">
           <thead className="text-xs font-semibold text-slate-500">
             <tr>
               {["Intern", "Role", "Hours This Week", "Total Hours", "Progress", "Status", "Current Assignment", "Next Deadline", "Actions"].map(

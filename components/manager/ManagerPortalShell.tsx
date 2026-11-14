@@ -91,8 +91,8 @@ export default function ManagerPortalShell({
   const pathname = usePathname() || GROWTH_MANAGER_BASE;
 
   return (
-    <div className={`min-h-dvh ${DESK_UI.pageBg} text-[#0F2744]`}>
-      <div className="mx-auto flex min-h-dvh max-w-[1600px]">
+    <div className={`min-h-dvh w-full max-w-full overflow-x-clip ${DESK_UI.pageBg} text-[#0F2744]`}>
+      <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[1600px]">
         <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
           <div className="border-b border-slate-100 px-5 py-5">
             <Link href={MANAGER_PORTAL_BRAND.homePath} className="block" aria-label="SitGuru My Manager Portal">
@@ -172,7 +172,7 @@ export default function ManagerPortalShell({
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex w-full min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
             <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
               <Link href={MANAGER_PORTAL_BRAND.homePath} className="min-w-0 flex-1 xl:hidden">
@@ -201,7 +201,7 @@ export default function ManagerPortalShell({
             </div>
           </header>
 
-          <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
+          <main className="w-full min-w-0 max-w-full flex-1 overflow-x-clip px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
           <DeskChatDock aboveBottomNav />
           <WebappBottomNav
             label="Manager navigation"
