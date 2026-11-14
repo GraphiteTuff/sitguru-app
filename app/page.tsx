@@ -169,10 +169,10 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
 // Order these featured Guru cards first, in the order requested. A first-name
 // target includes every matching Guru (e.g. multiple Ashleys), never duplicates.
 const prioritizedHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
-  { label: "Lola", firstName: "lola" },
+  { label: "Ru", firstName: "ru" },
   { label: "Norah Wallace", fullName: "norah wallace" },
   { label: "Olivia Goode", fullName: "olivia goode" },
-  { label: "Ru", firstName: "ru" },
+  { label: "Lola", firstName: "lola" },
   { label: "Jennifer Kelly", fullName: "jennifer kelly" },
   { label: "Ashley", firstName: "ashley" },
   { label: "Victoria", firstName: "victoria" },
