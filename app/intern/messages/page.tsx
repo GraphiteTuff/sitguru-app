@@ -14,6 +14,7 @@ export default async function InternMessagesPage({
   const params = searchParams ? await searchParams : {};
   const notice = Array.isArray(params.ok) ? params.ok[0] : params.ok || "";
   const error = Array.isArray(params.error) ? params.error[0] : params.error || "";
+  const initialConversationId = Array.isArray(params.c) ? params.c[0] : params.c || "";
   const inbox = await loadStaffInbox(access.actor.id, false, "intern");
 
   return (
@@ -25,6 +26,7 @@ export default async function InternMessagesPage({
       notice={error || notice || null}
       noticeError={Boolean(error)}
       audience="intern"
+      initialConversationId={initialConversationId}
     />
   );
 }
