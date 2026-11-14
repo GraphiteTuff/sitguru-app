@@ -99,7 +99,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
       isSuperUser: admin.isSuperUser,
       growthOnly: isGrowthOnlyRole(admin.role),
       intern: false,
-      brandApprover: admin.email.trim().toLowerCase() === "ava@sitguru.com" && admin.role === "social_community_manager",
+      brandApprover: String(user.email || "").trim().toLowerCase() === "ava@sitguru.com",
     };
     const { data: profile } = await supabaseAdmin
       .from("profiles")
