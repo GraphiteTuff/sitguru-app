@@ -15,12 +15,13 @@ import {
   BA495A_EXAMPLE,
   SYLLABUS_ACADEMIC_FIELDS,
   SYLLABUS_ASSESSMENT,
-  SYLLABUS_CORE_DELIVERABLES,
   SYLLABUS_GUIDELINES,
-  SYLLABUS_PHASES,
   SYLLABUS_WORKFLOW,
 } from "@/lib/internship/university-syllabus";
-import type { InternshipIntern } from "@/lib/internship/types";
+import type { InternshipIntern, InternshipProject } from "@/lib/internship/types";
+import { syllabusDeliveryCrosswalk, syllabusWeekCrosswalk } from "@/lib/internship/syllabus-alignment";
+import { FINAL_PROJECT_OUTPUTS } from "@/lib/internship/final-project";
+import InternshipSyllabusAlignmentSection, { type SyllabusUnmappedAssignment } from "@/components/internship/InternshipSyllabusAlignmentSection";
 import { syllabusAcademicPlanSummary } from "@/lib/internship/university-syllabus";
 
 export type SyllabusAcademicRow = Pick<
@@ -34,6 +35,7 @@ const jumpLinks = [
   { label: "Deliverables", href: "#program-deliverables" },
   { label: "Academic rules", href: "#program-academic" },
   { label: "Workflows", href: "#program-workflow" },
+  { label: "Final project", href: "#program-final-project" },
   { label: "Assessment", href: "#program-assessment" },
   { label: "Full syllabus", href: "#program-full" },
 ] as const;
@@ -42,6 +44,7 @@ const quickLinks = [
   { title: "Assignment center", description: "Ava creates tasks and reviews submissions", href: "/manager/assignments", icon: ListChecks },
   { title: "Intern assignments", description: "Each student completes their assigned work", href: "/intern/assignments", icon: ClipboardCheck },
   { title: "Intern calendar", description: "Due dates appear from the assigned task", href: "/intern/calendar", icon: CalendarDays },
+  { title: "Business Growth Report", description: "Approved assignments, campaigns and verified evidence build this report", href: "/intern/growth", icon: FileChartColumn },
   { title: "University directory", description: "Institution-specific requirements and approvals", href: "/admin/internship/universities", icon: GraduationCap },
 ] as const;
 
@@ -70,9 +73,13 @@ function SectionHeader({
 export default function InternshipSyllabusEnhancements({
   academicRows,
   cohortName,
+  projects,
+  unmappedAssignments,
 }: {
   academicRows: SyllabusAcademicRow[];
   cohortName: string;
+  projects: InternshipProject[];
+  unmappedAssignments: SyllabusUnmappedAssignment[];
 }) {
   return (
     <div className="space-y-5">
@@ -166,7 +173,7 @@ export default function InternshipSyllabusEnhancements({
           subtitle="This is SitGuru's example 15-week roadmap. It can be shortened or extended to match an approved academic term without changing the core learning outcomes."
         />
         <div className="mt-5 grid gap-3 lg:grid-cols-5">
-          {SYLLABUS_PHASES.map((phase, index) => (
+          {syllabusWeekCrosswalk().map((phase, index) => (
             <article key={phase.label} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="rounded-full bg-[#0D5C3A] px-3 py-1 text-[11px] font-black text-white">{phase.label}</span>
@@ -175,6 +182,14 @@ export default function InternshipSyllabusEnhancements({
               <h3 className="mt-3 text-base font-black text-slate-950">{phase.title}</h3>
               <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{phase.description}</p>
               <p className="mt-3 border-t border-slate-200 pt-3 text-xs font-black text-[#0D5C3A]">{phase.output}</p>
+              <details className="mt-3 text-xs text-slate-600">
+                <summary className="cursor-pointer font-bold text-blue-800">See aligned weekly work</summary>
+                <ul className="mt-2 space-y-2">
+                  {phase.weeks.map((week) => (
+                    <li key={week.week}><strong>Week {week.week}:</strong> {week.work} → {week.buildsToward}</li>
+                  ))}
+                </ul>
+              </details>
             </article>
           ))}
         </div>
@@ -187,7 +202,7 @@ export default function InternshipSyllabusEnhancements({
           subtitle="These categories incorporate the work outlined in the Penn State BA 495A proposal and apply across universities. Example quantities are starting points for each student's approved learning plan—not blanket requirements."
         />
         <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {SYLLABUS_CORE_DELIVERABLES.map((item) => (
+          {syllabusDeliveryCrosswalk().map((item) => (
             <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-emerald-200">
               <div className="flex items-start gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-sm font-black text-[#0D5C3A]">{item.letter}</span>
@@ -201,11 +216,23 @@ export default function InternshipSyllabusEnhancements({
                 <p className="text-[10px] font-black uppercase text-slate-500">Evidence to submit</p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">{item.evidence}</p>
               </div>
+              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-[#0D5C3A]">Connected to the existing Final Project</p>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-950">{item.sectionName} → {item.chapterName}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">
+                  {FINAL_PROJECT_OUTPUTS.find((out) => out.id === item.output)?.name || "Final project"} · approved evidence only
+                </p>
+                {item.secondaryNames.length ? (
+                  <p className="mt-1 text-[11px] text-slate-600">Other relevant sections: {item.secondaryNames.join(", ")}</p>
+                ) : null}
+              </div>
               <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">{item.model}</p>
             </article>
           ))}
         </div>
       </section>
+
+      <InternshipSyllabusAlignmentSection projects={projects} unmappedAssignments={unmappedAssignments} />
 
       <section id="program-academic" className={section}>
         <SectionHeader
