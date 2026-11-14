@@ -285,7 +285,8 @@ export async function saveCampusLink(formData: FormData) {
     created_by: who.userId,
   }).select("id").maybeSingle();
   if (error || !data?.id) bounce(path, "error", "That tracking link already exists or could not be saved.");
-  await audit({ internId: intern.id, type: "link", id: String(data.id), action: "campaign.launched", actorId: who.userId, note: code });
+  await audit({ internId: intern.id, type: "link", id: String(data.id), action: "tracking_link.created", actorId: who.userId, note: code });
+  await signal(intern,"campus.link.created",String(data.id),who.userId);
   refresh();
   bounce(path, "ok", "Campus tracking link saved. It does not create Ambassador rewards.");
 }
@@ -344,6 +345,7 @@ export async function saveCampusPolicy(formData: FormData) {
   }, { onConflict: "intern_id" });
   if (error) bounce(path, "error", "Campus notes could not be saved.");
   await audit({ internId: intern.id, type: "profile", id: intern.id, action: "policy.updated", actorId: who.userId });
+  await signal(intern,"campus.policy.updated",intern.id,who.userId);
   refresh();
   bounce(path, "ok", "Campus notes saved. Rules stay specific to this campus.");
 }
