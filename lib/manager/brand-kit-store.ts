@@ -198,7 +198,7 @@ export async function listBrandAssets(input: {
   // Non-reviewers use the shared initial approved collection, not the private review queue.
   // Verified assets already present at the founder's approval snapshot are visible now,
   // even if the one-time database approval has not yet been run.
-  if (reviewer && status !== "all" && status !== "active") query = query.eq("approval_status", status);
+  if (reviewer && status !== "all" && status !== "active" && status !== "approved") query = query.eq("approval_status", status);
   else if (reviewer && status === "active") query = query.neq("approval_status", "archived");
   const { data, error } = await query;
   if (error) return { assets: [] as BrandAssetRecord[], error: libraryError(error), page: 1, pages: 1, total: 0 };
@@ -210,7 +210,7 @@ export async function listBrandAssets(input: {
     // This grants read-only access to the verified initial collection without treating
     // any newly submitted, unapproved intern files as public team materials.
     const initialCollection = isInitialBrandLibraryAsset(row);
-    if (!reviewer && row.approval_status !== "approved" && !initialCollection) continue;
+    if ((!reviewer || status === "approved") && row.approval_status !== "approved" && !initialCollection) continue;
     if (!brandAssetMatchesCategory(row.category, category)) continue;
     const mapped = withTimes(row);
     if (!editor) mapped.uploadedByName = "SitGuru";
