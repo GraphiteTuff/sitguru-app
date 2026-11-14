@@ -92,7 +92,9 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
     if (conn) {
       const metadata = conn.metadata && typeof conn.metadata === "object" && !Array.isArray(conn.metadata) ? conn.metadata as Record<string, unknown> : {};
       const verified = item.platform === "facebook" && metadata.verified_source === "meta_graph_api" && Boolean(metadata.page_id);
-      const statusRaw = verified ? text(conn.status).toLowerCase() : text(conn.status).toLowerCase() === "connected" ? "manual" : text(conn.status).toLowerCase();
+      const statusRaw = item.platform === "facebook" && !verified && text(conn.status).toLowerCase() === "connected"
+        ? "manual"
+        : text(conn.status).toLowerCase();
       const status =
         statusRaw === "connected"
           ? "connected"
