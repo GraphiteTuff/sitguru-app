@@ -335,7 +335,7 @@ function TrackingTab({card,links,results,health}:{card:CampusCard;links:CampusLi
         </form>
         <h4 className="mt-5 text-sm font-black text-[#0F2744]">Links for this campus ({links.length})</h4>
         <div className="mt-3 space-y-3">
-          {links.length?links.map(link=><CampusLinkShareCard key={link.id} link={health.visits?link:{...link,visits:0,scans:0}}/>):
+          {links.length?links.map(link=><CampusLinkShareCard key={link.id} link={link} visitsAvailable={health.visits}/>):
             <Empty title="No tracking links yet" detail="Create one for an approved outreach campaign. It will point to the right public SitGuru audience and can be downloaded as a QR graphic."/>}
         </div>
       </section>
