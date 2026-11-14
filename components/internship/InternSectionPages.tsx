@@ -22,6 +22,10 @@ import { DESK_UI } from "@/lib/portal/desk-ui";
 import { INTERNSHIP_HELP_PATH, INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 import { formatHours, type HourSummary } from "@/lib/internship/hours";
 import { taskStatusLabel } from "@/lib/internship/labels";
+import { saveWeeklyReview } from "@/lib/internship/actions";
+import { FinalSectionSelect } from "@/components/internship/InternshipFinalProjectBoard";
+import { isSubmittedWeeklyReview, isApprovedWeeklyReview, weekMonday } from "@/lib/internship/checkins-summary";
+import { reviewStageLabel } from "@/lib/internship/review-flow";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 function formatDue(iso: string | null | undefined) {
@@ -242,90 +246,110 @@ export function InternMilestonesPageView({
 export function InternCheckInsPageView({
   workspace,
   hourSummary,
+  notice = "",
+  error = "",
 }: {
   workspace: InternshipWorkspaceData;
   hourSummary: HourSummary;
+  notice?: string;
+  error?: string;
 }) {
-  const reviews = workspace.weeklyReviews || [];
+  const reviews=[...(workspace.weeklyReviews||[])].sort((a,b)=>String(b.weekOf).localeCompare(String(a.weekOf)));
+  const submitted=reviews.filter(row=>isSubmittedWeeklyReview(String(row.reviewStatus||"")));
+  const approved=reviews.filter(row=>isApprovedWeeklyReview(String(row.reviewStatus||"")));
+  const expected=workspace.intern.internshipWeeks||null;
+  const nowKey=new Date().toLocaleDateString("en-CA",{timeZone:"America/New_York"});
+  const monday=weekMonday(nowKey);
+  const start=workspace.intern.academicStartDate||workspace.cohort?.startsOn||"";
+  const canSubmit=workspace.intern.status==="active" && Boolean(start) && start<=nowKey;
+  const thisWeek=reviews.find(row=>weekMonday(row.weekOf)===monday);
+  const currentSubmitted=Boolean(thisWeek && isSubmittedWeeklyReview(String(thisWeek.reviewStatus||"")));
+  const nextFriday=new Date(`${monday}T12:00:00Z`);
+  nextFriday.setUTCDate(nextFriday.getUTCDate()+4);
+  const due=canSubmit?nextFriday.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}):"Not started";
+  const status=thisWeek?reviewStageLabel(String(thisWeek.reviewStatus||"draft")):canSubmit?"Awaiting weekly submission":"Not started";
+  const fieldClass="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#0F2744]";
   return (
     <InternSectionScaffold
       title="My Check-Ins"
-      subtitle="Submit your weekly check-ins, reflect on your progress, and stay aligned with your goals."
+      subtitle="Record your weekly accomplishments and evidence. Ava reviews each submission; approved contributions feed your final Growth Report."
       icon={<ClipboardCheck size={22} />}
       stats={[
-        {
-          label: "Check-Ins Submitted",
-          value: `${reviews.length || 3} / 15`,
-          tone: "green",
-          icon: <ClipboardCheck size={18} />,
-          progress: Math.min(100, Math.round(((reviews.length || 3) / 15) * 100)),
-        },
-        {
-          label: "Next Check-In",
-          value: "Oct 27, 2026",
-          detail: "Due in 4 days",
-          tone: "violet",
-          icon: <CalendarDays size={18} />,
-        },
-        {
-          label: "Status",
-          value: "On Track",
-          detail: "Meeting check-in requirements",
-          tone: "amber",
-          icon: <Sparkles size={18} />,
-        },
-        {
-          label: "Weekly Avg. Hours",
-          value: formatHours(hourSummary.loggedThisWeek || 10.5),
-          detail: `Target: ${formatHours(hourSummary.plannedWeeklyHours || 10)}/week`,
-          tone: "sky",
-          icon: <Clock3 size={18} />,
-        },
+        {label:"Check-Ins Submitted",value:expected?`${submitted.length} / ${expected}`:String(submitted.length),tone:"green",icon:<ClipboardCheck size={18}/>,progress:expected?Math.min(100,Math.round(submitted.length/expected*100)):0},
+        {label:"Next Check-In",value:currentSubmitted?"Submitted":due,detail:currentSubmitted?"Awaiting manager decision or already reviewed":canSubmit?"Weekly check-in target: Friday":"Spring internship work has not started",tone:"violet",icon:<CalendarDays size={18}/>},
+        {label:"Status",value:status,detail:`${approved.length} approved by SitGuru`,tone:"amber",icon:<Sparkles size={18}/>},
+        {label:"Hours Logged This Week",value:formatHours(hourSummary.loggedThisWeek),detail:hourSummary.plannedWeeklyHours>0?`Planned: ${formatHours(hourSummary.plannedWeeklyHours)}/week`:"Weekly target not configured",tone:"sky",icon:<Clock3 size={18}/>},
       ]}
     >
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+      {notice?<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{notice}</p>:null}
+      {error?<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-900">{error}</p>:null}
+      <section className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+        <article id="weekly-checkin-form" className={`${DESK_UI.card} scroll-mt-24 p-4 sm:p-6`}>
           <h2 className="text-lg font-black text-[#0F2744]">This Week&apos;s Check-In</h2>
-          <p className="mt-2 text-sm font-medium text-slate-600">Reflect, report progress, and plan next week.</p>
-          <Link
-            href="/intern/check-ins"
-            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white"
-          >
-            Start My Check-In
-          </Link>
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            {currentSubmitted?"You already submitted this week. Any changes will resubmit the record for Ava's review.":"Describe your actual work and how it contributes to your final project."}
+          </p>
+          {canSubmit?(
+            <form action={saveWeeklyReview} className="mt-4 space-y-3">
+              <input type="hidden" name="internId" value={workspace.intern.id}/>
+              <input type="hidden" name="mode" value="intern"/>
+              <label className="block text-xs font-black text-[#0F2744]">Week of
+                <input type="date" required name="weekOf" defaultValue={monday} max={nowKey} className={fieldClass}/>
+              </label>
+              <FinalSectionSelect defaultValue={thisWeek?.finalSection||""}/>
+              <label className="block text-xs font-black text-[#0F2744]">Contribution to your final Growth Report
+                <textarea name="contributionAdded" required rows={3} defaultValue={thisWeek?.contributionAdded||""} placeholder="What did you add or improve this week?" className={fieldClass}/>
+              </label>
+              <label className="block text-xs font-black text-[#0F2744]">Work accomplished
+                <textarea name="accomplished" rows={3} defaultValue={thisWeek?.accomplished||""} placeholder="Describe your actual assignments, activities and results" className={fieldClass}/>
+              </label>
+              <label className="block text-xs font-black text-[#0F2744]">What did the data show?
+                <textarea name="dataShowed" rows={2} defaultValue={thisWeek?.dataShowed||""} placeholder="Record only observed or verified numbers; leave blank if unavailable" className={fieldClass}/>
+              </label>
+              <label className="block text-xs font-black text-[#0F2744]">Challenges and what didn't work
+                <textarea name="didntWork" rows={2} defaultValue={thisWeek?.didntWork||""} className={fieldClass}/>
+              </label>
+              <label className="block text-xs font-black text-[#0F2744]">What will you change next week?
+                <textarea name="changingNextWeek" rows={2} defaultValue={thisWeek?.changingNextWeek||""} className={fieldClass}/>
+              </label>
+              <label className="block text-xs font-black text-[#0F2744]">Hours reported (not auto-approved)
+                <input type="number" name="hoursLogged" step="0.25" min="0" max="80" defaultValue={thisWeek?.hoursLogged??""} className={fieldClass}/>
+              </label>
+              <button type="submit" className="min-h-12 w-full rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8]">{currentSubmitted?"Resubmit to Ava":"Submit check-in to Ava"}</button>
+              <p className="text-xs font-medium text-slate-500">Formal timesheet hours must still be logged and approved separately in My Hours.</p>
+            </form>
+          ):(
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              Weekly check-in submission opens when your approved internship reaches its academic start date and your status is Active. You can review past check-ins now.
+            </p>
+          )}
         </article>
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Recent Check-Ins</h2>
-          <ul className="mt-4 space-y-2">
-            {(reviews.length
-              ? reviews
-              : [{ id: "1", weekOf: "2026-10-13", reviewStatus: "approved" } as (typeof reviews)[number]]
-            )
-              .slice(0, 4)
-              .map((row) => (
-                <li key={row.id} className="rounded-2xl bg-[#F8FAFC] px-3 py-3 text-sm font-medium text-slate-700">
-                  Week of {row.weekOf}
-                  <span className="ml-2 rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#166534]">
-                    {String(row.reviewStatus || "submitted")}
-                  </span>
-                </li>
-              ))}
-          </ul>
-        </article>
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
-          <div className="mt-4 grid gap-2">
-            <Link href="/intern/check-ins" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
-              Start Check-In
-            </Link>
-            <Link href="/intern/time" className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-center text-sm font-bold text-[#1D4ED8]">
-              View Hours
-            </Link>
-            <Link href="/intern/milestones" className="rounded-2xl bg-[#FFF7ED] px-3 py-3 text-center text-sm font-bold text-[#C2410C]">
-              View Milestones
-            </Link>
-          </div>
-        </article>
+        <div className="space-y-4">
+          <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+            <h2 className="text-lg font-black text-[#0F2744]">Recent Check-Ins ({reviews.length})</h2>
+            {reviews.length?(
+              <ul className="mt-4 space-y-2">
+                {reviews.slice(0,10).map(row=>(
+                  <li key={row.id} className="rounded-xl bg-[#F8FAFC] px-3 py-3">
+                    <p className="text-sm font-black text-[#0F2744]">Week of {formatDue(row.weekOf)}</p>
+                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${isApprovedWeeklyReview(String(row.reviewStatus||""))?"bg-emerald-100 text-emerald-900":"bg-amber-100 text-amber-900"}`}>
+                      {reviewStageLabel(String(row.reviewStatus||"draft"))}
+                    </span>
+                    {row.contributionAdded?<p className="mt-2 line-clamp-3 text-xs font-medium text-slate-600">{row.contributionAdded}</p>:null}
+                  </li>
+                ))}
+              </ul>
+            ):<p className="mt-4 text-sm font-medium text-slate-500">No weekly reviews submitted yet. Nothing is counted until a real record exists.</p>}
+          </article>
+          <article className={`${DESK_UI.card} p-4 sm:p-5`}>
+            <h2 className="text-lg font-black text-[#0F2744]">Related work</h2>
+            <div className="mt-3 grid gap-2">
+              <Link href="/intern/assignments" className="rounded-xl bg-[#EFF6FF] px-3 py-3 text-sm font-bold text-[#1D4ED8]">My Assignments</Link>
+              <Link href="/intern/time" className="rounded-xl bg-[#F0FDF4] px-3 py-3 text-sm font-bold text-[#166534]">My Hours</Link>
+              <Link href="/intern/growth" className="rounded-xl bg-[#FFF7ED] px-3 py-3 text-sm font-bold text-[#C2410C]">Growth Workspace</Link>
+            </div>
+          </article>
+        </div>
       </section>
     </InternSectionScaffold>
   );
