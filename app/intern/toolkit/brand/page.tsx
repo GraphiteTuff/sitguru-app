@@ -30,13 +30,14 @@ export default async function InternSharedBrandKitPage({
   return (
     <main className="mx-auto w-full max-w-7xl min-w-0 space-y-4 px-3 pb-24 sm:px-5 lg:px-6">
       <Link href="/intern/toolkit" className="inline-flex min-h-10 items-center text-sm font-black text-[#2563EB] hover:underline">Back to Intern Toolkit</Link>
-      <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <p className="text-[11px] font-black uppercase tracking-wider text-[#1D4ED8]">Shared SitGuru library</p>
-        <h1 className="mt-2 text-2xl font-black text-[#0F2744] sm:text-3xl">Brand Kit</h1>
-        <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          The same SitGuru asset library as Manager Toolkit. Browse all existing approved and initial collection files; new intern submissions go to Ava for review.
+      <div>
+        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#0D5C3A]">Shared SitGuru Brand Kit</p>
+        <h1 className="mt-2 text-2xl font-black tracking-tight text-[#0F2744] sm:text-3xl">Brand Kit</h1>
+        <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-slate-600">
+          The same library, layout, files and search tools available to your manager.
+          Existing verified assets are shared with interns today. New intern submissions go to Ava for review.
         </p>
-      </section>
+      </div>
       {submissions.length ? (
         <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <summary className="cursor-pointer text-sm font-black text-[#0F2744]">
