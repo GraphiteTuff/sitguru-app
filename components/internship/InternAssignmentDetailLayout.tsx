@@ -199,7 +199,7 @@ export default function InternAssignmentDetailLayout({
           <div className="rounded-xl bg-slate-50 p-4">
             <p className="font-black text-slate-950">Microsoft Planner</p>
             <p className="mt-1 text-xs text-slate-500">
-              {integration("planner")?.status === "connected" ? "Connected" : "Not yet configured"}
+              {integration("planner")?.status === "connected" ? "Connected" : integration("planner")?.status === "linked_manually" ? "Task link added (unverified)" : "Not yet configured"}
             </p>
             {integration("planner")?.externalUrl && isHttpUrl(integration("planner")!.externalUrl) ? (
               <a href={integration("planner")!.externalUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-blue-700 underline">Open Planner task</a>
