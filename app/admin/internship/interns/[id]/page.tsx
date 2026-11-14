@@ -18,7 +18,6 @@ import {
 import { saveInternAssignment } from "@/lib/internship/actions";
 import { INTERNSHIP_PROGRAM_NAME, internPortalPreviewPath } from "@/lib/internship/constants";
 import { academicLevelLabel } from "@/lib/internship/labels";
-import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import { internOnboardingStatusLabel } from "@/lib/internship/onboarding";
 import { buildInternshipProcess } from "@/lib/internship/process";
 import { canAdministerInternshipOnboarding } from "@/lib/internship/manager-access";
@@ -301,7 +300,8 @@ export default async function InternshipInternDetailPage({
             Save school header program
           </button>
         </form>
-      </section>        </details>
+        </details>
+      </section>
 
             <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">University packet</h2>
