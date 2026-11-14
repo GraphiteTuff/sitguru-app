@@ -46,7 +46,7 @@ function libraryQuery(input: {
   status?: string;
   sort?: string;
   page?: number;
-}) {
+}, baseHref = "/manager/toolkit/brand") {
   const params = new URLSearchParams();
   if (input.q) params.set("q", input.q);
   if (input.category) params.set("category", input.category);
@@ -54,7 +54,7 @@ function libraryQuery(input: {
   if (input.sort && input.sort !== "approved_first") params.set("sort", input.sort);
   if (input.page && input.page > 1) params.set("page", String(input.page));
   const query = params.toString();
-  return query ? `/manager/toolkit/brand?${query}` : "/manager/toolkit/brand";
+  return query ? `${baseHref}?${query}` : baseHref;
 }
 
 function uploadThroughSitGuru(
@@ -187,6 +187,7 @@ export default function BrandKitManager({
   status,
   sort,
   sharePointHref,
+  baseHref = "/manager/toolkit/brand",
 }: {
   assets: BrandAssetRecord[];
   total: number;
@@ -200,6 +201,7 @@ export default function BrandKitManager({
   status: string;
   sort: string;
   sharePointHref: string;
+  baseHref?: string;
 }) {
   const router = useRouter();
   const pulse = usePawPulse();
@@ -286,7 +288,7 @@ export default function BrandKitManager({
         </div>
       </div>
 
-      <form action="/manager/toolkit/brand" method="get" className={`${filtersOpen ? "grid" : "hidden"} gap-3 md:grid md:grid-cols-4`}>
+      <form action={baseHref} method="get" className={`${filtersOpen ? "grid" : "hidden"} gap-3 md:grid md:grid-cols-4`}>
         <label className="block md:col-span-2">
           <span className="sr-only">Search brand assets</span>
           <input className={fieldClass} name="q" defaultValue={query} placeholder="Search logos, graphics, and files" />
@@ -375,11 +377,11 @@ export default function BrandKitManager({
 
       {pages > 1 ? (
         <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Brand asset pages">
-          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page <= 1 ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page - 1 })}>
+          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page <= 1 ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page - 1 }, baseHref)}>
             Previous page
           </a>
           <p className="text-sm font-semibold text-slate-600">Page {page} of {pages}</p>
-          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page >= pages ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page + 1 })}>
+          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page >= pages ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page + 1 }, baseHref)}>
             Next page
           </a>
         </nav>
