@@ -135,6 +135,7 @@ export default function ManagerAssignmentsHome({
                       {row.title}
                     </button>
                     <Link href={`/manager/assignments/${row.id}`} className="mt-1 block text-xs font-bold text-[#2563EB]">Open</Link>
+                    <Link href={`/manager/assignments/${row.id}#planner-reminders`} className="mt-1 block text-xs font-bold text-[#0D5C3A]">Planner & reminders</Link>
                   </td>
                   <td className="px-4 py-3">
                     <InternName name={row.intern} src={row.avatarUrl} className="font-semibold text-slate-700" />

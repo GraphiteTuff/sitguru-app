@@ -131,10 +131,14 @@ export async function syncPublishedAssignment(input: {
     });
   }
 
+  const manuallyLinked = current("planner")?.status === "linked_manually";
   let plannerId = current("planner")?.externalId || "";
   let plannerUrl = current("planner")?.externalUrl || plannerUrlFallback;
-  let plannerStatus = plannerId ? "connected" : "pending";
-  if (!plannerId && config.planId && identity === "connected") {
+  let plannerStatus = manuallyLinked ? "linked_manually" : plannerId ? "connected" : "pending";
+  if (manuallyLinked) {
+    // Preserve the manager's explicit task link. Only a separately verified
+    // integration may promote this status to connected.
+  } else if (!plannerId && config.planId && identity === "connected") {
     const task = await graphRequest<{ id?: string }>({
       method: "POST",
       path: "/planner/tasks",
@@ -164,7 +168,7 @@ export async function syncPublishedAssignment(input: {
     externalId: plannerId,
     externalUrl: plannerUrl,
     status: plannerStatus,
-    metadata: { bucket: "Ready to Start", priority: input.priority },
+    metadata: { ...(manuallyLinked ? current("planner")?.metadata || {} : {}), bucket: "Ready to Start", priority: input.priority },
   });
 
   const teamsPlan = planTeamsChannel({
