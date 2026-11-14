@@ -24,6 +24,8 @@ import type {
   CampusCard, CampusLead, CampusLink, CampusMission, CampusOpportunity,
   CampusResult, CampusSourceHealth,
 } from "@/lib/internship/campus-growth-data";
+import { campusQuestProgress } from "@/lib/internship/campus-quests";
+import CampusQuestBoard from "@/components/internship/CampusQuestBoard";
 
 type Tab = "overview" | "opportunities" | "leads" | "tracking" | "missions";
 const TABS: Array<{ key: Tab; label: string; icon: typeof Flag }> = [
@@ -178,7 +180,7 @@ function CampusOverview({card,health,opportunities,missions,leads,openTab}:{
           <span className="rounded-full bg-[#EFF6FF] px-3 py-1.5 text-xs font-black text-[#1D4ED8]">{card.campusName}</span>
         </div>
         <p className="mt-2 text-sm font-medium leading-6 text-slate-600">Save permission sources, organization rules, ZIP/market observations and safe outreach options. These notes apply only to this intern's campus workspace.</p>
-        <form action={saveCampusPolicy} className="mt-4 space-y-3">
+        <form id="campus-policy-form" action={saveCampusPolicy} className="mt-4 space-y-3">
           <HiddenContext card={card} tab="overview"/>
           <label className="block space-y-1"><Label>University permissions & rules</Label>
             <textarea name="policyNotes" rows={4} defaultValue={card.policyNotes} maxLength={6000} className={INPUT}
@@ -235,12 +237,12 @@ function OpportunitiesTab({card,opportunities}:{card:CampusCard;opportunities:Ca
         <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#2563EB]"/>
         <input type="search" placeholder="Search opportunities and organizations…" aria-label="Search campus opportunities" className={INPUT+" pl-10"} value={query} onChange={e=>setQuery(e.target.value)}/>
       </label>
-      <div className="mt-4 space-y-3">{list.length?list.map(o=><ReviewBox key={o.id} opportunity={o} card={card}/>):<Empty title="No matching opportunities" detail="Choose another filter, or add a new research opportunity on the right."/>}</div>
+      <div id="review-queue" className="mt-4 space-y-3">{list.length?list.map(o=><ReviewBox key={o.id} opportunity={o} card={card}/>):<Empty title="No matching opportunities" detail="Choose another filter, or add a new research opportunity on the right."/>}</div>
     </section>
     <section className={DESK_UI.card+" p-4 sm:p-5 xl:sticky xl:top-24"}>
       <h3 className="text-lg font-black text-[#0F2744]">Add a campus opportunity</h3>
       <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Record a source first. New ideas begin in research; no public activity launches automatically.</p>
-      <form action={saveCampusOpportunity} className="mt-4 space-y-3">
+      <form id="add-opportunity" action={saveCampusOpportunity} className="mt-4 space-y-3">
         <HiddenContext card={card} tab="opportunities"/>
         <input type="hidden" name="approval" value="needs_research"/>
         <input type="hidden" name="status" value="Idea"/>
@@ -274,7 +276,7 @@ function LeadsTab({card,leads}:{card:CampusCard;leads:CampusLead[]}){
           <option value="all">All statuses</option>{CAMPUS_LEAD_STATUSES.map(s=><option key={s}>{s}</option>)}
         </select>
       </div>
-      <div className="mt-4 space-y-3">
+      <div id="campus-leads-list" className="mt-4 space-y-3">
         {matches.length?matches.map(l=>(
           <article key={l.id} className="rounded-2xl border border-slate-200 p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -322,7 +324,7 @@ function TrackingTab({card,links,results,health}:{card:CampusCard;links:CampusLi
       <section className={DESK_UI.card+" p-4 sm:p-5"}>
         <h3 className="text-lg font-black text-[#0F2744]">Unique campus tracking links</h3>
         <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Each new campaign gets a separate tracked code. Clicks to the link record visits, and QR-mode links record scan events—not authenticated registrations. A preview/test open will also count.</p>
-        <form action={saveCampusLink} className="mt-4 grid gap-3 sm:grid-cols-2">
+        <form id="campus-tracking-form" action={saveCampusLink} className="mt-4 grid gap-3 sm:grid-cols-2">
           <HiddenContext card={card} tab="tracking"/>
           <input type="hidden" name="campus" value={card.campusName}/>
           <label className="block space-y-1 sm:col-span-2"><Label>Campaign name</Label><input className={INPUT} name="campaign" required maxLength={100} placeholder="Campus Guru outreach · Nov 2026"/></label>
@@ -346,7 +348,7 @@ function TrackingTab({card,links,results,health}:{card:CampusCard;links:CampusLi
       <section className={DESK_UI.card+" p-4 sm:p-5"}>
         <h3 className="text-lg font-black text-[#0F2744]">Record and review learning</h3>
         <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Manual numbers are stored as reported outcomes—not automatically verified user signups, commissions or bookings. Add a source and avoid double-counting across reporting periods.</p>
-        <form action={saveCampusResult} className="mt-4 space-y-3">
+        <form id="campus-results-form" action={saveCampusResult} className="mt-4 space-y-3">
           <HiddenContext card={card} tab="tracking"/>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="block space-y-1"><Label>Reported Guru applications</Label><input type="number" name="guruApplications" min="0" max="100000" step="1" inputMode="numeric" defaultValue={0} className={INPUT}/></label>
@@ -374,7 +376,7 @@ function MissionsTab({card,missions,requestId}:{card:CampusCard;missions:CampusM
   const [template,setTemplate]=useState("custom");
   const chosen=MISSION_TEMPLATES.find(t=>t.key===template);
   return <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-    <section className={DESK_UI.card+" p-4 sm:p-5"}>
+    <section id="campus-missions" className={DESK_UI.card+" p-4 sm:p-5"}>
       <h3 className="text-lg font-black text-[#0F2744]">Build a real campus mission</h3>
       <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Publishing adds an actual student assignment to SitGuru. The existing Planner/Teams/SharePoint sync is attempted where configured; its success is not guaranteed by this screen.</p>
       <label className="mt-4 block space-y-1"><Label>Suggested learning activity (optional)</Label>
@@ -459,7 +461,10 @@ export default function ManagerCampusGrowthHome({
     missions:cards.reduce((sum,c)=>sum+c.missionCount,0),
   };
   function selectCampus(id:string) {setCampusId(id);setTab("overview");}
-  function openTab(value:Tab) {setTab(value);}
+  function openTab(value:Tab) {
+    setTab(value);
+    document.getElementById("campus-work-tabs")?.scrollIntoView({behavior:"smooth",block:"start"});
+  }
 
   return <div className="min-w-0 space-y-5 pb-28 lg:pb-8">
     <DeskPageHero icon={<GraduationCap size={22}/>} title="Campus Growth"
@@ -510,7 +515,9 @@ export default function ManagerCampusGrowthHome({
     </section>
 
     {card?<>
-      <section className={DESK_UI.card+" min-w-0 overflow-hidden p-3 sm:p-4"}>
+      <CampusQuestBoard progress={campusQuestProgress({card,opportunities:myOpportunities,leads:myLeads,links:myLinks,missions:myMissions,results:myResults,sourceHealth})}
+        campusName={card.campusName} mode="manager" onSelect={openTab}/>
+      <section id="campus-work-tabs" className={DESK_UI.card+" min-w-0 scroll-mt-24 overflow-hidden p-3 sm:p-4"}>
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-1 pb-3">
           <div className="min-w-0"><h2 className="truncate text-base font-black text-[#0F2744]">{card.campusName}</h2>
             <p className="mt-0.5 text-xs font-semibold text-slate-600">{card.internName}{card.semester?" · "+card.semester:""} · {card.status}</p></div>
