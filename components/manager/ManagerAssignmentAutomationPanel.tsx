@@ -27,7 +27,7 @@ export default function ManagerAssignmentAutomationPanel({
   const apiConnected = planner?.status === "connected";
   const href = planner?.externalUrl || "";
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div id="planner-reminders" className="grid scroll-mt-24 gap-4 lg:grid-cols-2">
       <section className={`${DESK_UI.card} p-5 sm:p-6`}>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-black text-[#0F2744]">Automatic deadline reminders</h2>
