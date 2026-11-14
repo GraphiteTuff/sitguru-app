@@ -4,6 +4,7 @@ import ManagerAssignmentsHome, {
   type ManagerAssignmentRow,
 } from "@/components/manager/ManagerAssignmentsHome";
 import { readAssignmentBrief } from "@/lib/internship/manager-assignment";
+import { defaultFinalSectionForCategory } from "@/lib/internship/syllabus-alignment";
 import { listCohortMilestones } from "@/lib/internship/queries";
 import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrations";
 import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
@@ -82,6 +83,18 @@ export default async function ManagerAssignmentsPage({
   }));
   const cohortIds = [...new Set((people || []).map((row) => String(row.cohort_id || "")).filter(Boolean))];
   const milestoneGroups = await Promise.all(cohortIds.map((id) => listCohortMilestones(id)));
+  const { data: cohortProjects } = cohortIds.length
+    ? await supabaseAdmin
+        .from("internship_projects")
+        .select("id,name,cohort_id")
+        .in("cohort_id", cohortIds)
+        .order("name")
+    : { data: [] };
+  const projects = (people || []).flatMap((intern) =>
+    (cohortProjects || [])
+      .filter((project) => String(project.cohort_id) === String(intern.cohort_id))
+      .map((project) => ({ id: String(project.id), title: String(project.name), internId: String(intern.id) })),
+  );
   const cohortMilestones = new Map(cohortIds.map((id, index) => [id, milestoneGroups[index] || []]));
   const milestones = (people || []).flatMap((person) =>
     (cohortMilestones.get(String(person.cohort_id || "")) || [])
@@ -92,7 +105,7 @@ export default async function ManagerAssignmentsPage({
   const { data: tasks } = ids.length
     ? await supabaseAdmin
         .from("internship_tasks")
-        .select("id,intern_id,title,due_on,status,metric_affected,business_objective,brief_payload")
+        .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,brief_payload")
         .in("intern_id", ids)
         .order("due_on", { ascending: true })
     : { data: [] };
@@ -111,6 +124,8 @@ export default async function ManagerAssignmentsPage({
       title: String(row.title || ""),
       category: brief.category || String(row.metric_affected || "Other"),
       milestoneId: brief.milestoneId || "",
+      projectId: String(row.project_id || brief.projectId || ""),
+      finalSection: String(row.final_section || brief.finalSection || defaultFinalSectionForCategory(brief.category || String(row.metric_affected || "Other"))),
       dueOn,
       dueLabel: dueLabel(dueOn),
       priority: brief.priority || "Normal",
@@ -154,6 +169,7 @@ export default async function ManagerAssignmentsPage({
       rows={rows}
       interns={interns}
       milestones={milestones}
+      projects={projects}
       initialOpen={first(params.create) === "true"}
       links={links}
       notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
