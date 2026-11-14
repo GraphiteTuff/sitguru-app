@@ -281,7 +281,7 @@ export async function approveInitialBrandAssets(actor: ResolvedBrandActor) {
           asset_title: String(asset.title).slice(0, 180),
           actor_id: actor.id,
           action: "approval",
-          detail: "Founder-directed initial approval of existing verified assets through Nov 13, 2026",
+          detail: "Founder-directed approval of verified assets existing at initial Nov 13 snapshot",
         })));
       approved += updated.length;
       if (auditError) return { approved, error: "Assets were approved, but their audit entries need reconciliation." };
