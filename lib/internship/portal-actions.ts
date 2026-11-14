@@ -53,6 +53,10 @@ function bounce(path: string, kind: "ok" | "error", message: string): never {
 function refresh(path: string) {
   revalidatePath("/intern");
   revalidatePath("/intern/manage");
+  revalidatePath("/manager/check-ins");
+  revalidatePath("/intern/check-ins");
+  revalidatePath("/intern/growth");
+  revalidatePath("/admin/growth/insights");
   revalidatePath("/admin/internship", "layout");
   revalidatePath(path);
 }
@@ -324,20 +328,21 @@ export async function approveWeekZero(formData: FormData) {
 
 export async function reviewPortalSubmission(formData: FormData) {
   const actor = await actorContext();
+  const returnTo=text(formData,"returnTo")==="/manager/check-ins"?"/manager/check-ins":"/intern/manage?tab=reviews";
   const internId = text(formData, "internId");
   const intern = await assertCanTouchIntern(internId, actor);
   if (!intern || !canReviewRoutineWork(actor.kind)) {
-    bounce("/intern/manage?tab=reviews", "error", "You can’t review that submission.");
+    bounce(returnTo, "error", "You can’t review that submission.");
   }
   const action = text(formData, "reviewAction") as ReviewAction;
   const targetType = text(formData, "targetType");
   const targetId = text(formData, "targetId");
   const comment = text(formData, "comment");
   if ((action === "request_changes" || action === "escalate" || action === "ceo_request_changes") && !comment) {
-    bounce("/intern/manage?tab=reviews", "error", "Add a note so the intern knows what you decided.");
+    bounce(returnTo, "error", "Add a note so the intern knows what you decided.");
   }
   if ((action === "ceo_approve" || action === "ceo_request_changes") && !canGiveCeoReview(actor.kind)) {
-    bounce("/intern/manage?tab=reviews", "error", "Only Jason can complete CEO review.");
+    bounce(returnTo, "error", "Only Jason can complete CEO review.");
   }
 
   if (targetType === "hours") {
@@ -353,13 +358,13 @@ export async function reviewPortalSubmission(formData: FormData) {
       ? "internship_weekly_reviews"
       : "internship_tasks";
   const { data: existing } = await supabaseAdmin.from(table).select("*").eq("id", targetId).eq("intern_id", internId).maybeSingle();
-  if (!existing) bounce("/intern/manage?tab=reviews", "error", "That submission is gone.");
+  if (!existing) bounce(returnTo, "error", "That submission is gone.");
 
   const currentStage = targetType === "weekly"
     ? String(existing.review_status || "submitted_to_ava")
     : String(existing.review_stage || existing.status || "submitted");
   const next = nextReviewStage({ stage: currentStage, action, actor: actor.kind === "supervisor" ? "supervisor" : "manager" });
-  if (!next.ok) bounce("/intern/manage?tab=reviews", "error", next.error);
+  if (!next.ok) bounce(returnTo, "error", next.error);
 
   const now = new Date().toISOString();
   const official = isOfficialReviewStage(next.stage);
@@ -381,7 +386,7 @@ export async function reviewPortalSubmission(formData: FormData) {
       };
 
   const { error } = await supabaseAdmin.from(table).update(payload).eq("id", targetId).eq("intern_id", internId);
-  if (error) bounce("/intern/manage?tab=reviews", "error", "Review could not be saved.");
+  if (error) bounce(returnTo, "error", "Review could not be saved.");
 
   await supabaseAdmin.from("internship_review_events").insert({
     intern_id: internId,
@@ -458,7 +463,7 @@ export async function reviewPortalSubmission(formData: FormData) {
   }
 
   refresh(`/admin/internship/interns/${internId}`);
-  bounce("/intern/manage?tab=reviews", "ok", official ? "Approved. It can go into the report." : "Review saved.");
+  bounce(returnTo, "ok", official ? "Approved. It can go into the report." : "Review saved.");
 }
 
 export async function saveRequirementConfig(formData: FormData) {

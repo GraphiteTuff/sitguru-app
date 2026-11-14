@@ -43,7 +43,7 @@ export default function InternGrowthWorkspaceHome({
     status: string;
     due: string;
   }>;
-  progress: Array<{ label: string; pct: number; tone: string }>;
+  progress: Array<{ label: string; pct: number | null; tone: string }>;
   nextActions: Array<{ step: number; title: string; href: string; cta: string }>;
   messages: Array<{ author: string; preview: string }>;
   upcoming: Array<{ title: string; when: string; kind: string }>;
@@ -51,7 +51,7 @@ export default function InternGrowthWorkspaceHome({
   const weekPct =
     hoursPlanned > 0
       ? Math.min(100, Math.round((hoursThisWeek / hoursPlanned) * 100))
-      : 0;
+      : null;
 
   return (
     <div className="space-y-5 pb-28 xl:pb-6">
@@ -74,15 +74,15 @@ export default function InternGrowthWorkspaceHome({
             {hoursThisWeek}
             <span className="text-sm font-bold text-slate-500">
               {" "}
-              / {hoursPlanned || "—"}
+              / {hoursPlanned > 0 ? hoursPlanned : "—"}
             </span>
           </p>
           <p className="mt-1 text-xs font-bold text-[#0F2744]">Hours This Week</p>
           <div className="mt-3 flex items-center gap-2">
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/80">
-              <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${weekPct}%` }} />
+              <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${weekPct ?? 0}%` }} />
             </div>
-            <span className="text-xs font-bold text-[#166534]">{weekPct}%</span>
+            <span className="text-xs font-bold text-[#166534]">{weekPct == null ? "—" : `${weekPct}%`}</span>
           </div>
         </article>
 
@@ -145,7 +145,7 @@ export default function InternGrowthWorkspaceHome({
             ))}
             {!assignments.length ? (
               <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                No assignments yet.
+                No open assignments at the moment.
               </li>
             ) : null}
           </ul>
@@ -158,12 +158,12 @@ export default function InternGrowthWorkspaceHome({
               <li key={item.label}>
                 <div className="flex items-center justify-between text-sm font-bold text-[#0F2744]">
                   <span>{item.label}</span>
-                  <span>{item.pct}%</span>
+                  <span>{item.pct == null ? "Not available" : `${item.pct}%`}</span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
                     className={`h-full rounded-full ${item.tone}`}
-                    style={{ width: `${item.pct}%` }}
+                    style={{ width: `${item.pct ?? 0}%` }}
                   />
                 </div>
               </li>
@@ -215,7 +215,7 @@ export default function InternGrowthWorkspaceHome({
             ))}
             {!messages.length ? (
               <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                Messages from Ava will show here.
+                No recent messages yet. New messages from your manager or SitGuru team will appear here.
               </li>
             ) : null}
           </ul>
@@ -240,7 +240,7 @@ export default function InternGrowthWorkspaceHome({
             ))}
             {!upcoming.length ? (
               <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                No upcoming dates yet.
+                No scheduled assignments or milestones are due.
               </li>
             ) : null}
           </ul>

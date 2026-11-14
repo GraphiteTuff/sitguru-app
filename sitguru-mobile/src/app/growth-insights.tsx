@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,6 +9,7 @@ import {
 } from 'react-native';
 
 import RoleGate from '@/components/RoleGate';
+import { useAuth } from '@/hooks/useAuth';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
@@ -65,7 +67,7 @@ function GrowthInsightsBody() {
     else setLoading(true);
     setError(null);
     const result = await sitguruApiFetch<Snapshot>(
-      '/api/growth-center/v2/snapshot?preset=last_7&role=manager',
+      '/api/growth-center/v2/snapshot?preset=last_7',
       { method: 'GET', cache: 'no-store' },
     );
     if (result.error || !result.data) {
@@ -87,6 +89,9 @@ function GrowthInsightsBody() {
       <View style={styles.content}>
         <Text style={styles.title}>Growth Insights</Text>
         <Text style={styles.subtitle}>SitGuru Growth Center 2.0</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/manager-help')} style={styles.helpButton}>
+          <Text style={styles.helpButtonText}>Manager Help · How-tos, FAQs & troubleshooting →</Text>
+        </Pressable>
 
         {loading ? (
           <View style={styles.center}>
@@ -169,8 +174,17 @@ function GrowthInsightsBody() {
 }
 
 export default function GrowthInsightsScreen() {
+  const { roles } = useAuth();
+  const requiredRole = roles.includes('admin')
+    ? 'admin'
+    : roles.includes('manager')
+      ? 'manager'
+      : roles.includes('intern')
+        ? 'intern'
+        : 'admin';
+
   return (
-    <RoleGate requiredRole="admin" title="Growth Insights" previewAllowed>
+    <RoleGate requiredRole={requiredRole} title="Growth Insights">
       <GrowthInsightsBody />
     </RoleGate>
   );
@@ -193,6 +207,8 @@ const styles = StyleSheet.create({
     color: SitGuruColors.textMuted,
     marginBottom: 4,
   },
+  helpButton: { minHeight: TOUCH_MIN, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  helpButtonText: { fontSize: 13, fontWeight: '900', color: '#1D4ED8', textAlign: 'center' },
   center: {
     alignItems: 'center',
     gap: 8,

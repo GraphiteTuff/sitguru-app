@@ -26,7 +26,15 @@ export default async function InternshipProgramDashboardPage({
   const milestones = cohort ? await listCohortMilestones(cohort.id) : [];
 
   return (
-    <InternshipProgramCommandCenter
+    <>
+      {actor.isSuperUser ? (
+        <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
+          <Link href="/admin/internship/connection-health" className="inline-flex min-h-11 items-center rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#1D4ED8] hover:bg-[#DBEAFE]">
+            Verify & reconcile Ava and Lola connections
+          </Link>
+        </div>
+      ) : null}
+      <InternshipProgramCommandCenter
       canAdminister={canAdministerInternshipOnboarding(actor)}
       cohortName={formatCohortHeadline(cohort || { name: INTERNSHIP_PROGRAM_NAME })}
       cohortId={cohort?.id || null}
@@ -38,5 +46,6 @@ export default async function InternshipProgramDashboardPage({
       notice={notice}
       noticeError={noticeError}
     />
+    </>
   );
 }

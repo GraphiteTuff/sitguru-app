@@ -41,6 +41,20 @@ export const WORKSPACES: Record<AppRole, SitGuruWorkspaceDefinition> = {
     dashboardPath: '/ambassador-dashboard',
     setupPath: '/ambassador-setup',
   },
+  manager: {
+    role: 'manager',
+    label: 'Growth Manager',
+    description: 'Review growth insights and coordinate SitGuru team assignments.',
+    switcherDescription: 'Growth insights and team coordination',
+    dashboardPath: '/growth-insights',
+  },
+  intern: {
+    role: 'intern',
+    label: 'SitGuru Intern',
+    description: 'Assignments, weekly hours, live growth and manager reviews.',
+    switcherDescription: 'Assignments, hours, check-ins and growth',
+    dashboardPath: '/intern-portal',
+  },
   admin: {
     role: 'admin',
     label: 'Super Admin HQ',
@@ -55,6 +69,8 @@ export const WORKSPACE_ORDER: AppRole[] = [
   'pet_parent',
   'guru',
   'ambassador',
+  'manager',
+  'intern',
   'admin',
 ];
 

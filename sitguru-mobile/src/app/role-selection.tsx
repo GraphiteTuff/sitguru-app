@@ -60,6 +60,8 @@ const DASHBOARD_PATHS: Record<AppRole, Href> = {
   pet_parent: '/pet-parent-dashboard',
   guru: '/guru-dashboard',
   ambassador: '/ambassador-dashboard',
+  manager: '/growth-insights',
+  intern: '/intern-portal',
   admin: '/admin-dashboard',
 };
 
@@ -73,6 +75,8 @@ const WORKSPACE_ORDER: AppRole[] = [
   'pet_parent',
   'guru',
   'ambassador',
+  'manager',
+  'intern',
   'admin',
 ];
 
@@ -201,14 +205,12 @@ export default function RoleSelectionScreen() {
     const standardRoles =
       STANDARD_WORKSPACES;
 
-    if (roles.includes('admin')) {
-      return [
-        ...standardRoles,
-        'admin' as AppRole,
-      ];
-    }
-
-    return standardRoles;
+    return [
+      ...standardRoles,
+      ...(roles.includes('manager') ? ['manager' as AppRole] : []),
+      ...(roles.includes('intern') ? ['intern' as AppRole] : []),
+      ...(roles.includes('admin') ? ['admin' as AppRole] : []),
+    ];
   }, [roles]);
 
   const workspaceMenuRoles = useMemo(
@@ -1174,13 +1176,9 @@ function WorkspaceIcon({
     );
   }
 
-  return (
-    <ShieldCheck
-      color={color}
-      size={22}
-      strokeWidth={2.4}
-    />
-  );
+  if (role === 'manager') return <BriefcaseBusiness color={color} size={22} strokeWidth={2.4} />;
+  if (role === 'intern') return <UsersRound color={color} size={22} strokeWidth={2.4} />;
+  return <ShieldCheck color={color} size={22} strokeWidth={2.4} />;
 }
 
 function ProfileAvatar({
@@ -1332,6 +1330,8 @@ function workspaceLabel(role: AppRole) {
     return 'Ambassador';
   }
 
+  if (role === 'manager') return 'Growth Manager';
+  if (role === 'intern') return 'Intern Portal';
   return 'SitGuru Admin';
 }
 
@@ -1348,6 +1348,8 @@ function workspaceDescription(role: AppRole) {
     return 'Promote SitGuru and earn rewards.';
   }
 
+  if (role === 'manager') return 'Review growth insights and manage assigned interns.';
+  if (role === 'intern') return 'Manage assignments, hours and internship goals.';
   return 'Manage operations, accounts, payouts, and platform activity.';
 }
 
@@ -1373,9 +1375,14 @@ function workspaceTone(
 
   if (role === 'ambassador') {
     return {
-      background:
-        palette.ambassadorSoft,
+      background: palette.ambassadorSoft,
       icon: palette.ambassador,
+    };
+  }
+  if (role === 'manager' || role === 'intern') {
+    return {
+      background: palette.primarySoft,
+      icon: palette.primary,
     };
   }
 

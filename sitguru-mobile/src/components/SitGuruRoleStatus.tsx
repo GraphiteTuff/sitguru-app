@@ -21,6 +21,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
   pet_parent: 'Pet Parent',
   guru: 'Guru',
   ambassador: 'Ambassador',
+  manager: 'Growth Manager',
+  intern: 'Intern',
   admin: 'Admin',
 };
 
