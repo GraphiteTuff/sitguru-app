@@ -14,6 +14,7 @@ import { uploadInternshipAsset } from "@/lib/internship/storage";
 import { internAllowedUpload } from "@/lib/internship/portal";
 import { publishInternAssignmentEvent } from "@/lib/realtime/publish-internship";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isJasonManagerAssignmentTestIntern } from "@/lib/internship/manager-assignment-test-intern";
 
 function field(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -68,6 +69,9 @@ export async function saveManagerAssignment(formData: FormData) {
   const taskId = field(formData, "taskId");
 
   const intern = await findInternById(value.internId);
+  if (intern && isJasonManagerAssignmentTestIntern(intern)) {
+    bounce("error", "Jason's test profile is not eligible for new assignments.");
+  }
   if (
     !intern ||
     !canReadPrivateInternRecord({
@@ -280,6 +284,9 @@ export async function retryManagerAssignmentSync(formData: FormData) {
     .maybeSingle();
   if (!task?.id || task.status === "draft") bounce("error", "Publish the assignment before syncing Microsoft 365.");
   const intern = await findInternById(String(task.intern_id));
+  if (intern && isJasonManagerAssignmentTestIntern(intern)) {
+    bounce("error", "Jason's retired test assignments cannot be synced.");
+  }
   const kind = internshipActorKind({ role: actor.role, isSuperUser: actor.isSuperUser });
   if (
     !intern ||
