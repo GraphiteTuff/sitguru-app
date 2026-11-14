@@ -8,6 +8,7 @@ import {
   campusAttributionReward,
   campusMissionDraft,
   campusTrackingCode,
+  campusSlug,
 } from "@/lib/internship/campus-growth";
 import { canReadPrivateInternRecord, internshipActorKind } from "@/lib/internship/manager-access";
 import { assignmentBrief, validateManagerAssignment } from "@/lib/internship/manager-assignment";
@@ -91,6 +92,8 @@ async function signal(intern: NonNullable<Awaited<ReturnType<typeof allowedInter
 
 function refresh() {
   revalidatePath("/manager/campus-growth");
+  revalidatePath("/admin/growth/oversight");
+  revalidatePath("/manager/insights");
   revalidatePath("/intern/campus-growth");
   revalidatePath("/manager/reports");
   revalidatePath("/manager/assignments");
@@ -142,20 +145,35 @@ export async function reviewCampusOpportunity(formData: FormData) {
   if (who.kind !== "manager" && who.kind !== "supervisor") bounce(path, "error", "A manager reviews campus work.");
   const approval = field(formData, "approval");
   if (!campusApprovalChangeAllowed({ actor: who.kind, next: approval })) bounce(path, "error", "Choose a real approval state.");
-  const { data: row } = await supabaseAdmin.from("campus_growth_opportunities").select("id,intern_id").eq("id", field(formData, "opportunityId")).maybeSingle();
+  const { data: row } = await supabaseAdmin.from("campus_growth_opportunities").select("id,intern_id,approval").eq("id", field(formData, "opportunityId")).maybeSingle();
   const intern = row?.intern_id ? await allowedIntern(String(row.intern_id), who) : null;
   if (!intern || !row?.id) bounce(path, "error", "That opportunity is not on your team.");
   const reviewNote = field(formData, "reviewNote");
+  if (approval === "approved" && reviewNote.length < 12) {
+    bounce(path, "error", "Approval needs a written reason and confirmed permission evidence (12+ characters).");
+  }
+  if (approval === "approved" && row.approval === "university_approval" && field(formData,"externalPermissionConfirmed") !== "yes") {
+    bounce(path,"error","University permission must be confirmed before approving this opportunity.");
+  }
   const patch: Record<string, string> = {
     approval,
-    status: approval === "approved" ? "Approved" : approval === "not_permitted" ? "Not Pursuing" : "Needs Ava Review",
+    status: approval === "approved" ? "Approved" :
+      approval === "not_permitted" ? "Not Pursuing" :
+      approval === "university_approval" ? "Approval Required" :
+      approval === "jason_review" ? "Approval Required" :
+      approval === "needs_research" ? "Researching" : "Needs Ava Review",
     updated_at: new Date().toISOString(),
   };
   if (who.kind === "supervisor") patch.jason_review = reviewNote;
   else patch.ava_review = reviewNote;
   const { error } = await supabaseAdmin.from("campus_growth_opportunities").update(patch).eq("id", row.id);
   if (error) bounce(path, "error", "The review could not be saved.");
-  await audit({ internId: intern.id, type: "opportunity", id: String(row.id), action: "manager.approved", actorId: who.userId, note: approval });
+  await audit({
+    internId: intern.id, type: "opportunity", id: String(row.id),
+    action: approval === "approved" ? "manager.approved" : "manager.reviewed",
+    actorId: who.userId,
+    note: approval + (reviewNote ? " | " + reviewNote.slice(0,500) : ""),
+  });
   await signal(intern, "campus.opportunity.reviewed", String(row.id), who.userId);
   refresh();
   bounce(path, "ok", "Campus review saved.");
@@ -188,6 +206,44 @@ export async function saveCampusLead(formData: FormData) {
   bounce(path, "ok", "Campus lead saved for manager follow-up.");
 }
 
+export const CAMPUS_LEAD_STATUSES = ["New","Researching","Contacted","Interested","Follow Up","Converted","Not Interested","Closed"] as const;
+
+export async function updateCampusLead(formData: FormData) {
+  const who = await actor();
+  const path = backPath(formData);
+  if (who.kind !== "manager" && who.kind !== "supervisor") {
+    bounce(path, "error", "Only the assigned manager may update a campus lead.");
+  }
+  const id = field(formData, "leadId");
+  const next = field(formData, "status");
+  if (!(CAMPUS_LEAD_STATUSES as readonly string[]).includes(next)) {
+    bounce(path, "error", "Choose a valid lead follow-up status.");
+  }
+  const { data: row, error: loadError } = await supabaseAdmin
+    .from("campus_growth_leads").select("id,intern_id,notes")
+    .eq("id", id).maybeSingle();
+  const intern = row?.intern_id ? await allowedIntern(String(row.intern_id),who) : null;
+  if (loadError || !row?.id || !intern) {
+    bounce(path, "error", "That lead is not available to this manager.");
+  }
+  const newNotes = field(formData,"notes");
+  if (newNotes.length > 2000) bounce(path,"error","Lead notes must be under 2,000 characters.");
+  const { error } = await supabaseAdmin
+    .from("campus_growth_leads")
+    .update({
+      status: next,
+      notes: newNotes || String(row.notes || ""),
+      follow_up: "manager",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", row.id).eq("intern_id", intern.id);
+  if (error) bounce(path,"error","Unable to save this lead follow-up.");
+  await audit({internId:intern.id,type:"lead",id:String(row.id),action:"lead.follow_up",actorId:who.userId,note:next});
+  await signal(intern,"campus.lead.updated",String(row.id),who.userId);
+  refresh();
+  bounce(path,"ok","Lead follow-up saved. The team can now see its current stage.");
+}
+
 export async function saveCampusLink(formData: FormData) {
   const who = await actor();
   const path = backPath(formData);
@@ -196,12 +252,19 @@ export async function saveCampusLink(formData: FormData) {
   const campus = field(formData, "campus") || "campus";
   const target = field(formData, "target") || "awareness";
   const channel = field(formData, "channel") || "link";
-  const code = campusTrackingCode({
+  const baseCode = campusTrackingCode({
     campus,
     intern: intern.preferredName || intern.fullName,
     target,
     channel,
   });
+  // Each separate campaign needs its own code. Preserve existing codes, which
+  // would otherwise collide when interns launch two QR/link experiments.
+  const code = [
+    baseCode.slice(0, 65),
+    campusSlug(field(formData,"campaign")||"campaign").slice(0,10),
+    crypto.randomUUID().slice(0,8),
+  ].join("-");
   const reward = campusAttributionReward();
   const { data, error } = await supabaseAdmin.from("campus_growth_links").insert({
     intern_id: intern.id,
