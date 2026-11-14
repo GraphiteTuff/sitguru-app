@@ -190,7 +190,7 @@ export default function InternAssignmentDetailLayout({
           <div className="rounded-xl bg-slate-50 p-4">
             <p className="font-black text-slate-950">SharePoint files</p>
             <p className="mt-1 text-xs text-slate-500">
-              {sharePoint?.status === "connected" ? "Connected" : "Folder found; automatic save requires configuration"}
+              {sharePoint?.status === "connected" ? "Connected" : sharePoint?.status === "needs_access" ? "SharePoint access needed" : sharePoint?.status === "error" ? "Folder sync failed" : folderUrl ? "Folder available; sync not verified" : "Not configured"}
             </p>
             {isHttpUrl(folderUrl) ? (
               <a href={folderUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-blue-700 underline">Open assignment folder</a>
