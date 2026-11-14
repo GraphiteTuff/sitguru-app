@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
+  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" && \"$VERCEL_GIT_COMMIT_REF\" != \"feature/planner-app-only-admin-test-20261114\" ]]'",
   "crons": [
     {
       "path": "/api/cron/profile-completion-reminders",
@@ -18,5 +18,6 @@
       "path": "/api/cron/internship-assignment-reminders",
       "schedule": "0 14 * * *"
     }
-  ]
+  ],
+  "buildCommand": "npm run build"
 }
