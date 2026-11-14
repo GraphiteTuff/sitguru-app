@@ -90,6 +90,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
       ((messages || []) as Record<string, unknown>[])
         .map((row) => text(row.sender_id))
         .concat(((participants || []) as Record<string, unknown>[]).map((row) => text(row.user_id)))
+        .concat(rows.flatMap(row => [text(row.started_by_user_id), text(row.assigned_user_id)]))
         .concat(userId)
         .filter(Boolean),
     ),
