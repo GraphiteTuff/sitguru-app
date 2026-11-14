@@ -25,7 +25,7 @@ export async function GET(req:NextRequest) {
   const inbox=await loadStaffInbox(resolved.user.id,false,"intern");
   const messages=inbox.conversations.slice(0,3).map(row=>({
     author:row.messages[row.messages.length-1]?.author || row.subject,
-    preview:row.preview || row.messages[row.messages.length-1]?.body || "",
+    preview:row.messages[row.messages.length-1]?.body || "",
   }));
   return json(req,{capturedAt:new Date().toISOString(),summary:buildInternGrowthSummary({workspace,recentMessages:messages})});
 }
