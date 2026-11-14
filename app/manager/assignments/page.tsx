@@ -10,6 +10,7 @@ import { listAssignmentIntegrations } from "@/lib/microsoft/assignment-integrati
 import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import { routeAssignmentCategory } from "@/lib/admin/growth/work-routing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isJasonManagerAssignmentTestIntern } from "@/lib/internship/manager-assignment-test-intern";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +61,18 @@ export default async function ManagerAssignmentsPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const ids = desk.cards.map((card) => card.id);
-  const { data: people } = ids.length
+  // Jason's former test intern record must not appear in Ava's live assignment
+  // queue, counts, due dates, project selectors, or Microsoft 365 status columns.
+  // This is a view exclusion, not a destructive database deletion.
+  const teamIds = desk.cards.map((card) => card.id);
+  const { data: teamPeople } = teamIds.length
     ? await supabaseAdmin
         .from("internship_interns")
-        .select("id,full_name,preferred_name,academic_program,cohort_id,university_id")
-        .in("id", ids)
+        .select("id,full_name,preferred_name,email,work_email,academic_program,cohort_id,university_id")
+        .in("id", teamIds)
     : { data: [] };
+  const people = (teamPeople || []).filter((person) => !isJasonManagerAssignmentTestIntern(person));
+  const ids = people.map((person) => String(person.id));
   const universityIds = [...new Set((people || []).map((row) => String(row.university_id || "")).filter(Boolean))];
   const { data: schools } = universityIds.length
     ? await supabaseAdmin.from("internship_universities").select("id,display_name,name").in("id", universityIds)
