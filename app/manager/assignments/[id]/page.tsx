@@ -12,6 +12,7 @@ import { plannerConfigurationReady } from "@/lib/microsoft/planner-automation";
 import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-sharepoint";
 import { retryManagerAssignmentSync } from "@/lib/internship/manager-assignment-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isJasonManagerAssignmentTestIntern } from "@/lib/internship/manager-assignment-test-intern";
 import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import ManagerAssignmentAutomationPanel from "@/components/manager/ManagerAssignmentAutomationPanel";
@@ -39,6 +40,8 @@ export default async function ManagerAssignmentDetailPage({
     .maybeSingle();
   if (!task?.id) notFound();
   const intern = await findInternById(String(task.intern_id));
+  // Legacy test assignment links should not bypass the active manager queue.
+  if (intern && isJasonManagerAssignmentTestIntern(intern)) notFound();
   if (
     !actor ||
     !intern ||
