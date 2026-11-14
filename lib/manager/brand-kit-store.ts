@@ -1,7 +1,7 @@
 import { getAdminIdentity } from "@/lib/admin/access";
-import { canUseGrowthPortal } from "@/lib/admin/growth/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
   BRAND_KIT_BUCKET,
   assessBrandUploadClaim,
@@ -91,7 +91,7 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
   if (!user) return null;
 
   const admin = await getAdminIdentity();
-  if (admin && canUseGrowthPortal(admin)) {
+  if (admin?.canAccessAdmin) {
     const actor: BrandActor = {
       canAccessAdmin: true,
       isSuperUser: admin.isSuperUser,
@@ -114,6 +114,9 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
 
   const intern = await findInternByAccount({ userId: user.id, email: user.email });
   if (!intern?.userId) return null;
+  // Match the Intern Portal gate: unpublished or unsigned intern accounts cannot download brand files.
+  const onboarding = await getInternOnboarding(intern.id);
+  if (!internOnboardingComplete(onboarding)) return null;
   const actor: BrandActor = {
     canAccessAdmin: false,
     isSuperUser: false,
