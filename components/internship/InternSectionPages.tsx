@@ -83,8 +83,11 @@ export function InternAssignmentsPageView({
       ]}
     >
       <article className={`${DESK_UI.card} overflow-hidden`}>
-        <div className="border-b border-slate-100 px-4 py-3 text-sm font-bold text-[#0D5C3A]">
-          All Assignments ({tasks.length})
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <span className="text-sm font-black text-[#0D5C3A]">All Assignments ({tasks.length})</span>
+          <Link href="/intern/calendar" className="inline-flex min-h-10 items-center rounded-full bg-blue-50 px-4 text-xs font-black text-blue-700 hover:bg-blue-100">
+            View my calendar
+          </Link>
         </div>
         <ul className="divide-y divide-slate-100">
           {tasks.map((task) => (
