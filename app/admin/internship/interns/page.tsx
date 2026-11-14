@@ -115,7 +115,7 @@ export default async function InternshipInternsPage({
   const ryanExists = interns.some((intern) => intern.fullName.toLowerCase().includes("ryan") && intern.fullName.toLowerCase().includes("manibo"));
 
   return (
-    <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 overflow-x-hidden px-3 pb-24 sm:px-5 lg:px-6">
+    <main className="admin-desk-surface mx-auto w-full max-w-7xl min-w-0 space-y-5 overflow-x-hidden px-3 pb-24 sm:px-5 lg:px-6">
       <DeskPageHero
         icon={<Users size={22} />}
         title="Intern Team"
