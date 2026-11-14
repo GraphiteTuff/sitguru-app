@@ -45,6 +45,8 @@ const WORKSPACE_ORDER: AppRole[] = [
   'pet_parent',
   'guru',
   'ambassador',
+  'manager',
+  'intern',
   'admin',
 ];
 
@@ -56,6 +58,10 @@ const DASHBOARD_PATHS:
       '/guru-dashboard',
     ambassador:
       '/ambassador-dashboard',
+    manager:
+      '/growth-insights',
+    intern:
+      '/intern-portal',
     admin:
       '/admin-dashboard',
   };
