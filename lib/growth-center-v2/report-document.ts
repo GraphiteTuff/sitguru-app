@@ -159,17 +159,19 @@ export function weeklyPulseMarkdown(pulse: WeeklySocialPulse) {
     "| Platform | Followers | Net growth | Reach | Impressions | Link clicks to SitGuru |",
     "| --- | ---: | ---: | ---: | ---: | ---: |",
   ];
+  const evidence: string[] = [];
   for (const item of WEEKLY_PULSE_PLATFORMS) {
     const p = pulse.platforms[item.id];
     const text = (key: "followers" | "netGrowth" | "reach" | "impressions" | "linkClicks") => p[key] === "" ? "Not supplied" : p[key];
     lines.push("| " + item.label + " | " + text("followers") + " | " + text("netGrowth") + " | " + text("reach") + " | " + text("impressions") + " | " + text("linkClicks") + " |");
-    if (p.evidenceLink) lines.push("- " + item.label + " evidence / dashboard: " + p.evidenceLink);
+    if (p.evidenceLink) evidence.push("- " + item.label + " evidence / dashboard: " + p.evidenceLink);
   }
   const rows = WEEKLY_PULSE_PLATFORMS.map(({ id }) => pulse.platforms[id]);
   lines.push("| **Sum of supplied platform counts (not unique reach)** | " +
     availableTotal(rows, "followers") + " | " + availableTotal(rows, "netGrowth") +
     " | " + availableTotal(rows, "reach") + " | " + availableTotal(rows, "impressions") +
     " | " + availableTotal(rows, "linkClicks") + " |");
+  if (evidence.length) lines.push("", "### Platform source references", "", ...evidence);
   lines.push("", "### Top performing asset of the week",
     "- Post / asset link: " + (pulse.topAssetLink || "Not supplied"),
     "- Primary performance metrics: " + (pulse.topAssetMetrics || "Not supplied"),
