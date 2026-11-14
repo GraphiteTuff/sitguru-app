@@ -30,6 +30,9 @@ export default async function InternCampusEventPage({
       leads={data.leads}
       links={data.links}
       missions={data.missions}
+      results={data.results}
+      sourceHealth={data.sourceHealth}
+      sourceIssues={data.sourceIssues}
       eventMode
       notice={first(params.error) || first(params.ok)}
       error={Boolean(first(params.error))}
