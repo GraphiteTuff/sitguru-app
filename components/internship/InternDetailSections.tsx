@@ -86,22 +86,22 @@ export default function InternDetailSections({
           })}
         </div>
       </nav>
-      {(() => {
-        const selected = INTERN_RECORD_TABS.find((item) => item.id === active) || INTERN_RECORD_TABS[0];
-        return (
-          <section
-            id={"intern-record-panel-" + selected.id}
-            aria-labelledby={"intern-record-tab-" + selected.id}
-            className="min-w-0 space-y-4"
-          >
-            <div className="px-1">
-              <h2 className="text-xl font-black tracking-tight text-[#0F2744] sm:text-2xl">{selected.title}</h2>
-              <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-600">{selected.description}</p>
-            </div>
-            {sections[active]}
-          </section>
-        );
-      })()}
+      {INTERN_RECORD_TABS.map((item) => (
+        <section
+          key={item.id}
+          id={"intern-record-panel-" + item.id}
+          role="tabpanel"
+          aria-labelledby={"intern-record-tab-" + item.id}
+          hidden={active !== item.id}
+          className={active === item.id ? "min-w-0 space-y-4" : "hidden"}
+        >
+          <div className="px-1">
+            <h2 className="text-xl font-black tracking-tight text-[#0F2744] sm:text-2xl">{item.title}</h2>
+            <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-600">{item.description}</p>
+          </div>
+          {sections[item.id]}
+        </section>
+      ))}
     </div>
   );
 }
