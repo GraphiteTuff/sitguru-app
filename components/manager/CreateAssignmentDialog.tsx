@@ -12,6 +12,8 @@ import {
   type AssignmentDraft,
 } from "@/lib/internship/manager-assignment";
 import { routeAssignmentCategory } from "@/lib/admin/growth/work-routing";
+import { defaultFinalSectionForCategory } from "@/lib/internship/syllabus-alignment";
+import { FINAL_CONTRIBUTION_SECTIONS, FINAL_PROJECT_OUTPUTS } from "@/lib/internship/final-project";
 
 export type AssignmentInternOption = {
   id: string;
@@ -22,6 +24,7 @@ export type AssignmentInternOption = {
 };
 
 export type AssignmentMilestoneOption = { id: string; title: string; internId: string };
+export type AssignmentProjectOption = { id: string; title: string; internId: string };
 
 export type AssignmentFormValue = AssignmentDraft & { taskId: string };
 
@@ -38,6 +41,8 @@ function blank(clientRequestId: string): AssignmentFormValue {
     title: "",
     category: "Content",
     milestoneId: "",
+    projectId: "",
+    finalSection: defaultFinalSectionForCategory("Content"),
     dueOn: "",
     priority: "Normal",
     description: "",
@@ -53,6 +58,7 @@ function blank(clientRequestId: string): AssignmentFormValue {
 export default function CreateAssignmentDialog({
   interns,
   milestones,
+  projects,
   open,
   focusIntern = false,
   initial,
@@ -60,6 +66,7 @@ export default function CreateAssignmentDialog({
 }: {
   interns: AssignmentInternOption[];
   milestones: AssignmentMilestoneOption[];
+  projects: AssignmentProjectOption[];
   open: boolean;
   focusIntern?: boolean;
   initial?: AssignmentFormValue | null;
@@ -99,6 +106,8 @@ export default function CreateAssignmentDialog({
 
   const dirty = JSON.stringify(form) !== baseline;
   const milestoneChoices = milestones.filter((item) => item.internId === form.internId);
+  const projectChoices = projects.filter((item) => item.internId === form.internId);
+  const selectedFinalSection = FINAL_CONTRIBUTION_SECTIONS.find((row) => row.id === form.finalSection);
   const publishCheck = validateManagerAssignment(form, "create");
 
   function patch(partial: Partial<AssignmentFormValue>) {
@@ -164,7 +173,11 @@ export default function CreateAssignmentDialog({
                   name="internId"
                   required
                   value={form.internId}
-                  onChange={(event) => patch({ internId: event.target.value, milestoneId: "" })}
+                  onChange={(event) => {
+                    const internId = event.target.value;
+                    const matches = projects.filter((item) => item.internId === internId);
+                    patch({ internId, milestoneId: "", projectId: matches.length === 1 ? matches[0].id : "" });
+                  }}
                   className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
                 >
                   <option value="">Choose an intern</option>
@@ -228,6 +241,52 @@ export default function CreateAssignmentDialog({
               {errors.deliverables ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.deliverables}</span> : null}
             </fieldset>
 
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4">
+              <p className="text-sm font-black text-[#0D5C3A]">How this assignment builds the intern's final project</p>
+              <p className="mt-1 text-xs font-medium leading-5 text-slate-600">
+                The intern completes this one task in SitGuru. Ava's approval places the evidence
+                in the selected chapter of the existing Business Growth Report, Playbook or Portfolio.
+                No duplicate assignment is created.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-bold text-[#0F2744]">
+                  Related SitGuru project
+                  <select
+                    name="projectId"
+                    value={form.projectId || ""}
+                    onChange={(event) => patch({ projectId: event.target.value })}
+                    className="mt-1 min-h-11 w-full rounded-xl border border-emerald-200 bg-white px-3 text-sm font-semibold"
+                  >
+                    <option value="">No specific project</option>
+                    {projectChoices.map((project) => (
+                      <option key={project.id} value={project.id}>{project.title}</option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs font-medium text-slate-500">
+                    {projectChoices.length ? "Only this intern's cohort projects are listed." : "No cohort project configured for this intern yet."}
+                  </span>
+                </label>
+                <label className="block text-sm font-bold text-[#0F2744]">
+                  Final Project chapter *
+                  <select
+                    name="finalSection"
+                    value={form.finalSection || ""}
+                    required
+                    onChange={(event) => patch({ finalSection: event.target.value })}
+                    className="mt-1 min-h-11 w-full rounded-xl border border-emerald-200 bg-white px-3 text-sm font-semibold"
+                  >
+                    {FINAL_CONTRIBUTION_SECTIONS.map((row) => (
+                      <option key={row.id} value={row.id}>{row.label}</option>
+                    ))}
+                  </select>
+                  {errors.finalSection ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.finalSection}</span> : null}
+                  <span className="mt-1 block text-xs font-semibold text-[#0D5C3A]">
+                    Destination: {FINAL_PROJECT_OUTPUTS.find((row) => row.id === selectedFinalSection?.output)?.name || "Final Growth Project"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <details className="rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-4">
               <summary className="cursor-pointer text-sm font-black text-blue-700">
                 More options (category, priority, resources, review)
@@ -236,7 +295,7 @@ export default function CreateAssignmentDialog({
                 <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold text-[#0F2744]">
                 Category *
-                <select name="category" value={form.category} onChange={(event) => patch({ category: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
+                <select name="category" value={form.category} onChange={(event) => patch({ category: event.target.value, finalSection: defaultFinalSectionForCategory(event.target.value) })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
                   {ASSIGNMENT_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
                 </select>
                 <span className="mt-1 block text-xs font-semibold text-[#2563EB]">

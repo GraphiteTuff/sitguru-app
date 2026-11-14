@@ -1,4 +1,5 @@
 /** Manager assignment form rules. Stored on the existing internship task row. */
+import { defaultFinalSectionForCategory, isValidFinalSection } from "@/lib/internship/syllabus-alignment";
 
 export const ASSIGNMENT_CATEGORIES = [
   "Content",
@@ -27,6 +28,8 @@ export type AssignmentDraft = {
   title: string;
   category: string;
   milestoneId: string;
+  projectId?: string;
+  finalSection?: string;
   dueOn: string;
   priority: string;
   description: string;
@@ -87,6 +90,8 @@ export function validateManagerAssignment(input: AssignmentDraft, intent: "draft
     title: input.title.trim(),
     category: input.category.trim(),
     milestoneId: input.milestoneId.trim(),
+    projectId: String(input.projectId || "").trim(),
+    finalSection: String(input.finalSection || defaultFinalSectionForCategory(input.category)).trim(),
     dueOn: input.dueOn.trim(),
     priority: input.priority.trim() || "Normal",
     description: input.description.trim(),
@@ -117,6 +122,7 @@ export function validateManagerAssignment(input: AssignmentDraft, intent: "draft
   }
 
   if (value.notes.length > TEXT_MAX) errors.notes = `Keep notes under ${TEXT_MAX} characters.`;
+  if (!isValidFinalSection(value.finalSection)) errors.finalSection = "Choose an existing final-project chapter.";
   if (!ASSIGNMENT_PRIORITIES.includes(value.priority as (typeof ASSIGNMENT_PRIORITIES)[number])) {
     errors.priority = "Choose a priority.";
   }
@@ -142,6 +148,8 @@ export function assignmentBrief(value: AssignmentDraft, actorUserId: string) {
   return {
     category: value.category,
     milestoneId: value.milestoneId,
+    projectId: value.projectId || "",
+    finalSection: value.finalSection || defaultFinalSectionForCategory(value.category),
     priority: value.priority,
     review: value.review,
     freedom: value.freedom,
@@ -161,6 +169,8 @@ export function readAssignmentBrief(payload: unknown): Partial<AssignmentDraft> 
   return {
     category: String(row.category || ""),
     milestoneId: String(row.milestoneId || ""),
+    projectId: String(row.projectId || ""),
+    finalSection: String(row.finalSection || ""),
     priority: String(row.priority || "Normal"),
     review: String(row.review || "Manager Review Required"),
     freedom: String(row.freedom || "Guided"),

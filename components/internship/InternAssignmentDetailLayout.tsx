@@ -7,6 +7,8 @@ import { expectedInternAssignmentFolder } from "@/lib/microsoft/assignment-share
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { InternshipTask, InternshipWorkspaceData } from "@/lib/internship/types";
 import type { AssignmentIntegration } from "@/lib/microsoft/assignment-integrations";
+import { FINAL_CONTRIBUTION_SECTIONS, FINAL_PROJECT_OUTPUTS, FINAL_WORKSPACE_CHAPTERS } from "@/lib/internship/final-project";
+import { isValidFinalSection } from "@/lib/internship/syllabus-alignment";
 
 type LinkedIntegration = AssignmentIntegration & { assignmentId: string };
 
@@ -41,6 +43,12 @@ export default function InternAssignmentDetailLayout({
   const workDocumentUrl = submittedUrl ||
     (expected.knownFolderId ? `${expected.url}/SitGuru%20Assignment%20Work.md` : "");
   const comments = workspace.comments.filter((row) => row.itemType === "task" && row.itemId === task.id);
+  const finalSection = isValidFinalSection(task.finalSection)
+    ? FINAL_CONTRIBUTION_SECTIONS.find((row) => row.id === task.finalSection)
+    : null;
+  const finalChapter = FINAL_WORKSPACE_CHAPTERS.find((row) => row.id === finalSection?.chapter);
+  const finalOutput = FINAL_PROJECT_OUTPUTS.find((row) => row.id === finalSection?.output);
+  const project = workspace.projects.find((row) => row.id === task.projectId);
 
   const workFields = (
     <>
@@ -114,6 +122,32 @@ export default function InternAssignmentDetailLayout({
         {flash?.error ? (
           <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-semibold text-red-800">{flash.error}</p>
         ) : null}
+
+        <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4">
+          <p className="text-xs font-black uppercase tracking-wider text-[#0D5C3A]">Why this matters for your final project</p>
+          {finalSection ? (
+            <>
+              <p className="mt-1 text-sm font-black text-slate-950">{finalSection.label} → {finalChapter?.label || "Final Growth Project"}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-700">
+                {project ? project.name + " · " : ""}{finalOutput?.name || "Final Growth Project"}
+              </p>
+              <p className="mt-2 text-xs font-medium leading-5 text-slate-600">
+                Save the requested evidence and submit it to Ava. Approved work becomes a contribution to
+                this final project chapter. Your report, Playbook, and portfolio reuse that approved work.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm font-medium text-slate-600">
+              Ava has not assigned this task to a final-project chapter yet.
+              Complete the instructions as usual; your work will be preserved for manager review.
+            </p>
+          )}
+          {!adminPreview ? (
+            <Link href="/intern/growth" className="mt-3 inline-flex min-h-10 items-center text-xs font-black text-blue-800 underline">
+              Open my Business Growth Report →
+            </Link>
+          ) : null}
+        </div>
 
         <h2 className="mt-6 text-lg font-black text-slate-950">Assignment instructions</h2>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">

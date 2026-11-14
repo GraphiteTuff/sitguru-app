@@ -15,6 +15,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { InternName } from "@/components/portal/PersonFace";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import ManagerAssignmentAutomationPanel from "@/components/manager/ManagerAssignmentAutomationPanel";
+import { FINAL_CONTRIBUTION_SECTIONS, FINAL_PROJECT_OUTPUTS, FINAL_WORKSPACE_CHAPTERS } from "@/lib/internship/final-project";
+import { isValidFinalSection } from "@/lib/internship/syllabus-alignment";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,7 @@ export default async function ManagerAssignmentDetailPage({
   const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
   const { data: task } = await supabaseAdmin
     .from("internship_tasks")
-    .select("id,intern_id,title,due_on,status,metric_affected,business_objective,student_notes,brief_payload")
+    .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,student_notes,brief_payload")
     .eq("id", id)
     .maybeSingle();
   if (!task?.id) notFound();
@@ -59,6 +61,14 @@ export default async function ManagerAssignmentDetailPage({
   });
   const brief = readAssignmentBrief(task.brief_payload);
   const route = routeAssignmentCategory(brief.category || String(task.metric_affected || ""));
+  const finalSection = isValidFinalSection(String(task.final_section || ""))
+    ? FINAL_CONTRIBUTION_SECTIONS.find((row) => row.id === task.final_section)
+    : null;
+  const finalChapter = FINAL_WORKSPACE_CHAPTERS.find((row) => row.id === finalSection?.chapter);
+  const finalOutput = FINAL_PROJECT_OUTPUTS.find((row) => row.id === finalSection?.output);
+  const { data: linkedProject } = task.project_id
+    ? await supabaseAdmin.from("internship_projects").select("name").eq("id", task.project_id).eq("cohort_id", intern.cohortId).maybeSingle()
+    : { data: null };
   const links = await listAssignmentIntegrations([String(task.id)]);
   const pick = (provider: string) => links.find((item) => item.provider === provider);
   const isLola = intern.fullName.trim().toLowerCase() === "lola uhl";
@@ -91,6 +101,20 @@ export default async function ManagerAssignmentDetailPage({
         </p>
         <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{brief.description || String(task.business_objective || "")}</p>
         <p className="mt-2 text-sm font-semibold text-slate-600">Creative freedom: {brief.freedom || "Guided"} · {brief.review || "Manager Review Required"}</p>
+        <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+          <h2 className="text-sm font-black text-[#0D5C3A]">Final project connection</h2>
+          <p className="mt-1 text-sm font-bold text-slate-900">
+            {finalSection
+              ? finalSection.label + " → " + (finalChapter?.label || "Final Growth Project")
+              : "Not mapped yet — edit this assignment to choose a final-project chapter."}
+          </p>
+          {finalOutput ? <p className="mt-1 text-xs text-slate-600">Destination: {finalOutput.name}</p> : null}
+          {linkedProject?.name ? <p className="mt-1 text-xs text-slate-600">Cohort project: {linkedProject.name}</p> : null}
+          <p className="mt-2 text-xs text-slate-600">
+            Approved intern evidence feeds the selected chapter. Use Edit in Manager Assignments
+            to correct the project or final chapter without replacing the intern's work.
+          </p>
+        </div>
         {brief.deliverables?.length ? (
           <div className="mt-5">
             <h2 className="text-base font-black text-[#0F2744]">Assignment deliverables</h2>

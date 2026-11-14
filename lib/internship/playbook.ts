@@ -10,10 +10,10 @@ import { ATTRIBUTION_RULE, INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/cons
 export const INTERNSHIP_TITLE = "Social Media & Community Growth Intern";
 
 export const MARKET_GROWTH_PROJECT_NAME =
-  "SitGuru Greater Philadelphia Market Growth Project";
+  "SitGuru Market Growth Project";
 
 export const MARKET_GROWTH_PROJECT_STATEMENT =
-  "Develop, execute, measure, and optimize a digital and community growth strategy that increases SitGuru’s qualified Pet Parent acquisition and strengthens marketplace density in a defined Pennsylvania target market, with results documented through attributable business metrics.";
+  "Develop, execute, measure, and optimize a digital and community growth strategy that strengthens SitGuru’s qualified Pet Parent acquisition, Guru marketplace supply, and community partnerships in a defined, supervisor-approved target market. Document outcomes through verified, attributable business metrics. Local market assignments, including Greater Philadelphia, are specific projects—not requirements for every university.";
 
 export const SMART_RULE =
   "Every intern goal must be Specific, Measurable, Achievable, Relevant, and Time-bound — and tied to a SitGuru-controlled source. Activity (posts published) is not a result.";
