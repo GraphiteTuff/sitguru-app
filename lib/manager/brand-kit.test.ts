@@ -8,6 +8,8 @@ import {
   BRAND_UPLOAD_STATUS,
   brandDownloadFileName,
   brandKitCapabilities,
+  brandSubmissionStatus,
+  BRAND_INITIAL_APPROVAL_CUTOFF_UTC,
   brandMasterFolder,
   internBrandLibraryHref,
   isBrandCategory,
@@ -26,7 +28,7 @@ const svg = new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg" vi
 const svgScript = new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`);
 
 describe("brand kit permissions", () => {
-  it("lets growth managers upload and archive, and only super users approve or delete", () => {
+  it("lets team members submit, Ava approve, and super users delete", () => {
     const manager = brandKitCapabilities({
       canAccessAdmin: true,
       isSuperUser: false,
@@ -51,9 +53,30 @@ describe("brand kit permissions", () => {
       growthOnly: false,
       intern: true,
     });
-    assert.equal(intern.upload, false);
+    assert.equal(intern.upload, true);
+    assert.equal(intern.approve, false);
     assert.equal(intern.delete, false);
     assert.equal(intern.viewApproved, true);
+
+    const ava = {
+      canAccessAdmin: true,
+      isSuperUser: false,
+      growthOnly: true,
+      intern: false,
+      brandApprover: true,
+    };
+    const reviewer = brandKitCapabilities(ava);
+    assert.equal(reviewer.approve, true);
+    assert.equal(reviewer.upload, true);
+    assert.equal(reviewer.delete, false);
+    assert.equal(brandSubmissionStatus(ava), "approved");
+    assert.equal(brandSubmissionStatus({
+      canAccessAdmin: true, isSuperUser: false, growthOnly: true, intern: false,
+    }), "pending_review");
+    assert.equal(brandSubmissionStatus({
+      canAccessAdmin: false, isSuperUser: false, growthOnly: false, intern: true,
+    }), "pending_review");
+    assert.equal(BRAND_INITIAL_APPROVAL_CUTOFF_UTC, "2026-11-14T05:00:00.000Z");
   });
 });
 
