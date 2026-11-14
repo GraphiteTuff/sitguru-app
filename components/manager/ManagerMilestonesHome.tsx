@@ -111,6 +111,7 @@ export default function ManagerMilestonesHome({
             <p className="mt-1 text-sm font-medium text-slate-600">All dates and statuses below come from SitGuru's saved internship calendar. Shared program milestones are not duplicated per student.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href="/manager/help/program-milestones" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#2563EB] hover:bg-[#EFF6FF]">How milestones work</Link>
             <Link href="/manager/team" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-[#F8FAFC] px-4 text-sm font-black text-[#0F2744] hover:bg-[#EFF6FF]">My Team</Link>
             <Link href="/manager/assignments" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8]">Assignments</Link>
             {canManageProgram ? <Link href="/admin/internship/timeline" className="inline-flex min-h-11 items-center rounded-xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">Manage official dates</Link> : null}
