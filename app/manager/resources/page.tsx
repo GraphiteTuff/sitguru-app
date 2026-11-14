@@ -1,6 +1,8 @@
 import GrowthOneNoteShortcuts from "@/components/admin/growth/GrowthOneNoteShortcuts";
 import GrowthSharePointShortcuts from "@/components/admin/growth/GrowthSharePointShortcuts";
 import ManagerResourceLibrary from "@/components/manager/ManagerResourceLibrary";
+import SharedTeamToolkitAssets from "@/components/portal/SharedTeamToolkitAssets";
+import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { buildManagerResources, searchResources } from "@/lib/manager/resource-catalog";
@@ -31,8 +33,14 @@ export default async function ManagerResourcesPage({
     }),
   );
   const showWorkLinks = isSitGuruWorkEmail(access.actor.email);
+  const brandActor = await resolveBrandActor();
+  const approved = brandActor?.capabilities.viewApproved
+    ? await listBrandAssets({ actor: brandActor, status: "approved", pageSize: 6 })
+    : { assets: [], total: 0, error: "Approved files are not available on this account." };
 
   return (
+    <div className="space-y-5">
+      <SharedTeamToolkitAssets role="manager" assets={approved.assets} total={approved.total} error={approved.error} />
     <ManagerResourceLibrary groups={groups} query={query} empty={Boolean(query) && groups.length === 0}>
       {showWorkLinks ? (
         <>
@@ -45,5 +53,6 @@ export default async function ManagerResourcesPage({
         </p>
       )}
     </ManagerResourceLibrary>
+    </div>
   );
 }
