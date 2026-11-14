@@ -9,6 +9,7 @@ import {
   campusMissionDraft,
   campusTrackingCode,
   campusSlug,
+  CAMPUS_LEAD_STATUSES,
 } from "@/lib/internship/campus-growth";
 import { canReadPrivateInternRecord, internshipActorKind } from "@/lib/internship/manager-access";
 import { assignmentBrief, validateManagerAssignment } from "@/lib/internship/manager-assignment";
@@ -26,12 +27,21 @@ function field(formData: FormData, key: string) {
 
 function backPath(formData: FormData) {
   const value = field(formData, "returnTo");
-  if (value === "/intern/campus-growth" || value === "/intern/campus-growth/event" || value === "/manager/campus-growth") return value;
+  if (value === "/manager/campus-growth") {
+    const campus = field(formData,"campusContext");
+    const tab = field(formData,"tabContext");
+    const allowedTabs = new Set(["overview","opportunities","leads","tracking","missions"]);
+    if (/^[0-9a-f]{8}-[0-9a-f-]{27,40}$/i.test(campus) && allowedTabs.has(tab)) {
+      return value + "?campus=" + encodeURIComponent(campus) + "&tab=" + tab;
+    }
+    return value;
+  }
+  if (value === "/intern/campus-growth" || value === "/intern/campus-growth/event") return value;
   return "/manager/campus-growth";
 }
 
 function bounce(path: string, kind: "ok" | "error", message: string): never {
-  redirect(`${path}?${kind}=${encodeURIComponent(message)}`);
+  redirect(`${path}${path.includes("?") ? "&" : "?"}${kind}=${encodeURIComponent(message)}`);
 }
 
 async function actor() {
@@ -206,8 +216,6 @@ export async function saveCampusLead(formData: FormData) {
   bounce(path, "ok", "Campus lead saved for manager follow-up.");
 }
 
-export const CAMPUS_LEAD_STATUSES = ["New","Researching","Contacted","Interested","Follow Up","Converted","Not Interested","Closed"] as const;
-
 export async function updateCampusLead(formData: FormData) {
   const who = await actor();
   const path = backPath(formData);
@@ -359,6 +367,14 @@ export async function createCampusMission(formData: FormData) {
   const checked = validateManagerAssignment(draft, intent);
   if (!checked.ok) bounce("/manager/campus-growth", "error", Object.values(checked.errors)[0] || "Check the campus mission.");
   const value = checked.value;
+  // Avoid creating two student assignments when a manager double-submits a form.
+  if (field(formData,"clientRequestId")) {
+    const { data: prior } = await supabaseAdmin.from("internship_tasks")
+      .select("id").eq("intern_id",intern.id)
+      .contains("brief_payload",{clientRequestId:value.clientRequestId})
+      .limit(1).maybeSingle();
+    if (prior?.id) bounce(backPath(formData),"ok","That mission is already saved. Open Assignments to view it.");
+  }
   const brief = {
     ...assignmentBrief(value, who.userId),
     campusMission: true,
@@ -412,5 +428,5 @@ export async function createCampusMission(formData: FormData) {
   }
   refresh();
   const first = (intern.preferredName || intern.fullName || "your intern").split(/\s+/)[0];
-  bounce("/manager/campus-growth", "ok", intent === "draft" ? `Draft saved. ${first} cannot see it yet.` : `Campus mission published for ${first}.`);
+  bounce(backPath(formData), "ok", intent === "draft" ? `Draft saved. ${first} cannot see it yet.` : `Campus mission published for ${first}.`);
 }
