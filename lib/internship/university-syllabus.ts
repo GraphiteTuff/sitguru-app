@@ -143,7 +143,7 @@ export const SYLLABUS_ACADEMIC_FIELDS = [
 ] as const;
 
 export const SYLLABUS_WORKFLOW = [
-  { step: "01", label: "Assign", actor: "Ava / SitGuru manager", detail: "Publish goals, acceptance criteria, due date and resources in SitGuru." },
+  { step: "01", label: "Assign", actor: "Ava / SitGuru manager", detail: "Choose the actual SitGuru cohort project, milestone and Final Growth Project chapter; publish goals, acceptance criteria, due date, and approved resources." },
   { step: "02", label: "Do the work", actor: "Assigned intern", detail: "Research, draft and collaborate within approved role permissions." },
   { step: "03", label: "Record evidence", actor: "Assigned intern", detail: "Save sources, work files and notes in the assignment's SharePoint folder; log hours and weekly reflections." },
   { step: "04", label: "Submit for review", actor: "Intern → Ava", detail: "Submit the SitGuru assignment for manager feedback; revise as needed." },
