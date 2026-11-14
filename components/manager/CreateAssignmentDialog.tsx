@@ -140,7 +140,7 @@ export default function CreateAssignmentDialog({
                 <h2 id={titleId} className="text-xl font-black text-[#0F2744] sm:text-2xl">
                   {form.taskId ? "Edit Assignment" : "Create Assignment"}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-slate-600">Add a new assignment for one or more of your interns.</p>
+                <p className="mt-1 text-sm font-medium text-slate-600">Choose an intern, set a due date, and explain the task. You can add extra settings later.</p>
               </div>
             </div>
             <button type="button" onClick={requestClose} aria-label="Close" className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100">
@@ -149,6 +149,9 @@ export default function CreateAssignmentDialog({
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-[#0F2744]">
+              1. Choose an intern and due date · 2. Add instructions · 3. Create. Reminders can be turned on from the assignment page.
+            </p>
             {!interns.length ? (
               <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
                 You don&apos;t have any active interns assigned yet. Open the Intern Team Desk when an intern is assigned to you.
@@ -156,7 +159,7 @@ export default function CreateAssignmentDialog({
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold text-[#0F2744]">
-                Assign to Intern *
+                Assign to intern *
                 <select
                   name="internId"
                   required
@@ -174,7 +177,7 @@ export default function CreateAssignmentDialog({
                 {errors.internId ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.internId}</span> : null}
               </label>
               <label className="text-sm font-bold text-[#0F2744]">
-                Assignment Title *
+                Task title *
                 <input
                   name="title"
                   value={form.title}
@@ -185,43 +188,21 @@ export default function CreateAssignmentDialog({
                 {errors.title ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.title}</span> : null}
               </label>
               <label className="text-sm font-bold text-[#0F2744]">
-                Category *
-                <select name="category" value={form.category} onChange={(event) => patch({ category: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
-                  {ASSIGNMENT_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
-                </select>
-                <span className="mt-1 block text-xs font-semibold text-[#2563EB]">
-                  Teams → {routeAssignmentCategory(form.category).channelLabel}
-                </span>
-              </label>
-              <label className="text-sm font-bold text-[#0F2744]">
-                Associated Milestone
-                <select name="milestoneId" value={form.milestoneId} onChange={(event) => patch({ milestoneId: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
-                  <option value="">None</option>
-                  {milestoneChoices.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-bold text-[#0F2744]">
                 Due Date *
                 <input type="date" name="dueOn" value={form.dueOn} onChange={(event) => patch({ dueOn: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold" />
                 {errors.dueOn ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.dueOn}</span> : null}
               </label>
-              <label className="text-sm font-bold text-[#0F2744]">
-                Priority
-                <select name="priority" value={form.priority} onChange={(event) => patch({ priority: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
-                  {ASSIGNMENT_PRIORITIES.map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </label>
             </div>
 
             <label className="block text-sm font-bold text-[#0F2744]">
-              Description *
+              What should they do? *
               <textarea name="description" value={form.description} maxLength={2000} rows={4} onChange={(event) => patch({ description: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" />
               <span className="mt-1 block text-right text-xs font-medium text-slate-500">{form.description.length}/2000</span>
               {errors.description ? <span className="block text-xs font-semibold text-rose-700">{errors.description}</span> : null}
             </label>
 
             <fieldset>
-              <legend className="text-sm font-bold text-[#0F2744]">Deliverables *</legend>
+              <legend className="text-sm font-bold text-[#0F2744]">What should they turn in? *</legend>
               <div className="mt-2 space-y-2">
                 {form.deliverables.map((value, index) => (
                   <div key={index} className="flex gap-2">
@@ -242,11 +223,40 @@ export default function CreateAssignmentDialog({
                 ))}
               </div>
               <button type="button" onClick={() => patch({ deliverables: [...form.deliverables, ""] })} className="mt-2 text-sm font-bold text-[#2563EB]">
-                + Add Deliverable
+                + Add another item
               </button>
               {errors.deliverables ? <span className="mt-1 block text-xs font-semibold text-rose-700">{errors.deliverables}</span> : null}
             </fieldset>
 
+            <details className="rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-4">
+              <summary className="cursor-pointer text-sm font-black text-blue-700">
+                More options (category, priority, resources, review)
+              </summary>
+              <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-bold text-[#0F2744]">
+                Category *
+                <select name="category" value={form.category} onChange={(event) => patch({ category: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
+                  {ASSIGNMENT_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+                </select>
+                <span className="mt-1 block text-xs font-semibold text-[#2563EB]">
+                  Teams → {routeAssignmentCategory(form.category).channelLabel}
+                </span>
+              </label>
+              <label className="text-sm font-bold text-[#0F2744]">
+                Associated Milestone
+                <select name="milestoneId" value={form.milestoneId} onChange={(event) => patch({ milestoneId: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
+                  <option value="">None</option>
+                  {milestoneChoices.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-bold text-[#0F2744]">
+                Priority
+                <select name="priority" value={form.priority} onChange={(event) => patch({ priority: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold">
+                  {ASSIGNMENT_PRIORITIES.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </label>
+                </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold text-[#0F2744]">
                 Review Requirement
@@ -301,6 +311,8 @@ export default function CreateAssignmentDialog({
               Additional Notes / Instructions
               <textarea name="notes" value={form.notes} maxLength={2000} rows={3} onChange={(event) => patch({ notes: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" />
             </label>
+              </div>
+            </details>
           </div>
 
           <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
@@ -312,7 +324,7 @@ export default function CreateAssignmentDialog({
                 Save as Draft
               </button>
               <button name="intent" value="create" disabled={!publishCheck.ok || !interns.length} className="min-h-11 rounded-full bg-[#16A34A] px-4 text-sm font-bold !text-white disabled:cursor-not-allowed disabled:opacity-50">
-                {form.taskId ? "Save assignment" : "Create Assignment"}
+                {form.taskId ? "Save changes" : "Assign task"}
               </button>
             </div>
           </div>

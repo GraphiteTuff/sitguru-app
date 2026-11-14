@@ -47,6 +47,24 @@ export function cleanList(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean);
 }
 
+/**
+ * Old assignment briefs sometimes stored several Markdown bullets inside one
+ * deliverable string. Normalize for display AND new edits without altering the
+ * original brief, splitting ordinary hyphenated words, or requiring a migration.
+ */
+export function readableAssignmentDeliverables(values: string[]): string[] {
+  return values.flatMap((entry) =>
+    String(entry || "")
+      .replace(/\r\n?/g, "\n")
+      .split(/\n(?=\s*(?:[-*]\s+|\d+[.)]\s+))/g)
+      .flatMap((part) => part.split(/\s+-\s+(?=\*\*)/g)),
+  ).map((part) => part
+    .replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)/, "")
+    .replace(/\*\*/g, "")
+    .trim()
+  ).filter(Boolean);
+}
+
 export function isHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -72,7 +90,7 @@ export function validateManagerAssignment(input: AssignmentDraft, intent: "draft
     dueOn: input.dueOn.trim(),
     priority: input.priority.trim() || "Normal",
     description: input.description.trim(),
-    deliverables: cleanList(input.deliverables),
+    deliverables: readableAssignmentDeliverables(input.deliverables),
     review: input.review.trim() || "Manager Review Required",
     freedom: input.freedom.trim() || "Guided",
     resources: cleanList(input.resources),
@@ -146,7 +164,7 @@ export function readAssignmentBrief(payload: unknown): Partial<AssignmentDraft> 
     priority: String(row.priority || "Normal"),
     review: String(row.review || "Manager Review Required"),
     freedom: String(row.freedom || "Guided"),
-    deliverables: list("deliverables"),
+    deliverables: readableAssignmentDeliverables(list("deliverables")),
     resources: list("resources"),
     notes: String(row.notes || ""),
     description: String(row.description || ""),

@@ -45,18 +45,18 @@ export default function InternAssignmentDetailLayout({
   const workFields = (
     <>
       <label className="block space-y-2">
-        <span className="text-sm font-black text-slate-950">Research, notes, and your content ideas</span>
+        <span className="text-sm font-black text-slate-950">Your answers, notes, and ideas</span>
         <textarea
           name="studentNotes"
           defaultValue={String(work.notes || "")}
-          rows={11}
+          rows={9}
           readOnly={!canEdit}
-          placeholder="Add your two pet trends, source links, SitGuru post or Reel ideas, and your SitGuru Pack discussion question here."
+          placeholder="Write your research, answers, ideas, or progress here. You can save and come back before submitting."
           className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:bg-slate-50"
         />
       </label>
       <label className="block space-y-2">
-        <span className="text-sm font-black text-slate-950">Additional work link (optional)</span>
+        <span className="text-sm font-black text-slate-950">Link to your work (optional)</span>
         <input
           name="workUrl"
           type="url"
@@ -82,6 +82,17 @@ export default function InternAssignmentDetailLayout({
             You are viewing this intern's actual assignment data without signing in as them. Saving, submitting, and editing are disabled. Use Employer review to manage work.
           </p>
         </div>
+      ) : null}
+
+      {!adminPreview ? (
+        <section aria-label="How assignments work" className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 sm:px-5">
+          <h2 className="text-sm font-black text-[#0F2744]">Three easy steps</h2>
+          <ol className="mt-3 grid gap-3 text-sm font-semibold text-slate-700 sm:grid-cols-3">
+            <li><span className="mr-2 font-black text-blue-700">1.</span>Read your instructions</li>
+            <li><span className="mr-2 font-black text-blue-700">2.</span>Write your work and save a draft</li>
+            <li><span className="mr-2 font-black text-blue-700">3.</span>Submit to Ava for review</li>
+          </ol>
+        </section>
       ) : null}
 
       <section className={`${DESK_UI.card} p-5 sm:p-7`}>
@@ -131,9 +142,9 @@ export default function InternAssignmentDetailLayout({
       </section>
 
       <section className={`${DESK_UI.card} p-5 sm:p-7`}>
-        <h2 className="text-xl font-black text-slate-950">My assignment work</h2>
+        <h2 className="text-xl font-black text-slate-950">Your work</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Work is saved to a Markdown document in SitGuru's SharePoint intern folder. Save as you go, then submit to Ava.
+          Write everything here. Click Save draft to keep it in SharePoint, then submit when it is ready for Ava. You do not need to open Planner or Teams.
         </p>
 
         {adminPreview ? (
@@ -141,10 +152,10 @@ export default function InternAssignmentDetailLayout({
             {workFields}
             <div className="flex flex-wrap gap-3">
               <button type="button" disabled className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white opacity-50 cursor-not-allowed">
-                Save Work to SharePoint
+                Save draft
               </button>
               <button type="button" disabled className="min-h-11 rounded-full bg-emerald-700 px-6 text-sm font-black text-white opacity-50 cursor-not-allowed">
-                Submit to Ava for Review
+                Submit to Ava
               </button>
             </div>
             <p className="text-xs font-semibold text-amber-900">Disabled for administrator previews; no files or assignment statuses can change.</p>
@@ -160,14 +171,17 @@ export default function InternAssignmentDetailLayout({
               <input type="hidden" name="assignmentId" value={task.id} />
               {workFields}
               {canEdit ? (
+                <>
+                <p className="text-xs font-medium text-slate-500">Saving keeps your draft editable. Submitting sends it to Ava and pauses editing until review.</p>
                 <div className="flex flex-wrap gap-3">
                   <button type="submit" name="intent" value="save" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    Save Work to SharePoint
+                    Save draft
                   </button>
                   <button type="submit" name="intent" value="submit" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-emerald-700 px-6 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    Submit to Ava for Review
+                    Submit to Ava
                   </button>
                 </div>
+                </>
               ) : (
                 <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
                   {stage === "submitted_to_ava" ? "Awaiting Ava’s review." : "This assignment is read-only until changes are requested."}
@@ -184,8 +198,9 @@ export default function InternAssignmentDetailLayout({
         ) : null}
       </section>
 
-      <section className={`${DESK_UI.card} p-5`}>
-        <h2 className="text-lg font-black text-slate-950">Microsoft 365 assignment resources</h2>
+      <details className={`${DESK_UI.card} p-5`}>
+        <summary className="cursor-pointer text-base font-black text-slate-950">Extra resources (SharePoint, Teams, Planner) — optional</summary>
+        <p className="mt-2 text-sm text-slate-600">Your assignment can be completed entirely in SitGuru. These links are available if you want them.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-slate-50 p-4">
             <p className="font-black text-slate-950">SharePoint files</p>
@@ -215,7 +230,7 @@ export default function InternAssignmentDetailLayout({
             ) : null}
           </div>
         </div>
-      </section>
+      </details>
 
       {task.supervisorNotes || comments.length ? (
         <section className={`${DESK_UI.card} p-5`}>
