@@ -37,8 +37,6 @@ export default async function InternToolkitPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const access = await requireGrowthWorkplace("intern");
-  if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
   const requested = first(params.tool);
   if (requested === "brand") {
@@ -50,6 +48,8 @@ export default async function InternToolkitPage({
     const qs = next.toString();
     redirect(qs ? `/intern/toolkit/brand?${qs}` : "/intern/toolkit/brand");
   }
+  const access = await requireGrowthWorkplace("intern");
+  if (!access.ok) return access.ui;
   const notice = first(params.ok) || first(params.error);
   const noticeError = Boolean(first(params.error));
   const section = await loadInternSectionWorkspace();
