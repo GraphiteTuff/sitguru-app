@@ -14,6 +14,7 @@ import {
   hasGuruProfilePhoto,
 } from "@/lib/gurus/profile-photo";
 import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
+import { isRemovedGuruAccount } from "@/lib/gurus/removed-account";
 import { supabase } from "@/lib/supabase";
 import {
   companionChatHref,
@@ -2342,6 +2343,7 @@ export default function HomePage() {
           guru.is_active !== false &&
           guru.is_public !== false &&
           hasGuruProfilePhoto(guru) &&
+          !isRemovedGuruAccount(guru) &&
           !excludedHomepageCarouselGuruNames.has(
             normalizeGuruDisplayName(getGuruName(guru)),
           ),
