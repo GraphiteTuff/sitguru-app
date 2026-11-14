@@ -64,7 +64,7 @@ export default async function ManagerCheckInsPage({searchParams}:{
   }));
   const localDate=new Date().toLocaleDateString("en-CA",{timeZone:"America/New_York"});
   const now=new Date(`${localDate}T12:00:00Z`);
-  const summary=buildManagerCheckinSummary({rows,activeInternIds:desk.cards.filter(c=>c.roster==="active").map(c=>c.id),now});
+  const summary=buildManagerCheckinSummary({rows,activeInternIds:desk.cards.filter(c=>c.roster==="active" && c.summary.weekNumber>0).map(c=>c.id),now});
   const params=searchParams?await searchParams:{};
   const first=(value:string|string[]|undefined)=>Array.isArray(value)?value[0]||"":value||"";
   return <ManagerCheckInsHome summary={summary} canCeo={access.actor.isSuperUser} notice={first(params.ok)} error={first(params.error)}/>;
