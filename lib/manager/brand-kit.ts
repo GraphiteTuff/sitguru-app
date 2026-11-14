@@ -120,7 +120,9 @@ export function brandKitCapabilities(actor: BrandActor | null): BrandCapabilitie
   );
   return {
     viewLibrary: editor,
-    viewApproved: editor || Boolean(actor?.intern),
+    // All authorized Admin/Manager/Intern seats see the same published assets.
+    // Management permissions remain role-scoped and never follow from view access.
+    viewApproved: editor || Boolean(actor?.canAccessAdmin) || Boolean(actor?.intern),
     upload: editor,
     edit: editor,
     archive: editor,
