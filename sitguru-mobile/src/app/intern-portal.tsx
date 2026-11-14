@@ -42,6 +42,17 @@ type TaskItem = {
   employerLetter?: string;
 };
 
+type GrowthSummary = {
+  progress: Array<{ label: string; pct: number | null }>;
+  assignmentCount: number;
+  assignmentsDueSoon: number;
+  hoursThisWeek: number;
+  hoursPlanned: number;
+  messages: Array<{ author: string; preview: string }>;
+  upcoming: Array<{ title: string; when: string; kind: string }>;
+};
+type GrowthPayload = { summary?: GrowthSummary; error?: string };
+
 type WorkspacePayload = {
   mode?: 'intern' | 'supervisor';
   onboarded?: boolean;
@@ -72,6 +83,7 @@ function letterColor(letter?: string) {
 export default function InternPortalScreen() {
   const { session, loading } = useAuth();
   const [payload, setPayload] = useState<WorkspacePayload | null>(null);
+  const [growth, setGrowth] = useState<GrowthSummary | null>(null);
   const [onboarding, setOnboarding] = useState<InternOnboardingPayload | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -89,11 +101,13 @@ export default function InternPortalScreen() {
     if (result.error || !result.data) {
       setError(result.error || 'Could not open Intern Portal.');
       setPayload(null);
+      setGrowth(null);
       return;
     }
     setError('');
     setPayload(result.data);
     if (result.data.onboardingRequired) {
+      setGrowth(null);
       const pack = await sitguruApiFetch<InternOnboardingPayload>(
         '/api/internship/onboarding',
       );
@@ -105,6 +119,12 @@ export default function InternPortalScreen() {
       return;
     }
     setOnboarding(null);
+    if (result.data.mode === 'intern') {
+      const latest = await sitguruApiFetch<GrowthPayload>('/api/internship/growth', { cache: 'no-store' });
+      setGrowth(latest.data?.summary || null);
+    } else {
+      setGrowth(null);
+    }
     const firstOpen = result.data.workspace?.tasks?.find(
       (row) => row.status !== 'approved' && row.status !== 'not_accepted',
     );
@@ -235,6 +255,34 @@ export default function InternPortalScreen() {
           </View>
         ) : null}
 
+        {payload?.mode === 'intern' && growth ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Live Growth Workspace</Text>
+            <Text style={styles.body}>
+              {growth.assignmentCount} open assignments · {growth.assignmentsDueSoon} due soon
+            </Text>
+            <Text style={styles.caption}>
+              Hours this week: {growth.hoursThisWeek} / {growth.hoursPlanned > 0 ? growth.hoursPlanned : 'not scheduled'}
+            </Text>
+            {growth.progress.map((item) => (
+              <View key={item.label} style={styles.growthRow}>
+                <Text style={styles.rowTitle}>{item.label}</Text>
+                <Text style={styles.growthValue}>{item.pct == null ? 'Not available' : `${item.pct}%`}</Text>
+              </View>
+            ))}
+            {growth.messages.length > 0 ? (
+              <View style={styles.growthMessages}>
+                <Text style={styles.rowTitle}>Recent team messages</Text>
+                {growth.messages.slice(0, 2).map((message, index) => (
+                  <Text key={`${index}-${message.author}`} style={styles.caption}>
+                    {message.author}: {message.preview}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {standing ? (
           <View style={[styles.card, { borderColor: letterColor(standing.letter) }]}>
             <View style={styles.letterRow}>
@@ -344,6 +392,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   rowTitle: { color: BrandColors.ink, fontSize: 16, fontWeight: '800' },
+  growthRow: { borderTopColor: BrandColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 9 },
+  growthValue: { color: '#1D4ED8', fontSize: 13, fontWeight: '800' },
+  growthMessages: { borderTopColor: BrandColors.border, borderTopWidth: 1, marginTop: 8, paddingTop: 10 },
+
   input: {
     borderColor: BrandColors.border,
     borderRadius: 16,
