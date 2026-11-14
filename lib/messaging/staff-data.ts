@@ -155,6 +155,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
           .filter((message) => text(message.conversation_id) === id)
           .reverse()
           .slice(-150)
+          .filter(message => actor !== "intern" || text(message.visibility) !== "internal_note")
           .filter((message) =>
             visibleMessage({
               visibility: text(message.visibility) === "internal_note" ? "internal_note" : "participant",
