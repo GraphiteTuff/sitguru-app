@@ -87,12 +87,14 @@ export default function InternshipGrowthWorkspace({
   notice,
   preview = false,
   initialTab,
+  embeddedInRecord = false,
 }: {
   data: InternshipWorkspaceData;
   mode: "intern" | "supervisor";
   notice?: { kind: "ok" | "error"; message: string } | null;
   preview?: boolean;
   initialTab?: string;
+  embeddedInRecord?: boolean;
 }) {
   const supervisor = mode === "supervisor";
   const readOnly = preview;
@@ -117,6 +119,7 @@ export default function InternshipGrowthWorkspace({
         </p>
       ) : null}
 
+      {!embeddedInRecord ? (
       <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -196,8 +199,9 @@ export default function InternshipGrowthWorkspace({
           ))}
         </div>
       </section>
+      ) : null}
 
-      <InternshipKpiLetterBoard data={data} />
+      {!embeddedInRecord ? <InternshipKpiLetterBoard data={data} /> : null}
 
       <div
         role="tablist"

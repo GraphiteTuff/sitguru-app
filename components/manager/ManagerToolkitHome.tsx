@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   CalendarDays,
   FolderOpen,
@@ -60,6 +61,7 @@ export default function ManagerToolkitHome({
   assetError,
   stats,
   statsError,
+  sharedAssets,
 }: {
   sections: ToolkitSection[];
   query: string;
@@ -67,6 +69,7 @@ export default function ManagerToolkitHome({
   assetError: string;
   stats: ToolkitLiveTotals | null;
   statsError: string;
+  sharedAssets?: ReactNode;
 }) {
   return (
     <div className="space-y-5 pb-28 lg:pb-8">
@@ -94,6 +97,8 @@ export default function ManagerToolkitHome({
           </div>
         </div>
       </section>
+
+      {sharedAssets}
 
       <form action="/manager/toolkit" method="get" role="search">
         <label className="block">

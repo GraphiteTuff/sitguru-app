@@ -1,19 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft, CreditCard, GraduationCap, Users } from "lucide-react";
 import { getAdminIdentity } from "@/lib/admin/access";
-import {
-  listActiveEngagements,
-  listCompensationRates,
-} from "@/lib/staff-time/engagement";
-import { updateEngagementRate } from "@/lib/staff-time/actions";
+import { listActiveEngagements, listCompensationRates } from "@/lib/staff-time/engagement";
 import { currentRate } from "@/lib/staff-time/rates";
-import { formatUsdFromCents } from "@/lib/staff-time/money";
 import { isoToday } from "@/lib/staff-time/periods";
-import {
-  GrowthCard,
-  GrowthPageFrame,
-  GrowthPrimaryLink,
-} from "@/components/admin/growth/GrowthPageFrame";
+import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
+import StaffPeopleDirectory, { type StaffPeopleRow } from "@/components/admin/hr/StaffPeopleDirectory";
 
 export const dynamic = "force-dynamic";
 
@@ -29,135 +22,81 @@ export default async function AdminPeoplePage({
   const actor = await getAdminIdentity();
   if (!actor?.canAccessAdmin) redirect("/admin/login?next=/admin/hr/people");
   const params = searchParams ? await searchParams : {};
-  const engagements = await listActiveEngagements();
+  const today = isoToday();
 
-  const rows = await Promise.all(
+  const engagements = await listActiveEngagements();
+  const people: StaffPeopleRow[] = await Promise.all(
     engagements.map(async (engagement) => {
       const rates = await listCompensationRates(engagement.id);
-      const rate = currentRate(rates, isoToday());
-      return { engagement, rate };
+      const rate = currentRate(rates, today);
+      return {
+        id: engagement.id,
+        userId: engagement.userId,
+        displayName: engagement.displayName,
+        title: engagement.title,
+        email: engagement.email,
+        classification: engagement.employmentClassification,
+        weeklyMin: engagement.expectedWeeklyMinHours,
+        weeklyMax: engagement.expectedWeeklyMaxHours,
+        cadence: engagement.paymentCadence,
+        startOn: engagement.startOn,
+        w9Status: engagement.w9Status,
+        rateCents: rate?.hourlyRateCents ?? null,
+      };
     }),
   );
 
+  const w9Received = people.filter((person) => person.w9Status === "received").length;
+  const ratesSet = people.filter((person) => person.rateCents != null).length;
+  const classifiedContractors = people.filter((person) => person.classification.toLowerCase() === "contractor").length;
+
   return (
+    <div className="admin-desk-surface">
     <GrowthPageFrame
-      kicker="People & Administration"
+      variant="desk"
+      kicker="Admin HQ · People & Administration"
       title="Team Members"
-      detail="Engagements, rates, W-9 status (status only), and payment oversight. Restricted tax identifiers are never shown here."
+      detail="Review active engagements, compensation setup, W-9 readiness and payment coordination in one organized workspace."
       action={
         <div className="flex flex-wrap gap-2">
-          <GrowthPrimaryLink href="/admin/hr/people/payments">Payments</GrowthPrimaryLink>
-          <Link
-            href="/admin"
-            className="inline-flex min-h-11 items-center rounded-2xl border border-white/40 px-4 text-sm font-black !text-white"
-          >
-            Admin Directory
+          <Link href="/admin/hr" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#0F2744]">
+            <ArrowLeft size={16} aria-hidden="true" /> HR Overview
+          </Link>
+          <Link href="/admin/hr/people/payments" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8]">
+            <CreditCard size={16} aria-hidden="true" /> Payments
           </Link>
         </div>
       }
     >
-      {first(params.ok) ? (
-        <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-950">
-          {first(params.ok)}
-        </p>
-      ) : null}
-      {first(params.error) ? (
-        <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-950">
-          {first(params.error)}
-        </p>
-      ) : null}
-
-      <div className="space-y-4">
-        {rows.map(({ engagement, rate }) => (
-          <GrowthCard key={engagement.id}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black text-slate-950">
-                  {engagement.displayName}
-                </h2>
-                <p className="text-sm font-semibold text-slate-600">
-                  {engagement.title} · {engagement.email}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-700">
-                  Expected {engagement.expectedWeeklyMinHours}–
-                  {engagement.expectedWeeklyMaxHours} hrs/week ·{" "}
-                  {engagement.paymentCadence}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-700">
-                  Current rate{" "}
-                  {rate
-                    ? `${formatUsdFromCents(rate.hourlyRateCents)}/hr`
-                    : "Not set"}{" "}
-                  · W-9 {engagement.w9Status === "received" ? "Received" : "Not on file"}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/admin/growth/preview/${encodeURIComponent(engagement.userId)}`}
-                  className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"
-                >
-                  View Workspace
-                </Link>
-                <Link
-                  href="/admin/hr/people/payments"
-                  className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
-                  style={{ background: "#0D5C3A" }}
-                >
-                  Payments
-                </Link>
-              </div>
-            </div>
-
-            <form
-              action={updateEngagementRate}
-              className="mt-4 grid gap-3 rounded-2xl bg-[#FAF6EE] p-3 md:grid-cols-4"
-            >
-              <input type="hidden" name="engagementId" value={engagement.id} />
-              <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-                New hourly rate
-                <input
-                  name="hourlyRateDollars"
-                  defaultValue={rate ? (rate.hourlyRateCents / 100).toFixed(2) : ""}
-                  placeholder="Agreement rate"
-                  required
-                  className="min-h-11 rounded-2xl border border-emerald-100 px-3 text-sm font-semibold text-slate-900"
-                />
-              </label>
-              <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-                Effective on
-                <input
-                  type="date"
-                  name="effectiveOn"
-                  defaultValue={isoToday()}
-                  className="min-h-11 rounded-2xl border border-emerald-100 px-3 text-sm font-semibold text-slate-900"
-                />
-              </label>
-              <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-800 md:col-span-2">
-                Notes
-                <input
-                  name="notes"
-                  placeholder="Why the rate changed"
-                  className="min-h-11 rounded-2xl border border-emerald-100 px-3 text-sm font-semibold text-slate-900"
-                />
-              </label>
-              <button
-                type="submit"
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900 md:col-span-4 md:justify-self-start"
-              >
-                Save effective-dated rate
-              </button>
-            </form>
-          </GrowthCard>
+      <section aria-label="Team summary" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Active engagements", value: people.length, help: "Team members with active staff engagements", theme: "border-[#DBEAFE] bg-[#EFF6FF] text-[#1D4ED8]" },
+          { label: "Rates configured", value: `${ratesSet}/${people.length}`, help: "Have a current effective hourly rate", theme: "border-[#DCFCE7] bg-[#F0FDF4] text-[#166534]" },
+          { label: "W-9 received", value: `${w9Received}/${people.length}`, help: "Status only; private tax data hidden", theme: "border-[#FFEDD5] bg-[#FFF7ED] text-[#C2410C]" },
+          { label: "Contractor engagements", value: classifiedContractors, help: "Classification from staff engagement records", theme: "border-[#EDE9FE] bg-[#F5F3FF] text-[#6D28D9]" },
+        ].map((stat) => (
+          <article key={stat.label} className={`rounded-2xl border p-4 shadow-sm ${stat.theme}`}>
+            <p className="text-[11px] font-black uppercase tracking-wider">{stat.label}</p>
+            <p className="mt-2 text-3xl font-black">{stat.value}</p>
+            <p className="mt-1 text-xs font-medium text-slate-600">{stat.help}</p>
+          </article>
         ))}
-        {!rows.length ? (
-          <GrowthCard>
-            <p className="text-sm font-semibold text-slate-600">
-              No active team-member engagements yet. Opening My Time as a Growth Manager
-              creates the engagement with configurable weekly range and rate history.
-            </p>
-          </GrowthCard>
-        ) : null}
+      </section>
+
+      {first(params.ok) ? <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{first(params.ok)}</p> : null}
+      {first(params.error) ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-900">{first(params.error)}</p> : null}
+
+      <StaffPeopleDirectory people={people} today={today} />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link href="/admin/internship/interns" className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] shadow-sm hover:bg-[#EFF6FF]">
+          <GraduationCap className="text-[#2563EB]" size={19} aria-hidden="true" /> Manage student interns
+        </Link>
+        <Link href="/admin/hr" className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] shadow-sm hover:bg-[#EFF6FF]">
+          <Users className="text-[#0D5C3A]" size={19} aria-hidden="true" /> Full HR workforce directory
+        </Link>
       </div>
     </GrowthPageFrame>
+    </div>
   );
 }

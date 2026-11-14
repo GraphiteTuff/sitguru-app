@@ -46,7 +46,7 @@ function libraryQuery(input: {
   status?: string;
   sort?: string;
   page?: number;
-}) {
+}, baseHref = "/manager/toolkit/brand") {
   const params = new URLSearchParams();
   if (input.q) params.set("q", input.q);
   if (input.category) params.set("category", input.category);
@@ -54,7 +54,7 @@ function libraryQuery(input: {
   if (input.sort && input.sort !== "approved_first") params.set("sort", input.sort);
   if (input.page && input.page > 1) params.set("page", String(input.page));
   const query = params.toString();
-  return query ? `/manager/toolkit/brand?${query}` : "/manager/toolkit/brand";
+  return query ? `${baseHref}?${query}` : baseHref;
 }
 
 function uploadThroughSitGuru(
@@ -187,6 +187,7 @@ export default function BrandKitManager({
   status,
   sort,
   sharePointHref,
+  baseHref = "/manager/toolkit/brand",
 }: {
   assets: BrandAssetRecord[];
   total: number;
@@ -200,6 +201,7 @@ export default function BrandKitManager({
   status: string;
   sort: string;
   sharePointHref: string;
+  baseHref?: string;
 }) {
   const router = useRouter();
   const pulse = usePawPulse();
@@ -251,11 +253,16 @@ export default function BrandKitManager({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-slate-600">
           {total} {total === 1 ? "file" : "files"}
-          {isSuperUser
-            ? ". Approved files lead the library. Drafts, pending review, and the archive stay in the status filter."
-            : ". Approved files are shown for the team. A Super Admin reviews drafts before they appear here."}
+          {capabilities.approve
+            ? ". Approved assets are visible to everyone. Use Pending review to approve intern submissions."
+            : ". Approved assets are shared across the team. New submissions go to Ava for review."}
         </p>
         <div className="flex flex-wrap gap-2">
+          {capabilities.approve ? (
+            <a href={libraryQuery({ status: "pending_review" }, baseHref)} className="inline-flex min-h-11 items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#1D4ED8]">
+              Pending Ava review
+            </a>
+          ) : null}
           {capabilities.upload ? (
             <button
               type="button"
@@ -286,7 +293,7 @@ export default function BrandKitManager({
         </div>
       </div>
 
-      <form action="/manager/toolkit/brand" method="get" className={`${filtersOpen ? "grid" : "hidden"} gap-3 md:grid md:grid-cols-4`}>
+      <form action={baseHref} method="get" className={`${filtersOpen ? "grid" : "hidden"} gap-3 md:grid md:grid-cols-4`}>
         <label className="block md:col-span-2">
           <span className="sr-only">Search brand assets</span>
           <input className={fieldClass} name="q" defaultValue={query} placeholder="Search logos, graphics, and files" />
@@ -300,7 +307,7 @@ export default function BrandKitManager({
             ))}
           </select>
         </label>
-        {isSuperUser ? (
+        {capabilities.approve ? (
           <label className="block">
             <span className="sr-only">Approval status</span>
             <select className={fieldClass} name="status" defaultValue={status || "active"}>
@@ -375,11 +382,11 @@ export default function BrandKitManager({
 
       {pages > 1 ? (
         <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Brand asset pages">
-          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page <= 1 ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page - 1 })}>
+          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page <= 1 ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page - 1 }, baseHref)}>
             Previous page
           </a>
           <p className="text-sm font-semibold text-slate-600">Page {page} of {pages}</p>
-          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page >= pages ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page + 1 })}>
+          <a className={`inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold ${page >= pages ? "pointer-events-none opacity-40" : "text-[#0F2744]"}`} href={libraryQuery({ ...filters, page: page + 1 }, baseHref)}>
             Next page
           </a>
         </nav>
@@ -401,7 +408,7 @@ export default function BrandKitManager({
       {uploadOpen ? (
         <UploadDialog
           capabilities={capabilities}
-          isSuperUser={isSuperUser}
+          canApprove={capabilities.approve}
           onClose={() => setUploadOpen(false)}
           onDone={(message) => {
             setUploadOpen(false);
@@ -449,13 +456,13 @@ function Preview({ asset, compact }: { asset: BrandAssetRecord; compact?: boolea
 }
 
 function UploadDialog({
-  isSuperUser,
+  canApprove,
   onClose,
   onDone,
   onError,
 }: {
   capabilities: Capabilities;
-  isSuperUser: boolean;
+  canApprove: boolean;
   onClose: () => void;
   onDone: (message: string) => void;
   onError: (message: string) => void;
@@ -484,9 +491,9 @@ function UploadDialog({
       }
       pulse.succeed(pulseId, "Brand file saved.");
       onDone(
-        isSuperUser
-          ? "Saved. It stays a draft until you approve it."
-          : "Saved as a draft. It appears in the team library after a Super Admin approves it.",
+        canApprove
+          ? "Uploaded and approved automatically. The asset is now available to the team."
+          : "Asset submitted for Ava's review. It becomes available to the team after approval.",
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed.";

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
 import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import type { InternBrandCard } from "@/components/internship/InternBrandLibrary";
@@ -7,6 +8,7 @@ import {
 } from "@/lib/admin/growth/outcomes";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import InternToolkitHome from "@/components/internship/InternToolkitHome";
+import SharedTeamToolkitAssets from "@/components/portal/SharedTeamToolkitAssets";
 import InternToolkitToolView from "@/components/internship/InternToolkitToolView";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
@@ -39,6 +41,15 @@ export default async function InternToolkitPage({
   if (!access.ok) return access.ui;
   const params = searchParams ? await searchParams : {};
   const requested = first(params.tool);
+  if (requested === "brand") {
+    const next = new URLSearchParams();
+    for (const field of ["q", "category", "sort", "page"]) {
+      const value = first(params[field]).slice(0, 120);
+      if (value) next.set(field, value);
+    }
+    const qs = next.toString();
+    redirect(qs ? `/intern/toolkit/brand?${qs}` : "/intern/toolkit/brand");
+  }
   const notice = first(params.ok) || first(params.error);
   const noticeError = Boolean(first(params.error));
   const section = await loadInternSectionWorkspace();
@@ -129,6 +140,11 @@ export default async function InternToolkitPage({
     );
   }
 
+  const brandActor = await resolveBrandActor();
+  const approved = brandActor?.capabilities.viewApproved
+    ? await listBrandAssets({ actor: brandActor, status: "approved", pageSize: 6 })
+    : { assets: [], total: 0, error: "Approved brand files require a completed internship onboarding." };
+
   const [stats, events, campaigns, initiatives, insights] = await Promise.all([
     getGrowthHomeStats(),
     listInternPromoteEvents(),
@@ -145,6 +161,7 @@ export default async function InternToolkitPage({
       campaigns={campaigns}
       initiatives={initiatives}
       insight={insights[0] || null}
+      sharedAssets={<SharedTeamToolkitAssets role="intern" assets={approved.assets} total={approved.total} error={approved.error} />}
     />
   );
 }

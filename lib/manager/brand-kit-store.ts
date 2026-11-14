@@ -1,7 +1,7 @@
 import { getAdminIdentity } from "@/lib/admin/access";
-import { canUseGrowthPortal } from "@/lib/admin/growth/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
   BRAND_KIT_BUCKET,
   assessBrandUploadClaim,
@@ -10,6 +10,8 @@ import {
   brandPreviewKind,
   inspectBrandBytes,
   BRAND_UPLOAD_STATUS,
+  BRAND_INITIAL_APPROVAL_CUTOFF_UTC,
+  brandSubmissionStatus,
   brandAssetMatchesCategory,
   isBrandCategory,
   isBrandStatus,
@@ -91,12 +93,13 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
   if (!user) return null;
 
   const admin = await getAdminIdentity();
-  if (admin && canUseGrowthPortal(admin)) {
+  if (admin?.canAccessAdmin) {
     const actor: BrandActor = {
       canAccessAdmin: true,
       isSuperUser: admin.isSuperUser,
       growthOnly: isGrowthOnlyRole(admin.role),
       intern: false,
+      brandApprover: String(user.email || "").trim().toLowerCase() === "ava@sitguru.com",
     };
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -114,6 +117,9 @@ export async function resolveBrandActor(): Promise<ResolvedBrandActor | null> {
 
   const intern = await findInternByAccount({ userId: user.id, email: user.email });
   if (!intern?.userId) return null;
+  // Match the Intern Portal gate: unpublished or unsigned intern accounts cannot download brand files.
+  const onboarding = await getInternOnboarding(intern.id);
+  if (!internOnboardingComplete(onboarding)) return null;
   const actor: BrandActor = {
     canAccessAdmin: false,
     isSuperUser: false,
@@ -166,8 +172,9 @@ export async function listBrandAssets(input: {
   if (!editor && !input.actor.capabilities.viewApproved) {
     return { assets: [] as BrandAssetRecord[], error: "Not allowed.", page: 1, pages: 1, total: 0 };
   }
+  const reviewer = input.actor.capabilities.approve;
   const status = resolveBrandLibraryStatus({
-    isSuperUser: input.actor.isSuperUser,
+    isSuperUser: reviewer,
     status: input.status,
   });
   let query = supabaseAdmin
@@ -177,7 +184,7 @@ export async function listBrandAssets(input: {
     )
     .eq("verified", true)
     .limit(500);
-  if (!input.actor.isSuperUser) query = query.eq("approval_status", "approved");
+  if (!reviewer) query = query.eq("approval_status", "approved");
   else if (status !== "all" && status !== "active") query = query.eq("approval_status", status);
   else if (status === "active") query = query.neq("approval_status", "archived");
   const { data, error } = await query;
@@ -200,6 +207,87 @@ export async function listBrandAssets(input: {
     input.pageSize,
   );
   return { assets: page.assets, error: "", page: page.page, pages: page.pages, total: page.total };
+}
+
+/**
+ * Founder-approved, bounded historical backfill.
+ * Excludes unverified uploads, archived files, and every file submitted after
+ * the snapshot cutoff so newer intern work can never bypass Ava's review.
+ */
+/** An intern may view the status of their own submissions, never another intern's work. */
+export async function listOwnBrandSubmissions(actor: ResolvedBrandActor) {
+  if (!actor.intern) return [] as Array<{ id: string; title: string; status: string; submittedAt: string }>;
+  const { data, error } = await supabaseAdmin
+    .from("growth_brand_assets")
+    .select("id,title,approval_status,created_at")
+    .eq("uploaded_by", actor.id)
+    .eq("verified", true)
+    .order("created_at", { ascending: false })
+    .limit(25);
+  if (error) return [] as Array<{ id: string; title: string; status: string; submittedAt: string }>;
+  return (data || []).map((row) => ({
+    id: String(row.id),
+    title: String(row.title),
+    status: String(row.approval_status),
+    submittedAt: String(row.created_at || ""),
+  }));
+}
+
+export async function countInitialBrandAssetsToApprove(actor: ResolvedBrandActor) {
+  if (!actor.isSuperUser) return { count: 0, error: "Super Admin access required." };
+  const { count, error } = await supabaseAdmin
+    .from("growth_brand_assets")
+    .select("id", { count: "exact", head: true })
+    .eq("verified", true)
+    .in("approval_status", ["draft", "pending_review"])
+    .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC);
+  return { count: count || 0, error: error ? libraryError(error) : "" };
+}
+
+export async function approveInitialBrandAssets(actor: ResolvedBrandActor) {
+  if (!actor.isSuperUser) return { approved: 0, error: "Super Admin access required." };
+  let approved = 0;
+  // Bounded batches allow a safe retry, with a guard against unbounded work.
+  for (let batch = 0; batch < 40; batch += 1) {
+    const { data: pending, error: lookupError } = await supabaseAdmin
+      .from("growth_brand_assets")
+      .select("id,title")
+      .eq("verified", true)
+      .in("approval_status", ["draft", "pending_review"])
+      .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC)
+      .order("created_at", { ascending: true })
+      .limit(50);
+    if (lookupError) return { approved, error: libraryError(lookupError) };
+    if (!pending?.length) return { approved, error: "" };
+    const ids = pending.map((asset) => asset.id);
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("growth_brand_assets")
+      .update({
+        approval_status: "approved",
+        updated_at: new Date().toISOString(),
+        updated_by: actor.id,
+      })
+      .in("id", ids)
+      .eq("verified", true)
+      .in("approval_status", ["draft", "pending_review"])
+      .lte("created_at", BRAND_INITIAL_APPROVAL_CUTOFF_UTC)
+      .select("id,title");
+    if (updateError) return { approved, error: libraryError(updateError) };
+    if (updated?.length) {
+      const { error: auditError } = await supabaseAdmin
+        .from("growth_brand_asset_events")
+        .insert(updated.map((asset) => ({
+          asset_id: asset.id,
+          asset_title: String(asset.title).slice(0, 180),
+          actor_id: actor.id,
+          action: "approval",
+          detail: "Founder-directed approval of verified assets existing at initial Nov 13 snapshot",
+        })));
+      approved += updated.length;
+      if (auditError) return { approved, error: "Assets were approved, but their audit entries need reconciliation." };
+    }
+  }
+  return { approved, error: "Approval exceeded batch limit. Run again to finish remaining verified assets." };
 }
 
 export async function prepareBrandUpload(input: {
@@ -329,7 +417,7 @@ export async function saveBrandFile(input: {
     description: sanitizeBrandText(input.description, 2000),
     category: input.category,
     tags: sanitizeBrandTags(input.tags),
-    approval_status: BRAND_UPLOAD_STATUS,
+    approval_status: brandSubmissionStatus(input.actor),
     file_name: inspected.safeName,
     mime_type: inspected.mime,
     file_size: input.bytes.byteLength,
@@ -353,6 +441,12 @@ export async function saveBrandFile(input: {
     action: "created",
     detail: inspected.safeName,
   });
+  if (brandSubmissionStatus(input.actor) === "approved") {
+    await recordEvent({
+      assetId: id, title, actorId: input.actor.id,
+      action: "approval", detail: "Auto-approved because the creator is an authorized brand approver",
+    });
+  }
   return { error: "", id };
 }
 
@@ -402,6 +496,7 @@ export async function verifyBrandUpload(input: { actor: ResolvedBrandActor; id: 
     .from("growth_brand_assets")
     .update({
       verified: true,
+      approval_status: brandSubmissionStatus(input.actor),
       mime_type: inspected.mime,
       file_size: length || row.file_size,
       updated_at: new Date().toISOString(),
@@ -416,6 +511,12 @@ export async function verifyBrandUpload(input: { actor: ResolvedBrandActor; id: 
     action: "created",
     detail: row.file_name,
   });
+  if (brandSubmissionStatus(input.actor) === "approved") {
+    await recordEvent({
+      assetId: row.id, title: row.title, actorId: input.actor.id,
+      action: "approval", detail: "Auto-approved after verified upload by an authorized brand approver",
+    });
+  }
   return { error: "", id: row.id };
 }
 
@@ -484,7 +585,7 @@ export async function updateBrandAsset(input: {
   if (input.approvalStatus !== undefined) {
     if (!isBrandStatus(input.approvalStatus)) return { error: "Choose a valid status." };
     if (input.approvalStatus === "approved" && !input.actor.capabilities.approve) {
-      return { error: "A Super Admin approves brand files." };
+      return { error: "Only Ava or a Super Admin may approve brand files." };
     }
     if (input.approvalStatus === "archived" && !input.actor.capabilities.archive) {
       return { error: "You cannot archive this file." };
@@ -547,12 +648,16 @@ export async function deleteBrandAsset(input: { actor: ResolvedBrandActor; id: s
 export async function openBrandAssetFile(input: { actor: ResolvedBrandActor; id: string; download?: boolean }) {
   const { data: row } = await supabaseAdmin
     .from("growth_brand_assets")
-    .select("id,title,file_name,mime_type,approval_status,storage_path,verified")
+    .select("id,title,file_name,mime_type,approval_status,storage_path,verified,uploaded_by")
     .eq("id", input.id)
     .maybeSingle();
   if (!row || !row.verified) return { error: "File not found.", status: 404 as const };
-  const editor = input.actor.capabilities.viewLibrary;
-  if (!editor && (row.approval_status !== "approved" || !input.actor.capabilities.viewApproved)) {
+  if (row.approval_status === "approved") {
+    if (!input.actor.capabilities.viewApproved) return { error: "Not allowed.", status: 403 as const };
+  } else if (
+    !input.actor.capabilities.approve &&
+    !(input.actor.capabilities.edit && row.uploaded_by === input.actor.id)
+  ) {
     return { error: "Not allowed.", status: 403 as const };
   }
   const fileName = brandDownloadFileName(row.file_name);

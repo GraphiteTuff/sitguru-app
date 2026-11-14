@@ -1,4 +1,5 @@
 import ManagerToolkitHome from "@/components/manager/ManagerToolkitHome";
+import SharedTeamToolkitAssets from "@/components/portal/SharedTeamToolkitAssets";
 import { getGrowthHomeStats } from "@/lib/admin/growth/data";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
@@ -56,6 +57,10 @@ export default async function ManagerToolkitPage({
     }));
   }
 
+  const approved = actor?.capabilities.viewApproved
+    ? await listBrandAssets({ actor, status: "approved", pageSize: 6 })
+    : { assets: [], total: 0, error: "Approved assets are not available on this account." };
+
   return (
     <ManagerToolkitHome
       sections={sections}
@@ -64,6 +69,7 @@ export default async function ManagerToolkitPage({
       assetError={assetError}
       stats={stats}
       statsError={statsError}
+      sharedAssets={<SharedTeamToolkitAssets role="manager" assets={approved.assets} total={approved.total} error={approved.error} />}
     />
   );
 }
