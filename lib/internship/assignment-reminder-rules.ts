@@ -29,8 +29,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function parseAssignmentReminderSettings(briefPayload: unknown): AssignmentReminderSettings {
   const raw = isRecord(briefPayload) && isRecord(briefPayload.managerAutomation)
     ? briefPayload.managerAutomation : {};
-  const days = Array.isArray(raw.daysBefore)
-    ? REMINDER_DAY_OPTIONS.filter((day) => raw.daysBefore.includes(day))
+  const rawDays = Array.isArray(raw.daysBefore) ? raw.daysBefore : null;
+  const days = rawDays
+    ? REMINDER_DAY_OPTIONS.filter((day) => rawDays.includes(day))
     : DEFAULT_ASSIGNMENT_REMINDERS.daysBefore;
   return {
     enabled: raw.enabled === true,
