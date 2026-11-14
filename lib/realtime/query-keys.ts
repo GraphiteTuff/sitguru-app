@@ -30,6 +30,8 @@ export const WORKSPACE_REFRESH_PATHS = {
   managerPortal: "/manager",
   managerInsights: "/manager/insights",
   internGrowth: "/intern/growth",
+  internCheckins: "/intern/check-ins",
+  managerCheckins: "/manager/check-ins",
   internInsights: "/intern/insights",
   internHelp: "/intern/help",
   internOnboarding: "/intern/onboarding",
@@ -49,6 +51,8 @@ export function pathsForInternWorkspace() {
   return [
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.internGrowth,
+    WORKSPACE_REFRESH_PATHS.internCheckins,
+    WORKSPACE_REFRESH_PATHS.managerCheckins,
     WORKSPACE_REFRESH_PATHS.internInsights,
     WORKSPACE_REFRESH_PATHS.adminGrowth,
     WORKSPACE_REFRESH_PATHS.adminGrowthInsights,
