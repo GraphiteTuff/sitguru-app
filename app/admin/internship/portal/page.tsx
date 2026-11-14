@@ -22,6 +22,7 @@ export default async function InternshipPortalAccessPage() {
   return (
     <main className="mx-auto max-w-6xl space-y-5 px-4 pb-8">
       <h1 className="text-3xl font-black text-slate-950">Intern Portal</h1>
+      <Link href="/admin/internship/planner-setup" className="inline-flex min-h-11 items-center rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-800 hover:bg-blue-100">Microsoft Planner setup & test</Link>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
         Select an intern to inspect their real assignments in a secure read-only preview. You can also open their existing student dashboard or employer review without signing in as the intern.
       </p>
