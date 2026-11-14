@@ -3,6 +3,7 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
+import { findInternByAccount } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -30,16 +31,20 @@ export async function GET(request: Request) {
   if (!owned) return NextResponse.json({ messages: [] }, { status: 403 });
   const { data } = await supabaseAdmin
     .from("messages")
-    .select("id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,created_at")
+    .select("id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at")
     .eq("conversation_id", id)
-    .order("created_at", { ascending: true })
-    .limit(200);
-  const senderIds = [...new Set(((data || []) as { sender_id?: string }[]).map((row) => text(row.sender_id)).filter(Boolean))];
+    .order("created_at", { ascending: false })
+    .limit(150);
+  const intern = await findInternByAccount({ userId, email: user?.email });
+  const visibleRows = ((data || []) as Record<string, unknown>[])
+    .filter(row => !intern || admin?.isSuperUser || text(row.visibility) !== "internal_note")
+    .reverse();
+  const senderIds = [...new Set(visibleRows.map(row => text(row.sender_id)).filter(Boolean))];
   const { data: profiles } = senderIds.length
     ? await supabaseAdmin.from("profiles").select("id,first_name,full_name,avatar_url,profile_photo_url,photo_url,image_url").in("id", senderIds)
     : { data: [] };
   const people = new Map(((profiles || []) as Record<string, unknown>[]).map((row) => [text(row.id), row]));
-  const messages = ((data || []) as Record<string, unknown>[]).map((row) => {
+  const messages = visibleRows.map((row) => {
     const person = people.get(text(row.sender_id));
     const name = text(person?.first_name) || text(person?.full_name).split(/\s+/)[0] || text(row.sender_name_snapshot) || "SitGuru";
     return {
@@ -50,7 +55,12 @@ export async function GET(request: Request) {
       createdAt: text(row.created_at),
       internal: text(row.visibility) === "internal_note",
       own: text(row.sender_id) === userId,
-      attachments: [] as { url: string; mimeType: string; name: string }[],
+      attachments: (Array.isArray(row.media_urls) ? row.media_urls : [])
+        .map((url, index) => ({
+          url: String(url),
+          mimeType: String(Array.isArray(row.media_mime_types) ? row.media_mime_types[index] || "" : ""),
+          name: "Attachment",
+        })),
     };
   });
   return NextResponse.json({ messages });
