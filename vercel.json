@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
+  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" && \"$VERCEL_GIT_COMMIT_REF\" != \"feature/manager-planner-reminders-20261114\" ]]'",
   "crons": [
     {
       "path": "/api/cron/profile-completion-reminders",
@@ -13,6 +13,11 @@
     {
       "path": "/api/cron/sync-google-community-events",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/internship-assignment-reminders",
+      "schedule": "0 14 * * *"
     }
-  ]
+  ],
+  "buildCommand": "npx tsx --test lib/internship/assignment-reminder-rules.test.ts && npm run build"
 }
