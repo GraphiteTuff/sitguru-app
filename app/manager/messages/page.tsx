@@ -16,13 +16,16 @@ export default async function ManagerMessagesPage({
   const params = searchParams ? await searchParams : {};
   const notice = Array.isArray(params.ok) ? params.ok[0] : params.ok || "";
   const error = Array.isArray(params.error) ? params.error[0] : params.error || "";
+  const initialConversationId = Array.isArray(params.c) ? params.c[0] : params.c || "";
   const admin = await getAdminIdentity();
   const kind = internshipActorKind({ role: admin?.role, isSuperUser: admin?.isSuperUser });
   const seeAll = kind === "supervisor" || Boolean(admin?.isSuperUser);
+  let inboxLoadError = false;
   let inbox = { me: { firstName: "You", avatarUrl: "" }, conversations: [] as Awaited<ReturnType<typeof loadStaffInbox>>["conversations"] };
   try {
     inbox = await loadStaffInbox(access.actor.id, seeAll);
   } catch (loadError) {
+    inboxLoadError = true;
     console.error("Manager messages could not be loaded", loadError);
   }
 
@@ -32,8 +35,9 @@ export default async function ManagerMessagesPage({
       conversations={inbox.conversations}
       showAdminRecord={access.actor.isSuperUser}
       returnTo="/manager/messages"
-      notice={error || notice || null}
-      noticeError={Boolean(error)}
+      notice={error || (inboxLoadError ? "Your inbox could not be loaded. Refresh to try again; no conversations were changed." : notice) || null}
+      noticeError={Boolean(error) || inboxLoadError}
+      initialConversationId={initialConversationId}
     />
   );
 }

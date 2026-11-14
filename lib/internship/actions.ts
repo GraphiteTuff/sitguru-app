@@ -118,6 +118,8 @@ function refreshInternship(extra?: string) {
   revalidatePath("/intern/check-ins");
   revalidatePath("/intern/growth");
   revalidatePath("/manager/check-ins");
+  revalidatePath("/manager/milestones");
+  revalidatePath("/intern/milestones");
   revalidatePath("/manager/insights");
   revalidatePath("/admin/growth/insights");
   revalidatePath(INTERNSHIP_ONBOARDING_PATH);

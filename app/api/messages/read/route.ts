@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { markConversationReadForUser } from "@/lib/messaging/mark-conversation-read";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verify ownership before mutating shared read flags on a thread.
+    const [{ data: membership }, { data: ownership }] = await Promise.all([
+      supabaseAdmin.from("conversation_participants")
+        .select("user_id").eq("conversation_id", conversationId).eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("conversations")
+        .select("id").eq("id", conversationId)
+        .or("started_by_user_id.eq." + user.id + ",assigned_user_id.eq." + user.id).maybeSingle(),
+    ]);
+    if (!membership?.user_id && !ownership?.id) {
+      return NextResponse.json({ error: "This conversation is not assigned to you." }, { status: 403 });
+    }
     const result = await markConversationReadForUser(conversationId, user.id);
 
     return NextResponse.json({

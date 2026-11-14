@@ -33,13 +33,33 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
     .eq("user_id", userId)
     .limit(80);
   const memberIds = ((memberships || []) as Record<string, unknown>[]).map((row) => text(row.conversation_id)).filter(Boolean);
-  const { data, error } = await supabaseAdmin
+  // Filter to this user's real conversations in SQL first. A global 80-row
+  // limit before filtering silently hides older assigned team conversations.
+  const scoped = founder && actor !== "intern"
+    ? []
+    : [
+        ...memberIds,
+        ...((await Promise.all([
+          supabaseAdmin.from("conversations").select("id").eq("started_by_user_id", userId).limit(100),
+          supabaseAdmin.from("conversations").select("id").eq("assigned_user_id", userId).limit(100),
+        ])).flatMap(result => (result.data || []).map(row => text(row.id)))),
+      ];
+  const scopedIds = [...new Set(scoped.filter(Boolean))];
+  let conversationsQuery = supabaseAdmin
     .from("conversations")
     .select("id,subject,conversation_type,workflow_status,last_message_preview,assigned_user_id,started_by_user_id,updated_at")
     .neq("conversation_type", "marketplace")
     .order("updated_at", { ascending: false })
-    .limit(80);
-  if (error) return { conversations: [] as InboxConversation[], me: { firstName: "You", avatarUrl: "" } };
+    .limit(120);
+  if ((!founder || actor === "intern") && scopedIds.length === 0) {
+    return { conversations: [] as InboxConversation[], me: { firstName: "You", avatarUrl: "" } };
+  }
+  if (!founder || actor === "intern") conversationsQuery = conversationsQuery.in("id", scopedIds);
+  const { data, error } = await conversationsQuery;
+  if (error) {
+    console.error("[messaging] Cannot load assigned conversations", error.message);
+    throw new Error("Assigned conversations are temporarily unavailable.");
+  }
   const rows = ((data || []) as Record<string, unknown>[]).filter((row) => {
     const id = text(row.id);
     if (founder && actor !== "intern") return true;
@@ -52,7 +72,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
       participantIds: memberIds.includes(id) || text(row.started_by_user_id) === userId ? [userId] : [],
       assignedUserId: text(row.assigned_user_id),
     });
-  }).slice(0, 40);
+  }).slice(0, 80);
   const ids = rows.map((row) => text(row.id)).filter(Boolean);
   const { data: participants } = ids.length
     ? await supabaseAdmin.from("conversation_participants").select("conversation_id,user_id").in("conversation_id", ids)
@@ -62,14 +82,15 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
         .from("messages")
         .select("id,conversation_id,sender_id,body,content,visibility,sender_name_snapshot,deleted_at,media_urls,media_mime_types,created_at,is_read,read_at,status")
         .in("conversation_id", ids)
-        .order("created_at", { ascending: true })
-        .limit(200)
+        .order("created_at", { ascending: false })
+        .limit(1200)
     : { data: [] };
   const senderIds = [
     ...new Set(
       ((messages || []) as Record<string, unknown>[])
         .map((row) => text(row.sender_id))
         .concat(((participants || []) as Record<string, unknown>[]).map((row) => text(row.user_id)))
+        .concat(rows.flatMap(row => [text(row.started_by_user_id), text(row.assigned_user_id)]))
         .concat(userId)
         .filter(Boolean),
     ),
@@ -104,10 +125,21 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
     conversations: rows.map((row) => {
       const id = text(row.id);
       const type = text(row.conversation_type) || "internal_direct";
-      const peer = people.get(peers.get(id)?.[0] || "");
+      const fallbackPeer = [text(row.assigned_user_id), text(row.started_by_user_id)]
+        .find(candidate => candidate && candidate !== userId) || "";
+      const peer = people.get(peers.get(id)?.[0] || fallbackPeer);
       const subjectName =
         peer?.firstName ||
         chatDisplayName({ fullName: text(row.subject), fallback: "Conversation" });
+      const lastInternVisibleMessage = actor === "intern"
+        ? ((messages || []) as Record<string, unknown>[]).find(message =>
+            text(message.conversation_id) === id && text(message.visibility) !== "internal_note")
+        : null;
+      const safePreview = actor === "intern"
+        ? lastInternVisibleMessage
+          ? (lastInternVisibleMessage.deleted_at ? "Message removed" : text(lastInternVisibleMessage.body || lastInternVisibleMessage.content))
+          : ""
+        : text(row.last_message_preview);
       return {
         id,
         subject: subjectName,
@@ -116,7 +148,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
         fullSubject: text(row.subject) || "Conversation",
         typeLabel: type.replaceAll("_", " "),
         statusLabel: text(row.workflow_status) || "open",
-        preview: text(row.last_message_preview),
+        preview: safePreview,
         updatedAt: text(row.updated_at),
         unreadCount: ((messages || []) as Record<string, unknown>[])
           .filter((message) => text(message.conversation_id) === id)
@@ -131,6 +163,9 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
           .length,
         messages: ((messages || []) as Record<string, unknown>[])
           .filter((message) => text(message.conversation_id) === id)
+          .reverse()
+          .slice(-150)
+          .filter(message => actor !== "intern" || text(message.visibility) !== "internal_note")
           .filter((message) =>
             visibleMessage({
               visibility: text(message.visibility) === "internal_note" ? "internal_note" : "participant",
@@ -143,6 +178,7 @@ export async function loadStaffInbox(userId: string, founder: boolean, audience:
             const types = Array.isArray(message.media_mime_types) ? message.media_mime_types : [];
             return {
               id: text(message.id),
+              own: text(message.sender_id) === userId,
               internal: text(message.visibility) === "internal_note",
               author:
                 person?.firstName ||
@@ -194,6 +230,7 @@ type InboxConversation = {
   unreadCount?: number;
   messages: {
     id: string;
+    own: boolean;
     internal: boolean;
     author: string;
     avatarUrl: string;

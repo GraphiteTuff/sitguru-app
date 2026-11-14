@@ -4,7 +4,7 @@ import { MANAGER_HELP_ARTICLES, MANAGER_HELP_CATEGORIES, managerHelpArticle } fr
 import { searchManagerHelp, MANAGER_HELP_POPULAR_QUESTIONS } from "./manager-help-search";
 
 test("manager help has substantive, unique and actionable guides",()=>{
-  assert.ok(MANAGER_HELP_ARTICLES.length>=35);
+  assert.ok(MANAGER_HELP_ARTICLES.length>=40);
   assert.equal(new Set(MANAGER_HELP_ARTICLES.map(x=>x.slug)).size,MANAGER_HELP_ARTICLES.length);
   assert.equal(MANAGER_HELP_CATEGORIES.length,8);
   for(const article of MANAGER_HELP_ARTICLES){
@@ -24,6 +24,8 @@ test("natural-language manager questions find the right procedure",()=>{
     ["where to download logo and brand colors","brand-kit"],
     ["How to pay Ava from submitted hours","manager-own-hours"],
     ["planner teams sharepoint not syncing","teams-planner"],
+    ["How do I send Lola an attachment in team messages?","team-messaging"],
+    ["How do I see milestones for my intern at Saint Josephs University?","program-milestones"],
   ];
   for(const [question,expected] of cases){
     const hits=searchManagerHelp(question);
