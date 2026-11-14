@@ -75,11 +75,13 @@ export default function InternshipSyllabusEnhancements({
   cohortName,
   projects,
   unmappedAssignments,
+  auditAvailable,
 }: {
   academicRows: SyllabusAcademicRow[];
   cohortName: string;
   projects: InternshipProject[];
   unmappedAssignments: SyllabusUnmappedAssignment[];
+  auditAvailable: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -232,7 +234,7 @@ export default function InternshipSyllabusEnhancements({
         </div>
       </section>
 
-      <InternshipSyllabusAlignmentSection projects={projects} unmappedAssignments={unmappedAssignments} />
+      <InternshipSyllabusAlignmentSection projects={projects} unmappedAssignments={unmappedAssignments} auditAvailable={auditAvailable} />
 
       <section id="program-academic" className={section}>
         <SectionHeader
