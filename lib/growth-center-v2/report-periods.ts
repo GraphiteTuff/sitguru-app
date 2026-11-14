@@ -1,4 +1,4 @@
-import { zonedLocalToUtc, zonedParts } from "./date-range";
+import { zonedParts } from "./date-range";
 import type { GrowthCenterFilters } from "./types";
 
 export type ReportCadence = "daily" | "weekly" | "monthly";
@@ -39,8 +39,19 @@ function monthLast(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12));
 }
 
+/** Exact local midnight in Eastern Time, including DST transitions. */
 function localMidnight(date: Date) {
-  return zonedLocalToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 0, 0, 0, TZ).toISOString();
+  const midnightAsUtc = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  let instant = new Date(midnightAsUtc);
+  // Iterate the time-zone offset, rather than subtracting it twice.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = zonedParts(instant, TZ);
+    const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    const correction = midnightAsUtc - localAsUtc;
+    if (correction === 0) break;
+    instant = new Date(instant.getTime() + correction);
+  }
+  return instant.toISOString();
 }
 
 function todayInNewYork(now: Date) {
