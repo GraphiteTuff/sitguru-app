@@ -12,9 +12,11 @@ export type SyllabusUnmappedAssignment = {
 export default function InternshipSyllabusAlignmentSection({
   projects,
   unmappedAssignments,
+  auditAvailable,
 }: {
   projects: InternshipProject[];
   unmappedAssignments: SyllabusUnmappedAssignment[];
+  auditAvailable: boolean;
 }) {
   return (
     <section id="program-final-project" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -97,8 +99,10 @@ export default function InternshipSyllabusAlignmentSection({
           <h3 className="font-black text-slate-950">Check existing assignment-to-final-project mapping</h3>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-700">
-          {unmappedAssignments.length === 0
-            ? "All published assignments visible in this cohort have a mapped final-project chapter."
+          {!auditAvailable
+            ? "Assignment mapping audit is unavailable. Check the active cohort and assignment records."
+            : unmappedAssignments.length === 0
+              ? "All published assignments visible in this cohort have a mapped final-project chapter."
             : String(unmappedAssignments.length) + " existing published assignments need a final-project chapter. Ava can open each in Manager Assignments, select the correct chapter, and save. Existing submitted work is preserved."}
         </p>
         {unmappedAssignments.length ? (
