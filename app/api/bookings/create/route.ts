@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isRemovedGuruAccount, isRemovedGuruProfileIdentifier } from "@/lib/gurus/removed-account";
 import {
   optionsWithMobileCors,
   resolveRequestUser,
@@ -474,6 +475,9 @@ export async function POST(req: NextRequest) {
 
     const guruSlug = getFirstText(body, ["guruSlug", "slug", "guru_slug"]);
     const incomingGuruId = getFirstText(body, ["guruId", "guru_id"]);
+    if (isRemovedGuruProfileIdentifier(incomingGuruId) || isRemovedGuruProfileIdentifier(guruSlug)) {
+      return jsonError("This Guru is no longer available for bookings.", 404);
+    }
     const petName = getFirstText(body, ["petName", "pet_name"]);
     const incomingPetId = getFirstText(body, ["petId", "pet_id"]) || null;
 
@@ -550,6 +554,9 @@ export async function POST(req: NextRequest) {
       guruId: incomingGuruId,
       guruSlug,
     });
+    if (isRemovedGuruAccount(guru)) {
+      return jsonError("This Guru is no longer available for bookings.", 404);
+    }
 
     const resolvedGuruId =
       getFirstText(guru || {}, ["profile_id", "id", "user_id"]) || incomingGuruId;
