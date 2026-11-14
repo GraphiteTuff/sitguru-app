@@ -34,7 +34,7 @@ export default async function ManagerBusinessGrowthReportPage({
     <div className="space-y-5 pb-20">
       <ManagerGrowthReportingCenter
         period={period}
-        snapshot={snapshot}
+        snapshot={stored.report?.status === "submitted" ? stored.report.snapshot : snapshot}
         saved={stored.report}
         storeState={stored.state}
         canEdit={!access.actor.isSuperUser}
