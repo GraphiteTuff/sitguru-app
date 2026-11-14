@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Copy } from "lucide-react";
 import {
@@ -23,9 +22,6 @@ import {
   internGhostBtnClass,
   internPressClass,
   internPrimaryBtnClass,
-  SITGURU_BRAND_GREEN,
-  SITGURU_BRAND_GREEN_DARK,
-  SITGURU_BRAND_GREEN_LIGHT,
 } from "@/lib/internship/intern-ui";
 import InternBrandLibrary, { type InternBrandCard } from "@/components/internship/InternBrandLibrary";
 import BrandStyleReference from "@/components/portal/BrandStyleReference";
