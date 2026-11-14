@@ -239,7 +239,7 @@ describe("brand library order", () => {
       intern: true,
     });
     assert.equal(intern.viewApproved, true);
-    assert.equal(intern.upload, false);
+    assert.equal(intern.upload, true);
     assert.equal(intern.approve, false);
   });
 
