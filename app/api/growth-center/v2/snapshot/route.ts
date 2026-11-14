@@ -1,37 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireGrowthActor } from "@/lib/admin/growth/workplace";
+import { resolveRequestUser, mobileCorsHeaders, optionsWithMobileCors } from "@/lib/supabase/request-auth";
+import { resolveAdminIdentityForUser } from "@/lib/admin/access";
+import { canUseGrowthPortal } from "@/lib/admin/growth/access";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import { parseFiltersFromSearch } from "@/lib/growth-center-v2/date-range";
 import { loadGrowthCenterSnapshot } from "@/lib/growth-center-v2/snapshot";
 import type { GrowthAudience } from "@/lib/growth-center-v2/types";
 
-export const dynamic = "force-dynamic";
-
-function audienceFromActor(kind: string, requested: string | null): GrowthAudience {
-  if (kind === "intern") return "intern";
-  if (requested === "admin" || kind === "admin") return "admin";
-  return "manager";
+export const dynamic="force-dynamic";
+export function OPTIONS(req:NextRequest) { return optionsWithMobileCors(req); }
+function json(req:NextRequest, body:unknown, status=200) {
+  return NextResponse.json(body,{status,headers:{...mobileCorsHeaders(req),"Cache-Control":"private, no-store"}});
 }
 
-export async function GET(req: NextRequest) {
-  const access = await requireGrowthActor();
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error || "Unauthorized" }, { status: 401 });
+/** Browser cookie and native bearer sessions share the same authorized Growth snapshot. */
+export async function GET(req:NextRequest) {
+  const resolved=await resolveRequestUser(req);
+  if(!resolved)return json(req,{error:"Sign in required."},401);
+  if(!resolved.user.email_confirmed_at)return json(req,{error:"Confirm your SitGuru email before viewing Growth Insights."},403);
+  const user=resolved.user;
+  const intern=await findInternByAccount({userId:user.id,email:user.email});
+  let audience:GrowthAudience;
+  if(intern && (!intern.userId || intern.userId===user.id)) {
+    const ack=await getInternOnboarding(intern.id);
+    if(!internOnboardingComplete(ack))return json(req,{error:"Complete internship onboarding to view Growth Insights."},403);
+    audience="intern";
+  } else {
+    const admin=await resolveAdminIdentityForUser(user);
+    if(!admin||!canUseGrowthPortal(admin))return json(req,{error:"Growth Manager or Admin access required."},403);
+    audience=admin.isSuperUser ? "admin" : "manager";
   }
-
-  const audience = audienceFromActor(
-    access.actor.kind,
-    req.nextUrl.searchParams.get("role"),
-  );
-  const filters = parseFiltersFromSearch(req.nextUrl.searchParams);
-  const snapshot = await loadGrowthCenterSnapshot({
-    audience,
-    filters,
-    internUserId: audience === "intern" ? access.actor.id : null,
+  // Never trust a query-string role to elevate the viewer.
+  const filters=parseFiltersFromSearch(req.nextUrl.searchParams);
+  const snapshot=await loadGrowthCenterSnapshot({
+    audience,filters,internUserId:audience==="intern"?user.id:null,
   });
-
-  return NextResponse.json(snapshot, {
-    headers: {
-      "Cache-Control": "private, no-store",
-    },
-  });
+  return json(req,snapshot);
 }
