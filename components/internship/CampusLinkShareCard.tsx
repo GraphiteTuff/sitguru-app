@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import QRCode from "qrcode";
 import { Check, Clipboard, Download, ExternalLink, QrCode, X } from "lucide-react";
 import type { CampusLink } from "@/lib/internship/campus-growth-data";
@@ -17,8 +16,8 @@ function targetLabel(target:string) {
   if(target==="social")return "Join the SitGuru community";
   return "Explore SitGuru";
 }
-export default function CampusLinkShareCard({link,showAtEvent=false}:{
-  link:CampusLink;showAtEvent?:boolean;
+export default function CampusLinkShareCard({link,showAtEvent=false,visitsAvailable=true}:{
+  link:CampusLink;showAtEvent?:boolean;visitsAvailable?:boolean;
 }){
   const [open,setOpen]=useState(showAtEvent);
   const [qrData,setQrData]=useState("");
@@ -59,7 +58,7 @@ export default function CampusLinkShareCard({link,showAtEvent=false}:{
           <p className="mt-1 text-xs font-medium text-slate-500">Campaign destination: {campusDestinationForTarget(link.target)}</p>
         </div>
         <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-black text-[#1D4ED8]">
-          {link.visits} visits · {link.scans} QR events
+          {visitsAvailable?link.visits:"—"} visits · {visitsAvailable?link.scans:"—"} QR events
         </span>
       </div>
       <p className="mt-3 break-all rounded-xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-[#2563EB]">{href}</p>
