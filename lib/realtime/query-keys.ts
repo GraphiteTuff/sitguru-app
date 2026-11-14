@@ -49,6 +49,10 @@ export function pathsForInternWorkspace() {
   return [
     WORKSPACE_REFRESH_PATHS.internPortal,
     WORKSPACE_REFRESH_PATHS.internGrowth,
+    WORKSPACE_REFRESH_PATHS.internInsights,
+    WORKSPACE_REFRESH_PATHS.adminGrowth,
+    WORKSPACE_REFRESH_PATHS.adminGrowthInsights,
+    WORKSPACE_REFRESH_PATHS.managerInsights,
     WORKSPACE_REFRESH_PATHS.internHelp,
     WORKSPACE_REFRESH_PATHS.managerDesk,
     WORKSPACE_REFRESH_PATHS.managerPortal,
