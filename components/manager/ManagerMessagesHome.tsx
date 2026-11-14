@@ -93,6 +93,7 @@ export default function ManagerMessagesHome({
   notice,
   noticeError = false,
   audience = "manager",
+  initialConversationId = "",
 }: {
   me: { firstName: string; avatarUrl: string };
   conversations: Conversation[];
@@ -101,11 +102,12 @@ export default function ManagerMessagesHome({
   notice?: string | null;
   noticeError?: boolean;
   audience?: "manager" | "intern";
+  initialConversationId?: string;
 }) {
   const [threads, setThreads] = useState(() => initialSort(conversations));
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(() => conversations.some(item => item.id === initialConversationId) ? initialConversationId : "");
   const [newConversation, setNewConversation] = useState(false);
-  const [showMobileThread, setShowMobileThread] = useState(false);
+  const [showMobileThread, setShowMobileThread] = useState(() => conversations.some(item => item.id === initialConversationId));
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "announcements">("all");
   const [draft, setDraft] = useState("");
@@ -339,7 +341,7 @@ export default function ManagerMessagesHome({
           preview: data.message!.body,
           updatedAt: data.message!.createdAt,
           unreadCount: 0,
-          messages: [...(previous?.messages || []).filter(item => item.id !== localId), { ...data.message!, own: true }],
+          messages: [...(previous?.messages || []).filter(item => item.id !== localId && item.id !== data.message!.id), { ...data.message!, own: true }],
         };
         return [next, ...current.filter(item => item.id !== before && item.id !== resultId)];
       });
