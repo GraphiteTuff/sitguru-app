@@ -48,6 +48,8 @@ export const CAMPUS_APPROVALS = [
 
 export type CampusApproval = (typeof CAMPUS_APPROVALS)[number];
 
+export const CAMPUS_LEAD_STATUSES = ["New","Researching","Contacted","Interested","Follow Up","Converted","Not Interested","Closed"] as const;
+
 export const CAMPUS_LEAD_TYPES = [
   "Pet Parent",
   "Future Guru",
