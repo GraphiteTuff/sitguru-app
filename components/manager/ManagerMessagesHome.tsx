@@ -399,6 +399,9 @@ export default function ManagerMessagesHome({
           <RefreshCw size={16} aria-hidden="true" className={refreshing ? "animate-spin" : ""} />
           Refresh
         </button>
+        <Link href={audience === "manager" ? "/manager/help/team-messaging" : "/intern/help"} className="inline-flex min-h-10 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-[#2563EB] hover:bg-[#EFF6FF]">
+          How to use Messages
+        </Link>
         <button type="button" onClick={beginNew}
           className="ml-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8]">
           <Plus size={17} aria-hidden="true" /> New message
@@ -475,7 +478,7 @@ export default function ManagerMessagesHome({
           {selected ? (
             <>
               <header className="flex min-w-0 flex-wrap items-center gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:px-4">
-                <button type="button" aria-label="Back to inbox" onClick={() => setShowMobileThread(false)} className="grid h-11 w-11 place-items-center rounded-xl text-[#2563EB] hover:bg-[#EFF6FF] lg:hidden">
+                <button type="button" aria-label="Back to inbox" onClick={() => { setShowMobileThread(false); setSelectedId(""); }} className="grid h-11 w-11 place-items-center rounded-xl text-[#2563EB] hover:bg-[#EFF6FF] lg:hidden">
                   <ArrowLeft size={22} />
                 </button>
                 <Face name={selected.peerName || selected.subject} src={selected.peerAvatar} />
