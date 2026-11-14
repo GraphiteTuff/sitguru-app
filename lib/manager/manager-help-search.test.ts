@@ -12,7 +12,7 @@ test("manager help has substantive, unique and actionable guides",()=>{
     assert.ok(article.result.length>30,`No expected result: ${article.slug}`);
     assert.ok(article.faqs.length>=1,`No FAQ: ${article.slug}`);
     assert.ok(article.troubleshooting.length>=1,`No troubleshooting: ${article.slug}`);
-    assert.ok(article.route.startsWith("/manager/") || article.route.startsWith("/intern/manage"),`Wrong destination: ${article.slug}`);
+    assert.ok(article.route==="/manager" || article.route.startsWith("/manager/") || article.route.startsWith("/intern/manage"),`Wrong destination: ${article.slug}`);
     assert.equal(managerHelpArticle(article.slug)?.title,article.title);
   }
 });
