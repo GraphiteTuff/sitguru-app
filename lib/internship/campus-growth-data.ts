@@ -39,6 +39,8 @@ export type CampusLead = {
   organization: string;
   status: string;
   notes: string;
+  followUp: string;
+  updatedAt: string;
 };
 
 export type CampusLink = {
@@ -48,6 +50,8 @@ export type CampusLink = {
   campaign: string;
   channel: string;
   target: string;
+  visits: number;
+  scans: number;
 };
 
 export type CampusMission = {
@@ -58,7 +62,22 @@ export type CampusMission = {
   dueOn: string;
 };
 
+export type CampusResult = {
+  id: string;
+  internId: string;
+  lesson: string;
+  recommendation: string;
+  reportedPetParents: number;
+  reportedGuruApplications: number;
+  reportedBookings: number;
+  recordedAt: string;
+};
+
+export type CampusSourceKey = "profiles" | "opportunities" | "leads" | "links" | "visits" | "results" | "missions";
+export type CampusSourceHealth = Record<CampusSourceKey, boolean>;
+
 export type CampusCard = {
+  universityId: string;
   internId: string;
   internName: string;
   avatarUrl: string;
@@ -66,6 +85,10 @@ export type CampusCard = {
   semester: string;
   status: string;
   policyNotes: string;
+  marketNotes: string;
+  trackingLinks: number;
+  missionCount: number;
+  reportedResults: number;
   opportunities: number;
   activeCampaigns: number;
   upcomingEvents: number;
@@ -115,18 +138,39 @@ export async function loadCampusGrowth(input: {
   }));
   const ids = interns.map((intern) => intern.id);
   if (!ids.length) {
-    return { cards: [] as CampusCard[], opportunities: [] as CampusOpportunity[], leads: [] as CampusLead[], links: [] as CampusLink[], missions: [] as CampusMission[], interns };
+    return {
+      cards: [] as CampusCard[], opportunities: [] as CampusOpportunity[],
+      leads: [] as CampusLead[], links: [] as CampusLink[],
+      missions: [] as CampusMission[], results: [] as CampusResult[],
+      sourceHealth: { profiles:true, opportunities:true, leads:true, links:true, visits:true, results:true, missions:true } as CampusSourceHealth,
+      sourceIssues: [] as string[], interns,
+    };
   }
   const [universities, profiles, opportunities, leads, links, visits, results, tasks] = await Promise.all([
     Promise.all(interns.map(async (intern) => ({ id: intern.universityId, school: intern.universityId ? await getUniversity(intern.universityId) : null }))),
-    supabaseAdmin.from("campus_growth_profiles").select("intern_id,status,policy_notes").in("intern_id", ids),
+    supabaseAdmin.from("campus_growth_profiles").select("intern_id,status,policy_notes,market_notes").in("intern_id", ids),
     supabaseAdmin.from("campus_growth_opportunities").select("*").in("intern_id", ids).order("created_at", { ascending: false }),
     supabaseAdmin.from("campus_growth_leads").select("*").in("intern_id", ids).order("created_at", { ascending: false }),
     supabaseAdmin.from("campus_growth_links").select("*").in("intern_id", ids).order("created_at", { ascending: false }),
-    supabaseAdmin.from("campus_growth_visits").select("intern_id,kind").in("intern_id", ids),
-    supabaseAdmin.from("campus_growth_results").select("intern_id,pet_parent_registrations,guru_applications").in("intern_id", ids),
+    supabaseAdmin.from("campus_growth_visits").select("intern_id,link_id,kind").in("intern_id", ids),
+    supabaseAdmin.from("campus_growth_results").select("id,intern_id,pet_parent_registrations,guru_applications,bookings,lesson,recommendation,created_at").in("intern_id", ids),
     supabaseAdmin.from("internship_tasks").select("id,intern_id,title,status,due_on,metric_affected,brief_payload").in("intern_id", ids),
   ]);
+  const sourceResponses = { profiles, opportunities, leads, links, visits, results, missions:tasks };
+  const sourceLabels: Record<CampusSourceKey,string> = {
+    profiles:"Campus notes", opportunities:"Opportunities", leads:"Leads",
+    links:"Tracking links", visits:"Tracked visits and QR scans",
+    results:"Reported outcomes", missions:"Campus missions",
+  };
+  const sourceHealth = Object.fromEntries(
+    (Object.keys(sourceLabels) as CampusSourceKey[]).map(key => [key, !sourceResponses[key].error])
+  ) as CampusSourceHealth;
+  const sourceIssues = (Object.keys(sourceLabels) as CampusSourceKey[])
+    .filter(key => !sourceHealth[key])
+    .map(key => sourceLabels[key]);
+  if (sourceIssues.length) {
+    console.error("[campus growth] unavailable data sources", sourceIssues.join(", "));
+  }
   const schoolName = new Map(universities.map((row) => [row.id, row.school?.displayName || row.school?.name || "Campus not on file"]));
   const profileByIntern = new Map(rows(profiles.data).map((row) => [text(row.intern_id), row]));
   const opportunityRows = rows(opportunities.data).map(mapOpportunity);
@@ -138,7 +182,10 @@ export async function loadCampusGrowth(input: {
     organization: text(row.organization),
     status: text(row.status) || "New",
     notes: text(row.notes),
+    followUp: text(row.follow_up),
+    updatedAt: text(row.updated_at),
   }));
+  const trackedVisits=rows(visits.data);
   const linkRows: CampusLink[] = rows(links.data).map((row) => ({
     id: text(row.id),
     internId: text(row.intern_id),
@@ -146,6 +193,16 @@ export async function loadCampusGrowth(input: {
     campaign: text(row.campaign_label),
     channel: text(row.channel),
     target: text(row.target_type),
+    visits: trackedVisits.filter(visit => text(visit.link_id) === text(row.id) && text(visit.kind) !== "qr_scan").length,
+    scans: trackedVisits.filter(visit => text(visit.link_id) === text(row.id) && text(visit.kind) === "qr_scan").length,
+  }));
+  const resultRows: CampusResult[] = rows(results.data).map(row => ({
+    id:text(row.id),internId:text(row.intern_id),
+    lesson:text(row.lesson),recommendation:text(row.recommendation),
+    reportedPetParents:Math.max(0,Number(row.pet_parent_registrations||0)||0),
+    reportedGuruApplications:Math.max(0,Number(row.guru_applications||0)||0),
+    reportedBookings:Math.max(0,Number(row.bookings||0)||0),
+    recordedAt:text(row.created_at),
   }));
   const missionRows: CampusMission[] = rows(tasks.data).filter((row) => {
     const brief = row.brief_payload && typeof row.brief_payload === "object" ? row.brief_payload as Record<string, unknown> : {};
@@ -175,6 +232,7 @@ export async function loadCampusGrowth(input: {
       today,
     });
     return {
+      universityId: intern.universityId || "",
       internId: intern.id,
       internName: intern.preferredName || intern.fullName,
       avatarUrl: intern.avatarUrl || "",
@@ -182,6 +240,10 @@ export async function loadCampusGrowth(input: {
       semester: intern.semester || "",
       status: text(profile?.status) || (intern.status === "active" ? "Active" : intern.status || "Active"),
       policyNotes: text(profile?.policy_notes),
+      marketNotes: text(profile?.market_notes),
+      trackingLinks: linkRows.filter(link => link.internId === intern.id).length,
+      missionCount: mineMissions.length,
+      reportedResults: resultRows.filter(result => result.internId === intern.id).length,
       opportunities: summary.opportunities,
       activeCampaigns: summary.activeCampaigns,
       upcomingEvents: summary.upcomingEvents,
@@ -192,7 +254,12 @@ export async function loadCampusGrowth(input: {
       guruApplications: summary.guruApplications,
     } satisfies CampusCard;
   });
-  return { cards, opportunities: opportunityRows, leads: leadRows, links: linkRows, missions: missionRows.filter((row) => input.actor !== "intern" || campusMissionIsVisible(row.status)), interns };
+  return {
+    cards, opportunities: opportunityRows, leads: leadRows,
+    links: linkRows, results: resultRows,
+    missions: missionRows.filter(row => input.actor !== "intern" || campusMissionIsVisible(row.status)),
+    sourceHealth, sourceIssues, interns,
+  };
 }
 
 export function campusReportTotals(cards: CampusCard[], missions: CampusMission[]) {
