@@ -28,6 +28,7 @@ import {
   SITGURU_BRAND_GREEN_LIGHT,
 } from "@/lib/internship/intern-ui";
 import InternBrandLibrary, { type InternBrandCard } from "@/components/internship/InternBrandLibrary";
+import BrandStyleReference from "@/components/portal/BrandStyleReference";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 
 function Field({
@@ -154,72 +155,7 @@ export default function InternStudentTools({
         tool={tool}
         onBack={onBack}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div
-            className="public-dark-section flex min-h-32 items-center justify-center rounded-[1.4rem] p-5"
-            data-brand-green
-            style={{ background: SITGURU_BRAND_GREEN }}
-          >
-            <Image
-              src="/images/sitguru-logo-cropped.png"
-              alt="SitGuru"
-              width={180}
-              height={48}
-              className="h-12 w-auto mix-blend-multiply"
-            />
-          </div>
-          <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-              SitGuru Green
-            </p>
-            <p className="mt-2 text-2xl font-black text-slate-950">{SITGURU_BRAND_GREEN}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">RGB 22, 101, 52</p>
-            <div className="mt-3 flex items-center gap-2">
-              <span
-                className="h-11 w-11 rounded-xl border border-emerald-100"
-                style={{ background: SITGURU_BRAND_GREEN }}
-              />
-              <CopyButton value={SITGURU_BRAND_GREEN} />
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-emerald-100 p-3">
-                <span
-                  className="block h-8 w-full rounded-lg"
-                  style={{ background: SITGURU_BRAND_GREEN_DARK }}
-                />
-                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                  Dark green
-                </p>
-                <p className="text-xs font-black text-slate-950">{SITGURU_BRAND_GREEN_DARK}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-100 p-3">
-                <span
-                  className="block h-8 w-full rounded-lg border border-emerald-100"
-                  style={{ background: SITGURU_BRAND_GREEN_LIGHT }}
-                />
-                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                  Light green
-                </p>
-                <p className="text-xs font-black text-slate-950">{SITGURU_BRAND_GREEN_LIGHT}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <article className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-            Handle
-          </p>
-          <p className="mt-1 text-lg font-black text-slate-950">{SITGURU_OFFICIAL_HANDLE}</p>
-          <p className="mt-2 text-sm font-semibold text-slate-500">
-            Instagram, Facebook, TikTok, X, and YouTube. Rogue is the mascot. Bookings
-            stay on SitGuru.
-          </p>
-        </article>
-        <ul className="space-y-2 text-sm font-semibold text-slate-600">
-          <li>White type on SitGuru Green. Never dark text on {SITGURU_BRAND_GREEN}.</li>
-          <li>Don’t say a university endorses SitGuru.</li>
-          <li>Tag {SITGURU_OFFICIAL_HANDLE} when you post about SitGuru.</li>
-        </ul>
+        <BrandStyleReference />
         <InternBrandLibrary
           assets={brandLibrary?.assets || []}
           total={brandLibrary?.total || 0}
