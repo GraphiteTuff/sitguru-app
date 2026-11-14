@@ -17,6 +17,10 @@
     {
       "path": "/api/cron/internship-assignment-reminders",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/growth-reports",
+      "schedule": "15 6 * * *"
     }
   ]
 }
