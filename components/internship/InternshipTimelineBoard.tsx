@@ -64,6 +64,7 @@ function MilestoneGroup({
       <div className="mt-4 space-y-2">
         {milestones.map((row) => {
           const urgency = milestoneStatus(row.dueOn);
+          const completed = row.status === "done";
           return (
             <article
               key={row.id}
@@ -84,14 +85,16 @@ function MilestoneGroup({
                 </div>
                 <span
                   className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
-                    urgency === "due_or_past"
+                    completed
+                      ? "bg-emerald-100 text-emerald-900"
+                      : urgency === "due_or_past"
                       ? "bg-rose-50 text-rose-800"
                       : urgency === "upcoming"
                         ? "bg-amber-50 text-amber-800"
                         : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {String(row.status || "scheduled").replaceAll("_", " ")}
+                  {completed ? "Completed" : String(row.status || "scheduled").replaceAll("_", " ")}
                 </span>
               </div>
               {compact ? null : (
@@ -104,7 +107,7 @@ function MilestoneGroup({
                   >
                     <option value="scheduled">Scheduled</option>
                     <option value="in_progress">In progress</option>
-                    <option value="done">Done</option>
+                    <option value="done">Completed</option>
                     <option value="blocked">Blocked</option>
                   </select>
                   <button className="min-h-10 rounded-xl bg-[#166534] px-3 text-xs font-black !text-white">
