@@ -278,7 +278,7 @@ export function InternCheckInsPageView({
         {label:"Check-Ins Submitted",value:expected?`${submitted.length} / ${expected}`:String(submitted.length),tone:"green",icon:<ClipboardCheck size={18}/>,progress:expected?Math.min(100,Math.round(submitted.length/expected*100)):0},
         {label:"Next Check-In",value:currentSubmitted?"Submitted":due,detail:currentSubmitted?"Awaiting manager decision or already reviewed":canSubmit?"Weekly check-in target: Friday":"Spring internship work has not started",tone:"violet",icon:<CalendarDays size={18}/>},
         {label:"Status",value:status,detail:`${approved.length} approved by SitGuru`,tone:"amber",icon:<Sparkles size={18}/>},
-        {label:"Hours Logged This Week",value:formatHours(hourSummary.loggedThisWeek),detail:hourSummary.plannedWeeklyHours>0?`Planned: ${formatHours(hourSummary.plannedWeeklyHours)}/week`:"Weekly target not configured",tone:"sky",icon:<Clock3 size={18}/>},
+        {label:"Hours Logged This Week",value:formatHours(hourSummary.loggedThisWeek),detail:(hourSummary.plannedWeeklyHours??0)>0?`Planned: ${formatHours(hourSummary.plannedWeeklyHours??0)}/week`:"Weekly target not configured",tone:"sky",icon:<Clock3 size={18}/>},
       ]}
     >
       {notice?<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{notice}</p>:null}
