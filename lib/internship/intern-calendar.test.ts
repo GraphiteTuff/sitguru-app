@@ -46,7 +46,7 @@ describe("intern calendar follows Ava's SitGuru assignments automatically", () =
   it("never shows another intern's tasks or unpublished drafts", () => {
     const events = buildInternAssignmentCalendar({
       internId: INTERN_ID,
-      tasks: [task({ internId: OTHER_INTERN_ID }), task({ status: "draft" })],
+      tasks: [task({ internId: OTHER_INTERN_ID }), task({ status: "draft" as InternshipTask["status"] })],
     });
     assert.deepEqual(events, []);
   });
