@@ -9,6 +9,7 @@ import AmbientAudioSession from "@/components/AmbientAudioSession";
 import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
 import GoogleOneTapHost from "@/components/auth/GoogleOneTapHost";
 import { PawPulseProvider } from "@/components/pawpulse/PawPulseProvider";
+import GlobalTapPawFeedback from "@/components/pawpulse/GlobalTapPawFeedback";
 
 const plusJakartaSans = localFont({
   src: "./fonts/plus-jakarta-sans-latin.woff2",
@@ -163,6 +164,7 @@ export default function RootLayout({
 
         <AmbientAudioSession />
         <PawPulseProvider>
+          <GlobalTapPawFeedback />
           <RouteShell>{children}</RouteShell>
         </PawPulseProvider>
         <AmbassadorReferralCapture />
