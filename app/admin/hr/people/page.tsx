@@ -51,6 +51,7 @@ export default async function AdminPeoplePage({
   const classifiedContractors = people.filter((person) => person.classification.toLowerCase() === "contractor").length;
 
   return (
+    <div className="admin-desk-surface">
     <GrowthPageFrame
       variant="desk"
       kicker="Admin HQ · People & Administration"
@@ -96,5 +97,6 @@ export default async function AdminPeoplePage({
         </Link>
       </div>
     </GrowthPageFrame>
+    </div>
   );
 }
