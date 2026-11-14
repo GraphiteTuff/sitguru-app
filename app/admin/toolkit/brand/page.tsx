@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import BrandKitManager from "@/components/manager/BrandKitManager";
+import InitialBrandApprovalControl from "@/components/manager/InitialBrandApprovalControl";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { SITGURU_SHAREPOINT_FOLDERS, sitguruSharePointFolderHref } from "@/lib/admin/growth/sharepoint-files";
 import { isSitGuruWorkEmail } from "@/lib/admin/growth/teams-access";
-import { listBrandAssets, resolveBrandActor } from "@/lib/manager/brand-kit-store";
+import { listBrandAssets, resolveBrandActor, countInitialBrandAssetsToApprove } from "@/lib/manager/brand-kit-store";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function AdminBrandKitPage({ searchParams }: {
   const listed = actor?.capabilities.viewApproved
     ? await listBrandAssets({ actor, query, category, status, sort, page, pageSize: 12 })
     : { assets: [], error: "Approved assets are not available on this account.", page: 1, pages: 1, total: 0 };
+  const baseline = actor?.isSuperUser ? await countInitialBrandAssetsToApprove(actor) : { count: 0, error: "" };
   return (
     <main className="admin-desk-surface mx-auto w-full max-w-7xl space-y-4 px-3 pb-24 sm:px-5 lg:px-6">
       <Link href="/admin/toolkit" className="inline-flex min-h-10 items-center text-sm font-black text-[#2563EB]">Admin Toolkit</Link>
@@ -38,6 +40,8 @@ export default async function AdminBrandKitPage({ searchParams }: {
           The same approved logos, templates, graphics and guidelines used by managers and interns. Authorized admins can manage assets; only Super Admins approve or delete them.
         </p>
       </div>
+      {baseline.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{baseline.error}</p> : null}
+      {actor?.isSuperUser ? <InitialBrandApprovalControl pendingCount={baseline.count} /> : null}
       <BrandKitManager
         assets={listed.assets}
         total={listed.total}
