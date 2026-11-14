@@ -7,6 +7,7 @@ import {
 } from "@/lib/admin/growth/outcomes";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import InternToolkitHome from "@/components/internship/InternToolkitHome";
+import SharedTeamToolkitAssets from "@/components/portal/SharedTeamToolkitAssets";
 import InternToolkitToolView from "@/components/internship/InternToolkitToolView";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
 import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
@@ -129,6 +130,11 @@ export default async function InternToolkitPage({
     );
   }
 
+  const brandActor = await resolveBrandActor();
+  const approved = brandActor?.capabilities.viewApproved
+    ? await listBrandAssets({ actor: brandActor, status: "approved", pageSize: 6 })
+    : { assets: [], total: 0, error: "Approved brand files require a completed internship onboarding." };
+
   const [stats, events, campaigns, initiatives, insights] = await Promise.all([
     getGrowthHomeStats(),
     listInternPromoteEvents(),
@@ -145,6 +151,7 @@ export default async function InternToolkitPage({
       campaigns={campaigns}
       initiatives={initiatives}
       insight={insights[0] || null}
+      sharedAssets={<SharedTeamToolkitAssets role="intern" assets={approved.assets} total={approved.total} error={approved.error} />}
     />
   );
 }
