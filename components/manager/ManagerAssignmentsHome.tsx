@@ -52,6 +52,7 @@ export default function ManagerAssignmentsHome({
   const inProgress = rows.filter((row) => /progress/i.test(row.statusLabel)).length;
   const needsReview = rows.filter((row) => /review/i.test(row.statusLabel)).length;
   const internCount = new Set(rows.map((row) => row.internId).filter(Boolean)).size;
+  const percentage = (count: number) => active ? Math.round((count / active) * 100) : 0;
 
   function openCreate(focus: boolean) {
     setEditing(null);
@@ -80,21 +81,21 @@ export default function ManagerAssignmentsHome({
           value: onTrack,
           tone: "green",
           icon: <CheckCircle2 size={18} />,
-          progress: 58,
+          progress: percentage(onTrack),
         },
         {
           label: "In Progress",
           value: inProgress,
           tone: "amber",
           icon: <Clock3 size={18} />,
-          progress: 25,
+          progress: percentage(inProgress),
         },
         {
           label: "Needs Review",
           value: needsReview,
           tone: "peach",
           icon: <AlertTriangle size={18} />,
-          progress: 17,
+          progress: percentage(needsReview),
         },
       ]}
     >
