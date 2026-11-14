@@ -144,7 +144,7 @@ export default function InternAssignmentDetailLayout({
       <section className={`${DESK_UI.card} p-5 sm:p-7`}>
         <h2 className="text-xl font-black text-slate-950">Your work</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Work is saved to a Markdown document in SitGuru's SharePoint intern folder. Save as you go, then submit to Ava.
+          Write everything here. Click Save draft to keep it in SharePoint, then submit when it is ready for Ava. You do not need to open Planner or Teams.
         </p>
 
         {adminPreview ? (
@@ -175,10 +175,10 @@ export default function InternAssignmentDetailLayout({
                 <p className="text-xs font-medium text-slate-500">Saving keeps your draft editable. Submitting sends it to Ava and pauses editing until review.</p>
                 <div className="flex flex-wrap gap-3">
                   <button type="submit" name="intent" value="save" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    Save Work to SharePoint
+                    Save draft
                   </button>
                   <button type="submit" name="intent" value="submit" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-emerald-700 px-6 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    Submit to Ava for Review
+                    Submit to Ava
                   </button>
                 </div>
                 </>
