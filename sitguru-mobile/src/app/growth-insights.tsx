@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import RoleGate from '@/components/RoleGate';
+import { useAuth } from '@/hooks/useAuth';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
@@ -65,7 +66,7 @@ function GrowthInsightsBody() {
     else setLoading(true);
     setError(null);
     const result = await sitguruApiFetch<Snapshot>(
-      '/api/growth-center/v2/snapshot?preset=last_7&role=manager',
+      '/api/growth-center/v2/snapshot?preset=last_7',
       { method: 'GET', cache: 'no-store' },
     );
     if (result.error || !result.data) {
@@ -169,8 +170,17 @@ function GrowthInsightsBody() {
 }
 
 export default function GrowthInsightsScreen() {
+  const { roles } = useAuth();
+  const requiredRole = roles.includes('admin')
+    ? 'admin'
+    : roles.includes('manager')
+      ? 'manager'
+      : roles.includes('intern')
+        ? 'intern'
+        : 'admin';
+
   return (
-    <RoleGate requiredRole="admin" title="Growth Insights" previewAllowed>
+    <RoleGate requiredRole={requiredRole} title="Growth Insights">
       <GrowthInsightsBody />
     </RoleGate>
   );
