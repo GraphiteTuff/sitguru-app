@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { listBrandAssets, listOwnBrandSubmissions, resolveBrandActor } from "@/lib/manager/brand-kit-store";
 import BrandKitManager from "@/components/manager/BrandKitManager";
+import BrandStyleReference from "@/components/portal/BrandStyleReference";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,11 @@ export default async function InternSharedBrandKitPage({
   return (
     <main className="mx-auto w-full max-w-7xl min-w-0 space-y-4 px-3 pb-24 sm:px-5 lg:px-6">
       <Link href="/intern/toolkit" className="inline-flex min-h-10 items-center text-sm font-black text-[#2563EB] hover:underline">Back to Intern Toolkit</Link>
-      <section className="rounded-[1.5rem] border border-sky-100 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F5F3FF] p-4 sm:p-6">
+      <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <p className="text-[11px] font-black uppercase tracking-wider text-[#1D4ED8]">Shared SitGuru library</p>
-        <h1 className="mt-2 text-2xl font-black text-[#0F2744] sm:text-3xl">Brand Kit & Creative Submissions</h1>
+        <h1 className="mt-2 text-2xl font-black text-[#0F2744] sm:text-3xl">Brand Kit</h1>
         <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-          Use the same approved assets as Ava and Admin. Submit your own logos, graphics, flyers or videos directly here;
-          verified uploads are sent to Ava for approval before becoming visible to the team.
+          The same SitGuru asset library as Manager Toolkit. Browse all existing approved and initial collection files; new intern submissions go to Ava for review.
         </p>
       </section>
       {submissions.length ? (
@@ -54,6 +54,7 @@ export default async function InternSharedBrandKitPage({
           </ul>
         </details>
       ) : null}
+      <BrandStyleReference />
       <BrandKitManager
         assets={listed.assets}
         total={listed.total}
