@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { InternshipIntern } from "@/lib/internship/types";
 import { uniqueUserIds } from "@/lib/realtime/pure";
+import { SUPER_USER_EMAILS } from "@/lib/admin/super-users";
 
 export { uniqueUserIds };
 
@@ -65,4 +66,53 @@ export async function recipientsForGrowthWorkspace(
 ): Promise<string[]> {
   const oversight = await listGrowthOversightRecipientIds();
   return uniqueUserIds([...(extra || []), ...oversight]);
+}
+
+/**
+ * Contractor timesheet recipients are the authorized HR/Finance/Founder
+ * accounts, not every Growth manager. HQ assignments can have a null user_id;
+ * resolve those emails against authenticated profile/user records as well.
+ */
+export async function listContractorHoursApproverIds(): Promise<string[]> {
+  const roles = ["founder", "owner", "super_admin", "super_user", "hr_admin", "finance_admin", "billing_admin", "operations_admin"];
+  const [hq, admins, roleAssignments] = await Promise.all([
+    supabaseAdmin.from("admin_user_access")
+      .select("user_id,email,role_key")
+      .eq("is_active", true).in("role_key", roles),
+    supabaseAdmin.from("admin_users")
+      .select("user_id,email,role,is_active")
+      .eq("is_active", true).in("role", roles),
+    supabaseAdmin.from("user_roles")
+      .select("user_id,role").in("role", roles),
+  ]);
+  for (const [label, result] of [["hq", hq], ["admin", admins], ["roles", roleAssignments]] as const) {
+    if (result.error) console.warn("[contractor-alerts] approver lookup", label, result.error.message);
+  }
+  const ids: Array<string | null | undefined> = [
+    ...(hq.data || []).map((row) => row.user_id),
+    ...(admins.data || []).map((row) => row.user_id),
+    ...(roleAssignments.data || []).map((row) => row.user_id),
+  ];
+  const emails = [...new Set([
+    ...SUPER_USER_EMAILS,
+    ...(hq.data || []).map((row) => String(row.email || "").trim().toLowerCase()),
+    ...(admins.data || []).map((row) => String(row.email || "").trim().toLowerCase()),
+  ].filter(Boolean))];
+  if (emails.length) {
+    const [profiles, users] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id,email").in("email", emails),
+      supabaseAdmin.from("users").select("id,email").in("email", emails),
+    ]);
+    if (profiles.error) console.warn("[contractor-alerts] profile mapping", profiles.error.message);
+    if (users.error) console.warn("[contractor-alerts] user mapping", users.error.message);
+    ids.push(
+      ...(profiles.data || []).map((row) => row.id),
+      ...(users.data || []).map((row) => row.id),
+    );
+  }
+  const recipients = uniqueUserIds(ids);
+  if (!recipients.length) {
+    console.warn("[contractor-alerts] No founder/HR approver ID resolved; notification will be retried by the Admin attention queue.");
+  }
+  return recipients;
 }
