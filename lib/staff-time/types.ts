@@ -100,6 +100,7 @@ export type MyTimeDashboard = {
   period: StaffPaymentPeriod;
   periodLabel: string;
   entries: StaffTimeEntry[];
+  recentPeriods?: StaffPaymentPeriod[];
   estimatedPaymentLabel: string;
   payments: StaffPaymentRecord[];
   annualPaidCents: number;

@@ -97,7 +97,7 @@ export default async function AdminActionCenterPage() {
       value: contractorCounts.available
         ? String(contractorCounts.hoursAwaitingApproval)
         : "Review",
-      href: "/admin/financials/contractor-hours",
+      href: "/admin/hr/people/payments#approvals",
       priority: "High" as const,
     },
     {
@@ -105,7 +105,7 @@ export default async function AdminActionCenterPage() {
       value: contractorCounts.available
         ? String(contractorCounts.awaitingPayment)
         : "Review",
-      href: "/admin/financials/contractor-payments",
+      href: "/admin/hr/people/payments#payment-queue",
       priority: "High" as const,
     },
     {
@@ -166,12 +166,7 @@ export default async function AdminActionCenterPage() {
           {contractorItems.slice(0, 12).map((item) => (
             <Link
               key={item.period.id}
-              href={
-                item.period.status === "submitted" ||
-                item.period.status === "needs_correction"
-                  ? "/admin/financials/contractor-hours"
-                  : "/admin/financials/contractor-payments"
-              }
+              href={`/admin/hr/people/payments#period-${item.period.id}`}
               className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-[#FAF6EE] px-4 py-3"
             >
               <div className="min-w-0">

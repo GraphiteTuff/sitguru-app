@@ -10,7 +10,7 @@ import {
   listCompensationRates,
   resolveManagerEngagement,
 } from "@/lib/staff-time/engagement";
-import { parsePositiveHours } from "@/lib/staff-time/money";
+import { parsePositiveHours, formatHours, formatUsdFromCents } from "@/lib/staff-time/money";
 import { calculatePeriodTotals } from "@/lib/staff-time/rates";
 import {
   ensurePaymentPeriod,
@@ -351,7 +351,7 @@ export async function submitPaymentPeriod(formData: FormData) {
     bounce(myTimeHome(formData), "error", "Time entries could not be submitted. No approval request was created.");
   }
 
-  const { error } = await supabaseAdmin
+  const { data: confirmed, error } = await supabaseAdmin
     .from("staff_payment_periods")
     .update({
       status: "submitted",
@@ -361,8 +361,15 @@ export async function submitPaymentPeriod(formData: FormData) {
       correction_note: "",
       updated_at: now,
     })
-    .eq("id", periodId);
-  if (error) bounce(myTimeHome(formData), "error", "Could not submit payment period.");
+    .eq("id", periodId)
+    .eq("engagement_id", engagement.id)
+    .in("status", ["draft", "needs_correction"])
+    .select("id,status,submitted_at")
+    .maybeSingle();
+  if (error || !confirmed || confirmed.status !== "submitted") {
+    console.error("[staff-time] submit period", error?.message || "submission state was not confirmed");
+    bounce(myTimeHome(formData), "error", "Submission was not confirmed. Check the period status before retrying.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -373,9 +380,10 @@ export async function submitPaymentPeriod(formData: FormData) {
     actorUserId: actor.id,
     actorLabel: actor.email,
     notify: true,
-    notifyTitle: `${engagement.displayName} submitted a payment period`,
-    notifyBody: "Review hours and approve for payment.",
-    notifyHref: "/admin/hr/people/payments",
+    notifyTitle: `Review ${engagement.displayName}'s submitted hours`,
+    notifyBody: `${formatHours(refreshed.totalHours)} hours · ${formatUsdFromCents(refreshed.amountCents)} · ${periodRow.period_start} through ${periodRow.period_end}. Review and approve in Admin HQ.`,
+    notifyHref: `/admin/hr/people/payments#period-${periodId}`,
+    resourceVersion: now,
   });
 
   refreshStaffPaths();

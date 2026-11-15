@@ -7,7 +7,7 @@ import {
   stableEventId,
 } from "@/lib/realtime/publish-live-signal";
 import { WORKSPACE_REFRESH_PATHS } from "@/lib/realtime/query-keys";
-import { listGrowthOversightRecipientIds } from "@/lib/realtime/recipients";
+import { listContractorHoursApproverIds, listGrowthOversightRecipientIds } from "@/lib/realtime/recipients";
 import { uniqueUserIds } from "@/lib/realtime/pure";
 import type { StaffEngagement } from "@/lib/staff-time/types";
 
@@ -25,12 +25,15 @@ const STAFF_TIME_PATHS = [
   WORKSPACE_REFRESH_PATHS.adminPayments,
 ];
 
-async function staffRecipients(
-  engagement: StaffEngagement,
-  actorUserId?: string | null,
-) {
-  const oversight = await listGrowthOversightRecipientIds();
-  return uniqueUserIds([engagement.userId, actorUserId, ...oversight]);
+function isContractorFinanceEvent(eventType: string) {
+  const events: readonly string[] = [
+    SITGURU_DOMAIN_EVENTS.TIME_PERIOD_SUBMITTED,
+    SITGURU_DOMAIN_EVENTS.TIME_PERIOD_RETURNED,
+    SITGURU_DOMAIN_EVENTS.TIME_PERIOD_APPROVED,
+    SITGURU_DOMAIN_EVENTS.PAYMENT_READY,
+    SITGURU_DOMAIN_EVENTS.PAYMENT_PAID,
+  ];
+  return events.includes(eventType);
 }
 
 export async function publishStaffTimeEvent(input: {
@@ -45,7 +48,22 @@ export async function publishStaffTimeEvent(input: {
   notifyTitle?: string;
   notifyBody?: string;
   notifyHref?: string;
+  resourceVersion?: string;
 }) {
+  const financeEvent = isContractorFinanceEvent(input.eventType);
+  const [oversight, approvers] = await Promise.all([
+    listGrowthOversightRecipientIds(),
+    financeEvent ? listContractorHoursApproverIds() : Promise.resolve([] as string[]),
+  ]);
+  const recipientIds = uniqueUserIds([
+    input.engagement.userId, input.actorUserId, ...(financeEvent ? approvers : oversight),
+  ]);
+  const notifyRecipientUserIds =
+    input.eventType === SITGURU_DOMAIN_EVENTS.TIME_PERIOD_SUBMITTED
+      ? approvers
+      : financeEvent
+        ? [input.engagement.userId]
+        : recipientIds;
   return publishLiveSignals({
     eventType: input.eventType,
     eventId: stableEventId([
@@ -53,10 +71,13 @@ export async function publishStaffTimeEvent(input: {
       input.resourceId,
       input.actorUserId,
       input.resourceType,
+      input.resourceVersion,
     ]),
-    recipientUserIds: await staffRecipients(input.engagement, input.actorUserId),
+    recipientUserIds: recipientIds,
+    notifyRecipientUserIds,
     resourceType: input.resourceType,
     resourceId: input.resourceId,
+    resourceVersion: input.resourceVersion,
     scope: input.scope || "timekeeper",
     paths: STAFF_TIME_PATHS,
     actorUserId: input.actorUserId,

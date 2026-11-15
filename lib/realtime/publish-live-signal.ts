@@ -26,6 +26,8 @@ export type PublishLiveSignalInput = {
   eventId?: string;
   /** When true, also insert a lightweight in-app notification for recipients ≠ actor. */
   notify?: boolean;
+  /** Optional subset of authorized recipients to actually alert in-app. */
+  notifyRecipientUserIds?: string[];
   notifyTitle?: string;
   notifyBody?: string;
   notifyHref?: string;
@@ -76,9 +78,10 @@ export async function publishLiveSignals(
     resource_version: input.resourceVersion || "",
   }));
 
-  const { error } = await supabaseAdmin
+  const { data: insertedSignals, error } = await supabaseAdmin
     .from("sitguru_live_signals")
-    .upsert(rows, { onConflict: "event_id,recipient_user_id", ignoreDuplicates: true });
+    .upsert(rows, { onConflict: "event_id,recipient_user_id", ignoreDuplicates: true })
+    .select("recipient_user_id");
 
   if (error) {
     // Sync must never roll back the authoritative write.
@@ -92,8 +95,18 @@ export async function publishLiveSignals(
       Boolean(input.notifyTitle));
 
   if (shouldNotify && input.notifyTitle) {
+    const allowed = input.notifyRecipientUserIds
+      ? new Set(uniqueUserIds(input.notifyRecipientUserIds))
+      : null;
+    // Do not create duplicate bell alerts on retries of the same event.
+    // If the realtime table failed, still attempt the essential in-app alert.
+    const inserted = !error && insertedSignals
+      ? new Set(insertedSignals.map((row) => String(row.recipient_user_id)))
+      : null;
     const notifyRecipients = recipients.filter(
-      (id) => id !== input.actorUserId,
+      (id) => id !== input.actorUserId &&
+        (!allowed || allowed.has(id)) &&
+        (!inserted || inserted.has(id)),
     );
     if (notifyRecipients.length) {
       const href = input.notifyHref || input.paths?.[0] || "/intern";

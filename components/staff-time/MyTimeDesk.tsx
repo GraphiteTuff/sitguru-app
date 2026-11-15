@@ -11,12 +11,14 @@ import {
   submitPaymentPeriod,
 } from "@/lib/staff-time/actions";
 import { STAFF_TIME_CATEGORIES, staffCategoryLabel } from "@/lib/staff-time/categories";
-import { formatHours } from "@/lib/staff-time/money";
+import { formatHours, formatUsdFromCents } from "@/lib/staff-time/money";
+import { paymentStatusLabel } from "@/lib/staff-time/status";
+import { formatPeriodLabel } from "@/lib/staff-time/periods";
 import type { MyTimeDashboard } from "@/lib/staff-time/types";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { isoToday, weekBoundsContaining } from "@/lib/staff-time/periods";
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function PaceCard({
   label,
@@ -67,9 +69,12 @@ export default function MyTimeDesk({
   const maxDay = Math.max(...byDay.map((day) => day.hours), data.week.expectedMax / 5, 1);
   const planned = data.week.expectedMax || 0;
   const weekPct = planned ? Math.min(100, Math.round((data.week.hours / planned) * 100)) : 0;
-  const periodGoal = planned * 2;
+  const periodGoal = planned * (data.engagement.paymentCadence === "weekly" ? 1 : 2);
   const periodPct = periodGoal ? Math.min(100, Math.round((data.period.totalHours / periodGoal) * 100)) : 0;
   const pace = data.week.hours - planned / 2;
+  const priorPeriods = (data.recentPeriods || []).filter(
+    (period) => period.id !== data.period.id && period.periodEnd < data.period.periodStart,
+  ).slice(0, 8);
   const categories = STAFF_TIME_CATEGORIES.map((cat) => ({
     ...cat,
     hours: data.entries.filter((entry) => entry.categorySlug === cat.slug).reduce((sum, entry) => sum + entry.hours, 0),
@@ -89,6 +94,34 @@ export default function MyTimeDesk({
           {notice.message}
         </p>
       ) : null}
+      <section aria-label="Previous payment periods" className={`${DESK_UI.card} p-4`}>
+        <h2 className="text-lg font-black text-[#0F2744]">Previously Submitted Hours & Approval Status</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-600">Your older hours stay here when a new period starts. Admin HQ reviews the same submitted records.</p>
+        {priorPeriods.length ? (
+          <div className="mt-3 space-y-2">
+            {priorPeriods.map((period) => (
+              <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div>
+                  <p className="text-sm font-black text-[#0F2744]">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
+                  <p className="text-sm font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
+                  {period.status === "submitted" ? <p className="text-xs font-black text-amber-800">Submitted · Awaiting Admin HQ approval</p> : null}
+                  {period.status === "needs_correction" && period.correctionNote ? <p className="text-xs text-amber-900">{period.correctionNote}</p> : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-800">{paymentStatusLabel(period.status)}</span>
+                  {["draft","needs_correction"].includes(period.status) && period.totalHours > 0 ? (
+                    <form action={submitPaymentPeriod}>
+                      {returnField}
+                      <input type="hidden" name="periodId" value={period.id} />
+                      <button type="submit" className="rounded-xl bg-[#0D5C3A] px-3 py-2 text-xs font-black text-white">Submit for approval</button>
+                    </form>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : <p className="mt-3 text-sm text-slate-500">No previous periods recorded yet.</p>}
+      </section>
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PaceCard label="My Time This Week" value={`${formatHours(data.week.hours)} hrs`} detail={`of ${formatHours(planned)} planned`} pct={weekPct} tone="bg-[#ECFDF5] text-[#047857]" />
         <PaceCard label="This Period" value={`${formatHours(data.period.totalHours)} hrs`} detail={data.periodLabel} pct={periodPct} tone="bg-[#F5F3FF] text-[#6D28D9]" />
