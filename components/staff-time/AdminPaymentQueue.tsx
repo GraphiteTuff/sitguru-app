@@ -66,8 +66,9 @@ export default function AdminPaymentQueue({
         <div className="mt-4 space-y-3">
           {submitted.map((item) => (
             <article
+              id={`period-${item.period.id}`}
               key={item.period.id}
-              className="rounded-[1.4rem] border border-amber-100 bg-amber-50/40 p-4"
+              className="scroll-mt-32 rounded-[1.4rem] border border-amber-100 bg-amber-50/40 p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -133,7 +134,7 @@ export default function AdminPaymentQueue({
           <h2 className="text-lg font-black text-slate-950">Saved, Not Submitted</h2>
           <p className="mt-1 text-sm font-semibold text-slate-600">These drafts are not yet eligible for approval.</p>
           <div className="mt-3 space-y-3">{saved.map((item) => (
-            <article key={item.period.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <article id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><strong>{item.engagement.displayName}</strong><StatusChip status="draft" label="Draft — not submitted" /></div>
               <p className="mt-1 text-sm font-semibold">{formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</p>
               {item.entries?.length ? <details className="mt-2"><summary className="cursor-pointer text-sm font-semibold">View {item.entries.length} entries</summary><ul className="mt-2 space-y-1 text-sm">{item.entries.map((entry) => <li key={entry.id}>{entry.workedOn} · {formatHours(entry.hours)} hours · {entry.description}</li>)}</ul></details> : null}
@@ -152,8 +153,9 @@ export default function AdminPaymentQueue({
         <div className="mt-4 space-y-4">
           {ready.map((item) => (
             <article
+              id={`period-${item.period.id}`}
               key={item.period.id}
-              className="rounded-[1.4rem] border border-emerald-100 p-4"
+              className="scroll-mt-32 rounded-[1.4rem] border border-emerald-100 p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -245,7 +247,7 @@ export default function AdminPaymentQueue({
         <GrowthCard>
           <h2 className="text-lg font-black text-slate-950">Recent Paid Periods</h2>
           <div className="mt-3 space-y-2">{paidPeriods.map((item) => (
-            <div key={item.period.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 p-3 text-sm font-semibold">
+            <div id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 p-3 text-sm font-semibold">
               <span>{item.engagement.displayName} · {formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</span>
               <StatusChip status="paid" label="Paid" />
             </div>
