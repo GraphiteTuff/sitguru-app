@@ -1,7 +1,6 @@
 import type { StaffCompensationRate, StaffTimeEntry } from "@/lib/staff-time/types";
 import {
   formatUsdFromCents,
-  hoursTimesRateCents,
   sumCents,
 } from "@/lib/staff-time/money";
 
