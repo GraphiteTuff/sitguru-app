@@ -101,7 +101,7 @@ export async function fetchOfficialMetaSnapshot(
     throw new Error(`Meta ${platform} API returned an invalid response.`);
   }
   const row = payload as Record<string, unknown>;
-  if (row.error || typeof row.id !== "string" || !/^\\d+$/.test(row.id)) {
+  if (row.error || typeof row.id !== "string" || !/^\d+$/.test(row.id)) {
     throw new Error(`Meta ${platform} API did not return a valid account identity.`);
   }
   // Instagram Login returns an app-scoped /me identity, which can differ
