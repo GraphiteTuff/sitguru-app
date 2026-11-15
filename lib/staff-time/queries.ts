@@ -244,6 +244,7 @@ export type StaffPaymentQueueItem = {
   statusLabel: string;
   entries: StaffTimeEntry[];
   payment: StaffPaymentRecord | null;
+  recoveredByAdmin: boolean;
 };
 
 const ATTENTION_STATUSES = [
@@ -334,6 +335,20 @@ async function queryPaymentPeriodQueue(
     }
   }
 
+  const submittedIds = periods.filter((period) => period.status === "submitted").map((period) => period.id);
+  const recoveredPeriodIds = new Set<string>();
+  if (submittedIds.length) {
+    const { data: recoveryRows, error: recoveryError } = await supabaseAdmin
+      .from("staff_period_audit_events")
+      .select("period_id").eq("action", "admin_recovered_receipt")
+      .in("period_id", submittedIds);
+    if (recoveryError) {
+      console.error("[staff-time] receipt recovery events", recoveryError.message);
+      throw new Error("Contractor receipt audit trail could not be loaded.");
+    }
+    for (const row of recoveryRows || []) recoveredPeriodIds.add(String(row.period_id));
+  }
+
   return periods.map((period) => {
     const engagement = engagementById.get(period.engagementId);
     if (!engagement) {
@@ -345,6 +360,7 @@ async function queryPaymentPeriodQueue(
       statusLabel: paymentStatusLabel(period.status),
       entries: entriesByPeriod.get(period.id) || [],
       payment: paymentByPeriod.get(period.id) || null,
+      recoveredByAdmin: recoveredPeriodIds.has(period.id),
     };
   });
 }
