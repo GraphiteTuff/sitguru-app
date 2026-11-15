@@ -12,6 +12,8 @@ on:
       - "lib/admin/hq-nav.ts"
       - "lib/realtime/publish-staff-time.ts"
       - "scripts/contractor-center-invariants.test.mjs"
+      - "scripts/contractor-finance-invariants.test.mjs"
+      - "supabase/migrations/20261115_staff_payments_atomic_finance.sql"
       - ".github/workflows/contractor-center-verify.yml"
   workflow_dispatch:
 
@@ -41,4 +43,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Contractor desk invariants
-        run: node --test scripts/contractor-center-invariants.test.mjs
+        run: node --test scripts/contractor-center-invariants.test.mjs scripts/contractor-finance-invariants.test.mjs
+      - name: Period math and rate calculations
+        run: npx tsx --test lib/staff-time/money.test.ts

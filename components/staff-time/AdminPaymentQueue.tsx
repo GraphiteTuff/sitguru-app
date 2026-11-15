@@ -8,7 +8,7 @@ import {
 import { formatHours, formatUsdFromCents } from "@/lib/staff-time/money";
 import { staffCategoryLabel } from "@/lib/staff-time/categories";
 import { paymentStatusLabel } from "@/lib/staff-time/status";
-import type { StaffEngagement, StaffPaymentPeriod, StaffTimeEntry } from "@/lib/staff-time/types";
+import type { StaffEngagement, StaffPaymentPeriod, StaffTimeEntry, StaffPaymentRecord } from "@/lib/staff-time/types";
 import StatusChip from "@/components/staff-time/StatusChip";
 import { GrowthCard } from "@/components/admin/growth/GrowthPageFrame";
 import { formatPeriodLabel } from "@/lib/staff-time/periods";
@@ -18,6 +18,8 @@ export type QueueItem = {
   engagement: StaffEngagement;
   statusLabel: string;
   entries?: StaffTimeEntry[];
+  payment?: StaffPaymentRecord | null;
+  recoveredByAdmin?: boolean;
 };
 
 export default function AdminPaymentQueue({
@@ -37,7 +39,6 @@ export default function AdminPaymentQueue({
   );
   const submitted = items.filter((item) => item.period.status === "submitted");
   const corrections = items.filter((item) => item.period.status === "needs_correction");
-  const saved = items.filter((item) => item.period.status === "draft");
   const paidPeriods = items.filter((item) => item.period.status === "paid");
   const showHours = mode === "all" || mode === "hours";
   const showPayments = mode === "all" || mode === "payments";
@@ -61,7 +62,7 @@ export default function AdminPaymentQueue({
       <GrowthCard>
         <h2 className="text-lg font-black text-slate-950">Contractor Hours Approvals</h2>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          Submitted payment periods awaiting founder review. Drafts are visible below, separately from submitted hours.
+          Only hours submitted by a manager appear here. Review entries, approve, or request corrections.
         </p>
         <div className="mt-4 space-y-3">
           {submitted.map((item) => (
@@ -84,9 +85,10 @@ export default function AdminPaymentQueue({
                     {formatUsdFromCents(item.period.amountCents)}
                   </p>
                 </div>
-                <StatusChip status={item.period.status} label={item.statusLabel} />
+                <StatusChip status={item.period.status} label={item.recoveredByAdmin ? "Received for Review" : item.statusLabel} />
               </div>
-              <p className="mt-2 text-xs font-semibold text-slate-600">Submitted: {item.period.submittedAt ? new Date(item.period.submittedAt).toLocaleString("en-US", { timeZone: "America/New_York" }) : "Timestamp unavailable"} · {item.engagement.paymentCadence} cadence</p>
+              <p className="mt-2 text-xs font-semibold text-slate-600">{item.recoveredByAdmin ? "Administratively received" : "Submitted"}: {item.period.submittedAt ? new Date(item.period.submittedAt).toLocaleString("en-US", { timeZone: "America/New_York" }) : "Timestamp unavailable"} · {item.engagement.paymentCadence} cadence</p>
+              {item.recoveredByAdmin ? <p className="mt-1 text-xs font-semibold text-amber-900">Previously saved work was administratively received for review at the founder's request. The original submission wasn't confirmed by the system; see audit history.</p> : null}
               {item.entries?.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-white/75 p-3"><summary className="cursor-pointer text-sm font-black text-slate-800">Review {item.entries.length} time entries</summary><ul className="mt-2 space-y-2">{item.entries.map((entry) => <li key={entry.id} className="border-t border-slate-200 py-2 text-xs text-slate-700"><strong>{entry.workedOn} · {formatHours(entry.hours)} hrs · {staffCategoryLabel(entry.categorySlug)}</strong><p className="mt-1">{entry.description}</p></li>)}</ul></details> : <p className="mt-2 text-sm font-semibold text-amber-900">No time entry details found. Verify before approving.</p>}
 {canAct ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -126,21 +128,6 @@ export default function AdminPaymentQueue({
           ) : null}
         </div>
       </GrowthCard>
-      ) : null}
-
-      <div id="drafts" className="scroll-mt-28" />
-      {showHours && saved.length > 0 ? (
-        <GrowthCard>
-          <h2 className="text-lg font-black text-slate-950">Saved, Not Submitted</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-600">These drafts are not yet eligible for approval.</p>
-          <div className="mt-3 space-y-3">{saved.map((item) => (
-            <article id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2"><strong>{item.engagement.displayName}</strong><StatusChip status="draft" label="Draft — not submitted" /></div>
-              <p className="mt-1 text-sm font-semibold">{formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</p>
-              {item.entries?.length ? <details className="mt-2"><summary className="cursor-pointer text-sm font-semibold">View {item.entries.length} entries</summary><ul className="mt-2 space-y-1 text-sm">{item.entries.map((entry) => <li key={entry.id}>{entry.workedOn} · {formatHours(entry.hours)} hours · {entry.description}</li>)}</ul></details> : null}
-            </article>
-          ))}</div>
-        </GrowthCard>
       ) : null}
 
       <div id="payment-queue" className="scroll-mt-28" />
@@ -185,6 +172,8 @@ export default function AdminPaymentQueue({
                     name="amountDollars"
                     required
                     defaultValue={(item.period.amountCents / 100).toFixed(2)}
+                    readOnly
+                    title="Approved payable amount; resolve any discrepancy before recording bank settlement"
                     className="min-h-11 rounded-2xl border border-emerald-100 px-3"
                   />
                 </label>
@@ -248,7 +237,11 @@ export default function AdminPaymentQueue({
           <h2 className="text-lg font-black text-slate-950">Recent Paid Periods</h2>
           <div className="mt-3 space-y-2">{paidPeriods.map((item) => (
             <div id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 p-3 text-sm font-semibold">
-              <span>{item.engagement.displayName} · {formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</span>
+              <div>
+                <p>{item.engagement.displayName} · {formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</p>
+                {item.payment ? <p className="mt-1 text-xs text-slate-600">Paid {item.payment.paidOn || "Date unavailable"} · Confirmed bank ACH · Reference {item.payment.externalReference || "Not recorded"}</p> :
+                  <p className="mt-1 text-xs font-semibold text-rose-700">Missing ACH reconciliation record — administrator review required</p>}
+              </div>
               <StatusChip status="paid" label="Paid" />
             </div>
           ))}</div>

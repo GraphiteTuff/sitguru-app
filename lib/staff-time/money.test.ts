@@ -82,6 +82,21 @@ describe("staff money math", () => {
     assert.equal(totals.totalHours, 15);
   });
 
+  it("rounds Ava's 7.34-hour period once per rate, not each entry", () => {
+    const hours = [1, 0.17, 0.17, 0.25, 0.25, 0.5, 1.5, 1, 1, 1, 0.5];
+    const rate: StaffCompensationRate = { id: "ava-rate", engagementId: "ava",
+      hourlyRateCents: 1675, effectiveOn: "2026-11-01", endedOn: null, notes: "" };
+    const entries = hours.map((hours, i) => ({
+      id: String(i), engagementId: "ava", userId: "ava", paymentPeriodId: "p",
+      workedOn: "2026-11-12", hours, categorySlug: "social_content", description: "work",
+      growthInitiativeId: null, status: "draft", timerStartedAt: null,
+      timerStoppedAt: null, createdAt: "", updatedAt: "",
+    })) satisfies StaffTimeEntry[];
+    const result = calculatePeriodTotals(entries, [rate]);
+    assert.equal(result.totalHours, 7.34);
+    assert.equal(result.amountCents, 12295);
+  });
+
   it("validates hours and formats", () => {
     assert.equal(parsePositiveHours("2.5").ok, true);
     assert.equal(parsePositiveHours("0").ok, false);

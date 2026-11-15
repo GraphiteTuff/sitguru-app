@@ -1,7 +1,6 @@
 import type { StaffCompensationRate, StaffTimeEntry } from "@/lib/staff-time/types";
 import {
   formatUsdFromCents,
-  hoursTimesRateCents,
   sumCents,
 } from "@/lib/staff-time/money";
 
@@ -35,25 +34,32 @@ export function calculatePeriodTotals(
   entries: StaffTimeEntry[],
   rates: StaffCompensationRate[],
 ): PeriodTotals {
-  let totalHours = 0;
-  const amountParts: number[] = [];
+  let hundredthsOfHours = 0;
+  // Round at the pay-period level for each effective rate, not once per
+  // small time entry. Summing rounded entry cents overpays Ava's 7.34 hrs by 2c.
+  const groups = new Map<string, { hundredths: number; rateCents: number }>();
   const rateLabels = new Set<string>();
   const missingRateDates: string[] = [];
 
   for (const entry of entries) {
-    totalHours += entry.hours;
+    const entryHundredths = Math.round(entry.hours * 100);
+    hundredthsOfHours += entryHundredths;
     const rate = rateForWorkDate(rates, entry.workedOn);
     if (!rate) {
       missingRateDates.push(entry.workedOn);
       continue;
     }
-    amountParts.push(hoursTimesRateCents(entry.hours, rate.hourlyRateCents));
+    const current = groups.get(rate.id) || { hundredths: 0, rateCents: rate.hourlyRateCents };
+    current.hundredths += entryHundredths;
+    groups.set(rate.id, current);
     rateLabels.add(formatUsdFromCents(rate.hourlyRateCents) + "/hr");
   }
 
   return {
-    totalHours: Math.round(totalHours * 100) / 100,
-    amountCents: sumCents(amountParts),
+    totalHours: hundredthsOfHours / 100,
+    amountCents: sumCents([...groups.values()].map(
+      ({ hundredths, rateCents }) => Math.round((hundredths * rateCents) / 100),
+    )),
     rateSummary: [...rateLabels].join(", ") || "—",
     missingRateDates,
   };

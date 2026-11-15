@@ -11,7 +11,7 @@ import {
   formatHours,
 } from "@/lib/staff-time/money";
 import {
-  biweeklyPeriodContaining,
+  paymentPeriodContaining,
   formatPeriodLabel,
   isoToday,
   weekBoundsContaining,
@@ -30,7 +30,7 @@ export async function ensurePaymentPeriod(
   engagement: StaffEngagement,
   onDate = isoToday(),
 ): Promise<StaffPaymentPeriod> {
-  const range = biweeklyPeriodContaining(onDate, engagement.periodAnchorOn);
+  const range = paymentPeriodContaining(onDate, engagement.periodAnchorOn, engagement.paymentCadence);
   const { data: existing } = await supabaseAdmin
     .from("staff_payment_periods")
     .select("*")
@@ -70,8 +70,8 @@ export async function listPeriodEntries(
     .order("worked_on", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) {
-    console.warn("[staff-time] entries", error.message);
-    return [];
+    console.error("[staff-time] entries", error.message);
+    throw new Error("Contractor time entries could not be loaded.");
   }
   return (data || []).map((row) => mapTimeEntry(row as Record<string, unknown>));
 }
@@ -105,6 +105,7 @@ export async function recalculatePeriod(
     .maybeSingle();
   if (!periodRow) return null;
   const period = mapPeriod(periodRow as Record<string, unknown>);
+  if (!["draft", "needs_correction"].includes(period.status)) return period;
   const entries = await listPeriodEntries(periodId);
   const rates = await listCompensationRates(period.engagementId);
   const totals = calculatePeriodTotals(entries, rates);
@@ -116,6 +117,7 @@ export async function recalculatePeriod(
       updated_at: new Date().toISOString(),
     })
     .eq("id", periodId)
+    .in("status", ["draft", "needs_correction"])
     .select("*")
     .maybeSingle();
   if (error || !updated) {
@@ -241,13 +243,15 @@ export type StaffPaymentQueueItem = {
   engagement: StaffEngagement;
   statusLabel: string;
   entries: StaffTimeEntry[];
+  payment: StaffPaymentRecord | null;
+  recoveredByAdmin: boolean;
 };
 
 const ATTENTION_STATUSES = [
   "submitted", "approved", "ready_for_payment", "processing", "needs_correction",
 ] as const;
 const CONTRACTOR_STATUSES = [
-  "draft", "submitted", "approved", "ready_for_payment", "processing",
+  "submitted", "approved", "ready_for_payment", "processing",
   "needs_correction", "paid",
 ] as const;
 
@@ -292,7 +296,7 @@ async function queryPaymentPeriodQueue(
   if (!periods.length) return [];
 
   const reviewIds = periods
-    .filter((period) => ["draft", "submitted", "needs_correction"].includes(period.status))
+    .filter((period) => ["submitted", "needs_correction"].includes(period.status))
     .map((period) => period.id);
   const entriesByPeriod = new Map<string, StaffTimeEntry[]>();
   if (reviewIds.length) {
@@ -315,6 +319,36 @@ async function queryPaymentPeriodQueue(
     }
   }
 
+  const paidPeriodIds = periods.filter((period) => period.status === "paid").map((period) => period.id);
+  const paymentByPeriod = new Map<string, StaffPaymentRecord>();
+  if (paidPeriodIds.length) {
+    const { data: paymentRows, error: paymentError } = await supabaseAdmin
+      .from("staff_payment_records").select("*")
+      .in("payment_period_id", paidPeriodIds);
+    if (paymentError) {
+      console.error("[staff-time] contractor bank records", paymentError.message);
+      throw new Error("Contractor payment receipts could not be loaded.");
+    }
+    for (const row of paymentRows || []) {
+      const payment = mapPaymentRecord(row as Record<string, unknown>);
+      paymentByPeriod.set(payment.paymentPeriodId, payment);
+    }
+  }
+
+  const submittedIds = periods.filter((period) => period.status === "submitted").map((period) => period.id);
+  const recoveredPeriodIds = new Set<string>();
+  if (submittedIds.length) {
+    const { data: recoveryRows, error: recoveryError } = await supabaseAdmin
+      .from("staff_period_audit_events")
+      .select("period_id").eq("action", "admin_recovered_receipt")
+      .in("period_id", submittedIds);
+    if (recoveryError) {
+      console.error("[staff-time] receipt recovery events", recoveryError.message);
+      throw new Error("Contractor receipt audit trail could not be loaded.");
+    }
+    for (const row of recoveryRows || []) recoveredPeriodIds.add(String(row.period_id));
+  }
+
   return periods.map((period) => {
     const engagement = engagementById.get(period.engagementId);
     if (!engagement) {
@@ -325,6 +359,8 @@ async function queryPaymentPeriodQueue(
       engagement,
       statusLabel: paymentStatusLabel(period.status),
       entries: entriesByPeriod.get(period.id) || [],
+      payment: paymentByPeriod.get(period.id) || null,
+      recoveredByAdmin: recoveredPeriodIds.has(period.id),
     };
   });
 }

@@ -5,7 +5,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 test("manager submits a confirmed saved period and sends an exact-record alert", () => {
   const action = read("lib/staff-time/actions.ts");
-  assert.match(action, /select\("id,status,submitted_at"\)/);
+  assert.match(action, /staff_time_submit_period/);
+  assert.match(action, /submitted !== true/);
   assert.match(action, /notifyHref: `\/admin\/hr\/people\/payments#period-/);
   assert.match(action, /resourceVersion: now/);
 });

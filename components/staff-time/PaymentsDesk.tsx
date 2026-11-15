@@ -99,9 +99,14 @@ export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
                 <div><p className="text-sm font-black text-[#0F2744]">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
                   <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
                 </div>
-                <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-800">
-                  {period.status === "submitted" ? "Submitted · Awaiting Approval" : paymentStatusLabel(period.status)}
-                </p>
+                <div className="text-right">
+                  <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-800">
+                    {period.status === "submitted" ? "Submitted · Awaiting Approval" : paymentStatusLabel(period.status)}
+                  </p>
+                  {period.submittedAt ? <p className="mt-1 text-xs text-slate-500">Submitted {new Date(period.submittedAt).toLocaleDateString("en-US")}</p> : null}
+                  {period.approvedAt ? <p className="mt-1 text-xs font-semibold text-blue-700">Admin reviewed {new Date(period.approvedAt).toLocaleDateString("en-US")}</p> : null}
+                  {period.paidAt ? <p className="mt-1 text-xs font-semibold text-emerald-800">Paid {new Date(period.paidAt).toLocaleDateString("en-US")}</p> : null}
+                </div>
               </div>
             ))}
           </div>
