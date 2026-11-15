@@ -67,7 +67,7 @@ export default function MyTimeDesk({
   const maxDay = Math.max(...byDay.map((day) => day.hours), data.week.expectedMax / 5, 1);
   const planned = data.week.expectedMax || 0;
   const weekPct = planned ? Math.min(100, Math.round((data.week.hours / planned) * 100)) : 0;
-  const periodGoal = planned * 2;
+  const periodGoal = planned * (data.engagement.paymentCadence === "weekly" ? 1 : 2);
   const periodPct = periodGoal ? Math.min(100, Math.round((data.period.totalHours / periodGoal) * 100)) : 0;
   const pace = data.week.hours - planned / 2;
   const categories = STAFF_TIME_CATEGORIES.map((cat) => ({
