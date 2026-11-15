@@ -95,7 +95,7 @@ export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
         {priorPeriods.length ? (
           <div className="mt-3 space-y-2">
             {priorPeriods.map((period) => (
-              <div key={period.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3">
+              <div id={`period-${period.id}`} key={period.id} className="flex flex-wrap scroll-mt-28 items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3">
                 <div><p className="text-sm font-black text-[#0F2744]">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
                   <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
                 </div>
