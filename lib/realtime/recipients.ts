@@ -75,23 +75,20 @@ export async function recipientsForGrowthWorkspace(
  */
 export async function listContractorHoursApproverIds(): Promise<string[]> {
   const roles = ["founder", "owner", "super_admin", "super_user", "hr_admin", "finance_admin", "billing_admin", "operations_admin"];
-  const [hq, admins, roleAssignments] = await Promise.all([
+  const [hq, admins] = await Promise.all([
     supabaseAdmin.from("admin_user_access")
       .select("user_id,email,role_key")
       .eq("is_active", true).in("role_key", roles),
     supabaseAdmin.from("admin_users")
       .select("user_id,email,role,is_active")
       .eq("is_active", true).in("role", roles),
-    supabaseAdmin.from("user_roles")
-      .select("user_id,role").in("role", roles),
   ]);
-  for (const [label, result] of [["hq", hq], ["admin", admins], ["roles", roleAssignments]] as const) {
+  for (const [label, result] of [["hq", hq], ["admin", admins]] as const) {
     if (result.error) console.warn("[contractor-alerts] approver lookup", label, result.error.message);
   }
   const ids: Array<string | null | undefined> = [
     ...(hq.data || []).map((row) => row.user_id),
     ...(admins.data || []).map((row) => row.user_id),
-    ...(roleAssignments.data || []).map((row) => row.user_id),
   ];
   const emails = [...new Set([
     ...SUPER_USER_EMAILS,
@@ -112,7 +109,7 @@ export async function listContractorHoursApproverIds(): Promise<string[]> {
   }
   const recipients = uniqueUserIds(ids);
   if (!recipients.length) {
-    console.warn("[contractor-alerts] No founder/HR approver ID resolved; notification will be retried by the Admin attention queue.");
+    console.warn("[contractor-alerts] No founder/HR approver ID resolved; Admin action queue remains the fallback.");
   }
   return recipients;
 }
