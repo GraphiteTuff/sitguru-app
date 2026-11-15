@@ -341,11 +341,15 @@ export async function submitPaymentPeriod(formData: FormData) {
   }
 
   const now = new Date().toISOString();
-  await supabaseAdmin
+  const { error: entriesError } = await supabaseAdmin
     .from("staff_time_entries")
     .update({ status: "submitted", updated_at: now })
     .eq("payment_period_id", periodId)
     .eq("engagement_id", engagement.id);
+  if (entriesError) {
+    console.error("[staff-time] submit entries", entriesError.message);
+    bounce(myTimeHome(formData), "error", "Time entries could not be submitted. No approval request was created.");
+  }
 
   const { error } = await supabaseAdmin
     .from("staff_payment_periods")
@@ -404,7 +408,12 @@ export async function approvePaymentPeriod(formData: FormData) {
     );
   }
 
-  await recalculatePeriod(periodId);
+  const totals = await recalculatePeriod(periodId);
+  const submittedEntries = await listPeriodEntries(periodId);
+  if (!totals || totals.totalHours <= 0 || totals.amountCents <= 0 || submittedEntries.length === 0) {
+    bounce("/admin/hr/people/payments", "error",
+      "Approval requires submitted time entries and a valid positive calculated amount.");
+  }
   const now = new Date().toISOString();
   const { error } = await supabaseAdmin
     .from("staff_payment_periods")
