@@ -53,6 +53,47 @@ test("Instagram fetch returns a verified one-follower, zero-post account", async
   assert.equal(result.mediaCount, 0);
 });
 
+test("Instagram Login uses graph.instagram.com/me and validates the expected username", async () => {
+  let requestedUrl = "";
+  let authHeader = "";
+  const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
+    requestedUrl = String(input);
+    authHeader = new Headers(init?.headers).get("authorization") || "";
+    return new Response(JSON.stringify({
+      id: "12345678901234567",
+      username: "sitgurupetcare",
+      followers_count: 1,
+      media_count: 0,
+    }));
+  };
+  const result = await fetchOfficialMetaSnapshot("instagram", {
+    token: "instagram-login-secret",
+    authMode: "instagram_login",
+    fetcher: fetcher as typeof fetch,
+  });
+  assert.equal(new URL(requestedUrl).host, "graph.instagram.com");
+  assert.equal(new URL(requestedUrl).pathname, "/v27.0/me");
+  assert.equal(requestedUrl.includes("instagram-login-secret"), false);
+  assert.equal(authHeader, "Bearer instagram-login-secret");
+  assert.equal(result.accountId, "12345678901234567");
+  assert.equal(result.followers, 1);
+
+  const wrongUsername = async () => new Response(JSON.stringify({
+    id: "12345678901234567",
+    username: "someone_else",
+    followers_count: 1,
+    media_count: 0,
+  }));
+  await assert.rejects(
+    fetchOfficialMetaSnapshot("instagram", {
+      token: "test",
+      authMode: "instagram_login",
+      fetcher: wrongUsername as typeof fetch,
+    }),
+    /unexpected Instagram username/,
+  );
+});
+
 test("Rejects wrong account and malformed follower counts", async () => {
   const wrongAccount = async () =>
     new Response(
