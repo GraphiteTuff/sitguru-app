@@ -118,17 +118,7 @@ export const HQ_NAV_SECTIONS: HqNavSection[] = [
     title: "Finance",
     items: [
       { label: "Financial Overview", href: "/admin/financials", icon: "finance" },
-      {
-        label: "Contractor Hours",
-        href: "/admin/financials/contractor-hours",
-        icon: "clock",
-      },
-      {
-        label: "Contractor Payments",
-        href: "/admin/financials/contractor-payments",
-        icon: "wallet",
-      },
-      { label: "Team Payments (HR)", href: "/admin/hr/people/payments", icon: "wallet" },
+      { label: "Contractor Hours & Payments", href: "/admin/hr/people/payments", icon: "clock" },
       { label: "Banking", href: "/admin/financials/plaid", icon: "bank" },
       { label: "Payment Gateway", href: "/admin/financials/payment-gateway", icon: "card" },
       { label: "Profit & Loss", href: "/admin/financials/profit-loss", icon: "chart" },
@@ -163,7 +153,7 @@ export const HQ_HEADER_LINKS = [
   { label: "Overview", href: "/admin" },
   { label: "Action Center", href: "/admin/action-center" },
   { label: "Managers", href: "/admin/managers" },
-  { label: "Contractor Hours", href: "/admin/financials/contractor-hours" },
+  { label: "Contractor Reviews", href: "/admin/hr/people/payments" },
   { label: "Messages", href: "/admin/messages" },
   { label: "Manager Portal", href: "/manager" },
   { label: "Financials", href: "/admin/financials" },
