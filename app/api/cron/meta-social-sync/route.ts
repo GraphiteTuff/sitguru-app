@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       try {
         const snapshot = await fetchOfficialMetaSnapshot(platform);
         const saved = await persistOfficialMetaSnapshot(supabaseAdmin, snapshot);
-        return { platform, ok: true, ...saved };
+        return { ok: true, ...saved };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown sync error";
         // Neither the token nor the raw Meta error response is ever logged.
