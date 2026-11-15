@@ -26,13 +26,14 @@ const STAFF_TIME_PATHS = [
 ];
 
 function isContractorFinanceEvent(eventType: string) {
-  return [
+  const events: readonly string[] = [
     SITGURU_DOMAIN_EVENTS.TIME_PERIOD_SUBMITTED,
     SITGURU_DOMAIN_EVENTS.TIME_PERIOD_RETURNED,
     SITGURU_DOMAIN_EVENTS.TIME_PERIOD_APPROVED,
     SITGURU_DOMAIN_EVENTS.PAYMENT_READY,
     SITGURU_DOMAIN_EVENTS.PAYMENT_PAID,
-  ].includes(eventType as (typeof SITGURU_DOMAIN_EVENTS)[keyof typeof SITGURU_DOMAIN_EVENTS]);
+  ];
+  return events.includes(eventType);
 }
 
 export async function publishStaffTimeEvent(input: {
