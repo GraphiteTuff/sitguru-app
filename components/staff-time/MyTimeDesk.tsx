@@ -158,7 +158,7 @@ export default function MyTimeDesk({
           </ul>
         </article>
         <article className={`${DESK_UI.card} p-4`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Pacing & Goals</h2>
+          <h2 id={`period-${data.period.id}`} className="scroll-mt-28 text-lg font-black text-[#0F2744]">Pacing & Goals</h2>
           <p className="mt-2 text-sm font-semibold text-slate-600">{data.week.rangeLabel}</p>
           <p className="mt-2 text-sm font-semibold text-slate-600">Status {data.period.status.replaceAll("_", " ")}</p>
           {editable ? (
