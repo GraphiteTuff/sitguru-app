@@ -1,5 +1,5 @@
 /**
- * Biweekly payment period math from an engagement period_anchor_on.
+ * Weekly or biweekly payment period math from an engagement period_anchor_on.
  */
 
 export type DateRange = { start: string; end: string };
@@ -29,10 +29,19 @@ export function biweeklyPeriodContaining(
   onDate: string,
   anchorOn: string,
 ): DateRange {
+  return paymentPeriodContaining(onDate, anchorOn, "biweekly");
+}
+
+export function paymentPeriodContaining(
+  onDate: string,
+  anchorOn: string,
+  cadence: string,
+): DateRange {
+  const daysPerPeriod = cadence === "weekly" ? 7 : 14;
   const offset = daysBetween(anchorOn, onDate);
-  const periodIndex = Math.floor(offset / 14);
-  const start = addDays(anchorOn, periodIndex * 14);
-  const end = addDays(start, 13);
+  const periodIndex = Math.floor(offset / daysPerPeriod);
+  const start = addDays(anchorOn, periodIndex * daysPerPeriod);
+  const end = addDays(start, daysPerPeriod - 1);
   return { start, end };
 }
 
