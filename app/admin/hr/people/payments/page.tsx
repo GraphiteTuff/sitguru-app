@@ -92,7 +92,7 @@ export default async function AdminPeoplePaymentsPage({
           mode="all"
           items={allItems}
           canAct={actor.isSuperUser || [
-            "founder", "owner", "super_admin", "hr_admin", "operations_admin", "billing_admin",
+            "founder", "owner", "super_admin", "hr_admin", "operations_admin", "billing_admin", "finance_admin",
           ].includes(actor.role)}
           notice={
             first(params.ok)
