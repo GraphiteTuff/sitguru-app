@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import LiveResultsClock from "@/components/portal/LiveResultsClock";
+import MetaSocialSyncControl from "@/components/portal/MetaSocialSyncControl";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { LiveResultsData } from "@/lib/admin/growth/live-results";
 
@@ -43,9 +44,11 @@ function formatCount(value: number) {
 export default function LiveResultsBoard({
   audience,
   data,
+  canSyncMeta = false,
 }: {
   audience: "manager" | "intern";
   data: LiveResultsData;
+  canSyncMeta?: boolean;
 }) {
   const manager = audience === "manager";
   const base = manager ? "/manager" : "/intern";
@@ -156,7 +159,10 @@ export default function LiveResultsBoard({
             );
           })}
         </div>
-        <h3 className="text-sm font-black text-[#0F2744]">Social</h3>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="text-sm font-black text-[#0F2744]">Social</h3>
+          {canSyncMeta && manager ? <MetaSocialSyncControl /> : null}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {data.social.map((card) => {
             const verified = card.verifiedStatus === "connected" && card.verifiedFollowers !== null;
