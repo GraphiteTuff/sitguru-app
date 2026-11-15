@@ -8,9 +8,9 @@ import { dollarsToCents } from "@/lib/staff-time/money";
 export const DEFAULT_STAFF_ENGAGEMENT = {
   expectedWeeklyMinHours: 10,
   expectedWeeklyMaxHours: 15,
-  paymentCadence: "biweekly",
-  /** Team kickoff pay-period anchor (current biweekly window start). */
-  periodAnchorOn: "2026-11-01",
+  paymentCadence: "weekly",
+  /** Sunday week start; existing engagement rows keep their established cadence. */
+  periodAnchorOn: "2026-11-15",
   hourlyRateDollars: 16.75,
   title: GROWTH_HIRE_TITLE,
 } as const;
@@ -129,8 +129,8 @@ export async function listCompensationRates(
     .eq("engagement_id", engagementId)
     .order("effective_on", { ascending: false });
   if (error) {
-    console.warn("[staff-time] rates", error.message);
-    return [];
+    console.error("[staff-time] rates", error.message);
+    throw new Error("Contractor rates could not be loaded.");
   }
   return (data || []).map((row) => mapRate(row as Record<string, unknown>));
 }
