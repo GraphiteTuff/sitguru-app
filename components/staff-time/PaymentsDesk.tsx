@@ -3,12 +3,14 @@ import { CreditCard, FileText, HelpCircle, Landmark } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import { formatHours, formatUsdFromCents } from "@/lib/staff-time/money";
 import { paymentStatusLabel } from "@/lib/staff-time/status";
+import { formatPeriodLabel } from "@/lib/staff-time/periods";
 import type { MyTimeDashboard } from "@/lib/staff-time/types";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
   const paid = data.payments;
-  const hoursGoal = (data.week.expectedMax || 0) * 2 || 1;
+  const hoursGoal = (data.week.expectedMax || 0) * (data.engagement.paymentCadence === "weekly" ? 1 : 2) || 1;
+  const priorPeriods = (data.recentPeriods || []).filter((period) => period.id !== data.period.id).slice(0, 10);
   const pct = Math.min(100, Math.round((data.period.totalHours / hoursGoal) * 100));
   const months = new Map<string, number>();
   for (const payment of paid) {
@@ -87,6 +89,25 @@ export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
           </div>
         </article>
       </section>
+      <section aria-label="Prior payment periods" className={`${DESK_UI.card} p-4`}>
+        <h2 className="text-lg font-black text-[#0F2744]">Submitted, Approved & Awaiting Payment</h2>
+        <p className="mt-1 text-sm text-slate-600">Each pay period stays visible after the next week begins. Admin HQ reviews these same records.</p>
+        {priorPeriods.length ? (
+          <div className="mt-3 space-y-2">
+            {priorPeriods.map((period) => (
+              <div key={period.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3">
+                <div><p className="text-sm font-black text-[#0F2744]">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
+                  <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
+                </div>
+                <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-800">
+                  {period.status === "submitted" ? "Submitted · Awaiting Approval" : paymentStatusLabel(period.status)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : <p className="mt-3 text-sm text-slate-500">No earlier pay periods yet.</p>}
+      </section>
+
       <section id="payment-history" className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(260px,0.7fr)]">
         <article className={`${DESK_UI.card} overflow-hidden`}>
           <h2 className="px-4 py-3 text-lg font-black text-[#0F2744]">Payment History</h2>
