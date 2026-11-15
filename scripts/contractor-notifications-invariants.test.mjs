@@ -63,6 +63,8 @@ test("reviewed-and-approved and Paid messages deep-link to the correct manager p
   assert.match(action, /Your contractor payment was marked Paid/);
   assert.equal((action.match(/notifyHref: `\/manager\/payments#period-\$\{periodId\}`/g) || []).length, 2);
   for (const filename of ["MyTimeDesk", "MyTimePanel", "PaymentsDesk"]) {
-    assert.match(read(`components/staff-time/${filename}.tsx`), /id=\{`period-\$\{period\.id\}\`\}/);
+    const view = read(`components/staff-time/${filename}.tsx`);
+    assert.match(view, /id=\{`period-\$\{period\.id\}\`\}/);
+    assert.match(view, /id=\{`period-\$\{data\.period\.id\}\`\}/);
   }
 });
