@@ -123,7 +123,7 @@ export default function LiveResultsBoard({
             <p className="text-xs font-bold text-[#2563EB]">Live SitGuru Results</p>
             <h2 className="text-2xl font-black text-[#0F2744]">People and social visits</h2>
             <p className="text-sm font-medium text-slate-500">
-              Totals are live. Social numbers are public visits and QR scans, not follower counts.
+              People totals come from SitGuru. Social cards show verified API followers when connected, with website visits and QR scans listed separately.
             </p>
           </div>
           <LiveResultsClock />
@@ -158,22 +158,64 @@ export default function LiveResultsBoard({
         </div>
         <h3 className="text-sm font-black text-[#0F2744]">Social</h3>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {data.social.map((card) => (
-            <article key={card.label} className={`${DESK_UI.card} p-4`}>
-              <p className="text-xs font-black uppercase tracking-wide" style={{ color: card.color }}>
-                {card.label}
-              </p>
-              <p className="mt-1 text-2xl font-black text-[#0F2744]">
-                {formatCount(card.value)}{" "}
-                <span className={`text-xs font-bold ${card.tone === "up" ? "text-[#16A34A]" : "text-slate-500"}`}>
-                  {card.badge}
-                </span>
-              </p>
-              <p className="mt-1 text-[10px] font-semibold uppercase text-slate-400">Last week and this week</p>
-              <Bars values={card.weekly} color={card.color} />
-              <p className="mt-2 text-[11px] font-medium text-slate-500">Public visits and QR scans</p>
-            </article>
-          ))}
+          {data.social.map((card) => {
+            const verified = card.verifiedStatus === "connected" && card.verifiedFollowers !== null;
+            const statusLabel = verified
+              ? "Verified API"
+              : card.verifiedStatus === "error"
+                ? "Stale data"
+                : card.verifiedStatus === "manual"
+                  ? "Not verified"
+                  : "Not connected";
+            const updatedAt = card.verifiedAt ? Date.parse(card.verifiedAt) : NaN;
+            return (
+              <article key={card.label} className={`${DESK_UI.card} p-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-black uppercase tracking-wide" style={{ color: card.color }}>
+                    {card.label}
+                  </p>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    verified ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {statusLabel}
+                  </span>
+                </div>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-slate-400">Followers</p>
+                <p className="mt-1 text-3xl font-black tabular-nums text-[#0F2744]">
+                  {verified && card.verifiedFollowers !== null ? formatCount(card.verifiedFollowers) : "—"}
+                </p>
+                <p className="mt-1 min-h-8 text-[11px] font-semibold text-slate-500">
+                  {verified
+                    ? card.verifiedFollowerDelta === null
+                      ? "Verified by official social API"
+                      : `${card.verifiedFollowerDelta >= 0 ? "+" : ""}${formatCount(card.verifiedFollowerDelta)} since first verified sync`
+                    : card.verifiedStatus === "error"
+                      ? "The last verified sync is stale"
+                      : "Official follower count unavailable"}
+                </p>
+                {card.accountLabel && (
+                  <p className="truncate text-[11px] font-semibold text-slate-500">{card.accountLabel}</p>
+                )}
+                {verified && Number.isFinite(updatedAt) && (
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Synced {new Date(updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "short", timeStyle: "short" })} ET
+                  </p>
+                )}
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1">
+                    <p className="text-[11px] font-bold text-slate-700">
+                      {formatCount(card.value)} SitGuru visits / QR scans
+                    </p>
+                    <p className={`text-[10px] font-bold ${card.tone === "up" ? "text-[#16A34A]" : "text-slate-500"}`}>
+                      {card.badge}
+                    </p>
+                  </div>
+                  <Bars values={card.weekly} color={card.color} />
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">Public referrals, not platform impressions</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
