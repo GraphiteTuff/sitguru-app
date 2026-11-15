@@ -8,5 +8,5 @@ export default async function ManagerResultsPage() {
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
   const data = await loadLiveResults();
-  return <LiveResultsBoard audience="manager" data={data} />;
+  return <LiveResultsBoard audience="manager" data={data} canSyncMeta={access.actor.isSuperUser} />;
 }
