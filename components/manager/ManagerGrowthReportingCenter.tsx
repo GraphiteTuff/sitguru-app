@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3, CalendarDays, CheckCircle2, FileText, Info, Link2, ShieldCheck } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
+import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { saveManagerGrowthReport } from "@/lib/growth-center-v2/report-actions";
 import {
@@ -81,6 +82,7 @@ export default function ManagerGrowthReportingCenter({
 
   return (
     <div className="space-y-5">
+      {!editable ? <LiveSocialAutoRefresh intervalMs={90_000} /> : null}
       <DeskPageHero
         icon={<BarChart3 size={22} />}
         title="Growth & Performance Reports"

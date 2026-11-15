@@ -2,6 +2,7 @@ import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { parseFiltersFromSearch } from "@/lib/growth-center-v2/date-range";
 import { loadGrowthCenterSnapshot } from "@/lib/growth-center-v2/snapshot";
 import GrowthCenterInsightsBoard from "@/components/growth-center-v2/GrowthCenterInsightsBoard";
+import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import ManagerActivityHeatmap from "@/components/manager/ManagerActivityHeatmap";
 import { loadManagerDashboard } from "@/lib/internship/manager-data";
 
@@ -33,6 +34,7 @@ export default async function ManagerMetricsPage({
 
   return (
     <div className="space-y-5">
+      <LiveSocialAutoRefresh intervalMs={90_000} />
       <GrowthCenterInsightsBoard
         snapshot={snapshot}
         userId={access.actor.id}
