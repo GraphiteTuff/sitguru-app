@@ -94,6 +94,44 @@ test("Instagram Login uses graph.instagram.com/me and validates the expected use
   );
 });
 
+test("Instagram 401 retries the pinned Facebook Graph asset with system-user token", async () => {
+  const previousInstagram = process.env.META_INSTAGRAM_ACCESS_TOKEN;
+  const previousSystem = process.env.META_SYSTEM_USER_ACCESS_TOKEN;
+  const seen: Array<{ url: string; authorization: string }> = [];
+  process.env.META_INSTAGRAM_ACCESS_TOKEN = "expired-ig-token";
+  process.env.META_SYSTEM_USER_ACCESS_TOKEN = "authorized-system-token";
+  try {
+    const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const authorization = new Headers(init?.headers).get("authorization") || "";
+      seen.push({ url, authorization });
+      if (seen.length === 1) return new Response("unauthorized", { status: 401 });
+      return new Response(JSON.stringify({
+        id: "17841475074314025",
+        username: "sitgurupetcare",
+        followers_count: 1,
+        media_count: 0,
+      }));
+    };
+    const result = await fetchOfficialMetaSnapshot("instagram", {
+      fetcher: fetcher as typeof fetch,
+    });
+    assert.equal(result.followers, 1);
+    assert.equal(seen.length, 2);
+    assert.equal(new URL(seen[0].url).host, "graph.instagram.com");
+    assert.equal(new URL(seen[1].url).host, "graph.facebook.com");
+    assert.equal(new URL(seen[1].url).pathname, "/v27.0/17841475074314025");
+    assert.equal(seen[0].authorization, "Bearer expired-ig-token");
+    assert.equal(seen[1].authorization, "Bearer authorized-system-token");
+    assert.ok(seen.every((item) => !item.url.includes("token")));
+  } finally {
+    if (previousInstagram === undefined) delete process.env.META_INSTAGRAM_ACCESS_TOKEN;
+    else process.env.META_INSTAGRAM_ACCESS_TOKEN = previousInstagram;
+    if (previousSystem === undefined) delete process.env.META_SYSTEM_USER_ACCESS_TOKEN;
+    else process.env.META_SYSTEM_USER_ACCESS_TOKEN = previousSystem;
+  }
+});
+
 test("Rejects wrong account and malformed follower counts", async () => {
   const wrongAccount = async () =>
     new Response(
