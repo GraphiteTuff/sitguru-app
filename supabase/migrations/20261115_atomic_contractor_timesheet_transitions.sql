@@ -8,7 +8,7 @@ create or replace function public.submit_staff_payment_period(
 )
 returns boolean language plpgsql security definer set search_path = public as $$
 declare v_period public.staff_payment_periods%rowtype;
-declare v_owner uuid;
+v_owner uuid;
 begin
   select * into v_period from public.staff_payment_periods
     where id = p_period_id and engagement_id = p_engagement_id for update;
@@ -44,7 +44,7 @@ create or replace function public.approve_staff_payment_period(
 )
 returns boolean language plpgsql security definer set search_path = public as $$
 declare v_period public.staff_payment_periods%rowtype;
-declare v_owner uuid;
+v_owner uuid;
 begin
   select * into v_period from public.staff_payment_periods
     where id = p_period_id for update;
@@ -71,7 +71,7 @@ create or replace function public.return_staff_payment_period(
 )
 returns boolean language plpgsql security definer set search_path = public as $$
 declare v_period public.staff_payment_periods%rowtype;
-declare v_owner uuid;
+v_owner uuid;
 begin
   if length(trim(coalesce(p_note,''))) < 4 then
     raise exception 'An actionable correction note is required';
