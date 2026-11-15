@@ -98,7 +98,7 @@ export default function MyTimePanel({
         </GrowthCard>
 
         <GrowthCard>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+          <p id={`period-${data.period.id}`} className="scroll-mt-28 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
             Current Payment Period
           </p>
           <p className="mt-2 text-xl font-black text-slate-950">{data.periodLabel}</p>
