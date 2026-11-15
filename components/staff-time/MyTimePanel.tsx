@@ -61,6 +61,9 @@ export default function MyTimePanel({
                 <p className="text-sm font-black text-slate-900">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
                 <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
                 {period.status === "submitted" ? <p className="text-xs font-bold text-amber-800">Submitted · Awaiting Admin approval</p> : null}
+                {period.submittedAt ? <p className="text-xs text-slate-500">Submitted {new Date(period.submittedAt).toLocaleDateString("en-US")}</p> : null}
+                {period.approvedAt ? <p className="text-xs font-semibold text-blue-700">Reviewed and approved by Admin {new Date(period.approvedAt).toLocaleDateString("en-US")}</p> : null}
+                {period.paidAt ? <p className="text-xs font-semibold text-emerald-800">Paid · Updated {new Date(period.paidAt).toLocaleDateString("en-US")}</p> : null}
                 {period.status === "needs_correction" && period.correctionNote ? <p className="text-xs text-amber-900">{period.correctionNote}</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
