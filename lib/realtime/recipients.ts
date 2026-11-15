@@ -108,7 +108,7 @@ export async function listContractorHoursApproverIds(): Promise<string[]> {
       if (row.email) foundFounderEmails.add(String(row.email).toLowerCase());
     }
   }
-  const missingFounders = new Set(SUPER_USER_EMAILS.filter((email) => !foundFounderEmails.has(email)));
+  const missingFounders = new Set<string>(SUPER_USER_EMAILS.filter((email) => !foundFounderEmails.has(email)));
   if (missingFounders.size) {
     for (let page = 1; page <= 5; page++) {
       const { data: directory, error: directoryError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
@@ -121,7 +121,7 @@ export async function listContractorHoursApproverIds(): Promise<string[]> {
         const email = String(user.email || "").toLowerCase();
         if (missingFounders.has(email)) {
           ids.push(user.id);
-          missingFounders.delete(email as (typeof SUPER_USER_EMAILS)[number]);
+          missingFounders.delete(email);
         }
       }
       if (!missingFounders.size || authUsers.length < 200) break;
