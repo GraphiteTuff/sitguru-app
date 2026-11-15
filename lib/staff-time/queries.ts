@@ -160,6 +160,21 @@ export async function annualPaidTotalCents(engagementId: string, year?: number) 
   );
 }
 
+/** Historical periods stay visible after the calendar rolls into a new week. */
+export async function listRecentStaffPeriods(
+  engagementId: string,
+  limit = 18,
+): Promise<StaffPaymentPeriod[]> {
+  const { data, error } = await supabaseAdmin.from("staff_payment_periods")
+    .select("*").eq("engagement_id", engagementId)
+    .order("period_end", { ascending: false }).limit(limit);
+  if (error) {
+    console.error("[staff-time] recent periods", error.message);
+    return [];
+  }
+  return (data || []).map((row) => mapPeriod(row as Record<string, unknown>));
+}
+
 export async function loadMyTimeDashboard(
   engagement: StaffEngagement,
 ): Promise<MyTimeDashboard> {
@@ -167,13 +182,14 @@ export async function loadMyTimeDashboard(
   const week = weekBoundsContaining(today);
   const period = await ensurePaymentPeriod(engagement, today);
   const refreshed = (await recalculatePeriod(period.id)) || period;
-  const [entries, weekEntries, rates, payments, annualPaidCents] =
+  const [entries, weekEntries, rates, payments, annualPaidCents, recentPeriods] =
     await Promise.all([
       listPeriodEntries(refreshed.id),
       listWeekEntries(engagement.id, week.start, week.end),
       listCompensationRates(engagement.id),
       listPaymentHistory(engagement.id),
       annualPaidTotalCents(engagement.id),
+      listRecentStaffPeriods(engagement.id),
     ]);
 
   const rate = currentRate(rates, today);
@@ -204,6 +220,7 @@ export async function loadMyTimeDashboard(
       end: refreshed.periodEnd,
     }),
     entries,
+    recentPeriods,
     estimatedPaymentLabel: formatUsdFromCents(refreshed.amountCents),
     payments,
     annualPaidCents,
