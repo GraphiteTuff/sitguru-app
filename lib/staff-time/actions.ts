@@ -552,7 +552,7 @@ export async function recordStaffPaymentPaid(formData: FormData) {
   if (method !== "manual_bank_ach") {
     bounce("/admin/financials/contractor-payments", "error", "Unsupported contractor payment method.");
   }
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(paidOn) || paidOn > isoToday()) {
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(paidOn) || paidOn > isoToday()) {
     bounce("/admin/financials/contractor-payments", "error", "Choose a valid confirmed payment date.");
   }
 
