@@ -25,7 +25,7 @@ export function mapEngagement(row: Record<string, unknown>): StaffEngagement {
     status: text(row.status) || "active",
     expectedWeeklyMinHours: num(row.expected_weekly_min_hours, 10),
     expectedWeeklyMaxHours: num(row.expected_weekly_max_hours, 15),
-    paymentCadence: text(row.payment_cadence) || "biweekly",
+    paymentCadence: text(row.payment_cadence) || "weekly",
     periodAnchorOn: text(row.period_anchor_on) || "2026-11-01",
     currency: text(row.currency) || "USD",
     w9Status: text(row.w9_status) || "not_requested",
