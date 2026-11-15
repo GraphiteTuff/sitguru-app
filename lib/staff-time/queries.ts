@@ -243,6 +243,7 @@ export type StaffPaymentQueueItem = {
   engagement: StaffEngagement;
   statusLabel: string;
   entries: StaffTimeEntry[];
+  payment: StaffPaymentRecord | null;
 };
 
 const ATTENTION_STATUSES = [
@@ -317,6 +318,22 @@ async function queryPaymentPeriodQueue(
     }
   }
 
+  const paidPeriodIds = periods.filter((period) => period.status === "paid").map((period) => period.id);
+  const paymentByPeriod = new Map<string, StaffPaymentRecord>();
+  if (paidPeriodIds.length) {
+    const { data: paymentRows, error: paymentError } = await supabaseAdmin
+      .from("staff_payment_records").select("*")
+      .in("payment_period_id", paidPeriodIds);
+    if (paymentError) {
+      console.error("[staff-time] contractor bank records", paymentError.message);
+      throw new Error("Contractor payment receipts could not be loaded.");
+    }
+    for (const row of paymentRows || []) {
+      const payment = mapPaymentRecord(row as Record<string, unknown>);
+      paymentByPeriod.set(payment.paymentPeriodId, payment);
+    }
+  }
+
   return periods.map((period) => {
     const engagement = engagementById.get(period.engagementId);
     if (!engagement) {
@@ -327,6 +344,7 @@ async function queryPaymentPeriodQueue(
       engagement,
       statusLabel: paymentStatusLabel(period.status),
       entries: entriesByPeriod.get(period.id) || [],
+      payment: paymentByPeriod.get(period.id) || null,
     };
   });
 }
