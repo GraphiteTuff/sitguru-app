@@ -11,8 +11,9 @@ on:
       - "components/growth-center-v2/**"
       - "package.json"
       - ".github/workflows/meta-social-analytics.yml"
-  push:
-    branches: [feature/meta-live-analytics-sync-20261115]
+concurrency:
+  group: meta-social-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
