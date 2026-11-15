@@ -546,45 +546,37 @@ export async function recordStaffPaymentPaid(formData: FormData) {
   const entries = await listPeriodEntries(periodId);
   const rates = await listCompensationRates(engagement.id);
   const totals = calculatePeriodTotals(entries, rates);
-  const now = new Date().toISOString();
-
-  const { error: periodError } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "paid",
-      paid_at: now,
-      amount_cents: amountCents,
-      total_hours: totals.totalHours,
-      updated_at: now,
-    })
-    .eq("id", periodId);
-  if (periodError) {
-    bounce("/admin/hr/people/payments", "error", "Could not mark period Paid.");
+  if (externalReference.trim().length < 4) {
+    bounce("/admin/financials/contractor-payments", "error", "Enter the confirmed ACH bank reference before recording payment.");
+  }
+  if (method !== "manual_bank_ach") {
+    bounce("/admin/financials/contractor-payments", "error", "Unsupported contractor payment method.");
+  }
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(paidOn) || paidOn > isoToday()) {
+    bounce("/admin/financials/contractor-payments", "error", "Choose a valid confirmed payment date.");
   }
 
-  const { error: recordError } = await supabaseAdmin.from("staff_payment_records").upsert(
+  // This database function locks the payable row, inserts one bank
+  // reconciliation receipt and transitions its status within ONE transaction.
+  // No ACH transfer is initiated by SitGuru.
+  const { data: paymentRecorded, error: paymentError } = await supabaseAdmin.rpc(
+    "record_staff_contract_payment",
     {
-      engagement_id: engagement.id,
-      payment_period_id: periodId,
-      approved_hours: totals.totalHours,
-      amount_cents: amountCents,
-      currency: engagement.currency,
-      rate_summary: totals.rateSummary,
-      payment_method: method,
-      provider: "graff_enterprises_llc",
-      expense_category: "Contract Labor",
-      initiated_on: paidOn,
-      paid_on: paidOn,
-      external_reference: externalReference,
-      recorded_by: actor.id,
-      notes,
-      status: "paid",
-      updated_at: now,
+      p_period_id: periodId,
+      p_actor_id: actor.id,
+      p_amount_cents: amountCents,
+      p_paid_on: paidOn,
+      p_method: method,
+      p_reference: externalReference,
+      p_notes: notes,
+      p_total_hours: totals.totalHours,
+      p_rate_summary: totals.rateSummary,
     },
-    { onConflict: "payment_period_id" },
   );
-  if (recordError) {
-    console.warn("[staff-time] payment record", recordError.message);
+  if (paymentError || paymentRecorded !== true) {
+    console.error("[staff-time] atomic ACH reconciliation", paymentError?.message || "receipt not confirmed");
+    bounce("/admin/financials/contractor-payments", "error",
+      "Payment was NOT marked Paid. Verify the confirmed bank reference and database migration.");
   }
 
   await publishStaffTimeEvent({
