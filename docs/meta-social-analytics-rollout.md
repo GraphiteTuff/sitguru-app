@@ -4,7 +4,7 @@
 - Read-only official Graph API requests to verified assets:
   - Facebook Page: `1115780798285628` (SitGuru)
   - Instagram professional account: `17841475074314025` (@sitgurupetcare)
-- New secret-gated cron: `/api/cron/meta-social-sync`, scheduled for 06:00 UTC daily.
+- New secret-gated cron: `/api/cron/meta-social-sync`, scheduled hourly at minute 00 UTC.
 - Official metrics are saved under `social_platform_metrics.entity_id = brand_meta_official`, **not** in the old seeded `brand`, `rogue`, or `delilah` rows.
 - The first successful snapshot sets a baseline once; subsequent updates preserve it.
 - Manager Metrics, Live Results and Growth Reports consume only recent official Meta snapshots. Missing, invalid or stale counts show as unavailable, never 1,250/980-style placeholders.
@@ -24,11 +24,11 @@
 
 ## Validation
 - Before activation, the new endpoint responds `enabled:false` for an authorized cron request, and does not write any rows.
-- After activation, the next scheduled or explicitly authorized run should return two `ok:true` results. A Meta permissions/token/ID failure returns 502 and leaves old verified rows untouched.
+- After activation, the next hourly scheduled or explicitly authorized run should return two `ok:true` results. A Meta permissions/token/ID failure returns 502 and leaves old verified rows untouched.
 - Verify two `social_platform_metrics` rows with `entity_id='brand_meta_official'`: `facebook` and `instagram`. Read their `updated_at` timestamps and counts.
 - Compare the current counts with Meta's Graph API Explorer; the November 15 manual checks were Facebook 30 and Instagram 1, but these values can change.
 - In `/manager/metrics`, `/manager/results` and `/manager/reports`, confirm labels, freshness and that seeded personas are not counted as SitGuru official followers.
-- Once a daily sync is older than 36 hours, the dashboard marks Meta metrics stale/unavailable. Check Vercel function logs and token expiry.
+- Once a follower snapshot is older than 36 hours, the dashboard marks Meta metrics stale/unavailable. Check Vercel function logs and token expiry.
 - Vercel/environment variable changes take effect on a new deployment. Do not deploy before credentials and the production release checklist are satisfied.
 
 ## Security, ownership and limits
