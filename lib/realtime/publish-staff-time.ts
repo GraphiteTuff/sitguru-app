@@ -17,6 +17,10 @@ const STAFF_TIME_PATHS = [
   "/admin/growth/payments",
   "/admin/hr/people",
   "/admin/hr/people/payments",
+  "/admin/financials/contractor-hours",
+  "/admin/financials/contractor-payments",
+  "/manager/my-time",
+  "/manager/payments",
   "/admin/hr",
   WORKSPACE_REFRESH_PATHS.adminPayments,
 ];
