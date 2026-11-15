@@ -100,7 +100,7 @@ export default function MyTimeDesk({
         {priorPeriods.length ? (
           <div className="mt-3 space-y-2">
             {priorPeriods.map((period) => (
-              <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div id={`period-${period.id}`} key={period.id} className="flex flex-wrap scroll-mt-28 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div>
                   <p className="text-sm font-black text-[#0F2744]">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
                   <p className="text-sm font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
@@ -158,7 +158,7 @@ export default function MyTimeDesk({
           </ul>
         </article>
         <article className={`${DESK_UI.card} p-4`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Pacing & Goals</h2>
+          <h2 id={`period-${data.period.id}`} className="scroll-mt-28 text-lg font-black text-[#0F2744]">Pacing & Goals</h2>
           <p className="mt-2 text-sm font-semibold text-slate-600">{data.week.rangeLabel}</p>
           <p className="mt-2 text-sm font-semibold text-slate-600">Status {data.period.status.replaceAll("_", " ")}</p>
           {editable ? (

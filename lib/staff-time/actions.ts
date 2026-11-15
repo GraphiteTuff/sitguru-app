@@ -21,6 +21,7 @@ import { canEditTimeEntry } from "@/lib/staff-time/status";
 import { mapTimeEntry } from "@/lib/staff-time/mappers";
 import {
   publishStaffTimeEvent,
+  publishManagerTimesheetReceipt,
   SITGURU_DOMAIN_EVENTS,
 } from "@/lib/realtime/publish-staff-time";
 import { isoToday } from "@/lib/staff-time/periods";
@@ -376,6 +377,17 @@ export async function submitPaymentPeriod(formData: FormData) {
     resourceVersion: now,
   });
 
+  await publishManagerTimesheetReceipt({
+    engagement,
+    periodId,
+    periodStart: String(periodRow.period_start),
+    periodEnd: String(periodRow.period_end),
+    hoursLabel: formatHours(totals.totalHours),
+    amountLabel: formatUsdFromCents(totals.amountCents),
+    submittedAt: now,
+    href: `${myTimeHome(formData)}#period-${periodId}`,
+  });
+
   refreshStaffPaths();
   bounce(myTimeHome(formData), "ok", "Payment period submitted for review.");
 }
@@ -435,7 +447,7 @@ export async function approvePaymentPeriod(formData: FormData) {
     notify: true,
     notifyTitle: "Your hours were reviewed and approved by Admin",
     notifyBody: `${formatHours(totals.totalHours)} hours · ${formatUsdFromCents(totals.amountCents)} are ready for payment.`,
-    notifyHref: "/manager/payments",
+    notifyHref: `/manager/payments#period-${periodId}`,
   });
   await publishStaffTimeEvent({
     engagement,
@@ -569,7 +581,7 @@ export async function recordStaffPaymentPaid(formData: FormData) {
     notify: true,
     notifyTitle: "Your contractor payment was marked Paid",
     notifyBody: `${formatUsdFromCents(amountCents)} · confirmed external ACH dated ${paidOn}.`,
-    notifyHref: "/manager/payments",
+    notifyHref: `/manager/payments#period-${periodId}`,
   });
 
   refreshStaffPaths();

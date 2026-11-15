@@ -56,7 +56,7 @@ export default function MyTimePanel({
         <p className="mt-1 text-sm font-semibold text-slate-600">A new pay period never removes a submitted timesheet. Admin HQ sees these same records.</p>
         {priorPeriods.length ? <div className="mt-3 space-y-2">
           {priorPeriods.map((period) => (
-            <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+            <div id={`period-${period.id}`} key={period.id} className="flex flex-wrap scroll-mt-28 items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
               <div>
                 <p className="text-sm font-black text-slate-900">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
                 <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
@@ -98,7 +98,7 @@ export default function MyTimePanel({
         </GrowthCard>
 
         <GrowthCard>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+          <p id={`period-${data.period.id}`} className="scroll-mt-28 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
             Current Payment Period
           </p>
           <p className="mt-2 text-xl font-black text-slate-950">{data.periodLabel}</p>
