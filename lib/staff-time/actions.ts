@@ -341,11 +341,12 @@ export async function submitPaymentPeriod(formData: FormData) {
   }
 
   const now = new Date().toISOString();
-  await supabaseAdmin
+  const { error: entriesError } = await supabaseAdmin
     .from("staff_time_entries")
     .update({ status: "submitted", updated_at: now })
     .eq("payment_period_id", periodId)
     .eq("engagement_id", engagement.id);
+  if (entriesError) bounce(myTimeHome(formData), "error", "Could not submit your time entries. Please try again.");
 
   const { error } = await supabaseAdmin
     .from("staff_payment_periods")
@@ -357,7 +358,10 @@ export async function submitPaymentPeriod(formData: FormData) {
       correction_note: "",
       updated_at: now,
     })
-    .eq("id", periodId);
+    .eq("id", periodId)
+    .eq("status", String(periodRow.status))
+    .select("id")
+    .maybeSingle();
   if (error) bounce(myTimeHome(formData), "error", "Could not submit payment period.");
 
   await publishStaffTimeEvent({
@@ -419,10 +423,11 @@ export async function approvePaymentPeriod(formData: FormData) {
     .eq("status", "submitted");
   if (error) bounce("/admin/hr/people/payments", "error", "Approval failed.");
 
-  await supabaseAdmin
+  const { error: lockError } = await supabaseAdmin
     .from("staff_time_entries")
     .update({ status: "locked", updated_at: now })
     .eq("payment_period_id", periodId);
+  if (lockError) console.error("[staff-time] locking approved entries", lockError.message);
 
   await publishStaffTimeEvent({
     engagement,
