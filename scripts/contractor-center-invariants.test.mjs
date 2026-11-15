@@ -10,6 +10,7 @@ test("HR payments is the only contractor workflow and uses all contractor status
   assert.match(page, /AdminPaymentQueue/);
   assert.match(page, /Submitted for review/);
   assert.match(page, /Ready for payment/);
+  assert.doesNotMatch(page, /Saved drafts|#drafts/);
 });
 
 test("Finance contractor pages redirect to canonical HR workspace", () => {
@@ -31,6 +32,6 @@ test("Only one canonical link appears in Finance navigation", () => {
 test("Queue includes entries for review, drafts and paid reconciliation", () => {
   const queue = source("components/staff-time/AdminPaymentQueue.tsx");
   assert.match(queue, /item\.entries/);
-  assert.match(queue, /Saved, Not Submitted/);
+  assert.doesNotMatch(queue, /Saved, Not Submitted|Draft — not submitted/);
   assert.match(queue, /Recent Paid Periods/);
 });
