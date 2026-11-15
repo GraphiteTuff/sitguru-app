@@ -11,7 +11,7 @@ import {
   formatHours,
 } from "@/lib/staff-time/money";
 import {
-  biweeklyPeriodContaining,
+  paymentPeriodContaining,
   formatPeriodLabel,
   isoToday,
   weekBoundsContaining,
@@ -30,7 +30,7 @@ export async function ensurePaymentPeriod(
   engagement: StaffEngagement,
   onDate = isoToday(),
 ): Promise<StaffPaymentPeriod> {
-  const range = biweeklyPeriodContaining(onDate, engagement.periodAnchorOn);
+  const range = paymentPeriodContaining(onDate, engagement.periodAnchorOn, engagement.paymentCadence);
   const { data: existing } = await supabaseAdmin
     .from("staff_payment_periods")
     .select("*")
