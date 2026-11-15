@@ -169,6 +169,8 @@ export default function AdminPaymentQueue({
                     name="amountDollars"
                     required
                     defaultValue={(item.period.amountCents / 100).toFixed(2)}
+                    readOnly
+                    title="Approved payable amount; resolve any discrepancy before recording bank settlement"
                     className="min-h-11 rounded-2xl border border-emerald-100 px-3"
                   />
                 </label>
