@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import LiveResultsClock from "@/components/portal/LiveResultsClock";
+import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import MetaSocialSyncControl from "@/components/portal/MetaSocialSyncControl";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { LiveResultsData } from "@/lib/admin/growth/live-results";
@@ -68,6 +69,7 @@ export default function LiveResultsBoard({
 
   return (
     <div className="space-y-4 pb-28 lg:pb-8">
+      <LiveSocialAutoRefresh intervalMs={60_000} />
       <DeskPageHero
         icon={<LineChart size={22} />}
         title="Live Results"
