@@ -20,9 +20,9 @@ export function paymentStatusLabel(status: string): string {
     case "submitted":
       return "Submitted";
     case "approved":
-      return "Approved";
+      return "Reviewed by Admin";
     case "ready_for_payment":
-      return "Ready for Payment";
+      return "Reviewed by Admin · Ready to Pay";
     case "processing":
       return "Processing";
     case "paid":
