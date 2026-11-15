@@ -90,4 +90,45 @@ export async function publishStaffTimeEvent(input: {
   });
 }
 
+
+/**
+ * A verified manager submission has TWO audiences:
+ * - Admin receives a review request via publishStaffTimeEvent.
+ * - The submitting manager receives their own receipt (not an Admin review link).
+ *
+ * The receipt uses a separate stable event ID so it cannot conflict with
+ * the Admin request's live signal for the same period.
+ */
+export async function publishManagerTimesheetReceipt(input: {
+  engagement: StaffEngagement;
+  periodId: string;
+  periodStart: string;
+  periodEnd: string;
+  hoursLabel: string;
+  amountLabel: string;
+  submittedAt: string;
+  href: string;
+}) {
+  const eventType = "time.period.submission_confirmed";
+  return publishLiveSignals({
+    eventType,
+    eventId: stableEventId([eventType, input.periodId, input.submittedAt]),
+    recipientUserIds: [input.engagement.userId],
+    notifyRecipientUserIds: [input.engagement.userId],
+    // System receipt, not a message from the submitting manager to themselves.
+    actorUserId: null,
+    actorLabel: "SitGuru Timekeeper",
+    resourceType: "staff_payment_periods",
+    resourceId: input.periodId,
+    resourceVersion: input.submittedAt,
+    scope: "payments",
+    paths: STAFF_TIME_PATHS,
+    revalidatePaths: ["/manager/my-time", "/manager/payments", "/admin/growth/my-time", "/admin/growth/payments"],
+    notify: true,
+    notifyTitle: "Your hours were submitted successfully",
+    notifyBody: `SitGuru received ${input.hoursLabel} hours (${input.amountLabel}) for ${input.periodStart} through ${input.periodEnd}. Your timesheet is awaiting Admin review.`,
+    notifyHref: input.href,
+  });
+}
+
 export { SITGURU_DOMAIN_EVENTS };
