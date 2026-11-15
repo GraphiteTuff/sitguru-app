@@ -51,13 +51,26 @@ function nonnegativeInteger(value: unknown, label: string): number {
 
 export async function fetchOfficialMetaSnapshot(
   platform: MetaPlatform,
-  options: { token?: string; fetcher?: typeof fetch } = {},
+  options: {
+    token?: string;
+    fetcher?: typeof fetch;
+    /** Explicitly choose Meta's Instagram Login API in test/integration calls. */
+    authMode?: "instagram_login" | "facebook_login";
+  } = {},
 ): Promise<OfficialMetaSnapshot> {
   const token = options.token?.trim() || configuredToken(platform);
   if (!token) {
     throw new Error(`Missing server-only Meta credential for ${platform}.`);
   }
 
+  // Instagram Login tokens require graph.instagram.com, whereas Meta system
+  // user tokens use graph.facebook.com. Never send one to the other's host.
+  const instagramLogin =
+    platform === "instagram" &&
+    (options.authMode === "instagram_login" ||
+      (options.authMode !== "facebook_login" &&
+        !options.token &&
+        Boolean(process.env.META_INSTAGRAM_ACCESS_TOKEN?.trim())));
   const accountId = VERIFIED_IDS[platform];
   const accountLabel = VERIFIED_LABELS[platform];
   const fields =
@@ -65,9 +78,9 @@ export async function fetchOfficialMetaSnapshot(
       ? "id,name,followers_count"
       : "id,username,followers_count,media_count";
 
-  const url = new URL(
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${accountId}`,
-  );
+  const host = instagramLogin ? "graph.instagram.com" : "graph.facebook.com";
+  const path = instagramLogin ? "me" : accountId;
+  const url = new URL(`https://${host}/${META_GRAPH_VERSION}/${path}`);
   url.searchParams.set("fields", fields);
 
   // Keep access tokens in Authorization headers, not URLs, logs or analytics.
@@ -88,7 +101,13 @@ export async function fetchOfficialMetaSnapshot(
     throw new Error(`Meta ${platform} API returned an invalid response.`);
   }
   const row = payload as Record<string, unknown>;
-  if (row.error || String(row.id || "") !== accountId) {
+  if (row.error || typeof row.id !== "string" || !/^\\d+$/.test(row.id)) {
+    throw new Error(`Meta ${platform} API did not return a valid account identity.`);
+  }
+  // Instagram Login returns an app-scoped /me identity, which can differ
+  // from the Facebook Graph IG user ID. Pin username instead of comparing
+  // incompatible IDs; the Instagram token is saved for @sitgurupetcare only.
+  if (!instagramLogin && row.id !== accountId) {
     throw new Error(`Meta ${platform} API did not return the expected SitGuru account.`);
   }
   if (platform === "instagram" && row.username !== "sitgurupetcare") {
@@ -100,7 +119,7 @@ export async function fetchOfficialMetaSnapshot(
 
   return {
     platform,
-    accountId,
+    accountId: instagramLogin ? row.id : accountId,
     accountLabel,
     followers: nonnegativeInteger(row.followers_count, "followers_count"),
     mediaCount:
