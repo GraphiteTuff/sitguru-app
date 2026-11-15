@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { listPeriodsNeedingAttention } from "@/lib/staff-time/queries";
+import { listContractorPeriods } from "@/lib/staff-time/queries";
 import AdminPaymentQueue from "@/components/staff-time/AdminPaymentQueue";
 import {
   GrowthPageFrame,
@@ -28,15 +28,13 @@ export default async function AdminContractorHoursPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const items = (await listPeriodsNeedingAttention()).filter((item) =>
-    ["submitted", "needs_correction"].includes(item.period.status),
-  );
+  const items = await listContractorPeriods();
 
   return (
     <GrowthPageFrame
       kicker="Finance · Contractor Hours"
       title="Review contractor service logs"
-      detail="Approve or request changes on submitted weekly/biweekly service periods. Approval creates a payable — it does not send ACH."
+      detail="Review saved and submitted contractor hours, approve or return weekly service periods, and reconcile recent paid periods. Approval never sends ACH."
       action={
         <div className="flex flex-wrap gap-2">
           <GrowthPrimaryLink href="/admin/financials/contractor-payments">
