@@ -598,7 +598,7 @@ export async function loadGrowthCenterSnapshot(input: {
       null,
       "social_platform_metrics",
       hasFollowerData ? "partial" : "unavailable",
-      "Not unique people across platforms. Official APIs may still be disconnected.",
+      "Only recent verified Meta API follower counts are included; seeded/manual numbers are excluded. People may follow on both platforms.",
     ),
   ];
 
