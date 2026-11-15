@@ -8,9 +8,9 @@ import { dollarsToCents } from "@/lib/staff-time/money";
 export const DEFAULT_STAFF_ENGAGEMENT = {
   expectedWeeklyMinHours: 10,
   expectedWeeklyMaxHours: 15,
-  paymentCadence: "biweekly",
-  /** Team kickoff pay-period anchor (current biweekly window start). */
-  periodAnchorOn: "2026-11-01",
+  paymentCadence: "weekly",
+  /** Weekly payment periods anchored to Monday, Nov 2, 2026. Existing engagements retain their saved cadence until migrated. */
+  periodAnchorOn: "2026-11-02",
   hourlyRateDollars: 16.75,
   title: GROWTH_HIRE_TITLE,
 } as const;
