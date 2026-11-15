@@ -44,6 +44,7 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
     const { data, error } = await supabaseAdmin
       .from("social_platform_metrics")
       .select("entity_id,platform,current_followers,baseline_followers,updated_at")
+      .in("entity_id", [OFFICIAL_META_ENTITY_ID, "brand"])
       .limit(100);
     if (!error && Array.isArray(data)) metricRows = data as AnyRow[];
   } catch {
