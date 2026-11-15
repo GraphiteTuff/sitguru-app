@@ -18,7 +18,7 @@ import type { MyTimeDashboard } from "@/lib/staff-time/types";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { isoToday, weekBoundsContaining } from "@/lib/staff-time/periods";
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function PaceCard({
   label,
