@@ -101,6 +101,7 @@ function canApprovePayments(actor: { isSuperUser: boolean; role: string }) {
     "hr_admin",
     "operations_admin",
     "billing_admin",
+    "finance_admin",
   ].includes(role);
 }
 
@@ -340,36 +341,25 @@ export async function submitPaymentPeriod(formData: FormData) {
     bounce(myTimeHome(formData), "error", "Add time before submitting this period.");
   }
 
+  const entries = await listPeriodEntries(periodId);
+  const rates = await listCompensationRates(engagement.id);
+  const totals = calculatePeriodTotals(entries, rates);
+  if (totals.missingRateDates.length || totals.totalHours <= 0 ||
+      totals.amountCents <= 0 || entries.some((entry) =>
+        entry.timerStartedAt && !entry.timerStoppedAt)) {
+    bounce(myTimeHome(formData), "error", "Finish entries and check the hourly rate before submitting.");
+  }
+  // One database transaction locks the period, submits its entries, and
+  // records a manager-submitted audit event. Never claim success on partial writes.
+  const { data: submitted, error: submitError } = await supabaseAdmin.rpc(
+    "staff_time_submit_period",
+    { p_period_id: periodId, p_actor_id: actor.id },
+  );
+  if (submitError || submitted !== true) {
+    console.error("[staff-time] atomic submission", submitError?.message || "Submission not confirmed");
+    bounce(myTimeHome(formData), "error", "Submission could not be confirmed. Please try again.");
+  }
   const now = new Date().toISOString();
-  const { error: entriesError } = await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "submitted", updated_at: now })
-    .eq("payment_period_id", periodId)
-    .eq("engagement_id", engagement.id);
-  if (entriesError) {
-    console.error("[staff-time] submit entries", entriesError.message);
-    bounce(myTimeHome(formData), "error", "Time entries could not be submitted. No approval request was created.");
-  }
-
-  const { data: confirmed, error } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "submitted",
-      submitted_at: now,
-      submitted_by: actor.id,
-      needs_correction_at: null,
-      correction_note: "",
-      updated_at: now,
-    })
-    .eq("id", periodId)
-    .eq("engagement_id", engagement.id)
-    .in("status", ["draft", "needs_correction"])
-    .select("id,status,submitted_at")
-    .maybeSingle();
-  if (error || !confirmed || confirmed.status !== "submitted") {
-    console.error("[staff-time] submit period", error?.message || "submission state was not confirmed");
-    bounce(myTimeHome(formData), "error", "Submission was not confirmed. Check the period status before retrying.");
-  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -422,24 +412,17 @@ export async function approvePaymentPeriod(formData: FormData) {
     bounce("/admin/hr/people/payments", "error",
       "Approval requires submitted time entries and a valid positive calculated amount.");
   }
-  const now = new Date().toISOString();
-  const { error } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "ready_for_payment",
-      approved_at: now,
-      approved_by: actor.id,
-      ready_at: now,
-      updated_at: now,
-    })
-    .eq("id", periodId)
-    .eq("status", "submitted");
-  if (error) bounce("/admin/hr/people/payments", "error", "Approval failed.");
-
-  await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "locked", updated_at: now })
-    .eq("payment_period_id", periodId);
+  if (submittedEntries.some((entry) => entry.status !== "submitted")) {
+    bounce("/admin/hr/people/payments", "error", "All hours must have been submitted before approval.");
+  }
+  const { data: approved, error: approvalError } = await supabaseAdmin.rpc(
+    "staff_time_approve_period",
+    { p_period_id: periodId, p_actor_id: actor.id },
+  );
+  if (approvalError || approved !== true) {
+    console.error("[staff-time] atomic approval", approvalError?.message || "Approval not confirmed");
+    bounce("/admin/hr/people/payments", "error", "Approval failed. No bank transfer was initiated.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -450,9 +433,9 @@ export async function approvePaymentPeriod(formData: FormData) {
     actorUserId: actor.id,
     actorLabel: actor.email,
     notify: true,
-    notifyTitle: "Payment period approved",
-    notifyBody: "Your period is Ready for Payment.",
-    notifyHref: "/admin/growth/payments",
+    notifyTitle: "Your hours were reviewed and approved by Admin",
+    notifyBody: `${formatHours(totals.totalHours)} hours · ${formatUsdFromCents(totals.amountCents)} are ready for payment.`,
+    notifyHref: "/manager/payments",
   });
   await publishStaffTimeEvent({
     engagement,
@@ -490,20 +473,14 @@ export async function returnPaymentPeriod(formData: FormData) {
   const engagement = await findEngagementById(String(periodRow.engagement_id));
   if (!engagement) bounce("/admin/hr/people/payments", "error", "Engagement missing.");
 
-  const now = new Date().toISOString();
-  await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "needs_correction",
-      needs_correction_at: now,
-      correction_note: note,
-      updated_at: now,
-    })
-    .eq("id", periodId);
-  await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "draft", updated_at: now })
-    .eq("payment_period_id", periodId);
+  const { data: returned, error: returnError } = await supabaseAdmin.rpc(
+    "staff_time_return_period",
+    { p_period_id: periodId, p_actor_id: actor.id, p_note: note },
+  );
+  if (returnError || returned !== true) {
+    console.error("[staff-time] return to contractor", returnError?.message || "Return not confirmed");
+    bounce("/admin/hr/people/payments", "error", "Correction request could not be saved.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -516,7 +493,7 @@ export async function returnPaymentPeriod(formData: FormData) {
     notify: true,
     notifyTitle: "Payment period needs correction",
     notifyBody: note,
-    notifyHref: "/admin/growth/my-time",
+    notifyHref: "/manager/my-time",
   });
 
   refreshStaffPaths();
@@ -547,56 +524,38 @@ export async function recordStaffPaymentPaid(formData: FormData) {
 
   const amountRaw = text(formData, "amountDollars");
   const amountCents = Math.round(Number(amountRaw) * 100);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) {
-    bounce("/admin/hr/people/payments", "error", "Enter a valid payment amount.");
+  if (!Number.isFinite(amountCents) || amountCents !== Number(periodRow.amount_cents)) {
+    bounce("/admin/hr/people/payments", "error", "Payment amount must match the approved payable. Request a correction before adjusting.");
   }
-  const paidOn = text(formData, "paidOn") || isoToday();
-  const method = text(formData, "paymentMethod") || "manual_bank_ach";
+  const paidOn = text(formData, "paidOn");
+  const method = text(formData, "paymentMethod");
   const externalReference = text(formData, "externalReference");
   const notes = text(formData, "notes");
-
-  const entries = await listPeriodEntries(periodId);
-  const rates = await listCompensationRates(engagement.id);
-  const totals = calculatePeriodTotals(entries, rates);
-  const now = new Date().toISOString();
-
-  const { error: periodError } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "paid",
-      paid_at: now,
-      amount_cents: amountCents,
-      total_hours: totals.totalHours,
-      updated_at: now,
-    })
-    .eq("id", periodId);
-  if (periodError) {
-    bounce("/admin/hr/people/payments", "error", "Could not mark period Paid.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || paidOn > isoToday() ||
+      method !== "manual_bank_ach" || externalReference.length < 4) {
+    bounce("/admin/hr/people/payments", "error",
+      "Enter the confirmed bank ACH date and reference after completing the transfer.");
   }
 
-  const { error: recordError } = await supabaseAdmin.from("staff_payment_records").upsert(
+  // The payable amount is frozen at approval. This transaction records the
+  // bank confirmation and Paid state together; it never initiates an ACH.
+  const { data: paid, error: paymentError } = await supabaseAdmin.rpc(
+    "staff_time_record_confirmed_ach",
     {
-      engagement_id: engagement.id,
-      payment_period_id: periodId,
-      approved_hours: totals.totalHours,
-      amount_cents: amountCents,
-      currency: engagement.currency,
-      rate_summary: totals.rateSummary,
-      payment_method: method,
-      provider: "graff_enterprises_llc",
-      expense_category: "Contract Labor",
-      initiated_on: paidOn,
-      paid_on: paidOn,
-      external_reference: externalReference,
-      recorded_by: actor.id,
-      notes,
-      status: "paid",
-      updated_at: now,
+      p_period_id: periodId,
+      p_actor_id: actor.id,
+      p_paid_on: paidOn,
+      p_reference: externalReference,
+      p_amount_cents: amountCents,
+      p_rate_summary: (await listCompensationRates(engagement.id))
+        .map((rate) => formatUsdFromCents(rate.hourlyRateCents) + "/hr").join(", "),
+      p_note: notes,
     },
-    { onConflict: "payment_period_id" },
   );
-  if (recordError) {
-    console.warn("[staff-time] payment record", recordError.message);
+  if (paymentError || paid !== true) {
+    console.error("[staff-time] atomic bank reconciliation", paymentError?.message || "Payment not confirmed");
+    bounce("/admin/hr/people/payments", "error",
+      "The payment was NOT marked Paid. Verify the confirmed bank reference and retry.");
   }
 
   await publishStaffTimeEvent({
@@ -608,9 +567,9 @@ export async function recordStaffPaymentPaid(formData: FormData) {
     actorUserId: actor.id,
     actorLabel: actor.email,
     notify: true,
-    notifyTitle: "Payment recorded as Paid",
-    notifyBody: `Your ${paidOn} payment was marked Paid.`,
-    notifyHref: "/admin/growth/payments",
+    notifyTitle: "Your contractor payment was marked Paid",
+    notifyBody: `${formatUsdFromCents(amountCents)} · confirmed external ACH dated ${paidOn}.`,
+    notifyHref: "/manager/payments",
   });
 
   refreshStaffPaths();
