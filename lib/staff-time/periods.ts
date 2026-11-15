@@ -61,9 +61,9 @@ export function isoToday(now = new Date()): string {
 
 export function weekBoundsContaining(onDate: string): DateRange {
   const date = parseDateKey(onDate);
-  const day = date.getUTCDay(); // 0 Sun
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const start = addDays(onDate, mondayOffset);
+  // SitGuru contractor service weeks run Sunday through Saturday.
+  const sundayOffset = -date.getUTCDay();
+  const start = addDays(onDate, sundayOffset);
   const end = addDays(start, 6);
   return { start, end };
 }
