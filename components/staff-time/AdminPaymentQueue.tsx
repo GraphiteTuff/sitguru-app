@@ -234,7 +234,11 @@ export default function AdminPaymentQueue({
           <h2 className="text-lg font-black text-slate-950">Recent Paid Periods</h2>
           <div className="mt-3 space-y-2">{paidPeriods.map((item) => (
             <div id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 p-3 text-sm font-semibold">
-              <span>{item.engagement.displayName} · {formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</span>
+              <div>
+                <p>{item.engagement.displayName} · {formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</p>
+                {item.payment ? <p className="mt-1 text-xs text-slate-600">Paid {item.payment.paidOn || "Date unavailable"} · Confirmed bank ACH · Reference {item.payment.externalReference || "Not recorded"}</p> :
+                  <p className="mt-1 text-xs font-semibold text-rose-700">Missing ACH reconciliation record — administrator review required</p>}
+              </div>
               <StatusChip status="paid" label="Paid" />
             </div>
           ))}</div>
