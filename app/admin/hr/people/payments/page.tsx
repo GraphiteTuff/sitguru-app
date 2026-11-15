@@ -40,7 +40,6 @@ export default async function AdminPeoplePaymentsPage({
   const ready = allItems.filter((item) =>
     ["approved", "ready_for_payment", "processing"].includes(item.period.status),
   ).length;
-  const drafts = count("draft");
   const corrections = count("needs_correction");
   const paid = count("paid");
 
@@ -65,12 +64,11 @@ export default async function AdminPeoplePaymentsPage({
           </div>
         }
       >
-        <section aria-label="Contractor payment status summary" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <section aria-label="Contractor payment status summary" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Submitted for review", value: submitted, href: "#approvals", tone: "bg-amber-50 border-amber-200 text-amber-950" },
             { label: "Ready for payment", value: ready, href: "#payment-queue", tone: "bg-blue-50 border-blue-200 text-blue-950" },
             { label: "Needs correction", value: corrections, href: "#corrections", tone: "bg-orange-50 border-orange-200 text-orange-950" },
-            { label: "Saved drafts", value: drafts, href: "#drafts", tone: "bg-slate-50 border-slate-200 text-slate-900" },
             { label: "Paid periods", value: paid, href: "#paid-history", tone: "bg-emerald-50 border-emerald-200 text-emerald-950" },
           ].map((card) => (
             <Link href={card.href} key={card.label} className={`block rounded-2xl border p-4 transition-colors hover:brightness-[.98] ${card.tone}`}>
@@ -85,8 +83,7 @@ export default async function AdminPeoplePaymentsPage({
           <section role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
             <h2 className="text-lg font-black">No contractor payment periods found</h2>
             <p className="mt-2 font-medium">
-              This is not confirmation that hours were never submitted. Check the staff engagement,
-              staff time entries and submission status before asking anyone to submit twice.
+              This is not confirmation that hours were never submitted. Only submitted, correction, approved, and paid periods are listed here. Unsubmitted work stays inside each manager’s My Time portal.
             </p>
           </section>
         ) : null}
