@@ -138,8 +138,7 @@ export default function AdminPaymentQueue({
       <GrowthCard>
         <h2 className="text-lg font-black text-slate-950">Contractor Payments</h2>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          SitGuru calculates the amount. Record Business ACH after Navy Federal / SitGuru
-          bank payment is confirmed — approving hours does not send money.
+          SitGuru calculates the amount. Record Business ACH only after the bank transfer is confirmed. A bank confirmation/reference is required. Approving hours does not send money.
         </p>
         <div className="mt-4 space-y-4">
           {ready.map((item) => (
@@ -200,8 +199,10 @@ export default function AdminPaymentQueue({
                   External / Bank Reference
                   <input
                     name="externalReference"
+                    required
+                    minLength={4}
                     className="min-h-11 rounded-2xl border border-emerald-100 px-3"
-                    placeholder="ACH confirmation"
+                    placeholder="Confirmed Navy Federal ACH reference"
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-semibold md:col-span-2">
@@ -216,7 +217,7 @@ export default function AdminPaymentQueue({
                   className="inline-flex min-h-11 items-center justify-center rounded-2xl px-4 text-sm font-black !text-white md:col-span-2 md:justify-self-start"
                   style={{ background: "#0D5C3A" }}
                 >
-                  Mark Paid
+                  Record Confirmed ACH as Paid
                 </button>
               </form>
             </article>
