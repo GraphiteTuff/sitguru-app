@@ -11,7 +11,7 @@ import {
   formatHours,
 } from "@/lib/staff-time/money";
 import {
-  biweeklyPeriodContaining,
+  paymentPeriodContaining,
   formatPeriodLabel,
   isoToday,
   weekBoundsContaining,
@@ -30,7 +30,7 @@ export async function ensurePaymentPeriod(
   engagement: StaffEngagement,
   onDate = isoToday(),
 ): Promise<StaffPaymentPeriod> {
-  const range = biweeklyPeriodContaining(onDate, engagement.periodAnchorOn);
+  const range = paymentPeriodContaining(onDate, engagement.periodAnchorOn, engagement.paymentCadence);
   const { data: existing } = await supabaseAdmin
     .from("staff_payment_periods")
     .select("*")
@@ -70,8 +70,8 @@ export async function listPeriodEntries(
     .order("worked_on", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) {
-    console.warn("[staff-time] entries", error.message);
-    return [];
+    console.error("[staff-time] entries", error.message);
+    throw new Error("Contractor time entries could not be loaded.");
   }
   return (data || []).map((row) => mapTimeEntry(row as Record<string, unknown>));
 }
@@ -105,6 +105,7 @@ export async function recalculatePeriod(
     .maybeSingle();
   if (!periodRow) return null;
   const period = mapPeriod(periodRow as Record<string, unknown>);
+  if (!["draft", "needs_correction"].includes(period.status)) return period;
   const entries = await listPeriodEntries(periodId);
   const rates = await listCompensationRates(period.engagementId);
   const totals = calculatePeriodTotals(entries, rates);
@@ -116,6 +117,7 @@ export async function recalculatePeriod(
       updated_at: new Date().toISOString(),
     })
     .eq("id", periodId)
+    .in("status", ["draft", "needs_correction"])
     .select("*")
     .maybeSingle();
   if (error || !updated) {
