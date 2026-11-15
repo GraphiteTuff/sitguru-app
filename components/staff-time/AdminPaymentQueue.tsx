@@ -37,7 +37,6 @@ export default function AdminPaymentQueue({
   );
   const submitted = items.filter((item) => item.period.status === "submitted");
   const corrections = items.filter((item) => item.period.status === "needs_correction");
-  const saved = items.filter((item) => item.period.status === "draft");
   const paidPeriods = items.filter((item) => item.period.status === "paid");
   const showHours = mode === "all" || mode === "hours";
   const showPayments = mode === "all" || mode === "payments";
@@ -61,7 +60,7 @@ export default function AdminPaymentQueue({
       <GrowthCard>
         <h2 className="text-lg font-black text-slate-950">Contractor Hours Approvals</h2>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          Submitted payment periods awaiting founder review. Drafts are visible below, separately from submitted hours.
+          Only hours submitted by a manager appear here. Review entries, approve, or request corrections.
         </p>
         <div className="mt-4 space-y-3">
           {submitted.map((item) => (
@@ -126,21 +125,6 @@ export default function AdminPaymentQueue({
           ) : null}
         </div>
       </GrowthCard>
-      ) : null}
-
-      <div id="drafts" className="scroll-mt-28" />
-      {showHours && saved.length > 0 ? (
-        <GrowthCard>
-          <h2 className="text-lg font-black text-slate-950">Saved, Not Submitted</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-600">These drafts are not yet eligible for approval.</p>
-          <div className="mt-3 space-y-3">{saved.map((item) => (
-            <article id={`period-${item.period.id}`} key={item.period.id} className="scroll-mt-32 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2"><strong>{item.engagement.displayName}</strong><StatusChip status="draft" label="Draft — not submitted" /></div>
-              <p className="mt-1 text-sm font-semibold">{formatPeriodLabel({start:item.period.periodStart,end:item.period.periodEnd})} · {formatHours(item.period.totalHours)} hours · {formatUsdFromCents(item.period.amountCents)}</p>
-              {item.entries?.length ? <details className="mt-2"><summary className="cursor-pointer text-sm font-semibold">View {item.entries.length} entries</summary><ul className="mt-2 space-y-1 text-sm">{item.entries.map((entry) => <li key={entry.id}>{entry.workedOn} · {formatHours(entry.hours)} hours · {entry.description}</li>)}</ul></details> : null}
-            </article>
-          ))}</div>
-        </GrowthCard>
       ) : null}
 
       <div id="payment-queue" className="scroll-mt-28" />
