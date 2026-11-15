@@ -93,7 +93,9 @@ export default function AdminPaymentQueue({
                   <input type="hidden" name="periodId" value={item.period.id} />
                   <button
                     type="submit"
-                    className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white"
+                    disabled={!item.entries?.length || item.period.totalHours <= 0 || item.period.amountCents <= 0}
+                    title={!item.entries?.length || item.period.totalHours <= 0 || item.period.amountCents <= 0 ? "Verify submitted time entries and an active rate before approval" : "Approve hours for payment"}
+                    className="inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-black !text-white disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ background: "#0D5C3A" }}
                   >
                     Approve
