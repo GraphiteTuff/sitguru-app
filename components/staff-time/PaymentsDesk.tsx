@@ -63,7 +63,7 @@ export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
       </section>
       <section className="grid gap-4 xl:grid-cols-3">
         <article className={`${DESK_UI.card} p-4`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Current Payment Period</h2>
+          <h2 id={`period-${data.period.id}`} className="scroll-mt-28 text-lg font-black text-[#0F2744]">Current Payment Period</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">{data.periodLabel}</p>
           <p className="mt-3 text-2xl font-black text-[#0F2744]">{formatHours(data.period.totalHours)} / {formatHours(hoursGoal)} hours</p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#22C55E]" style={{ width: `${pct}%` }} /></div>
