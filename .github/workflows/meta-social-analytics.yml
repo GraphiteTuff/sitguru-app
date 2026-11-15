@@ -8,7 +8,12 @@ on:
       - "lib/growth-center-v2/**"
       - "app/api/cron/**"
       - "app/manager/results/**"
+      - "app/manager/metrics/**"
+      - "app/manager/reports/**"
+      - "components/portal/LiveResultsBoard.tsx"
+      - "components/manager/ManagerGrowthReportingCenter.tsx"
       - "components/growth-center-v2/**"
+      - "vercel.json"
       - "package.json"
       - ".github/workflows/meta-social-analytics.yml"
 concurrency:

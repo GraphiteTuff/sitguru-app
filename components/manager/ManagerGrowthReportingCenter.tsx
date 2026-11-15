@@ -10,7 +10,7 @@ import {
 import { EMPTY_REPORT_REVIEW, WEEKLY_PULSE_PLATFORMS, normalizedReportReview } from "@/lib/growth-center-v2/report-document";
 import type { SavedGrowthReport } from "@/lib/growth-center-v2/report-document";
 import type { GrowthReportPeriod } from "@/lib/growth-center-v2/report-periods";
-import type { GrowthCenterSnapshot, MetricValue } from "@/lib/growth-center-v2/types";
+import type { GrowthCenterSnapshot, MetricValue, SocialConnectorStatus } from "@/lib/growth-center-v2/types";
 
 function valueOf(kpi: MetricValue | undefined, prior = false) {
   if (!kpi) return "Unavailable";
@@ -40,6 +40,7 @@ function field(label: string, name: string, value: string, description: string, 
 export default function ManagerGrowthReportingCenter({
   period,
   snapshot,
+  liveSocial,
   saved,
   storeState,
   canEdit,
@@ -47,6 +48,7 @@ export default function ManagerGrowthReportingCenter({
 }: {
   period: GrowthReportPeriod;
   snapshot: GrowthCenterSnapshot;
+  liveSocial: SocialConnectorStatus[];
   saved: SavedGrowthReport | null;
   storeState: "connected" | "not_configured" | "unavailable";
   canEdit: boolean;
@@ -73,7 +75,7 @@ export default function ManagerGrowthReportingCenter({
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   });
   const reportLink = saved?.sharePointUrl || ANALYTICS_RESULTS_SHAREPOINT_URL;
-  const socialUnavailable = snapshot.social.filter((platform) => platform.status !== "connected");
+  const socialUnavailable = liveSocial.filter((platform) => platform.status !== "connected");
   const csvHref = "/api/manager/growth-reports/export?period=" +
     encodeURIComponent(period.cadence) + "&end=" + encodeURIComponent(period.endDate);
 
@@ -181,10 +183,10 @@ export default function ManagerGrowthReportingCenter({
       <section className={DESK_UI.card + " p-5"}>
         <h2 className="text-lg font-black text-[#0F2744]">Social analytics source health</h2>
         <p className="mt-1 text-xs font-semibold text-slate-600">
-          Official API data, manual metrics and unavailable data are labeled separately. Missing data never counts as zero.
+          Current official API status and follower snapshots, independent of archived report submissions. Missing data never counts as zero.
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {snapshot.social.map((platform) => (
+          {liveSocial.map((platform) => (
             <div key={platform.platform} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-black text-[#0F2744]">{platform.label}</p>
               <p className={"mt-1 text-xs font-black " + (platform.status === "connected" ? "text-emerald-700" : "text-amber-800")}>{platform.status.replace(/_/g, " ")}</p>
@@ -223,7 +225,7 @@ export default function ManagerGrowthReportingCenter({
               <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {WEEKLY_PULSE_PLATFORMS.map((platform) => {
                   const row = review.weeklyPulse.platforms[platform.id];
-                  const tracked = snapshot.social.find((item) => item.platform === platform.id);
+                  const tracked = liveSocial.find((item) => item.platform === platform.id);
                   const entries = [
                     { key: "followers", title: "Total followers" },
                     { key: "netGrowth", title: "Net growth this week (+/-)" },
