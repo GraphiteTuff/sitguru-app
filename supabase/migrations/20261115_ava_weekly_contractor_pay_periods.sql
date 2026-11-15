@@ -79,6 +79,31 @@ begin
     end if;
   end if;
 
+  -- Recalculate the two resulting draft totals so Admin HQ does not
+  -- temporarily show $0 pending the next Manager Portal refresh.
+  if current_draft is not null then
+    update public.staff_payment_periods p
+       set total_hours = coalesce((
+             select sum(e.hours) from public.staff_time_entries e
+             where e.payment_period_id = p.id
+           ), 0),
+           amount_cents = coalesce((
+             select round(sum(e.hours * coalesce((
+               select r.hourly_rate_cents
+                 from public.staff_compensation_rates r
+                where r.engagement_id = target_engagement
+                  and r.effective_on <= e.worked_on
+                  and (r.ended_on is null or r.ended_on >= e.worked_on)
+                order by r.effective_on desc
+                limit 1
+             ), 0)))::integer
+             from public.staff_time_entries e
+             where e.payment_period_id = p.id
+           ), 0),
+           updated_at = now()
+     where p.id in (current_draft, next_draft);
+  end if;
+
   update public.staff_engagements
      set payment_cadence = 'weekly',
          period_anchor_on = date '2026-11-15',
