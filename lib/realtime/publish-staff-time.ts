@@ -56,7 +56,7 @@ export async function publishStaffTimeEvent(input: {
     financeEvent ? listContractorHoursApproverIds() : Promise.resolve([] as string[]),
   ]);
   const recipientIds = uniqueUserIds([
-    input.engagement.userId, input.actorUserId, ...oversight, ...approvers,
+    input.engagement.userId, input.actorUserId, ...(financeEvent ? approvers : oversight),
   ]);
   const notifyRecipientUserIds =
     input.eventType === SITGURU_DOMAIN_EVENTS.TIME_PERIOD_SUBMITTED
