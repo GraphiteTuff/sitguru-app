@@ -83,7 +83,7 @@ export default async function AdminPeoplePaymentsPage({
           <section role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
             <h2 className="text-lg font-black">No contractor payment periods found</h2>
             <p className="mt-2 font-medium">
-              This is not confirmation that hours were never submitted. Only submitted, correction, approved, and paid periods are listed here. Unsubmitted work stays inside each manager’s My Time portal.
+              This is not confirmation that hours were never submitted. Only manager-submitted or reviewed periods appear here. Hours that have not been submitted remain in the manager portal.
             </p>
           </section>
         ) : null}
