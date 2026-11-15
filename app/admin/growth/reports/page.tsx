@@ -35,6 +35,7 @@ export default async function AdminGrowthReportsPage({
       <ManagerGrowthReportingCenter
         period={period}
         snapshot={stored.report?.status === "submitted" ? stored.report.snapshot : snapshot}
+        liveSocial={snapshot.social}
         saved={stored.report}
         storeState={stored.state}
         canEdit={false}
