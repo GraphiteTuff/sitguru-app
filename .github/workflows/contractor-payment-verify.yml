@@ -12,6 +12,10 @@ on:
       - ".github/workflows/contractor-payment-verify.yml"
   workflow_dispatch:
 
+concurrency:
+  group: contractor-payment-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
