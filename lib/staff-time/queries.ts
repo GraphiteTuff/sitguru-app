@@ -247,7 +247,7 @@ const ATTENTION_STATUSES = [
   "submitted", "approved", "ready_for_payment", "processing", "needs_correction",
 ] as const;
 const CONTRACTOR_STATUSES = [
-  "draft", "submitted", "approved", "ready_for_payment", "processing",
+  "submitted", "approved", "ready_for_payment", "processing",
   "needs_correction", "paid",
 ] as const;
 
@@ -292,7 +292,7 @@ async function queryPaymentPeriodQueue(
   if (!periods.length) return [];
 
   const reviewIds = periods
-    .filter((period) => ["draft", "submitted", "needs_correction"].includes(period.status))
+    .filter((period) => ["submitted", "needs_correction"].includes(period.status))
     .map((period) => period.id);
   const entriesByPeriod = new Map<string, StaffTimeEntry[]>();
   if (reviewIds.length) {
