@@ -14,6 +14,7 @@
     "test:local-smoke": "node scripts/local-smoke.mjs",
     "test:sitguru3": "node --test scripts/preview-policy.test.mjs && tsx --test lib/community-studio/*.test.ts app/api/community-studio/route.test.ts app/api/stripe/checkout/route.test.ts lib/internship/activity-heatmap.test.ts lib/realtime/events.test.ts lib/admin/growth/manager-routes.test.ts lib/internship/intern-routes.test.ts lib/internship/content-studio.test.ts lib/internship/manager-assignment.test.ts lib/internship/intern-access.test.ts lib/admin/growth/teams-access.test.ts lib/admin/growth/onenote-notebook.test.ts lib/admin/growth/sharepoint-files.test.ts lib/microsoft/teams-notify.test.ts lib/microsoft/graph.test.ts",
     "test:email": "tsx --test lib/email/resend-webhook.test.ts lib/email/headers.test.ts lib/email/suppression.test.ts lib/email/email-updates-welcome.test.ts",
+    "test:meta-social": "tsx --test lib/meta/social-analytics.test.ts",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
     "diagnose-payments": "tsx scripts/diagnose-payments.ts",
