@@ -259,9 +259,28 @@ async function queryPaymentPeriodQueue(
   statuses: readonly string[],
   limit = 100,
 ): Promise<StaffPaymentQueueItem[]> {
+  // Query contractors FIRST: a global 200-period limit could silently hide
+  // Ava's submitted period behind unrelated draft records.
+  const { data: engagementRows, error: engagementError } = await supabaseAdmin
+    .from("staff_engagements").select("*")
+    .eq("employment_classification", "contractor");
+  if (engagementError) {
+    console.error("[staff-time] contractor engagement lookup", engagementError.message);
+    throw new Error("Contractor identities could not be loaded.");
+  }
+  const engagementById = new Map(
+    (engagementRows || []).map((row) => {
+      const engagement = mapEngagement(row as Record<string, unknown>);
+      return [engagement.id, engagement] as const;
+    }),
+  );
+  const ids = [...engagementById.keys()];
+  if (!ids.length) return [];
+
   const { data: rows, error } = await supabaseAdmin
     .from("staff_payment_periods")
     .select("*")
+    .in("engagement_id", ids)
     .in("status", [...statuses])
     .order("period_end", { ascending: false })
     .limit(limit);
@@ -269,26 +288,8 @@ async function queryPaymentPeriodQueue(
     console.error("[staff-time] contractor period queue", error.message);
     throw new Error("Contractor periods could not be loaded. Check the database connection.");
   }
-
   const periods = (rows || []).map((row) => mapPeriod(row as Record<string, unknown>));
   if (!periods.length) return [];
-
-  const engagementIds = [...new Set(periods.map((period) => period.engagementId))];
-  const { data: engagementRows, error: engagementError } = await supabaseAdmin
-    .from("staff_engagements")
-    .select("*")
-    .in("id", engagementIds);
-  if (engagementError) {
-    console.error("[staff-time] contractor engagement lookup", engagementError.message);
-    throw new Error("Contractor identities could not be loaded.");
-  }
-
-  const engagementById = new Map(
-    (engagementRows || []).map((row) => {
-      const engagement = mapEngagement(row as Record<string, unknown>);
-      return [engagement.id, engagement] as const;
-    }),
-  );
 
   const reviewIds = periods
     .filter((period) => ["draft", "submitted", "needs_correction"].includes(period.status))
@@ -335,8 +336,7 @@ export async function listPeriodsNeedingAttention(): Promise<StaffPaymentQueueIt
 
 /** Finance screens also show saved drafts and completed periods for reconciliation. */
 export async function listContractorPeriods(): Promise<StaffPaymentQueueItem[]> {
-  const items = await queryPaymentPeriodQueue(CONTRACTOR_STATUSES, 200);
-  return items.filter((item) => item.engagement.employmentClassification === "contractor");
+  return queryPaymentPeriodQueue(CONTRACTOR_STATUSES, 200);
 }
 
 export async function listReadyForPaymentQueue() {
