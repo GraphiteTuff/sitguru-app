@@ -85,7 +85,7 @@ export default function AdminPaymentQueue({
                 </div>
                 <StatusChip status={item.period.status} label={item.statusLabel} />
               </div>
-              <p className="mt-2 text-xs font-semibold text-slate-600">Submitted: {item.period.submittedAt ? new Date(item.period.submittedAt).toLocaleString("en-US") : "Timestamp unavailable"} · {item.engagement.paymentCadence} cadence</p>
+              <p className="mt-2 text-xs font-semibold text-slate-600">Submitted: {item.period.submittedAt ? new Date(item.period.submittedAt).toLocaleString("en-US", { timeZone: "America/New_York" }) : "Timestamp unavailable"} · {item.engagement.paymentCadence} cadence</p>
               {item.entries?.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-white/75 p-3"><summary className="cursor-pointer text-sm font-black text-slate-800">Review {item.entries.length} time entries</summary><ul className="mt-2 space-y-2">{item.entries.map((entry) => <li key={entry.id} className="border-t border-slate-200 py-2 text-xs text-slate-700"><strong>{entry.workedOn} · {formatHours(entry.hours)} hrs · {staffCategoryLabel(entry.categorySlug)}</strong><p className="mt-1">{entry.description}</p></li>)}</ul></details> : <p className="mt-2 text-sm font-semibold text-amber-900">No time entry details found. Verify before approving.</p>}
 {canAct ? (
               <div className="mt-3 flex flex-wrap gap-2">
