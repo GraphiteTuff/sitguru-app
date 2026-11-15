@@ -7,7 +7,7 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/social-metrics-baseline",
+      "path": "/api/cron/meta-social-sync",
       "schedule": "0 6 * * *"
     },
     {
