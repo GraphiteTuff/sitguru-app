@@ -398,7 +398,7 @@ export async function approvePaymentPeriod(formData: FormData) {
 
   const engagement = await findEngagementById(String(periodRow.engagement_id));
   if (!engagement) bounce("/admin/hr/people/payments", "error", "Engagement missing.");
-  if (engagement.userId === actor.id && !actor.isSuperUser) {
+  if (engagement.userId === actor.id) {
     bounce(
       "/admin/hr/people/payments",
       "error",
