@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { listPeriodsNeedingAttention } from "@/lib/staff-time/queries";
+import { listContractorPeriods } from "@/lib/staff-time/queries";
 import AdminPaymentQueue from "@/components/staff-time/AdminPaymentQueue";
 import {
   GrowthPageFrame,
@@ -28,9 +28,7 @@ export default async function AdminContractorPaymentsPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const items = (await listPeriodsNeedingAttention()).filter((item) =>
-    ["approved", "ready_for_payment", "processing"].includes(item.period.status),
-  );
+  const items = await listContractorPeriods();
 
   return (
     <GrowthPageFrame
