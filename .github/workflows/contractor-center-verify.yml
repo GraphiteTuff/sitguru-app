@@ -1,0 +1,44 @@
+name: Verify Central Contractor Admin Desk
+
+on:
+  pull_request:
+    branches: [sitguru-main]
+    paths:
+      - "app/admin/hr/people/payments/page.tsx"
+      - "app/admin/financials/contractor-hours/page.tsx"
+      - "app/admin/financials/contractor-payments/page.tsx"
+      - "components/staff-time/**"
+      - "lib/staff-time/**"
+      - "lib/admin/hq-nav.ts"
+      - "lib/realtime/publish-staff-time.ts"
+      - "scripts/contractor-center-invariants.test.mjs"
+      - ".github/workflows/contractor-center-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contractor-central-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contractor-desk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install
+        run: npm ci --ignore-scripts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Contractor desk invariants
+        run: node --test scripts/contractor-center-invariants.test.mjs
