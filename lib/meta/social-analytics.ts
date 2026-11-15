@@ -91,6 +91,26 @@ export async function fetchOfficialMetaSnapshot(
     signal: AbortSignal.timeout(10000),
   });
 
+  // An Instagram Login token may be expired/revoked while the separately
+  // configured system-user credential remains authorized for the linked IG
+  // Business asset. On authentication failures alone, try that credential
+  // through the Facebook Graph API using the pinned verified IG asset ID.
+  // Never downgrade on wrong-account, invalid-content, or database errors.
+  if (
+    platform === "instagram" &&
+    instagramLogin &&
+    !options.token &&
+    (response.status === 401 || response.status === 403) &&
+    process.env.META_SYSTEM_USER_ACCESS_TOKEN?.trim() &&
+    process.env.META_SYSTEM_USER_ACCESS_TOKEN.trim() !== token
+  ) {
+    return fetchOfficialMetaSnapshot("instagram", {
+      token: process.env.META_SYSTEM_USER_ACCESS_TOKEN.trim(),
+      fetcher: options.fetcher,
+      authMode: "facebook_login",
+    });
+  }
+
   // Never log Meta's raw error body: it can contain sensitive context.
   if (!response.ok) {
     throw new Error(`Meta ${platform} API returned HTTP ${response.status}.`);
