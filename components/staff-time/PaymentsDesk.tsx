@@ -8,7 +8,7 @@ import { DESK_UI } from "@/lib/portal/desk-ui";
 
 export default function PaymentsDesk({ data }: { data: MyTimeDashboard }) {
   const paid = data.payments;
-  const hoursGoal = (data.week.expectedMax || 0) * 2 || 1;
+  const hoursGoal = (data.week.expectedMax || 0) * (data.engagement.paymentCadence === "weekly" ? 1 : 2) || 1;
   const pct = Math.min(100, Math.round((data.period.totalHours / hoursGoal) * 100));
   const months = new Map<string, number>();
   for (const payment of paid) {
