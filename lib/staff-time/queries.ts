@@ -219,55 +219,107 @@ export async function loadMyTimeDashboard(
   };
 }
 
-export async function listPeriodsNeedingAttention(): Promise<
-  Array<{
-    period: StaffPaymentPeriod;
-    engagement: StaffEngagement;
-    statusLabel: string;
-  }>
-> {
-  const { data, error } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .select("*, staff_engagements(*)")
-    .in("status", ["submitted", "approved", "ready_for_payment", "processing", "needs_correction"])
-    .order("period_end", { ascending: false })
-    .limit(100);
+export type StaffPaymentQueueItem = {
+  period: StaffPaymentPeriod;
+  engagement: StaffEngagement;
+  statusLabel: string;
+  entries: StaffTimeEntry[];
+};
 
+const ATTENTION_STATUSES = [
+  "submitted", "approved", "ready_for_payment", "processing", "needs_correction",
+] as const;
+const CONTRACTOR_STATUSES = [
+  "draft", "submitted", "approved", "ready_for_payment", "processing",
+  "needs_correction", "paid",
+] as const;
+
+/**
+ * Use explicit engagement lookups instead of a nested PostgREST relationship.
+ * A query failure must not masquerade as an empty approval inbox.
+ */
+async function queryPaymentPeriodQueue(
+  statuses: readonly string[],
+  limit = 100,
+): Promise<StaffPaymentQueueItem[]> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("staff_payment_periods")
+    .select("*")
+    .in("status", [...statuses])
+    .order("period_end", { ascending: false })
+    .limit(limit);
   if (error) {
-    console.warn("[staff-time] attention queue", error.message);
-    return [];
+    console.error("[staff-time] contractor period queue", error.message);
+    throw new Error("Contractor periods could not be loaded. Check the database connection.");
   }
 
-  return (data || []).map((row) => {
-    const period = mapPeriod(row as Record<string, unknown>);
-    const engRaw = (row as { staff_engagements?: Record<string, unknown> })
-      .staff_engagements;
-    const engagement = engRaw
-      ? mapEngagement(engRaw)
-      : ({
-          id: period.engagementId,
-          userId: "",
-          email: "",
-          displayName: "Team member",
-          title: "",
-          status: "active",
-          expectedWeeklyMinHours: 10,
-          expectedWeeklyMaxHours: 15,
-          paymentCadence: "biweekly",
-          periodAnchorOn: "2026-11-01",
-          currency: "USD",
-          w9Status: "not_requested",
-          employmentClassification: "contractor",
-          startOn: null,
-          endOn: null,
-          notes: "",
-        } satisfies StaffEngagement);
+  const periods = (rows || []).map((row) => mapPeriod(row as Record<string, unknown>));
+  if (!periods.length) return [];
+
+  const engagementIds = [...new Set(periods.map((period) => period.engagementId))];
+  const { data: engagementRows, error: engagementError } = await supabaseAdmin
+    .from("staff_engagements")
+    .select("*")
+    .in("id", engagementIds);
+  if (engagementError) {
+    console.error("[staff-time] contractor engagement lookup", engagementError.message);
+    throw new Error("Contractor identities could not be loaded.");
+  }
+
+  const engagementById = new Map(
+    (engagementRows || []).map((row) => {
+      const engagement = mapEngagement(row as Record<string, unknown>);
+      return [engagement.id, engagement] as const;
+    }),
+  );
+
+  const reviewIds = periods
+    .filter((period) => ["draft", "submitted", "needs_correction"].includes(period.status))
+    .map((period) => period.id);
+  const entriesByPeriod = new Map<string, StaffTimeEntry[]>();
+  if (reviewIds.length) {
+    const { data: entryRows, error: entriesError } = await supabaseAdmin
+      .from("staff_time_entries")
+      .select("*")
+      .in("payment_period_id", reviewIds)
+      .order("worked_on", { ascending: true })
+      .limit(2500);
+    if (entriesError) {
+      console.error("[staff-time] contractor entry lookup", entriesError.message);
+      throw new Error("Contractor time-entry details could not be loaded.");
+    }
+    for (const row of entryRows || []) {
+      const entry = mapTimeEntry(row as Record<string, unknown>);
+      if (!entry.paymentPeriodId) continue;
+      const group = entriesByPeriod.get(entry.paymentPeriodId) || [];
+      group.push(entry);
+      entriesByPeriod.set(entry.paymentPeriodId, group);
+    }
+  }
+
+  return periods.map((period) => {
+    const engagement = engagementById.get(period.engagementId);
+    if (!engagement) {
+      throw new Error(`Engagement missing for contractor period ${period.id}.`);
+    }
     return {
       period,
       engagement,
       statusLabel: paymentStatusLabel(period.status),
+      entries: entriesByPeriod.get(period.id) || [],
     };
   });
+}
+
+/** Admin attention counts and the unified HR approval desk. */
+export async function listPeriodsNeedingAttention(): Promise<StaffPaymentQueueItem[]> {
+  return queryPaymentPeriodQueue(ATTENTION_STATUSES);
+}
+
+/** Finance screens also show saved drafts and completed periods for reconciliation. */
+export async function listContractorPeriods(): Promise<StaffPaymentQueueItem[]> {
+  const items = await queryPaymentPeriodQueue(CONTRACTOR_STATUSES, 200);
+  return items.filter((item) => item.engagement.employmentClassification === "contractor");
 }
 
 export async function listReadyForPaymentQueue() {
