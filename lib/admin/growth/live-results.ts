@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { loadSocialConnectorStatus } from "@/lib/growth-center-v2/social-connectors";
 import {
   getGrowthHomeStats,
   listGrowthContent,
@@ -55,6 +56,11 @@ export type LiveResultsData = {
     tone: KpiTrend["tone"];
     weekly: readonly [number, number];
     color: string;
+    verifiedFollowers: number | null;
+    verifiedFollowerDelta: number | null;
+    verifiedStatus: "connected" | "manual" | "not_configured" | "error";
+    verifiedAt: string | null;
+    accountLabel: string | null;
   }>;
   content: Array<{ title: string; detail: string; mark: string }>;
   weeklyNew: {
@@ -120,12 +126,13 @@ function inWeek(iso: string | null, start: string, end: string) {
 export async function loadLiveResults(): Promise<LiveResultsData> {
   const nowIso = new Date().toISOString();
   const thisStart = isoDaysAgo(7);
-  const [snapshot, stats, content, upcoming, socialWeeks] = await Promise.all([
+  const [snapshot, stats, content, upcoming, socialWeeks, socialConnections] = await Promise.all([
     loadInternSafeKpiSnapshot(),
     getGrowthHomeStats(),
     listGrowthContent(),
     listUpcomingGrowthEvents(40),
     socialWeekCounts(),
+    loadSocialConnectorStatus(),
   ]);
 
   const postsThisWeek = content.filter((item) =>
@@ -191,22 +198,35 @@ export async function loadLiveResults(): Promise<LiveResultsData> {
         color: "#A855F7",
       },
     ],
-    social: SOCIAL_ORDER.map((platform) => ({
-      label: SOCIAL_LABELS[platform],
-      value:
-        snapshot.social[platform].visits + snapshot.social[platform].scans,
-      badge: weekBadge(socialWeeks[platform][1]),
-      tone: socialWeeks[platform][1] > 0 ? "up" : "flat",
-      weekly: socialWeeks[platform],
-      color:
-        platform === "facebook"
-          ? "#2563EB"
-          : platform === "instagram"
-            ? "#EC4899"
-            : platform === "youtube"
-              ? "#DC2626"
-              : "#0F2744",
-    })),
+    social: SOCIAL_ORDER.map((platform) => {
+      const connector = socialConnections.find((item) => item.platform === platform);
+      const verified =
+        connector?.status === "connected" && connector.followers != null;
+      const followers = verified ? connector.followers : null;
+      const baseline = verified ? connector.baselineFollowers : null;
+      return {
+        label: SOCIAL_LABELS[platform],
+        // Existing visit data remains separate from verified follower counts.
+        value: snapshot.social[platform].visits + snapshot.social[platform].scans,
+        badge: weekBadge(socialWeeks[platform][1]),
+        tone: socialWeeks[platform][1] > 0 ? "up" : "flat",
+        weekly: socialWeeks[platform],
+        color:
+          platform === "facebook"
+            ? "#2563EB"
+            : platform === "instagram"
+              ? "#EC4899"
+              : platform === "youtube"
+                ? "#DC2626"
+                : "#0F2744",
+        verifiedFollowers: followers,
+        verifiedFollowerDelta:
+          followers != null && baseline != null ? followers - baseline : null,
+        verifiedStatus: connector?.status || "not_configured",
+        verifiedAt: connector?.lastSyncedAt || null,
+        accountLabel: connector?.accountLabel || null,
+      };
+    }),
     content: content.slice(0, 3).map((item) => ({
       title: item.title,
       detail: [item.platform, item.status, item.plannedDate]
