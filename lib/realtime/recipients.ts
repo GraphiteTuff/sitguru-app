@@ -95,6 +95,7 @@ export async function listContractorHoursApproverIds(): Promise<string[]> {
     ...(hq.data || []).map((row) => String(row.email || "").trim().toLowerCase()),
     ...(admins.data || []).map((row) => String(row.email || "").trim().toLowerCase()),
   ].filter(Boolean))];
+  const foundFounderEmails = new Set<string>();
   if (emails.length) {
     const [profiles, users] = await Promise.all([
       supabaseAdmin.from("profiles").select("id,email").in("email", emails),
@@ -102,10 +103,29 @@ export async function listContractorHoursApproverIds(): Promise<string[]> {
     ]);
     if (profiles.error) console.warn("[contractor-alerts] profile mapping", profiles.error.message);
     if (users.error) console.warn("[contractor-alerts] user mapping", users.error.message);
-    ids.push(
-      ...(profiles.data || []).map((row) => row.id),
-      ...(users.data || []).map((row) => row.id),
-    );
+    for (const row of [...(profiles.data || []), ...(users.data || [])]) {
+      ids.push(row.id);
+      if (row.email) foundFounderEmails.add(String(row.email).toLowerCase());
+    }
+  }
+  const missingFounders = new Set(SUPER_USER_EMAILS.filter((email) => !foundFounderEmails.has(email)));
+  if (missingFounders.size) {
+    for (let page = 1; page <= 5; page++) {
+      const { data: directory, error: directoryError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (directoryError) {
+        console.warn("[contractor-alerts] founder auth directory", directoryError.message);
+        break;
+      }
+      const authUsers = directory?.users || [];
+      for (const user of authUsers) {
+        const email = String(user.email || "").toLowerCase();
+        if (missingFounders.has(email)) {
+          ids.push(user.id);
+          missingFounders.delete(email as (typeof SUPER_USER_EMAILS)[number]);
+        }
+      }
+      if (!missingFounders.size || authUsers.length < 200) break;
+    }
   }
   const recipients = uniqueUserIds(ids);
   if (!recipients.length) {
