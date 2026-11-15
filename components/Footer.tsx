@@ -81,7 +81,7 @@ const socialLinks = [
   },
   {
     label: "Instagram",
-    href: "https://www.instagram.com/SitGuruOfficial",
+    href: "https://www.instagram.com/sitgurupetcare/",
     icon: FaInstagram,
   },
   {
