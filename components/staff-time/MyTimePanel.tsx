@@ -14,6 +14,7 @@ import { formatHours, formatUsdFromCents } from "@/lib/staff-time/money";
 import { paymentStatusLabel } from "@/lib/staff-time/status";
 import type { MyTimeDashboard } from "@/lib/staff-time/types";
 import StatusChip from "@/components/staff-time/StatusChip";
+import { formatPeriodLabel } from "@/lib/staff-time/periods";
 import { GrowthCard } from "@/components/admin/growth/GrowthPageFrame";
 
 export default function MyTimePanel({
@@ -34,6 +35,7 @@ export default function MyTimePanel({
   const returnBase = basePath === "/manager" ? "/manager" : "/admin/growth";
   const paymentsHref = `${returnBase}/payments`;
   const returnField = <input type="hidden" name="returnBase" value={returnBase} />;
+  const priorPeriods = (data.recentPeriods || []).filter((period) => period.id !== data.period.id && period.periodEnd < data.period.periodStart).slice(0, 8);
 
   return (
     <div className="space-y-4">
@@ -48,6 +50,32 @@ export default function MyTimePanel({
           {notice.message}
         </p>
       ) : null}
+
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">Previous Submitted Hours & Review Status</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-600">A new pay period never removes a submitted timesheet. Admin HQ sees these same records.</p>
+        {priorPeriods.length ? <div className="mt-3 space-y-2">
+          {priorPeriods.map((period) => (
+            <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+              <div>
+                <p className="text-sm font-black text-slate-900">{formatPeriodLabel({start:period.periodStart,end:period.periodEnd})}</p>
+                <p className="text-xs font-semibold text-slate-600">{formatHours(period.totalHours)} hrs · {formatUsdFromCents(period.amountCents)}</p>
+                {period.status === "submitted" ? <p className="text-xs font-bold text-amber-800">Submitted · Awaiting Admin approval</p> : null}
+                {period.status === "needs_correction" && period.correctionNote ? <p className="text-xs text-amber-900">{period.correctionNote}</p> : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusChip status={period.status} label={paymentStatusLabel(period.status)} />
+                {["draft","needs_correction"].includes(period.status) && period.totalHours > 0 ? (
+                  <form action={submitPaymentPeriod}>{returnField}
+                    <input type="hidden" name="periodId" value={period.id} />
+                    <button type="submit" className="rounded-xl bg-[#0D5C3A] px-3 py-2 text-xs font-black text-white">Submit for review</button>
+                  </form>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div> : <p className="mt-2 text-sm text-slate-500">No prior periods recorded.</p>}
+      </GrowthCard>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <GrowthCard>
