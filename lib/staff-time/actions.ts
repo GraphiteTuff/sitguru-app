@@ -340,29 +340,20 @@ export async function submitPaymentPeriod(formData: FormData) {
     bounce(myTimeHome(formData), "error", "Add time before submitting this period.");
   }
 
-  const now = new Date().toISOString();
-  const { error: entriesError } = await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "submitted", updated_at: now })
-    .eq("payment_period_id", periodId)
-    .eq("engagement_id", engagement.id);
-  if (entriesError) bounce(myTimeHome(formData), "error", "Could not submit your time entries. Please try again.");
-
-  const { error } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "submitted",
-      submitted_at: now,
-      submitted_by: actor.id,
-      needs_correction_at: null,
-      correction_note: "",
-      updated_at: now,
-    })
-    .eq("id", periodId)
-    .eq("status", String(periodRow.status))
-    .select("id")
-    .maybeSingle();
-  if (error) bounce(myTimeHome(formData), "error", "Could not submit payment period.");
+  // Atomically submit entries and the parent period: partial submissions
+  // must never vanish from the Admin HQ review queue.
+  const { data: submitted, error: submitError } = await supabaseAdmin.rpc(
+    "submit_staff_payment_period",
+    {
+      p_period_id: periodId,
+      p_engagement_id: engagement.id,
+      p_actor_id: actor.id,
+    },
+  );
+  if (submitError || submitted !== true) {
+    console.error("[staff-time] submit period", submitError?.message || "submission not confirmed");
+    bounce(myTimeHome(formData), "error", "Hours were not submitted. Please review your entries and retry.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -409,25 +400,14 @@ export async function approvePaymentPeriod(formData: FormData) {
   }
 
   await recalculatePeriod(periodId);
-  const now = new Date().toISOString();
-  const { error } = await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "ready_for_payment",
-      approved_at: now,
-      approved_by: actor.id,
-      ready_at: now,
-      updated_at: now,
-    })
-    .eq("id", periodId)
-    .eq("status", "submitted");
-  if (error) bounce("/admin/hr/people/payments", "error", "Approval failed.");
-
-  const { error: lockError } = await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "locked", updated_at: now })
-    .eq("payment_period_id", periodId);
-  if (lockError) console.error("[staff-time] locking approved entries", lockError.message);
+  const { data: approved, error: approveError } = await supabaseAdmin.rpc(
+    "approve_staff_payment_period",
+    { p_period_id: periodId, p_actor_id: actor.id },
+  );
+  if (approveError || approved !== true) {
+    console.error("[staff-time] approve period", approveError?.message || "approval not confirmed");
+    bounce("/admin/financials/contractor-hours", "error", "Approval did not complete. No payment was initiated.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
@@ -478,20 +458,14 @@ export async function returnPaymentPeriod(formData: FormData) {
   const engagement = await findEngagementById(String(periodRow.engagement_id));
   if (!engagement) bounce("/admin/hr/people/payments", "error", "Engagement missing.");
 
-  const now = new Date().toISOString();
-  await supabaseAdmin
-    .from("staff_payment_periods")
-    .update({
-      status: "needs_correction",
-      needs_correction_at: now,
-      correction_note: note,
-      updated_at: now,
-    })
-    .eq("id", periodId);
-  await supabaseAdmin
-    .from("staff_time_entries")
-    .update({ status: "draft", updated_at: now })
-    .eq("payment_period_id", periodId);
+  const { data: returned, error: returnError } = await supabaseAdmin.rpc(
+    "return_staff_payment_period",
+    { p_period_id: periodId, p_actor_id: actor.id, p_note: note },
+  );
+  if (returnError || returned !== true) {
+    console.error("[staff-time] return period", returnError?.message || "return not confirmed");
+    bounce("/admin/financials/contractor-hours", "error", "Could not return hours for correction.");
+  }
 
   await publishStaffTimeEvent({
     engagement,
