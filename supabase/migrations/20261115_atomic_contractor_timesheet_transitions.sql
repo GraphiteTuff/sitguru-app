@@ -53,7 +53,7 @@ begin
   end if;
   select user_id into v_owner from public.staff_engagements
     where id = v_period.engagement_id;
-  if v_owner = p_actor_id then
+  if v_owner is null or v_owner = p_actor_id then
     raise exception 'Contractors cannot approve their own period';
   end if;
   update public.staff_time_entries set status='locked', updated_at=now()
@@ -83,7 +83,7 @@ begin
   end if;
   select user_id into v_owner from public.staff_engagements
     where id = v_period.engagement_id;
-  if v_owner = p_actor_id then
+  if v_owner is null or v_owner = p_actor_id then
     raise exception 'Contractors cannot return their own period';
   end if;
   update public.staff_time_entries set status='draft', updated_at=now()
