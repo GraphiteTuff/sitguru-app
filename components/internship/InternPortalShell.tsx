@@ -43,6 +43,7 @@ const ICONS = {
   "Intern Portal": LayoutDashboard,
   "My Work": ClipboardList,
   "Create Content": PenLine,
+  "Promotion Sources": BarChart3,
   "Reads & Media": BookOpen,
   "Community Studio": PawPrint,
   "My Assignments": ClipboardList,
