@@ -72,7 +72,7 @@ export default function PromotionSourceHub({
                       {item.publicUrl ? (
                         <Link href={item.publicUrl} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800">View public page</Link>
                       ) : (
-                        <Link href={item.destination} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800">View approved asset</Link>
+                        <Link href={mode === "intern" ? "/intern/toolkit?tool=brand" : item.destination} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800">View approved asset</Link>
                       )}
                       {mode === "intern" ? (
                         <Link href={internDraftHref(item)} className="inline-flex min-h-10 items-center rounded-lg bg-[#2563EB] px-3 text-xs font-black text-white">Create social draft</Link>
