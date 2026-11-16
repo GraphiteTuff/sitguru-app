@@ -49,11 +49,14 @@ export type MetricValue = {
 export type SocialConnectorStatus = {
   platform: Exclude<GrowthPlatform, "all" | "sitguru">;
   label: string;
-  status: "connected" | "manual" | "not_configured" | "error";
+  status: "connected" | "sandbox_connected" | "manual" | "not_configured" | "error";
   accountLabel: string | null;
   lastSyncedAt: string | null;
   followers: number | null;
   baselineFollowers: number | null;
+  /** Sandbox-only snapshot: shown as a test, never included in production KPIs. */
+  sandboxFollowers?: number | null;
+  sandboxLastSyncedAt?: string | null;
   setupHint: string;
 };
 
