@@ -49,15 +49,23 @@ export default function LiveResultsBoard({
   canConnectTikTok = false,
   tiktokNotice = "",
 }: {
-  audience: "manager" | "intern";
+  audience: "manager" | "intern" | "admin";
   data: LiveResultsData;
   canSyncMeta?: boolean;
   canConnectTikTok?: boolean;
   tiktokNotice?: string;
 }) {
-  const manager = audience === "manager";
-  const base = manager ? "/manager" : "/intern";
-  const actions: Array<{ href: string; label: string; tone: string; icon: LucideIcon }> = manager
+  const manager = audience !== "intern";
+  const base = audience === "admin" ? "/admin/growth" : manager ? "/manager" : "/intern";
+  const contentHref = audience === "admin" ? "/admin/growth/content" : manager ? "/manager/content" : "/intern/work";
+  const actions: Array<{ href: string; label: string; tone: string; icon: LucideIcon }> = audience === "admin"
+    ? [
+        { href: "/admin/growth/insights?view=social", label: "Social Metrics", tone: "bg-[#F5F3FF] text-[#6D28D9]", icon: BarChart3 },
+        { href: "/admin/growth/reports", label: "Growth Reports", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: FileDown },
+        { href: "/admin/growth/content", label: "Content Oversight", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
+        { href: "/admin/growth", label: "Growth HQ", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: LineChart },
+      ]
+    : manager
     ? [
         { href: "/manager/content", label: "Create a Post", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
         { href: "/manager/calendar", label: "View Calendar", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: CalendarDays },
@@ -68,7 +76,7 @@ export default function LiveResultsBoard({
         { href: "/intern/work", label: "Create a Post", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
         { href: "/intern/calendar", label: "View Calendar", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: CalendarDays },
         { href: "/intern/metrics", label: "View Metrics", tone: "bg-[#F5F3FF] text-[#6D28D9]", icon: BarChart3 },
-        { href: "/intern/growth", label: "Export Report", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: FileDown },
+        { href: "/intern/metrics?view=reports", label: "View Reports", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: FileDown },
       ];
 
   return (
@@ -100,7 +108,7 @@ export default function LiveResultsBoard({
           <p className="mt-1 text-sm font-medium text-slate-600">
             {manager ? "Posts waiting on review" : "Complete your weekly check-in"}
           </p>
-          <Link href={manager ? "/manager/content" : `${base}/check-ins`} className="mt-2 inline-flex text-xs font-bold text-[#166534]">
+          <Link href={manager ? contentHref : `${base}/check-ins`} className="mt-2 inline-flex text-xs font-bold text-[#166534]">
             {manager ? "Open content →" : "Open check-in →"}
           </Link>
         </article>
@@ -259,7 +267,7 @@ export default function LiveResultsBoard({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-[#0F2744]">New this week</h2>
-            <Link href={`${base}/metrics`} className="text-xs font-bold text-[#2563EB]">
+            <Link href={audience === "admin" ? "/admin/growth/insights?view=social" : `${base}/metrics`} className="text-xs font-bold text-[#2563EB]">
               View Details →
             </Link>
           </div>
@@ -273,7 +281,7 @@ export default function LiveResultsBoard({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-[#0F2744]">Latest content</h2>
-            <Link href={manager ? "/manager/content" : "/intern/work"} className="text-xs font-bold text-[#2563EB]">
+            <Link href={contentHref} className="text-xs font-bold text-[#2563EB]">
               View All →
             </Link>
           </div>
