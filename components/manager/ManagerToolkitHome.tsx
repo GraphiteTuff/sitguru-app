@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -97,6 +98,8 @@ export default function ManagerToolkitHome({
           </div>
         </div>
       </section>
+
+      <PromotionEntryPoint source="Manager Toolkit" description="One launch point for SitGuru's approved brand assets, promotional content, campaigns and measured results." />
 
       {sharedAssets}
 
