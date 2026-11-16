@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { promoCampaignHref, type PromotionOpportunity } from "@/lib/growth-center-v2/promotion-sources";
+import { promoCampaignHref } from "@/lib/growth-center-v2/promotion-links";
+import type { PromotionOpportunity } from "@/lib/growth-center-v2/promotion-sources";
 
 const HEADINGS = [
   { kind: "reads", title: "Reads & Listens", empty: "No published editorial picks available yet." },
