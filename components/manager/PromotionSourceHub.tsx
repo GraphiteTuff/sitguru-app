@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { promoCampaignHref } from "@/lib/growth-center-v2/promotion-links";
+import { internDraftHref, promoCampaignHref } from "@/lib/growth-center-v2/promotion-links";
 import type { PromotionOpportunity } from "@/lib/growth-center-v2/promotion-sources";
 
 const HEADINGS = [
@@ -12,25 +12,31 @@ const HEADINGS = [
 
 export default function PromotionSourceHub({
   items,
-}: { items: PromotionOpportunity[] }) {
+  mode = "manager",
+}: { items: PromotionOpportunity[]; mode?: "manager" | "intern" }) {
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-24">
       <header className="rounded-[28px] bg-[#0F2744] p-5 text-white sm:p-7">
         <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-200">SitGuru Social & Community Growth</p>
         <h1 className="mt-2 text-2xl font-black text-white sm:text-3xl">Promotion Hub</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
-          Turn approved SitGuru content into tracked Facebook, Instagram, and TikTok campaigns.
+          Turn approved SitGuru content into Facebook, Instagram, and TikTok campaigns.
           Select a source, create a tracking link, then route the creative through the existing Content Studio approval workflow.
           No content is automatically posted and no ads are purchased here.
         </p>
         <nav className="mt-4 flex flex-wrap gap-2" aria-label="Promotion workspaces">
-          {[
+          {(mode === "intern" ? [
+            ["Create social draft", "/intern/content"],
+            ["Intern Brand Kit", "/intern/toolkit"],
+            ["Intern Metrics", "/intern/metrics"],
+            ["Intern Live Results", "/intern/results"],
+          ] : [
             ["Content Studio", "/manager/campaigns-content"],
             ["Brand Kit", "/manager/toolkit/brand"],
             ["Growth & Conversions", "/manager/conversions"],
             ["Live Results", "/manager/results"],
             ["Business Growth Report", "/manager/reports"],
-          ].map(([label, href]) => (
+          ]).map(([label, href]) => (
             <Link key={href} href={href} className="inline-flex min-h-10 items-center rounded-xl border border-white/30 px-3 text-xs font-bold text-white hover:bg-white/10">{label}</Link>
           ))}
         </nav>
@@ -68,7 +74,9 @@ export default function PromotionSourceHub({
                       ) : (
                         <Link href={item.destination} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800">View approved asset</Link>
                       )}
-                      {item.kind !== "brand" ? (
+                      {mode === "intern" ? (
+                        <Link href={internDraftHref(item)} className="inline-flex min-h-10 items-center rounded-lg bg-[#2563EB] px-3 text-xs font-black text-white">Create social draft</Link>
+                      ) : item.kind !== "brand" ? (
                         <Link href={promoCampaignHref(item)} className="inline-flex min-h-10 items-center rounded-lg bg-[#2563EB] px-3 text-xs font-black text-white">Create tracked campaign</Link>
                       ) : (
                         <Link href="/manager/campaigns-content" className="inline-flex min-h-10 items-center rounded-lg bg-[#2563EB] px-3 text-xs font-black text-white">Use in Content Studio</Link>
