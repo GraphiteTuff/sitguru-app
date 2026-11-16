@@ -4,6 +4,7 @@ import { brandCategoryLabel } from "@/lib/manager/brand-kit";
 import { CONTENT_PLATFORMS, CONTENT_TYPES, studioRowLabel } from "@/lib/internship/content-studio";
 import { loadInternContentStudio, saveStudioContent } from "@/lib/internship/content-studio-actions";
 import { currentAssignedIntern, requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { loadPromotionOpportunities } from "@/lib/growth-center-v2/promotion-sources";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,17 @@ export default async function InternContentPage({
   const params = searchParams ? await searchParams : {};
   const studio = await loadInternContentStudio(intern.id);
   const editing = studio.items.find((item) => item.id === first(params.edit)) || null;
+  const seedKind = first(params.seedKind);
+  const seedId = first(params.seedId);
+  const seedSources = !editing && seedId && ["reads", "events", "community", "surveys", "brand"].includes(seedKind)
+    ? await loadPromotionOpportunities({ managerUserId: intern.managerUserId || "", includeStaffAssets: true })
+    : [];
+  // A query parameter cannot manufacture an approved creative or rights grant:
+  // it must match a currently eligible source in the server's curated list.
+  const selectedSource = seedSources.find((source) => source.kind === seedKind && source.id === seedId);
+  const seedCaption = selectedSource?.publicUrl
+    ? `Check this out on SitGuru: https://www.sitguru.com${selectedSource.publicUrl}\n\n#SitGuru #PetCare`
+    : "";
   const manager = (intern.dayToDayManagerName || "").split(" ")[0] || "your manager";
   const field = "min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900";
 
@@ -35,6 +47,7 @@ export default async function InternContentPage({
         <p className="mt-1 text-sm font-semibold text-slate-600">
           Save a draft, attach an approved Brand Kit file, then submit it to {intern.dayToDayManagerName || "your manager"}.
         </p>
+        <Link href="/intern/promotions" className="mt-3 mr-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-900">Browse approved promotion sources</Link>
         <Link
           href="/intern/content/reads"
           className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-950"
@@ -44,11 +57,16 @@ export default async function InternContentPage({
       </header>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
+      {selectedSource ? (
+        <p className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold text-sky-900">
+          Draft seeded from {selectedSource.label}: {selectedSource.title}. Attach approved creative and submit to your manager for review. This does not post to a social network.
+        </p>
+      ) : null}
       <form key={editing?.id || "new"} action={saveStudioContent} className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4">
         <input type="hidden" name="internId" value={intern.id} />
         {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
         <label className="block text-sm font-black text-slate-800">Content title
-          <input name="title" required defaultValue={editing?.title || ""} className={`mt-1 ${field}`} placeholder="Pet Safety Awareness Post" />
+          <input name="title" required defaultValue={editing?.title || selectedSource?.title || ""} className={`mt-1 ${field}`} placeholder="Pet Safety Awareness Post" />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm font-black text-slate-800">Content type
@@ -63,7 +81,7 @@ export default async function InternContentPage({
           </label>
         </div>
         <label className="block text-sm font-black text-slate-800">Caption
-          <textarea name="caption" rows={4} defaultValue={editing?.caption || ""} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Post text, hashtags, and call to action" />
+          <textarea name="caption" rows={4} defaultValue={editing?.caption || seedCaption} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Post text, hashtags, and call to action" />
         </label>
         <div>
           <p className="text-sm font-black text-slate-800">Finished graphic or video</p>
@@ -79,7 +97,7 @@ export default async function InternContentPage({
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {studio.assets.map((asset) => (
               <label key={asset.id} className="flex items-start gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
-                <input type="checkbox" name="assetId" value={asset.id} defaultChecked={editing?.assetIds.includes(asset.id)} className="mt-1" />
+                <input type="checkbox" name="assetId" value={asset.id} defaultChecked={editing?.assetIds.includes(asset.id) || (selectedSource?.kind === "brand" && selectedSource.id === asset.id)} className="mt-1" />
                 <span>{asset.title}<span className="block break-words text-xs font-medium text-slate-500">{brandCategoryLabel(asset.category)}</span></span>
               </label>
             ))}
