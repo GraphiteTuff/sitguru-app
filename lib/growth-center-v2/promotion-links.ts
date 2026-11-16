@@ -29,10 +29,11 @@ export function promoCampaignHref(source: { title: string; destination: string; 
   return "/manager/create?" + query.toString();
 }
 
-export function internDraftHref(source: { title: string; destination: string; kind: PromotionKind; id: string }) {
+export function internDraftHref(source: { title: string; destination: string; kind: PromotionKind; id: string }, platform: "Facebook" | "Instagram" | "TikTok" = "Instagram") {
   const query = new URLSearchParams({
     seedKind: source.kind,
     seedId: source.id,
+    platform,
   });
   return "/intern/content?" + query.toString();
 }
