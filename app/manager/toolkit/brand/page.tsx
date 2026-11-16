@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import Link from "next/link";
 import BrandKitManager from "@/components/manager/BrandKitManager";
 import BrandStyleReference from "@/components/portal/BrandStyleReference";
@@ -44,6 +45,7 @@ export default async function ManagerBrandKitPage({
           Your SitGuru library of approved logos, graphics, and creative resources. SharePoint keeps the master files. This page is the team download library, and uploads are not copied there automatically.
         </p>
       </div>
+      <PromotionEntryPoint source="Approved Brand Kit" description="Use approved logos, templates and marketing graphics in the existing Content Studio; respect third-party asset rights." />
       <BrandStyleReference />
       <BrandKitManager
         assets={listed.assets}
