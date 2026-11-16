@@ -55,6 +55,7 @@ const ICONS = {
   "Intern Team": Users,
   "My Weekly Work": ClipboardList,
   "Content Studio": Megaphone,
+  "Social Promotions": Megaphone,
   "Reads & Media": BookOpen,
   "Community Studio": PawPrint,
   "Community Outreach": Users,
