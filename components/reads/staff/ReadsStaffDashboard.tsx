@@ -1,6 +1,7 @@
+"use client";
+
 import Link from "next/link";
 import { promoCampaignHref, publishedReadsPath } from "@/lib/growth-center-v2/promotion-links";
-"use client";
 
 import { useMemo, useState } from "react";
 import ActionFeedback, {
