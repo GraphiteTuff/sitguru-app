@@ -231,6 +231,12 @@ export async function GrowthWorkplaceHome({
             detail: "Official follower snapshots beside submitted reports",
             icon: ClipboardList,
           },
+          {
+            href: "/admin/growth/promotions",
+            label: "Promotion Hub",
+            detail: "Approved cross-channel content from Reads, Events, Community and Brand Kit",
+            icon: Megaphone,
+          },
         ]
       : []),
     ...(workplace.kind === "admin"
