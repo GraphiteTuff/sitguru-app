@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { socialReuseAllowed } from "@/lib/community-studio/rights";
 import { surveyIsOpen } from "@/lib/manager-growth/model";
+import { publishedReadsPath } from "./promotion-links";
 
 export type PromotionCategory = "reads" | "events" | "community" | "surveys" | "brand";
 export type PromotionOpportunity = {
@@ -25,16 +26,6 @@ const REVIEW_NOTES: Record<PromotionCategory, string> = {
   surveys: "Only an active, publicly open poll can be promoted; responses and participant information stay private.",
   brand: "Use approved Brand Kit files in Content Studio. Recheck third-party branding rights before posting.",
 };
-
-export function promoCampaignHref(source: Pick<PromotionOpportunity, "title" | "destination" | "kind">) {
-  const query = new URLSearchParams({
-    type: source.kind === "events" ? "event" : "post",
-    title: source.title.slice(0, 150),
-    dest: internalPath(source.destination),
-    href: internalPath(source.destination),
-  });
-  return "/manager/create?" + query.toString();
-}
 
 /**
  * Promotion Hub only queries public/published or approved content.
@@ -95,12 +86,8 @@ export async function loadPromotionOpportunities(input: {
   for (const item of reads.data || []) {
     const slug = asText(item.slug);
     const type = asText(item.content_type);
-    if (!slug || !["book", "magazine", "podcast", "video", "author", "expert", "publication"].includes(type)) continue;
-    const section: Record<string, string> = {
-      book: "books", magazine: "magazines", podcast: "podcasts",
-      video: "videos", author: "authors", expert: "authors", publication: "magazines",
-    };
-    const destination = internalPath("/reads/" + section[type] + "/" + encodeURIComponent(slug));
+    const destination = publishedReadsPath(type, slug);
+    if (!destination) continue;
     output.push({
       id: String(item.id), kind: "reads", label: "Reads & Listens • " + type,
       title: asText(item.title), summary: asText(item.editorial_summary || item.description).slice(0, 190),
