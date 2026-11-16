@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { ConversionPanel, GrowthFrame } from "@/components/manager/GrowthWorkPanels";
 import { loadScorecard } from "@/lib/manager-growth/data";
@@ -29,6 +30,7 @@ export default async function ConversionsPage({
         </select>
         <button className="min-h-11 rounded-full bg-[#2563EB] px-4 text-sm font-bold !text-white">Update</button>
       </form>
+      <PromotionEntryPoint source="Growth & Conversions" description="Use actual visits, registrations and bookings to decide which Facebook, Instagram and TikTok campaigns to improve." />
       <ConversionPanel card={card} />
     </GrowthFrame>
   );
