@@ -46,10 +46,14 @@ export default function LiveResultsBoard({
   audience,
   data,
   canSyncMeta = false,
+  canConnectTikTok = false,
+  tiktokNotice = "",
 }: {
   audience: "manager" | "intern";
   data: LiveResultsData;
   canSyncMeta?: boolean;
+  canConnectTikTok?: boolean;
+  tiktokNotice?: string;
 }) {
   const manager = audience === "manager";
   const base = manager ? "/manager" : "/intern";
@@ -81,6 +85,11 @@ export default function LiveResultsBoard({
         banner={manager ? "manager" : "intern"}
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
+      {manager && tiktokNotice ? (
+        <p role="status" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-900">
+          {tiktokNotice}
+        </p>
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-emerald-100 bg-[#F0FDF4] p-4">
@@ -204,6 +213,14 @@ export default function LiveResultsBoard({
                 {card.accountLabel && (
                   <p className="truncate text-[11px] font-semibold text-slate-500">{card.accountLabel}</p>
                 )}
+                {canConnectTikTok && manager && card.label === "TikTok" ? (
+                  <Link
+                    href="/api/integrations/tiktok/start"
+                    className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
+                  >
+                    Connect TikTok (sandbox)
+                  </Link>
+                ) : null}
                 {verified && Number.isFinite(updatedAt) && (
                   <p className="mt-1 text-[10px] text-slate-400">
                     Synced {new Date(updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "short", timeStyle: "short" })} ET
