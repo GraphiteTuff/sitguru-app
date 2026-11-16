@@ -58,8 +58,10 @@ export type LiveResultsData = {
     color: string;
     verifiedFollowers: number | null;
     verifiedFollowerDelta: number | null;
-    verifiedStatus: "connected" | "manual" | "not_configured" | "error";
+    verifiedStatus: "connected" | "sandbox_connected" | "manual" | "not_configured" | "error";
     verifiedAt: string | null;
+    sandboxFollowers: number | null;
+    sandboxAt: string | null;
     accountLabel: string | null;
   }>;
   content: Array<{ title: string; detail: string; mark: string }>;
@@ -224,6 +226,8 @@ export async function loadLiveResults(): Promise<LiveResultsData> {
           followers != null && baseline != null ? followers - baseline : null,
         verifiedStatus: connector?.status || "not_configured",
         verifiedAt: connector?.lastSyncedAt || null,
+        sandboxFollowers: connector?.sandboxFollowers ?? null,
+        sandboxAt: connector?.sandboxLastSyncedAt || null,
         accountLabel: connector?.accountLabel || null,
       };
     }),

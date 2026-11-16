@@ -7,6 +7,7 @@ export const INTERN_ROUTES = {
   portal: "/intern",
   work: "/intern/work",
   content: "/intern/content",
+  promotions: "/intern/promotions",
   reads: "/intern/content/reads",
   communityStudio: "/intern/community-studio",
   assignments: "/intern/assignments",

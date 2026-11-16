@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import ReadsStaffShell from "@/components/reads/staff/ReadsStaffShell";
 import ReadsStaffDashboard from "@/components/reads/staff/ReadsStaffDashboard";
 import { requireReadsPortal } from "@/lib/reads/portal-access";
@@ -44,6 +45,7 @@ export default async function ManagerReadsPage({ searchParams }: PageProps) {
       title="Ava — Reads & Media"
       subtitle="Growth Manager review, publishing, Team Picks, partnerships, and analytics."
     >
+      <PromotionEntryPoint source="Reads & Listens" description="Promote published books, magazines, podcasts, team picks and expert content with tracked campaign links." />
       <ReadsStaffDashboard
         role="manager"
         tab={tab}

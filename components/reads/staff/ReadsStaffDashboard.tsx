@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { promoCampaignHref, publishedReadsPath } from "@/lib/growth-center-v2/promotion-links";
+
 import { useMemo, useState } from "react";
 import ActionFeedback, {
   type ActionFeedbackState,
@@ -611,6 +614,12 @@ export default function ReadsStaffDashboard({
                       >
                         Publish
                       </button>
+                    ) : null}
+
+                    {role === "manager" && item.status === "published" && item.visibility === "public" && publishedReadsPath(item.content_type, item.slug) ? (
+                      <Link href={promoCampaignHref({ kind: "reads", title: item.title, destination: publishedReadsPath(item.content_type, item.slug)! })} className="inline-flex min-h-9 items-center rounded-full bg-sky-50 px-3 text-xs font-black text-sky-800 hover:bg-sky-100">
+                        Promote & track
+                      </Link>
                     ) : null}
 
                     {role !== "intern" ? (

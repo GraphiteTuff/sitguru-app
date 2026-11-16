@@ -49,15 +49,23 @@ export default function LiveResultsBoard({
   canConnectTikTok = false,
   tiktokNotice = "",
 }: {
-  audience: "manager" | "intern";
+  audience: "manager" | "intern" | "admin";
   data: LiveResultsData;
   canSyncMeta?: boolean;
   canConnectTikTok?: boolean;
   tiktokNotice?: string;
 }) {
-  const manager = audience === "manager";
-  const base = manager ? "/manager" : "/intern";
-  const actions: Array<{ href: string; label: string; tone: string; icon: LucideIcon }> = manager
+  const manager = audience !== "intern";
+  const base = audience === "admin" ? "/admin/growth" : manager ? "/manager" : "/intern";
+  const contentHref = audience === "admin" ? "/admin/growth/content" : manager ? "/manager/content" : "/intern/work";
+  const actions: Array<{ href: string; label: string; tone: string; icon: LucideIcon }> = audience === "admin"
+    ? [
+        { href: "/admin/growth/insights?view=social", label: "Social Metrics", tone: "bg-[#F5F3FF] text-[#6D28D9]", icon: BarChart3 },
+        { href: "/admin/growth/reports", label: "Growth Reports", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: FileDown },
+        { href: "/admin/growth/content", label: "Content Oversight", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
+        { href: "/admin/growth", label: "Growth HQ", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: LineChart },
+      ]
+    : manager
     ? [
         { href: "/manager/content", label: "Create a Post", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
         { href: "/manager/calendar", label: "View Calendar", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: CalendarDays },
@@ -68,7 +76,7 @@ export default function LiveResultsBoard({
         { href: "/intern/work", label: "Create a Post", tone: "bg-[#ECFDF5] text-[#047857]", icon: PenLine },
         { href: "/intern/calendar", label: "View Calendar", tone: "bg-[#EFF6FF] text-[#1D4ED8]", icon: CalendarDays },
         { href: "/intern/metrics", label: "View Metrics", tone: "bg-[#F5F3FF] text-[#6D28D9]", icon: BarChart3 },
-        { href: "/intern/growth", label: "Export Report", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: FileDown },
+        { href: "/intern/metrics?view=reports", label: "View Reports", tone: "bg-[#FFF7ED] text-[#C2410C]", icon: FileDown },
       ];
 
   return (
@@ -100,7 +108,7 @@ export default function LiveResultsBoard({
           <p className="mt-1 text-sm font-medium text-slate-600">
             {manager ? "Posts waiting on review" : "Complete your weekly check-in"}
           </p>
-          <Link href={manager ? "/manager/content" : `${base}/check-ins`} className="mt-2 inline-flex text-xs font-bold text-[#166534]">
+          <Link href={manager ? contentHref : `${base}/check-ins`} className="mt-2 inline-flex text-xs font-bold text-[#166534]">
             {manager ? "Open content →" : "Open check-in →"}
           </Link>
         </article>
@@ -177,14 +185,18 @@ export default function LiveResultsBoard({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {data.social.map((card) => {
             const verified = card.verifiedStatus === "connected" && card.verifiedFollowers !== null;
+            const sandbox = card.verifiedStatus === "sandbox_connected" && card.sandboxFollowers !== null;
             const statusLabel = verified
               ? "Verified API"
+              : sandbox
+                ? "Sandbox test"
               : card.verifiedStatus === "error"
                 ? "Stale data"
                 : card.verifiedStatus === "manual"
                   ? "Not verified"
                   : "Not connected";
-            const updatedAt = card.verifiedAt ? Date.parse(card.verifiedAt) : NaN;
+            const displayedAt = sandbox ? card.sandboxAt : card.verifiedAt;
+            const updatedAt = displayedAt ? Date.parse(displayedAt) : NaN;
             return (
               <article key={card.label} className={`${DESK_UI.card} p-4`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -192,22 +204,28 @@ export default function LiveResultsBoard({
                     {card.label}
                   </p>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    verified ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    verified ? "bg-emerald-50 text-emerald-700" : sandbox ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-600"
                   }`}>
                     {statusLabel}
                   </span>
                 </div>
                 <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-slate-400">Followers</p>
                 <p className="mt-1 text-3xl font-black tabular-nums text-[#0F2744]">
-                  {verified && card.verifiedFollowers !== null ? formatCount(card.verifiedFollowers) : "—"}
+                  {verified && card.verifiedFollowers !== null
+                    ? formatCount(card.verifiedFollowers)
+                    : sandbox && card.sandboxFollowers !== null
+                      ? formatCount(card.sandboxFollowers)
+                      : "—"}
                 </p>
                 <p className="mt-1 min-h-8 text-[11px] font-semibold text-slate-500">
                   {verified
                     ? card.verifiedFollowerDelta === null
                       ? "Verified by official social API"
                       : `${card.verifiedFollowerDelta >= 0 ? "+" : ""}${formatCount(card.verifiedFollowerDelta)} since first verified sync`
+                    : sandbox
+                      ? "Sandbox test snapshot • not an official production KPI"
                     : card.verifiedStatus === "error"
-                      ? "The last verified sync is stale"
+                      ? "The last authorized sync is stale or unavailable"
                       : "Official follower count unavailable"}
                 </p>
                 {card.accountLabel && (
@@ -218,12 +236,13 @@ export default function LiveResultsBoard({
                     href="/api/integrations/tiktok/start"
                     className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
                   >
-                    Connect TikTok (sandbox)
+                    {sandbox ? "Reconnect TikTok (sandbox)" : "Connect TikTok (sandbox)"}
                   </Link>
                 ) : null}
-                {verified && Number.isFinite(updatedAt) && (
+                {(verified || sandbox) && Number.isFinite(updatedAt) && (
                   <p className="mt-1 text-[10px] text-slate-400">
-                    Synced {new Date(updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "short", timeStyle: "short" })} ET
+                    {sandbox ? "Sandbox updated" : "Synced"}{" "}
+                    {new Date(updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "short", timeStyle: "short" })} ET
                   </p>
                 )}
                 <div className="mt-3 border-t border-slate-100 pt-3">
@@ -248,7 +267,7 @@ export default function LiveResultsBoard({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-[#0F2744]">New this week</h2>
-            <Link href={`${base}/metrics`} className="text-xs font-bold text-[#2563EB]">
+            <Link href={audience === "admin" ? "/admin/growth/insights?view=social" : `${base}/metrics`} className="text-xs font-bold text-[#2563EB]">
               View Details →
             </Link>
           </div>
@@ -262,7 +281,7 @@ export default function LiveResultsBoard({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-[#0F2744]">Latest content</h2>
-            <Link href={manager ? "/manager/content" : "/intern/work"} className="text-xs font-bold text-[#2563EB]">
+            <Link href={contentHref} className="text-xs font-bold text-[#2563EB]">
               View All →
             </Link>
           </div>

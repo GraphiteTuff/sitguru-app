@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import { ContentStudioBoard } from "@/components/manager/ContentStudioBoard";
 import { CampaignPanel, GrowthFrame } from "@/components/manager/GrowthWorkPanels";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -24,6 +25,7 @@ export default async function CampaignsContentPage({
   ]);
   return (
     <GrowthFrame title="Content Studio" subtitle="Review intern content, then keep your own campaigns beside it." notice={first(params.ok)}>
+      <PromotionEntryPoint source="Content Studio" description="Bring approved Brand Kit, Reads, Events and Community sources into the existing intern-to-Ava review process." />
       <ContentStudioBoard
         items={studio.items}
         summary={studio.summary}

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { promoCampaignHref } from "@/lib/growth-center-v2/promotion-links";
+import { surveyIsOpen } from "@/lib/manager-growth/model";
 import type { ReactNode } from "react";
 import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";
 import { DESK_UI } from "@/lib/portal/desk-ui";
@@ -312,7 +314,15 @@ export function SurveyPanel({
               <li key={String(survey.id)} className="rounded-2xl bg-[#F8FAFC] px-3 py-3">
                 <p className="font-black text-[#0F2744]">{String(survey.title)}</p>
                 <p className="text-sm text-slate-600">{String(survey.status)} · {mine.length} answers</p>
-                <p className="break-all text-sm text-[#2563EB]">/s/{String(survey.code)}</p>
+                <Link href={`/s/${encodeURIComponent(String(survey.code))}`} className="break-all text-sm font-bold text-[#2563EB]">/s/{String(survey.code)}</Link>
+                {surveyIsOpen({
+                  status: String(survey.status || ""),
+                  startOn: String(survey.start_on || ""),
+                  endOn: String(survey.end_on || ""),
+                  today: new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }),
+                }) ? (
+                  <Link href={promoCampaignHref({kind:"surveys",title:String(survey.title),destination:`/s/${encodeURIComponent(String(survey.code))}`})} className="mt-2 inline-flex min-h-9 items-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-800">Promote this open poll</Link>
+                ) : null}
                 <ul className="mt-1 text-sm text-slate-600">
                   {[...counts.entries()].map(([choice, count]) => <li key={choice}>{choice}: {count}</li>)}
                 </ul>

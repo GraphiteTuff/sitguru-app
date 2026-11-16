@@ -1,3 +1,4 @@
+import PromotionEntryPoint from "@/components/manager/PromotionEntryPoint";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { GrowthFrame, SurveyPanel } from "@/components/manager/GrowthWorkPanels";
 import { loadSurveys } from "@/lib/manager-growth/data";
@@ -19,6 +20,7 @@ export default async function SurveysPage({
   const desk = await loadSurveys(access.actor.id);
   return (
     <GrowthFrame title="Polls & Surveys" subtitle="One question at a time. You choose when it opens. Answers stay on SitGuru." notice={first(params.ok)}>
+      <PromotionEntryPoint source="Polls & Surveys" description="Promote only currently open public polls; use aggregated learning for future campaigns, not individual responses." />
       <SurveyPanel surveys={desk.surveys} responses={desk.responses} />
     </GrowthFrame>
   );

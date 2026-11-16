@@ -212,6 +212,34 @@ export async function GrowthWorkplaceHome({
       icon: BarChart3,
     },
     ...(workplace.kind === "admin"
+      ? [
+          {
+            href: "/admin/growth/results",
+            label: "Live Results",
+            detail: "The same verified follower and traffic cards as Manager and Intern",
+            icon: BarChart3,
+          },
+          {
+            href: "/admin/growth/insights?view=social",
+            label: "Social Metrics",
+            detail: "Auto-refreshing Meta and TikTok API source status",
+            icon: Megaphone,
+          },
+          {
+            href: "/admin/growth/reports",
+            label: "Growth Reports",
+            detail: "Official follower snapshots beside submitted reports",
+            icon: ClipboardList,
+          },
+          {
+            href: "/admin/growth/promotions",
+            label: "Promotion Hub",
+            detail: "Approved cross-channel content from Reads, Events, Community and Brand Kit",
+            icon: Megaphone,
+          },
+        ]
+      : []),
+    ...(workplace.kind === "admin"
       ? [{
           href: "/admin/growth/content",
           label: "Content overview",

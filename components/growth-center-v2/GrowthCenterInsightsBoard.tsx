@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
+import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import { useWorkspaceLiveSync } from "@/hooks/useWorkspaceLiveSync";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { GROWTH_CHART_COLORS, GROWTH_KPI_TONES } from "@/lib/growth-center-v2/colors";
@@ -127,6 +128,7 @@ export default function GrowthCenterInsightsBoard({
 
   return (
     <div className="space-y-4 pb-28 lg:pb-8">
+      <LiveSocialAutoRefresh intervalMs={90_000} />
       <DeskPageHero
         icon={<LineChart size={22} />}
         title="Growth Center Insights"
@@ -379,6 +381,8 @@ export default function GrowthCenterInsightsBoard({
                     className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
                       item.status === "connected"
                         ? "bg-emerald-100 text-emerald-800"
+                        : item.status === "sandbox_connected"
+                          ? "bg-sky-100 text-sky-800"
                         : item.status === "manual"
                           ? "bg-amber-100 text-amber-800"
                           : item.status === "error"
@@ -390,17 +394,24 @@ export default function GrowthCenterInsightsBoard({
                   </span>
                 </div>
                 <p className="mt-2 text-2xl font-black text-[#0F2744]">
-                  {item.followers == null ? "—" : item.followers.toLocaleString("en-US")}
+                  {item.followers !== null
+                    ? item.followers.toLocaleString("en-US")
+                    : item.status === "sandbox_connected" && item.sandboxFollowers !== null && item.sandboxFollowers !== undefined
+                      ? item.sandboxFollowers.toLocaleString("en-US")
+                      : "—"}
                 </p>
                 <p className="text-xs font-semibold text-slate-500">
                   {item.accountLabel || "No account connected"}
                 </p>
+                {item.status === "sandbox_connected" ? (
+                  <p className="mt-1 text-xs font-bold text-sky-800">TikTok sandbox test • excluded from official totals</p>
+                ) : null}
                 <p className="mt-2 text-[11px] font-medium leading-4 text-slate-500">
                   {item.setupHint}
                 </p>
                 <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                  {item.lastSyncedAt
-                    ? `Last update ${new Date(item.lastSyncedAt).toLocaleString()}`
+                  {item.lastSyncedAt || item.sandboxLastSyncedAt
+                    ? `${item.status === "sandbox_connected" ? "Sandbox updated" : "Last update"} ${new Date((item.status === "sandbox_connected" ? item.sandboxLastSyncedAt : item.lastSyncedAt) || "").toLocaleString("en-US", { timeZone: "America/New_York" })} ET`
                     : "No sync yet"}
                 </p>
               </article>
