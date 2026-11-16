@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { OFFICIAL_META_ENTITY_ID } from "@/lib/meta/social-analytics";
-import { OFFICIAL_TIKTOK_ENTITY_ID } from "@/lib/tiktok/social-analytics";
+import { OFFICIAL_TIKTOK_ENTITY_ID, TIKTOK_SANDBOX_ENTITY_ID } from "@/lib/tiktok/social-analytics";
+import { deriveTikTokSocialStatus } from "./tiktok-status";
 import type { SocialConnectorStatus } from "./types";
 
 const PLATFORMS = [
@@ -45,7 +46,7 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
     const { data, error } = await supabaseAdmin
       .from("social_platform_metrics")
       .select("entity_id,platform,current_followers,baseline_followers,updated_at")
-      .in("entity_id", [OFFICIAL_META_ENTITY_ID, OFFICIAL_TIKTOK_ENTITY_ID, "brand"])
+      .in("entity_id", [OFFICIAL_META_ENTITY_ID, OFFICIAL_TIKTOK_ENTITY_ID, TIKTOK_SANDBOX_ENTITY_ID, "brand"])
       .limit(100);
     if (!error && Array.isArray(data)) metricRows = data as AnyRow[];
   } catch {
@@ -88,34 +89,15 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
     }
 
     if (item.platform === "tiktok") {
-      const connection = connectionRows.find((row) => text(row.platform) === "tiktok");
-      const metadata = connection?.metadata as { environment?: unknown } | null | undefined;
-      const isProductionAuthorization = metadata?.environment === "production";
-      const verified = metricRows.find(
-        (row) => text(row.entity_id) === OFFICIAL_TIKTOK_ENTITY_ID && text(row.platform) === "tiktok",
-      );
-      const lastSyncedAt = isProductionAuthorization ? text(verified?.updated_at) || null : null;
-      const age = lastSyncedAt ? Date.now() - Date.parse(lastSyncedAt) : NaN;
-      const fresh = Boolean(
-        verified && Number.isFinite(age) && age >= -5 * 60 * 1000 && age <= MAX_META_AGE_MS,
-      );
-      const followers = fresh && isProductionAuthorization ? count(verified?.current_followers) : null;
-      const baselineFollowers = fresh && isProductionAuthorization ? count(verified?.baseline_followers) : null;
-      const available = followers != null;
-      return {
-        platform: "tiktok",
-        label: "TikTok",
-        status: !isProductionAuthorization || !verified ? "not_configured" : available ? "connected" : "error",
-        accountLabel: isProductionAuthorization ? "@sitguruofficial" : null,
-        lastSyncedAt,
-        followers: available ? followers : null,
-        baselineFollowers: available ? baselineFollowers : null,
-        setupHint: !isProductionAuthorization
-          ? "TikTok sandbox is for testing only; public follower KPIs require approved production OAuth."
-          : !available
-            ? "TikTok API is not yet synchronized or the last verified snapshot is stale."
-            : "Official TikTok API statistics, captured at the time shown.",
-      };
+      return deriveTikTokSocialStatus({
+        connection: connectionRows.find((row) => text(row.platform) === "tiktok"),
+        productionMetric: metricRows.find(
+          (row) => text(row.entity_id) === OFFICIAL_TIKTOK_ENTITY_ID && text(row.platform) === "tiktok",
+        ),
+        sandboxMetric: metricRows.find(
+          (row) => text(row.entity_id) === TIKTOK_SANDBOX_ENTITY_ID && text(row.platform) === "tiktok",
+        ),
+      });
     }
 
     // Other platforms are not connected to official APIs in this phase.
