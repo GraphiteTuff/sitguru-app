@@ -72,6 +72,7 @@ export function buildManagerToolkit(input: {
         external("Published folder", "Copies of published work in SharePoint.", folder("content-published")),
         { label: "Campaign Tracking Links", detail: "Links created with each campaign.", href: MANAGER_ROUTES.campaigns },
         { label: "Create Campaign", detail: "Start a campaign in the growth workspace.", href: "/manager/create" },
+        { label: "Promotion Hub", detail: "Approved Reads, Events, Pack stories, public surveys, Brand Kit and tracking links in one place.", href: "/manager/promotions" },
       ],
     },
     {
@@ -85,7 +86,7 @@ export function buildManagerToolkit(input: {
         { label: "Pet Parent Growth", detail: "Pet Parent totals from Live Results.", href: MANAGER_ROUTES.results },
         { label: "Guru Growth", detail: "Guru totals from Live Results.", href: MANAGER_ROUTES.results },
         { label: "Registration and Conversion Data", detail: "Registration and booking conversions.", href: "/manager/conversions" },
-        { label: "Social Analytics", detail: "SitGuru channel totals. A separate social-network API is not connected.", href: MANAGER_ROUTES.metrics },
+        { label: "Social Analytics", detail: "Verified Facebook and Instagram metrics, TikTok test status, and current platform authorization.", href: MANAGER_ROUTES.metrics },
         external(
           "Competitor Research",
           "Manually maintained notes for Rover, Wag, and local competitors. SitGuru does not invent those figures.",
