@@ -26,6 +26,8 @@ export default async function InternContentPage({
   const params = searchParams ? await searchParams : {};
   const studio = await loadInternContentStudio(intern.id);
   const editing = studio.items.find((item) => item.id === first(params.edit)) || null;
+  const seedPlatform = first(params.platform);
+  const selectedPlatform = ["Facebook", "Instagram", "TikTok"].includes(seedPlatform) ? seedPlatform : "Instagram";
   const seedKind = first(params.seedKind);
   const seedId = first(params.seedId);
   const seedSources = !editing && seedId && ["reads", "events", "community", "surveys", "brand"].includes(seedKind)
@@ -75,7 +77,7 @@ export default async function InternContentPage({
             </select>
           </label>
           <label className="block text-sm font-black text-slate-800">Platform
-            <select name="platform" defaultValue={editing?.platform || "Instagram"} className={`mt-1 ${field}`}>
+            <select name="platform" defaultValue={editing?.platform || (selectedSource ? selectedPlatform : "Instagram")} className={`mt-1 ${field}`}>
               {CONTENT_PLATFORMS.map((platform) => <option key={platform}>{platform}</option>)}
             </select>
           </label>
