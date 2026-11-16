@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { BarChart3, CalendarDays, CheckCircle2, FileText, Info, Link2, ShieldCheck } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, FileText, Link2, ShieldCheck } from "lucide-react";
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
+import LiveSocialSourceHealth from "@/components/portal/LiveSocialSourceHealth";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { saveManagerGrowthReport } from "@/lib/growth-center-v2/report-actions";
 import {
@@ -76,7 +77,6 @@ export default function ManagerGrowthReportingCenter({
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   });
   const reportLink = saved?.sharePointUrl || ANALYTICS_RESULTS_SHAREPOINT_URL;
-  const socialUnavailable = liveSocial.filter((platform) => platform.status !== "connected");
   const csvHref = "/api/manager/growth-reports/export?period=" +
     encodeURIComponent(period.cadence) + "&end=" + encodeURIComponent(period.endDate);
 
@@ -182,27 +182,7 @@ export default function ManagerGrowthReportingCenter({
         </section>
       </div>
 
-      <section className={DESK_UI.card + " p-5"}>
-        <h2 className="text-lg font-black text-[#0F2744]">Social analytics source health</h2>
-        <p className="mt-1 text-xs font-semibold text-slate-600">
-          Current official API status and follower snapshots, independent of archived report submissions. Missing data never counts as zero.
-        </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {liveSocial.map((platform) => (
-            <div key={platform.platform} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-sm font-black text-[#0F2744]">{platform.label}</p>
-              <p className={"mt-1 text-xs font-black " + (platform.status === "connected" ? "text-emerald-700" : "text-amber-800")}>{platform.status.replace(/_/g, " ")}</p>
-              <p className="mt-2 text-xs text-slate-600">{platform.followers === null ? "Followers: unavailable" : "Tracked followers: " + platform.followers}</p>
-              <p className="mt-1 text-[11px] text-slate-500">{platform.lastSyncedAt ? "Updated " + formatTime(platform.lastSyncedAt) : "No verified sync timestamp"}</p>
-            </div>
-          ))}
-        </div>
-        {socialUnavailable.length > 0 ? (
-          <p className="mt-3 flex items-start gap-2 text-xs font-semibold text-amber-900">
-            <Info size={16} className="shrink-0" /> Some social metrics are manual or disconnected. These figures are not verified API engagement totals.
-          </p>
-        ) : null}
-      </section>
+      <LiveSocialSourceHealth initialSocial={liveSocial} />
 
       <section className={DESK_UI.card + " p-5 sm:p-6"}>
         <div className="flex flex-wrap items-start justify-between gap-3">
