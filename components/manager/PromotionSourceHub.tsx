@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import { internDraftHref, promoCampaignHref } from "@/lib/growth-center-v2/promotion-links";
 import type { PromotionOpportunity } from "@/lib/growth-center-v2/promotion-sources";
 
@@ -16,6 +17,7 @@ export default function PromotionSourceHub({
 }: { items: PromotionOpportunity[]; mode?: "manager" | "intern" }) {
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-24">
+      <LiveSocialAutoRefresh intervalMs={90_000} />
       <header className="rounded-[28px] bg-[#0F2744] p-5 text-white sm:p-7">
         <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-200">SitGuru Social & Community Growth</p>
         <h1 className="mt-2 text-2xl font-black text-white sm:text-3xl">Promotion Hub</h1>
