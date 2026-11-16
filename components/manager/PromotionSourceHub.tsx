@@ -52,6 +52,43 @@ export default function PromotionSourceHub({
         </p>
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Channel publishing and advertising readiness">
+        <h2 className="text-base font-black text-[#0F2744]">Publishing & advertising connections</h2>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {[
+            {
+              name: "Facebook",
+              state: "API follower analytics connected",
+              next: "Publishing and Meta Ads management require their own approved permissions and account grants.",
+              href: "https://business.facebook.com/",
+            },
+            {
+              name: "Instagram",
+              state: "API follower analytics connected",
+              next: "Instagram content publishing requires distinct professional-account permissions and a working media workflow.",
+              href: "https://business.facebook.com/",
+            },
+            {
+              name: "TikTok",
+              state: "Sandbox analytics connected",
+              next: "TikTok inbox uploads and public direct posts require separately approved posting scopes. Production app review remains necessary.",
+              href: "https://developers.tiktok.com/",
+            },
+          ].map(channel => (
+            <div key={channel.name} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <h3 className="font-black text-[#0F2744]">{channel.name}</h3>
+              <p className="mt-1 text-xs font-bold text-emerald-800">{channel.state}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{channel.next}</p>
+              <a href={channel.href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700">Open provider settings</a>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs font-semibold text-slate-600">
+          Content creation, scheduled approvals, campaign tracking, automatic follower snapshots, provider publishing and paid ads are separate capabilities.
+          No automatic posting or ad spending is activated by opening this hub.
+        </p>
+      </section>
+
       {HEADINGS.map(group => {
         const sources = items.filter(item => item.kind === group.kind);
         return (
