@@ -23,7 +23,7 @@ test("TikTok draft transfer accepts only TikTok's official HTTPS upload host", (
 test("TikTok upload action initializes and transfers a draft, never a direct post", async () => {
   const previous = global.fetch;
   const calls: Array<{ url: string; init?: RequestInit }> = [];
-  global.fetch = (async (url, init) => {
+  global.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ url: String(url), init });
     if (calls.length === 1) {
       return new Response(
