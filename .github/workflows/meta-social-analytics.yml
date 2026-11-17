@@ -2,9 +2,12 @@ name: Meta social analytics checks
 
 on:
   pull_request:
-    branches: [sitguru-main]
+    branches: [sitguru-main, feature/tiktok-live-social-reporting-20261116]
     paths:
       - "lib/meta/**"
+      - "lib/tiktok/**"
+      - "app/api/integrations/tiktok/**"
+      - "components/manager/ContentStudioBoard.tsx"
       - "lib/growth-center-v2/**"
       - "app/api/cron/**"
       - "app/manager/results/**"
@@ -42,6 +45,8 @@ jobs:
         run: npm run test:meta-social
       - name: Test TikTok sandbox status and safe promotion links
         run: npm run test:promotion-sync
+      - name: Run TikTok OAuth and draft-upload unit tests (no secrets)
+        run: npm run test:tiktok-social
       - name: Check TypeScript compilation
         run: npm run typecheck
       - name: Isolated production build (no real credentials)

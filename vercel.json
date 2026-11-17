@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash -c '[[ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]]'",
+  "ignoreCommand": "bash -c 'if [ \"$SITGURU_ISOLATED_STAGING\" = \"true\" ]; then [ \"$VERCEL_GIT_COMMIT_REF\" != \"feature/tiktok-content-studio-draft-upload-20261116\" ]; else [ \"$VERCEL_GIT_COMMIT_REF\" != \"sitguru-main\" ]; fi'",
   "crons": [
     {
       "path": "/api/cron/profile-completion-reminders",

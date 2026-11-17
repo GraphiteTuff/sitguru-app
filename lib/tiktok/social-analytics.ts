@@ -8,14 +8,16 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+const TIKTOK_STAGING_ORIGIN = "https://sitguru-tiktok-staging-jason-graffs-projects.vercel.app";
 export const TIKTOK_REDIRECT_URI =
-  "https://www.sitguru.com/api/integrations/tiktok/callback";
+  `${process.env.SITGURU_ISOLATED_STAGING === "true" ? TIKTOK_STAGING_ORIGIN : "https://www.sitguru.com"}/api/integrations/tiktok/callback`;
 export const OFFICIAL_TIKTOK_ENTITY_ID = "brand_tiktok_official";
 export const TIKTOK_SANDBOX_ENTITY_ID = "brand_tiktok_sandbox";
 const TIKTOK_ACCOUNT_LABEL = "@sitguruofficial";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 const USER_INFO_URL = "https://open.tiktokapis.com/v2/user/info/";
 const REQUIRED_SCOPES = ["user.info.basic", "user.info.stats"] as const;
+const TIKTOK_UPLOAD_SCOPE = "video.upload";
 
 type Environment = "sandbox" | "production";
 type TikTokConfig = {
@@ -80,11 +82,11 @@ export function getTikTokConfig(): TikTokConfig {
   };
 }
 
-export function makeTikTokAuthorizationUrl(clientKey: string, state: string): string {
+export function makeTikTokAuthorizationUrl(clientKey: string, state: string, includeUpload = false): string {
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
   url.searchParams.set("client_key", clientKey);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", REQUIRED_SCOPES.join(","));
+  url.searchParams.set("scope", [...REQUIRED_SCOPES, ...(includeUpload ? [TIKTOK_UPLOAD_SCOPE] : [])].join(","));
   url.searchParams.set("redirect_uri", TIKTOK_REDIRECT_URI);
   url.searchParams.set("state", state);
   return url.toString();
@@ -331,9 +333,12 @@ async function persistSnapshot(snapshot: TikTokSnapshot, config: TikTokConfig) {
   };
 }
 
-export async function connectTikTokCode(code: string) {
+export async function connectTikTokCode(code: string, requireUpload = false) {
   const config = getTikTokConfig();
   const bundle = await exchangeTikTokCode(code, config);
+  if (requireUpload && !bundle.scopes.includes(TIKTOK_UPLOAD_SCOPE)) {
+    throw new Error("TikTok did not grant the draft-upload permission.");
+  }
   const snapshot = await fetchTikTokSnapshot(bundle);
   await persistCredentials(bundle, config);
   return persistSnapshot(snapshot, config);
@@ -364,4 +369,36 @@ export async function syncAuthorizedTikTok() {
   }
   const snapshot = await fetchTikTokSnapshot(bundle);
   return persistSnapshot(snapshot, config);
+}
+/**
+ * Server-only access for founder-approved draft transfers. Never return this
+ * value to a browser, log, React component, or untrusted caller.
+ */
+export async function getTikTokDraftUploadAccessToken(): Promise<string> {
+  const config = getTikTokConfig();
+  const { data, error } = await supabaseAdmin
+    .from("growth_social_connections")
+    .select("token_ciphertext,metadata")
+    .eq("platform", "tiktok")
+    .maybeSingle();
+  if (error || !data?.token_ciphertext) throw new Error("Reconnect the SitGuru TikTok account.");
+  const metadata = data.metadata as { environment?: unknown } | null;
+  if (metadata?.environment !== config.environment) {
+    throw new Error("TikTok account was connected in a different environment.");
+  }
+  let bundle = unseal(data.token_ciphertext, config.encryptionKey);
+  if (config.expectedOpenId && bundle.openId !== config.expectedOpenId) {
+    throw new Error("TikTok identity does not match the official account.");
+  }
+  if (!bundle.scopes.includes(TIKTOK_UPLOAD_SCOPE)) {
+    throw new Error("Reconnect TikTok with draft-upload permission.");
+  }
+  if (Date.parse(bundle.accessExpiresAt) <= Date.now() + 5 * 60 * 1000) {
+    bundle = await refreshTikTokTokens(bundle, config);
+    if (!bundle.scopes.includes(TIKTOK_UPLOAD_SCOPE)) {
+      throw new Error("TikTok upload permission expired. Reconnect the account.");
+    }
+    await persistCredentials(bundle, config);
+  }
+  return bundle.accessToken;
 }
