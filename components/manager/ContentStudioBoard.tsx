@@ -7,6 +7,7 @@ import {
 } from "@/lib/internship/content-studio-actions";
 import { studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
 import { DESK_UI } from "@/lib/portal/desk-ui";
+import { sendApprovedTikTokVideoDraft } from "@/lib/tiktok/content-posting-actions";
 
 const PLATFORM_LINKS: Record<string, string> = {
   Facebook: "https://www.facebook.com/",
@@ -73,6 +74,13 @@ export function ContentStudioBoard({
         ))}
       </div>
       {isSuperUser ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+          <p className="text-sm font-bold text-sky-950">TikTok draft-upload pilot</p>
+          <p className="mt-1 text-sm text-sky-900">Authorize @sitguruofficial to send approved video to TikTok drafts. This is separate from follower analytics and never publishes a public TikTok post.</p>
+          <Link href="/api/integrations/tiktok/start?upload=1" className="mt-3 inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-black !text-white">Connect TikTok for draft uploads</Link>
+        </div>
+      ) : null}
+      {isSuperUser ? (
         <p className="text-sm font-semibold text-slate-600">
           {summary.escalated} escalation{summary.escalated === 1 ? "" : "s"} waiting for Admin. Routine posts stay with the assigned manager.
         </p>
@@ -137,6 +145,17 @@ export function ContentStudioBoard({
               {labels.action === "CEO review" && !isSuperUser ? (
                 <p className="mt-3 text-sm font-semibold text-slate-600">Escalated to Admin. Routine approval stays with the assigned manager.</p>
               ) : null}
+              {isSuperUser && item.platform === "TikTok" && item.creativePath && item.creativeMime.startsWith("video/") && !item.publishedUrl && ["Manager approved", "CEO Approved", "Approved / Complete"].includes(labels.status) ? (
+                <form action={sendApprovedTikTokVideoDraft} className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                  <input type="hidden" name="contentId" value={item.id} />
+                  <p className="text-sm font-bold text-sky-950">Send approved video to TikTok drafts</p>
+                  <label className="flex items-start gap-2 text-xs font-semibold text-sky-900">
+                    <input type="checkbox" name="confirm" value="yes" required className="mt-1" />
+                    I confirm this is the approved video and SitGuru has permission to share it on TikTok. Final editing and publication happen inside TikTok.
+                  </label>
+                  <button type="submit" className="min-h-11 rounded-full bg-[#2563EB] px-4 text-sm font-black !text-white">Send to TikTok inbox as draft</button>
+                </form>
+              ) : null}
               {labels.status !== "Published" && (labels.action === "Publish" || labels.status === "Manager approved" || labels.status === "CEO Approved") ? (
                 <form action={recordStudioPublication} className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                   <input type="hidden" name="contentId" value={item.id} />
@@ -155,7 +174,7 @@ export function ContentStudioBoard({
         ) : null}
       </section>
       <p className="text-xs font-semibold text-slate-500">
-        Opening a social network or copying a caption does not mark a post published. SitGuru does not post to Facebook, Instagram, TikTok, X, or YouTube from this page. Approving a post does not complete internship hours.
+        Opening a social network or copying a caption does not mark a post published. Sending a TikTok video creates a draft for final editing in the TikTok app; it is not a published post. SitGuru does not automatically publish to Facebook, Instagram, TikTok, X, or YouTube. Approving a post does not complete internship hours.
       </p>
     </div>
   );
