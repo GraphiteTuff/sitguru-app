@@ -8,8 +8,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+const TIKTOK_STAGING_ORIGIN = "https://sitguru-tiktok-staging-jason-graffs-projects.vercel.app";
 export const TIKTOK_REDIRECT_URI =
-  "https://www.sitguru.com/api/integrations/tiktok/callback";
+  `${process.env.SITGURU_ISOLATED_STAGING === "true" ? TIKTOK_STAGING_ORIGIN : "https://www.sitguru.com"}/api/integrations/tiktok/callback`;
 export const OFFICIAL_TIKTOK_ENTITY_ID = "brand_tiktok_official";
 export const TIKTOK_SANDBOX_ENTITY_ID = "brand_tiktok_sandbox";
 const TIKTOK_ACCOUNT_LABEL = "@sitguruofficial";
