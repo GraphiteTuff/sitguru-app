@@ -1,17 +1,17 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { connectTikTokCode } from "@/lib/tiktok/social-analytics";
+import { connectTikTokCode, TIKTOK_REDIRECT_URI } from "@/lib/tiktok/social-analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const STATE_COOKIE = "sitguru_tiktok_oauth_state";
 const UPLOAD_COOKIE = "sitguru_tiktok_oauth_upload";
-const FINISH_URL = "https://www.sitguru.com/manager/results";
+const FINISH_URL = `${new URL(TIKTOK_REDIRECT_URI).origin}/manager/results`;
 
 function finish(status: string, uploadFlow = false): NextResponse {
-  const destination = new URL(uploadFlow ? "https://www.sitguru.com/manager/campaigns-content" : FINISH_URL);
+  const destination = new URL(uploadFlow ? `${new URL(TIKTOK_REDIRECT_URI).origin}/manager/campaigns-content` : FINISH_URL);
   destination.searchParams.set("tiktok", status);
   const response = NextResponse.redirect(destination);
   response.cookies.set(STATE_COOKIE, "", {
