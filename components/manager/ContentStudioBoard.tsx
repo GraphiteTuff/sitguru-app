@@ -41,6 +41,7 @@ export function ContentStudioBoard({
   error?: string;
   focusId?: string;
 }) {
+  const draftUploadPilotEnabled = process.env.TIKTOK_DRAFT_UPLOAD_ENABLED === "true";
   const cards = [
     ["Drafts", summary.drafts],
     ["Pending my approval", summary.pending],
@@ -73,7 +74,7 @@ export function ContentStudioBoard({
           </article>
         ))}
       </div>
-      {isSuperUser ? (
+      {isSuperUser && draftUploadPilotEnabled ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
           <p className="text-sm font-bold text-sky-950">TikTok draft-upload pilot</p>
           <p className="mt-1 text-sm text-sky-900">Authorize @sitguruofficial to send approved video to TikTok drafts. This is separate from follower analytics and never publishes a public TikTok post.</p>
@@ -145,7 +146,7 @@ export function ContentStudioBoard({
               {labels.action === "CEO review" && !isSuperUser ? (
                 <p className="mt-3 text-sm font-semibold text-slate-600">Escalated to Admin. Routine approval stays with the assigned manager.</p>
               ) : null}
-              {isSuperUser && item.platform === "TikTok" && item.creativePath && item.creativeMime.startsWith("video/") && !item.publishedUrl && ["Manager approved", "CEO Approved", "Approved / Complete"].includes(labels.status) ? (
+              {isSuperUser && draftUploadPilotEnabled && item.platform === "TikTok" && item.creativePath && item.creativeMime.startsWith("video/") && !item.publishedUrl && ["Manager approved", "CEO Approved", "Approved / Complete"].includes(labels.status) ? (
                 <form action={sendApprovedTikTokVideoDraft} className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
                   <input type="hidden" name="contentId" value={item.id} />
                   <p className="text-sm font-bold text-sky-950">Send approved video to TikTok drafts</p>
