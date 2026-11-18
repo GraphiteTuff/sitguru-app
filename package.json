@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:email": "tsx --test lib/email/headers.test.ts lib/email/suppression.test.ts lib/email/email-updates-welcome.test.ts",
+    "test:sms": "tsx --test lib/sms/disclosures.test.ts",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
     "seed-social-baseline": "tsx scripts/seed-social-baseline.ts"
