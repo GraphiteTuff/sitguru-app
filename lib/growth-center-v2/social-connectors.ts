@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { OFFICIAL_META_ENTITY_ID } from "@/lib/meta/social-analytics";
 import { OFFICIAL_TIKTOK_ENTITY_ID } from "@/lib/tiktok/social-analytics";
+import { OFFICIAL_X_ENTITY_ID } from "@/lib/x/social-analytics";
 import type { SocialConnectorStatus } from "./types";
 
 const PLATFORMS = [
@@ -45,7 +46,7 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
     const { data, error } = await supabaseAdmin
       .from("social_platform_metrics")
       .select("entity_id,platform,current_followers,baseline_followers,updated_at")
-      .in("entity_id", [OFFICIAL_META_ENTITY_ID, OFFICIAL_TIKTOK_ENTITY_ID, "brand"])
+      .in("entity_id", [OFFICIAL_META_ENTITY_ID, OFFICIAL_TIKTOK_ENTITY_ID, OFFICIAL_X_ENTITY_ID, "brand"])
       .limit(100);
     if (!error && Array.isArray(data)) metricRows = data as AnyRow[];
   } catch {
@@ -115,6 +116,37 @@ export async function loadSocialConnectorStatus(): Promise<SocialConnectorStatus
           : !available
             ? "TikTok API is not yet synchronized or the last verified snapshot is stale."
             : "Official TikTok API statistics, captured at the time shown.",
+      };
+    }
+
+    if (item.platform === "x") {
+      const conn = connectionRows.find((row) => text(row.platform) === "x");
+      const metadata = conn?.metadata as { environment?: unknown } | null | undefined;
+      const isProduction = metadata?.environment === "production";
+      const verified = metricRows.find(
+        (row) => text(row.entity_id) === OFFICIAL_X_ENTITY_ID && text(row.platform) === "x",
+      );
+      const lastSyncedAt = isProduction ? text(verified?.updated_at) || null : null;
+      const age = lastSyncedAt ? Date.now() - Date.parse(lastSyncedAt) : NaN;
+      const fresh = Boolean(
+        verified && Number.isFinite(age) && age >= -5 * 60 * 1000 && age <= MAX_META_AGE_MS,
+      );
+      const followers = fresh && isProduction ? count(verified?.current_followers) : null;
+      const baselineFollowers = fresh && isProduction ? count(verified?.baseline_followers) : null;
+      const available = text(conn?.status) === "connected" && followers != null;
+      return {
+        platform: "x",
+        label: "X",
+        status: !isProduction || !verified ? "not_configured" : available ? "connected" : "error",
+        accountLabel: isProduction ? "@SitGuruOfficial" : null,
+        lastSyncedAt,
+        followers: available ? followers : null,
+        baselineFollowers: available ? baselineFollowers : null,
+        setupHint: !isProduction
+          ? "X OAuth has not been authorized in production. Staging data is not used for public KPIs."
+          : !available
+            ? "X API statistics are stale or unavailable; sync requires founder approval and API credits."
+            : "Verified X API follower count, captured at the time shown.",
       };
     }
 
