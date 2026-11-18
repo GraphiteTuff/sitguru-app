@@ -19,6 +19,12 @@ test("TikTok authorization uses only approved minimal scopes and exact callback"
   assert.equal(url.searchParams.get("redirect_uri"), TIKTOK_REDIRECT_URI);
 });
 
+test("TikTok can request video.upload explicitly without changing ordinary analytics scope", () => {
+  const url = new URL(makeTikTokAuthorizationUrl("test-client", "upload-nonce", true));
+  assert.equal(url.searchParams.get("scope"), "user.info.basic,user.info.stats,video.upload");
+  assert.equal(url.searchParams.get("redirect_uri"), TIKTOK_REDIRECT_URI);
+});
+
 test("TikTok integration is disabled without an explicit flag", () => {
   const previous = process.env.TIKTOK_SOCIAL_SYNC_ENABLED;
   delete process.env.TIKTOK_SOCIAL_SYNC_ENABLED;
