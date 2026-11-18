@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 
+import { getStripeServer } from "@/lib/stripe/server";
+import { syncStripeConnectAccountForUser } from "@/lib/payments/sync-stripe-connect-account";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -34,81 +35,26 @@ function buildRedirectUrl(
   return url.toString();
 }
 
-async function saveGuruConnectStatus({
-  userId,
-  stripeAccountId,
-  chargesEnabled,
-  payoutsEnabled,
-  detailsSubmitted,
-}: {
-  userId: string;
-  stripeAccountId: string;
-  chargesEnabled: boolean;
-  payoutsEnabled: boolean;
-  detailsSubmitted: boolean;
-}) {
-  const now = new Date().toISOString();
-  const complete = chargesEnabled && payoutsEnabled;
-  const connectStatus = complete
-    ? "connected"
-    : detailsSubmitted
-      ? "pending"
-      : "onboarding_started";
-
-  const updateAttempts = [
-    {
-      stripe_account_id: stripeAccountId,
-      stripe_connect_status: connectStatus,
-      stripe_onboarding_complete: complete,
-      charges_enabled: chargesEnabled,
-      payouts_enabled: payoutsEnabled,
-      stripe_onboarding_completed_at: complete ? now : null,
-      updated_at: now,
-    },
-    {
-      stripe_account_id: stripeAccountId,
-      stripe_connect_status: connectStatus,
-      stripe_onboarding_complete: complete,
-      charges_enabled: chargesEnabled,
-      payouts_enabled: payoutsEnabled,
-      updated_at: now,
-    },
-    {
-      stripe_account_id: stripeAccountId,
-      stripe_onboarding_complete: complete,
-      charges_enabled: chargesEnabled,
-      payouts_enabled: payoutsEnabled,
-      updated_at: now,
-    },
-    {
-      stripe_account_id: stripeAccountId,
-      stripe_onboarding_complete: complete,
-    },
-  ];
-
-  for (const payload of updateAttempts) {
-    const { error } = await supabaseAdmin
-      .from("gurus")
-      .update(payload)
-      .eq("user_id", userId);
-
-    if (!error) return;
-  }
-}
-
 export async function GET(request: NextRequest) {
   const baseUrl = getBaseUrl(request);
   const role = request.nextUrl.searchParams.get("role") || "guru";
+  const client = (request.nextUrl.searchParams.get("client") || "").toLowerCase();
   const dashboardPath =
-    role === "ambassador" ? "/ambassador/dashboard" : "/guru/dashboard";
+    role === "ambassador" ? "/ambassador/dashboard" : "/guru/dashboard/earnings";
   const loginPath =
     role === "ambassador"
       ? "/login?role=ambassador"
       : "/login?role=guru";
 
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (client.includes("mobile")) {
+    return NextResponse.redirect(
+      new URL("/api/mobile/stripe/return?result=return", baseUrl),
+    );
+  }
 
-  if (!stripeSecretKey) {
+  try {
+    getStripeServer();
+  } catch {
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
         stripe: "error",
@@ -120,23 +66,28 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    const next = `/api/stripe/return?role=${encodeURIComponent(role)}`;
+  if (!user) {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, loginPath, { next }),
+      buildRedirectUrl(baseUrl, loginPath, {
+        next: dashboardPath,
+        stripe: "return",
+      }),
     );
   }
 
-  const { data: guru, error: guruError } = await supabaseAdmin
+  const { data: guru } = await supabaseAdmin
     .from("gurus")
-    .select("id, stripe_account_id")
+    .select("stripe_account_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (guruError || !guru?.stripe_account_id) {
+  const stripeAccountId = guru?.stripe_account_id
+    ? String(guru.stripe_account_id)
+    : "";
+
+  if (!stripeAccountId) {
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
         stripe: "error",
@@ -146,36 +97,25 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const stripe = new Stripe(stripeSecretKey);
-    const account = await stripe.accounts.retrieve(
-      String(guru.stripe_account_id),
-    );
-
-    const chargesEnabled = account.charges_enabled === true;
-    const payoutsEnabled = account.payouts_enabled === true;
-    const detailsSubmitted = account.details_submitted === true;
-
-    await saveGuruConnectStatus({
+    const stripe = getStripeServer();
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+    const readiness = await syncStripeConnectAccountForUser({
       userId: user.id,
-      stripeAccountId: account.id,
-      chargesEnabled,
-      payoutsEnabled,
-      detailsSubmitted,
+      account,
     });
 
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
-        stripe:
-          chargesEnabled && payoutsEnabled ? "connected" : "needs_attention",
+        stripe: readiness.complete ? "connected" : "pending",
       }),
     );
   } catch (error) {
-    console.error("Stripe Connect return failed:", error);
+    console.error("Stripe return sync failed:", error);
 
     return NextResponse.redirect(
       buildRedirectUrl(baseUrl, dashboardPath, {
         stripe: "error",
-        stripe_error: "return_failed",
+        stripe_error: "sync_failed",
       }),
     );
   }

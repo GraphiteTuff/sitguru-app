@@ -41,7 +41,7 @@ import { AppFonts } from '@/constants/fonts';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
-import { getSitGuruApiBaseUrl, sitguruApiFetch } from '@/lib/data/api';
+import { sitguruApiFetch } from '@/lib/data/api';
 import { formatUsd } from '@/lib/data/money';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -122,14 +122,9 @@ const OWNER_FIELDS = [
   'connected_account_owner_id',
 ];
 
-const SITE_URL =
-  process.env.EXPO_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
-  'https://www.sitguru.com';
-
 /** Payout routes that actually exist on the SitGuru web app. */
 const PAYOUT_SETUP_PATH = '/api/payouts/setup';
 const STRIPE_CONNECT_PATH = '/api/stripe/connect';
-const STRIPE_ONBOARD_PATH = '/api/stripe/connect/onboard?role=guru';
 const PAYPAL_ONBOARDING_PATH = '/api/paypal/onboarding';
 
 type PayoutProvider = 'stripe' | 'paypal';
@@ -279,8 +274,6 @@ export default function GuruEarningsScreen() {
   const [message, setMessage] = useState('');
   const [payoutStatus, setPayoutStatus] =
     useState<GuruPayoutStatus>(EMPTY_PAYOUT_STATUS);
-
-  const apiBaseUrl = getSitGuruApiBaseUrl() || SITE_URL;
 
   const refreshPayoutStatus = useCallback(async () => {
     const next = await loadGuruPayoutStatus();
@@ -454,14 +447,18 @@ export default function GuruEarningsScreen() {
           { method: 'POST', body: {} },
         );
 
-        /*
-          POST /api/stripe/connect authenticates from web cookies only, so a
-          bearer-token call can be rejected. The hosted onboarding redirect
-          handles its own sign-in, so it is the reliable mobile fallback.
-        */
         hostedUrl =
           (typeof connect.data?.url === 'string' ? connect.data.url : '') ||
-          `${apiBaseUrl}${STRIPE_ONBOARD_PATH}`;
+          '';
+
+        if (!hostedUrl) {
+          Alert.alert(
+            'Payout setup unavailable',
+            connect.error ||
+              'SitGuru could not start secure payout setup right now. Please try again.',
+          );
+          return;
+        }
       } else {
         const paypal = await sitguruApiFetch<PayPalOnboardingResponse>(
           PAYPAL_ONBOARDING_PATH,
@@ -1028,12 +1025,11 @@ export default function GuruEarningsScreen() {
 
                     <View style={styles.stripeCopy}>
                       <Text style={styles.stripeTitle}>
-                        Secure payout management
+                        Secure payouts when you’re ready
                       </Text>
                       <Text style={styles.stripeText}>
-                        Identity, tax, and bank details are completed directly
-                        with Stripe or PayPal. SitGuru does not display your
-                        full bank or identity information.
+                        Finish a quick setup with Stripe or PayPal so you can
+                        earn from bookings. SitGuru keeps this simple and secure.
                       </Text>
                     </View>
                   </View>

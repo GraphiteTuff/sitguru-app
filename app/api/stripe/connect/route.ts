@@ -1,9 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@/utils/supabase/server";
-import { supabaseAdmin } from "@/utils/supabase/admin";
+
+import {
+  mobileCorsHeaders,
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getStripeServer } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type GuruStripeConnectRecord = {
   id: string;
@@ -18,19 +25,12 @@ type GuruStripeConnectRecord = {
   payouts_enabled: boolean | null;
 };
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-if (!stripeSecretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY environment variable.");
-}
-
-const stripe = new Stripe(stripeSecretKey);
-
-function getAppUrl() {
+function getAppUrl(request?: NextRequest) {
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.VERCEL_URL ||
+    request?.nextUrl.origin ||
     "http://localhost:3000";
 
   return appUrl.startsWith("http")
@@ -38,19 +38,50 @@ function getAppUrl() {
     : `https://${appUrl.replace(/\/$/, "")}`;
 }
 
-async function createOrResumeStripeConnectOnboarding() {
-  const appUrl = getAppUrl();
-  const supabase = await createClient();
+function isMobileClient(request: NextRequest) {
+  const header = (
+    request.headers.get("x-sitguru-client") ||
+    request.nextUrl.searchParams.get("client") ||
+    ""
+  ).toLowerCase();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  return header.includes("mobile") || header === "sitguru-mobile";
+}
 
-  if (userError || !user) {
+function jsonWithCors(
+  request: NextRequest,
+  body: Record<string, unknown>,
+  status = 200,
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: mobileCorsHeaders(request),
+  });
+}
+
+async function createOrResumeStripeConnectOnboarding(request: NextRequest) {
+  const appUrl = getAppUrl(request);
+  const mobile = isMobileClient(request);
+  const resolved = await resolveRequestUser(request);
+
+  if (!resolved?.user) {
     return {
       error: "Unauthorized.",
       status: 401,
+      url: null as string | null,
+      stripeAccountId: null as string | null,
+    };
+  }
+
+  const user = resolved.user;
+
+  let stripe: Stripe;
+  try {
+    stripe = getStripeServer();
+  } catch {
+    return {
+      error: "Stripe is not configured.",
+      status: 503,
       url: null,
       stripeAccountId: null,
     };
@@ -108,7 +139,7 @@ async function createOrResumeStripeConnectOnboarding() {
       metadata: {
         guru_id: String(guru.id),
         user_id: String(user.id),
-        source: "sitguru_guru_step_5_onboarding",
+        source: "sitguru_guru_payout_setup",
       },
       capabilities: {
         card_payments: { requested: true },
@@ -141,10 +172,17 @@ async function createOrResumeStripeConnectOnboarding() {
     }
   }
 
+  const refreshUrl = mobile
+    ? `${appUrl}/api/mobile/stripe/return?result=refresh`
+    : `${appUrl}/guru/dashboard?stripe=refresh`;
+  const returnUrl = mobile
+    ? `${appUrl}/api/mobile/stripe/return?result=return`
+    : `${appUrl}/api/stripe/return`;
+
   const accountLink = await stripe.accountLinks.create({
     account: stripeAccountId,
-    refresh_url: `${appUrl}/guru/dashboard?stripe=refresh`,
-    return_url: `${appUrl}/api/stripe/return`,
+    refresh_url: refreshUrl,
+    return_url: returnUrl,
     type: "account_onboarding",
   });
 
@@ -156,34 +194,39 @@ async function createOrResumeStripeConnectOnboarding() {
   };
 }
 
-export async function GET() {
+export async function OPTIONS(request: NextRequest) {
+  return optionsWithMobileCors(request);
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const result = await createOrResumeStripeConnectOnboarding();
+    const result = await createOrResumeStripeConnectOnboarding(request);
 
     if (result.error || !result.url) {
-      return NextResponse.redirect(`${getAppUrl()}/guru/dashboard?stripe=error`);
+      return NextResponse.redirect(`${getAppUrl(request)}/guru/dashboard?stripe=error`);
     }
 
     return NextResponse.redirect(result.url);
   } catch (error) {
     console.error("Stripe Connect GET route error:", error);
 
-    return NextResponse.redirect(`${getAppUrl()}/guru/dashboard?stripe=error`);
+    return NextResponse.redirect(`${getAppUrl(request)}/guru/dashboard?stripe=error`);
   }
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const result = await createOrResumeStripeConnectOnboarding();
+    const result = await createOrResumeStripeConnectOnboarding(request);
 
     if (result.error || !result.url) {
-      return NextResponse.json(
+      return jsonWithCors(
+        request,
         { error: result.error || "Failed to start Stripe Connect onboarding." },
-        { status: result.status },
+        result.status,
       );
     }
 
-    return NextResponse.json({
+    return jsonWithCors(request, {
       ok: true,
       url: result.url,
       stripe_account_id: result.stripeAccountId,
@@ -191,9 +234,10 @@ export async function POST() {
   } catch (error) {
     console.error("Stripe Connect POST route error:", error);
 
-    return NextResponse.json(
+    return jsonWithCors(
+      request,
       { error: "Failed to start Stripe Connect onboarding." },
-      { status: 500 },
+      500,
     );
   }
 }
