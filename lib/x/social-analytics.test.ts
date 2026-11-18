@@ -73,7 +73,7 @@ test("X token request contains client_id and does not trust unapproved scopes", 
   await withTestConfig(async () => {
     const previous = global.fetch;
     let hits = 0;
-    global.fetch = (async (_input, init) => {
+    global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       hits += 1;
       const form = init?.body as URLSearchParams;
       assert.equal(form.get("client_id"), TEST_ENV.X_OAUTH_CLIENT_ID);
@@ -101,7 +101,7 @@ test("X refuses authorization of an account other than @SitGuruOfficial", async 
   await withTestConfig(async () => {
     const previous = global.fetch;
     let hits = 0;
-    global.fetch = (async (input) => {
+    global.fetch = (async (input: RequestInfo | URL) => {
       hits += 1;
       if (String(input).includes("/oauth2/token")) {
         return new Response(JSON.stringify({
@@ -127,7 +127,7 @@ test("X refuses authorization of an account other than @SitGuruOfficial", async 
 test("X refuses malformed follower counts even for the official username", async () => {
   await withTestConfig(async () => {
     const previous = global.fetch;
-    global.fetch = (async (input) => {
+    global.fetch = (async (input: RequestInfo | URL) => {
       if (String(input).includes("/oauth2/token")) {
         return new Response(JSON.stringify({
           access_token: "test-access",
