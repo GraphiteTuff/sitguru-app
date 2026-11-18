@@ -31,6 +31,7 @@ import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -282,6 +283,8 @@ const LESSONS: Lesson[] = [
 ];
 
 export default function GuruSuccessCenterScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
@@ -372,6 +375,7 @@ export default function GuruSuccessCenterScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}

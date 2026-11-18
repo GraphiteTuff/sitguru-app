@@ -29,6 +29,7 @@ import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,6 +80,8 @@ const TABLES = [
 const OWNER_FIELDS = ['referrer_id', 'guru_id', 'user_id', 'owner_id'];
 
 export default function GuruReferralsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
@@ -253,6 +256,7 @@ export default function GuruReferralsScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl

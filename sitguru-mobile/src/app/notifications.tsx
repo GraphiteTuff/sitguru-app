@@ -39,6 +39,7 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -464,6 +465,8 @@ async function updateNotification(
 }
 
 export default function NotificationsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const colorScheme = useColorScheme();
   const themePreference = useThemePreference();
   const theme = getAppTheme(colorScheme === 'dark' ? 'dark' : 'light');
@@ -732,6 +735,7 @@ export default function NotificationsScreen() {
                 ) : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl

@@ -36,6 +36,7 @@ import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { getGuruVerification, MARKETPLACE_TRUST_LINES } from '@/lib/marketplace-trust';
 import {
@@ -89,6 +90,8 @@ async function loadPublicGurus() {
 }
 
 export default function GuruProfileScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const {
     guruId,
     slug,
@@ -264,6 +267,7 @@ export default function GuruProfileScreen() {
               ) : null}
 
               <ScrollView
+              {...tabBarScroll}
                 contentContainerStyle={[
                   styles.scrollContent,
                   isTablet && styles.scrollContentTablet,

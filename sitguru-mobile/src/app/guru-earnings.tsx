@@ -37,6 +37,7 @@ import RoleGate from '@/components/RoleGate';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
@@ -248,6 +249,8 @@ async function loadGuruPayoutStatus(): Promise<GuruPayoutStatus> {
 }
 
 export default function GuruEarningsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const params = useLocalSearchParams<{ focus?: string }>();
   const focus =
     typeof params.focus === 'string' ? params.focus : '';
@@ -563,6 +566,7 @@ export default function GuruEarningsScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+              {...tabBarScroll}
                   ref={scrollRef}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={

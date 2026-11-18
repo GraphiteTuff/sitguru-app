@@ -2,13 +2,14 @@ import { ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { useTheme } from '@/hooks/use-theme';
 
 type SitGuruScreenProps = {
@@ -29,6 +30,7 @@ export default function SitGuruScreen({
 }: SitGuruScreenProps) {
   const { width } = useWindowDimensions();
   const theme = useTheme();
+  const tabBarScroll = useFloatingTabBarScroll();
   const horizontalPadding = edgeToEdge ? 0 : width < 390 ? 16 : 20;
   const backgroundStyle = { backgroundColor: theme.colors.screen };
   const widthStyle = edgeToEdge ? styles.innerFullWidth : { maxWidth };
@@ -52,7 +54,7 @@ export default function SitGuruScreen({
           edgeToEdge && styles.safeAreaEdgeToEdge,
         ]}
       >
-        <ScrollView
+        <Animated.ScrollView
           contentContainerStyle={[
             styles.scrollContent,
             edgeToEdge && styles.scrollContentEdgeToEdge,
@@ -67,9 +69,10 @@ export default function SitGuruScreen({
           }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          {...tabBarScroll}
         >
           <View style={contentStyle}>{children}</View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     );
   }
