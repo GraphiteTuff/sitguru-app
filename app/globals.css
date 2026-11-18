@@ -1942,12 +1942,31 @@ p {
   background: #fff;
   color: #0f172a;
   overflow: hidden;
-  /* Positioning/sizing owned by Tailwind utilities on the element */
+  /* Positioning/sizing owned by Tailwind utilities + visualViewport JS */
+}
+
+.homepage-chat-panel--messaging {
+  /* Full-bleed messaging sheet on phones; floating card from sm up. */
+  max-height: 100dvh;
+  box-shadow: 0 0 0 1px rgba(13, 92, 58, 0.08);
+}
+
+@media (max-width: 639px) {
+  .homepage-chat-panel--messaging {
+    animation: homepage-chat-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+    border-radius: 0;
+  }
 }
 
 @media (min-width: 640px) {
   .homepage-chat-panel {
     animation: homepage-chat-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .homepage-chat-panel--messaging {
+    /* Desktop/tablet keep the floating card; ignore mobile VV top offset. */
+    top: auto !important;
+    bottom: 1.5rem !important;
   }
 }
 
@@ -2085,13 +2104,41 @@ div.homepage-chat-panel__header,
 .homepage-chat-panel__messages {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.85rem 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  background:
-    radial-gradient(120% 80% at 100% 0%, rgba(13, 92, 58, 0.06), transparent 55%),
-    var(--hcb-cream);
+  gap: 0.45rem;
+  /* Quiet thread canvas — like iMessage, bubbles do the talking */
+  background: #f2f4f3;
+}
+
+.homepage-chat-panel__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f8faf9;
+  box-shadow: none;
+}
+
+.homepage-chat-panel__chips {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding: 0.55rem 0.7rem 0.15rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background: #f8faf9;
+}
+
+.homepage-chat-panel__chips::-webkit-scrollbar {
+  display: none;
 }
 
 .homepage-chat-chips {
@@ -2127,22 +2174,24 @@ div.homepage-chat-panel__header,
 }
 
 .homepage-chat-bubble {
-  max-width: 88%;
-  padding: 0.85rem 1rem;
-  border-radius: 1rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  max-width: min(78%, 20.5rem);
+  padding: 0.62rem 0.85rem;
+  border-radius: 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.35;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: visible;
+  box-shadow: none;
 }
 
 .homepage-chat-bubble--ai {
   align-self: flex-start;
-  background: #fff;
+  background: #e8ebe9;
   color: #0f172a;
-  border: 1px solid rgba(13, 92, 58, 0.12);
-  border-bottom-left-radius: 0.35rem;
+  border: 0;
+  border-bottom-left-radius: 0.25rem;
 }
 
 /* Admin Rogue: beat `.admin-theme p { color: #cbd5f5 }` washing out bubble copy. */
@@ -2178,7 +2227,7 @@ div.homepage-chat-panel__header,
   align-self: flex-end;
   background: var(--hcb-green);
   color: #fff;
-  border-bottom-right-radius: 0.35rem;
+  border-bottom-right-radius: 0.25rem;
 }
 
 .homepage-chat-typing {
@@ -2215,37 +2264,46 @@ div.homepage-chat-panel__header,
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.45rem;
-  align-items: stretch;
-  padding: 0.65rem 0.7rem;
-  padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(13, 92, 58, 0.12);
-  background: #fff;
+  align-items: end;
+  padding: 0.45rem 0.65rem;
+  padding-bottom: max(0.55rem, env(safe-area-inset-bottom));
+  background: #f8faf9;
   min-width: 0;
 }
 
 .homepage-chat-panel__composer textarea {
   resize: none;
-  border: 1px solid rgba(13, 92, 58, 0.18);
-  border-radius: 0.85rem;
-  padding: 0.75rem 0.85rem;
+  border: 0;
+  border-radius: 1.4rem;
+  padding: 0.7rem 1rem;
   font: inherit;
   font-size: 1rem;
-  min-height: 2.75rem;
-  max-height: 6rem;
+  line-height: 1.35;
+  min-height: 2.6rem;
+  max-height: 7rem;
   outline: none;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
+  overflow-y: auto;
+}
+
+.homepage-chat-panel__composer textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
 }
 
 .homepage-chat-panel__composer textarea:focus {
-  border-color: var(--hcb-green);
-  box-shadow: 0 0 0 3px rgba(13, 92, 58, 0.15);
+  box-shadow: inset 0 0 0 1.5px rgba(13, 92, 58, 0.45);
+  background: #fff;
 }
 
-.homepage-chat-panel__composer button {
+.homepage-chat-panel__composer > button {
   border: 0;
-  border-radius: 0.85rem;
+  border-radius: 1.35rem;
   padding: 0 1rem;
   background: var(--hcb-green);
   color: #fff;
@@ -2257,9 +2315,41 @@ div.homepage-chat-panel__header,
   flex-shrink: 0;
 }
 
-.homepage-chat-panel__composer button:disabled {
+.homepage-chat-panel__composer > button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.homepage-chat-panel__send {
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: var(--hcb-green);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.homepage-chat-panel__send:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.homepage-chat-panel__send:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  background: #94a3b8;
+}
+
+.homepage-chat-panel[data-keyboard-open="true"] .homepage-chat-panel__composer {
+  padding-bottom: 0.55rem;
 }
 
 @keyframes homepage-chat-enter {

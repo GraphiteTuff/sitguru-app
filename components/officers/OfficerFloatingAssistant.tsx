@@ -21,7 +21,12 @@ import type { GuestOfficerId } from "@/lib/ai/officer-prompts";
 import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
 import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
 import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 
 export type OfficerTheme = {
   brand: string;
@@ -322,6 +327,7 @@ export default function OfficerFloatingAssistant({
   const [preset, setPreset] = useState<string>("");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportBox = useMessagingViewport(open);
 
   const headerBannerStyle: CSSProperties = {
     backgroundImage: `linear-gradient(135deg, ${theme.brand} 0%, ${theme.brandDeep} 100%)`,
@@ -377,7 +383,7 @@ export default function OfficerFloatingAssistant({
   const {
     messages,
     input,
-    handleInputChange,
+    setInput,
     handleSubmit,
     append,
     isLoading,
@@ -403,7 +409,7 @@ export default function OfficerFloatingAssistant({
     if (!open) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, open]);
+  }, [messages, isLoading, open, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (!open) return;
@@ -510,6 +516,7 @@ export default function OfficerFloatingAssistant({
   const panelSize = expanded
     ? "sm:h-[min(820px,92dvh)] sm:w-[min(560px,96vw)]"
     : "sm:h-[600px] sm:w-[400px]";
+  const panelStyle = messagingPanelStyle(viewportBox);
 
   const fullTitle = `${displayName}, ${title}`;
 
@@ -566,9 +573,11 @@ export default function OfficerFloatingAssistant({
 
       {open ? (
         <div
-          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
+          className={`homepage-chat-panel homepage-chat-panel--messaging pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
           role="dialog"
           aria-label={`${fullTitle} assistant`}
+          style={panelStyle}
+          data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
         >
           <div
             className="homepage-chat-panel__header relative shrink-0"
@@ -622,31 +631,6 @@ export default function OfficerFloatingAssistant({
                 <X className="h-5 w-5 text-white" aria-hidden="true" />
               </button>
             </div>
-          </div>
-
-          <div
-            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
-            role="toolbar"
-            aria-label={`${displayName} quick prompts`}
-          >
-            {chips.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                disabled={isLoading}
-                onClick={() => void runChip(chip)}
-                className={theme.chipClass}
-              >
-                {chip.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={clearChat}
-              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
-            >
-              Clear
-            </button>
           </div>
 
           <div
@@ -724,45 +708,56 @@ export default function OfficerFloatingAssistant({
             ) : null}
           </div>
 
-          <form
-            onSubmit={onSubmit}
-            className="homepage-chat-panel__composer shrink-0"
-          >
-            <textarea
-              ref={inputRef}
-              rows={1}
+          <div className="homepage-chat-panel__footer shrink-0">
+            {!viewportBox.keyboardOpen ? (
+              <div
+                className="homepage-chat-panel__chips"
+                role="toolbar"
+                aria-label={`${displayName} quick prompts`}
+              >
+                {chips.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => void runChip(chip)}
+                    className={theme.chipClass}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={clearChat}
+                  className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+
+            <MessagingChatComposer
               value={input}
-              onChange={handleInputChange}
-              placeholder={composerPlaceholder}
-              aria-label={`Message ${displayName}`}
-              style={{
-                color: "#0f172a",
-                WebkitTextFillColor: "#0f172a",
-                caretColor: "#0f172a",
-                backgroundColor: "#ffffff",
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (isLoading) return;
-                  const form = e.currentTarget.form;
-                  if (form) form.requestSubmit();
-                }
+              onChange={setInput}
+              onSubmit={onSubmit}
+              placeholder={composerPlaceholder || "Message..."}
+              disabled={isLoading}
+              inputId={`${officerId}-officer-chat-composer`}
+              label={`Message ${displayName}`}
+              inputRef={inputRef}
+              onInputFocus={() => {
+                window.setTimeout(() => {
+                  const el = scrollerRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 80);
               }}
             />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              aria-label={`Send to ${displayName}`}
-            >
-              {isLoading ? "…" : "Send"}
-            </button>
-          </form>
 
-          <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            <Sparkles size={12} />
-            {footerLabel}
-          </p>
+            <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <Sparkles size={12} />
+              {footerLabel}
+            </p>
+          </div>
         </div>
       ) : null}
     </div>

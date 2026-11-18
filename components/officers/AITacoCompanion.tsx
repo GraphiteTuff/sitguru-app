@@ -28,6 +28,7 @@ import {
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
 import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
+import MessagingChatComposer from "@/components/messaging/MessagingChatComposer";
 import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
@@ -36,6 +37,10 @@ import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
+import {
+  messagingPanelStyle,
+  useMessagingViewport,
+} from "@/hooks/useMessagingViewport";
 import { X } from "lucide-react";
 
 const TACO_BRAND = "#0D5C3A";
@@ -198,6 +203,7 @@ export default function AITacoCompanion({
   const [ambassadorName, setAmbassadorName] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportBox = useMessagingViewport(isOpen);
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
 
   useEffect(() => {
@@ -301,7 +307,7 @@ export default function AITacoCompanion({
   const {
     messages,
     input,
-    handleInputChange,
+    setInput,
     handleSubmit,
     append,
     isLoading,
@@ -333,7 +339,7 @@ export default function AITacoCompanion({
     if (!isOpen) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isLoading, isOpen, viewportBox.keyboardOpen, viewportBox.height]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -428,6 +434,8 @@ export default function AITacoCompanion({
           className={COMPANION_ROGUE_PANEL_CLASS}
           role="dialog"
           aria-label="Taco AI Companion"
+          style={messagingPanelStyle(viewportBox)}
+          data-keyboard-open={viewportBox.keyboardOpen ? "true" : "false"}
         >
           <div
             data-companion-header
@@ -512,32 +520,28 @@ export default function AITacoCompanion({
 
           <div
             ref={scrollerRef}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fbf8] px-4 py-3 text-sm text-slate-700"
+            className="homepage-chat-panel__messages min-h-0 flex-1"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
-              return (
+              if (!isAssistant && message.role !== "user") return null;
+              return isAssistant ? (
                 <div
                   key={message.id}
-                  className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
+                  className="homepage-chat-bubble homepage-chat-bubble--ai"
                 >
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
-                      isAssistant
-                        ? "border border-emerald-100 bg-white text-slate-700"
-                        : "whitespace-pre-wrap bg-[#0D5C3A] text-white"
-                    }`}
-                  >
-                    {isAssistant ? (
-                      <CompanionAssistantBubbleBody
-                        content={message.content}
-                        ctaContext={{ pagePath: requestBody.pagePath }}
-                        socialSource="taco_companion_chat"
-                      />
-                    ) : (
-                      message.content
-                    )}
-                  </div>
+                  <CompanionAssistantBubbleBody
+                    content={message.content}
+                    ctaContext={{ pagePath: requestBody.pagePath }}
+                    socialSource="taco_companion_chat"
+                  />
+                </div>
+              ) : (
+                <div
+                  key={message.id}
+                  className="homepage-chat-bubble homepage-chat-bubble--user"
+                >
+                  {message.content}
                 </div>
               );
             })}
@@ -569,9 +573,14 @@ export default function AITacoCompanion({
             ) : null}
 
             {isLoading ? (
-              <p className="text-xs font-semibold text-emerald-700">
-                Taco is fetching your next growth move…
-              </p>
+              <div
+                className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+                aria-live="polite"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
             ) : null}
             {error ? (
               <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -580,57 +589,52 @@ export default function AITacoCompanion({
             ) : null}
           </div>
 
-          <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
-            {isOnboarding ? (
-              <Link
-                href="/programs/ambassadors/apply?type=community&source=taco_companion"
-                className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
-              >
-                Sign Up & Claim Your Tools
-              </Link>
-            ) : null}
-            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {chips.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => void runChip(chip)}
-                  className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
+          <div className="homepage-chat-panel__footer shrink-0">
+            {!viewportBox.keyboardOpen ? (
+              <>
+                {isOnboarding ? (
+                  <Link
+                    href="/programs/ambassadors/apply?type=community&source=taco_companion"
+                    className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
+                  >
+                    Sign Up & Claim Your Tools
+                  </Link>
+                ) : null}
+                <div
+                  className="homepage-chat-panel__chips"
+                  role="toolbar"
+                  aria-label="Taco quick prompts"
                 >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-            <form onSubmit={onSubmit} className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                rows={1}
-                placeholder={
-                  isOnboarding
-                    ? "Ask Taco about rewards, referrals…"
-                    : "Ask Taco about your pack growth…"
-                }
-                className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto rounded-xl border border-emerald-100 bg-[#f7fbf8] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    if (!isLoading && input.trim()) {
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }
-                }}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Send
-              </button>
-            </form>
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => void runChip(chip)}
+                      className="shrink-0 rounded-full bg-[#0D5C3A] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#09462C] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <MessagingChatComposer
+              value={input}
+              onChange={setInput}
+              onSubmit={onSubmit}
+              placeholder="Message..."
+              disabled={isLoading}
+              inputId="taco-companion-chat-composer"
+              label="Message Taco"
+              inputRef={inputRef}
+              onInputFocus={() => {
+                window.setTimeout(() => {
+                  const el = scrollerRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 80);
+              }}
+            />
           </div>
         </div>
       ) : null}
