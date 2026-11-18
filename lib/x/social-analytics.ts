@@ -58,8 +58,14 @@ export function getXConfig(): XConfig {
   }
   const redirectUri = required(process.env.X_OAUTH_CALLBACK_URL, "X_OAUTH_CALLBACK_URL");
   const url = new URL(redirectUri);
-  if (url.protocol !== "https:" || url.pathname !== "/api/integrations/x/callback" || url.search || url.hash) {
+  if (url.protocol !== "https:" || url.pathname !== "/api/integrations/x/callback" || url.search || url.hash || url.username || url.password) {
     throw new Error("Invalid X OAuth callback URL.");
+  }
+  if (mode === "staging" && (url.hostname === "sitguru.com" || url.hostname === "www.sitguru.com")) {
+    throw new Error("X staging cannot use the live SitGuru callback.");
+  }
+  if (mode === "production" && url.origin !== "https://www.sitguru.com") {
+    throw new Error("X production must use the official SitGuru callback.");
   }
   const rawKey = Buffer.from(required(process.env.X_TOKEN_ENCRYPTION_KEY, "X_TOKEN_ENCRYPTION_KEY"), "base64");
   if (rawKey.length !== 32) throw new Error("X encryption key must be 32 random bytes in base64.");
@@ -81,7 +87,8 @@ export function makeXAuthorizationUrl(config: Pick<XConfig, "clientId" | "redire
   url.searchParams.set("scope", SCOPES.join(" "));
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", createHash("sha256").update(verifier).digest("base64url"));
-  url.searchParams.set("code_challenge_method", "S256");
+  // X's own OAuth 2.0 SDK uses lowercase "s256" for this parameter.
+  url.searchParams.set("code_challenge_method", "s256");
   return url.toString();
 }
 
@@ -116,7 +123,9 @@ function integer(value: unknown, name: string): number {
   return value;
 }
 
-async function requestTokens(form: URLSearchParams, config: XConfig, userId: string | null): Promise<TokenBundle> {
+async function requestTokens(form: URLSearchParams, config: XConfig, userId: string | null, existingScopes: readonly string[] = []): Promise<TokenBundle> {
+  // X requires client_id in the form even when authenticating the confidential app via HTTP Basic.
+  form.set("client_id", config.clientId);
   const basic = Buffer.from(config.clientId + ":" + config.clientSecret).toString("base64");
   const response = await fetch(TOKEN_URL, {
     method: "POST",
@@ -132,7 +141,11 @@ async function requestTokens(form: URLSearchParams, config: XConfig, userId: str
       typeof data.expires_in !== "number" || data.expires_in <= 0) {
     throw new Error("X did not return a refreshable user access token.");
   }
-  const scopes = typeof data.scope === "string" ? data.scope.split(" ").filter(Boolean) : [];
+  // X token responses can describe scopes using commas or spaces; refresh responses
+  // may omit the scope field, in which case retain previously verified scopes.
+  const scopes = typeof data.scope === "string"
+    ? data.scope.split(/[\s,]+/).filter(Boolean)
+    : [...existingScopes];
   if (!SCOPES.every((scope) => scopes.includes(scope))) {
     throw new Error("X did not grant all required account permissions.");
   }
@@ -245,6 +258,7 @@ export async function syncAuthorizedX() {
       new URLSearchParams({ grant_type: "refresh_token", refresh_token: bundle.refreshToken }),
       config,
       bundle.userId,
+      bundle.scopes,
     );
     // Persist rotated refresh token before using the new access token.
     const refreshedUser = await getVerifiedXUser(refreshed.accessToken, config);
