@@ -20,6 +20,26 @@ test("TikTok draft transfer accepts only TikTok's official HTTPS upload host", (
   }
 });
 
+test("TikTok diagnostics include only a sanitized host, never private upload tokens", () => {
+  const previous = console.warn;
+  const messages: string[] = [];
+  console.warn = (...args: unknown[]) => { messages.push(JSON.stringify(args)); };
+  try {
+    const secret = "secret-one-time-upload-capability";
+    assert.throws(
+      () => tiktokDraftUploadDestination(
+        "https://unexpected.tiktokapis.com/video/?upload_id=test&upload_token=" + secret,
+      ),
+      /untrusted upload destination/,
+    );
+    assert.ok(messages.join(" ").includes("unexpected.tiktokapis.com"));
+    assert.ok(!messages.join(" ").includes(secret));
+    assert.ok(!messages.join(" ").includes("upload_token"));
+  } finally {
+    console.warn = previous;
+  }
+});
+
 test("TikTok upload action initializes and transfers a draft, never a direct post", async () => {
   const previous = global.fetch;
   const calls: Array<{ url: string; init?: RequestInit }> = [];
