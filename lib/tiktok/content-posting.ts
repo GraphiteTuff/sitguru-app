@@ -21,12 +21,14 @@ export function tiktokDraftUploadDestination(input: string): string {
     console.warn("[tiktok-draft] Rejected malformed provider upload URL.");
     throw new Error("TikTok returned an untrusted upload destination.");
   }
-  // TikTok's Media Transfer Guide documents regional upload hosts such as
-  // upload.us.tiktokapis.com, in addition to open-upload.tiktokapis.com.
-  // Match only TikTok-owned hostnames with fully anchored labels; never use
-  // endsWith("tiktokapis.com") or permit arbitrary redirect destinations.
+  // TikTok's Media Transfer Guide documents upload.us.tiktokapis.com
+  // and open-upload.tiktokapis.com. Our authenticated TikTok inbox-init API
+  // also returns open-upload.tiktokapis.us for @SitGuruOfficial in the US.
+  // Pin the additional exact host rather than allowing all *.tiktokapis.us.
+  // Never relax this to endsWith(".tiktokapis.us") or follow redirects.
   const officialHost =
     url.hostname === "open-upload.tiktokapis.com" ||
+    url.hostname === "open-upload.tiktokapis.us" ||
     /^upload\.[a-z0-9-]{2,16}\.tiktokapis\.com$/.test(url.hostname);
   if (url.protocol !== "https:" || !officialHost || url.port !== "" || url.username || url.password) {
     // Host and protocol only: safe for distinguishing unexpected TikTok
