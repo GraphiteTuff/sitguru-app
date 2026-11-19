@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import DeskSettings, { type DeskSettingsPrefs } from "@/components/portal/DeskSettings";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
@@ -46,9 +48,25 @@ export default async function InternSettingsPage({
     data: { user },
   } = await supabase.auth.getUser();
   const saved = (user?.user_metadata?.desk_settings || {}) as Record<string, unknown>;
+  const { data: paidStaff } = user
+    ? await supabaseAdmin.from("staff_engagements").select("id")
+        .eq("user_id", user.id).eq("status", "active").maybeSingle()
+    : { data: null };
 
   return (
-    <DeskSettings
+    <>
+      {paidStaff ? (
+        <section className="mb-4 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-4 py-4 sm:px-6">
+          <h2 className="text-base font-black text-[#0F2744]">Secure paid-intern HR forms</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-600">
+            Keep your HR personal information up to date in the private SitGuru onboarding workspace.
+          </p>
+          <Link href="/intern/hr-onboarding" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
+            Open my secure HR forms
+          </Link>
+        </section>
+      ) : null}
+      <DeskSettings
       audience="intern"
       fullName={intern?.fullName || "Intern"}
       email={intern?.email || access.actor.email}
@@ -61,6 +79,7 @@ export default async function InternSettingsPage({
       notice={error || ok || null}
       noticeIsError={Boolean(error)}
       schoolLogoUrl={school?.logoUrl || ""}
-    />
+      />
+    </>
   );
 }
