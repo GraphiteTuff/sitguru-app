@@ -131,6 +131,11 @@ export default function StaffPeopleDirectory({ people, today }: { people: StaffP
                 <Link href="/admin/hr/people/payments" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#0F2744] hover:bg-[#F4F7FB] sm:flex-none">
                   <CircleDollarSign size={16} aria-hidden="true" /> Payments
                 </Link>
+                {person.title.toLowerCase().includes("intern") ? (
+                  <Link href={`/admin/hr/onboarding?person=${encodeURIComponent(person.userId)}`} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900 hover:bg-emerald-100 sm:flex-none">
+                    <UserRound size={16} aria-hidden="true" /> HR Onboarding
+                  </Link>
+                ) : null}
               </div>
               <details className="mt-4 border-t border-slate-100 pt-3">
                 <summary className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-black text-[#2563EB]">
