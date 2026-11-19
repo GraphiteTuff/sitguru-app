@@ -186,6 +186,27 @@ export default async function HumanResourcesDashboard({
   const activeHires = hires.filter((hire) => hire.status === "active" && hire.userId);
   const hireIds = activeHires.map((hire) => hire.userId);
   const visibleInterns = interns.filter((intern) => !excludeFromInternPortalList(intern));
+  // An intern with an active paid staff engagement is also a team member.
+  // Reuse the intern's identity; never create a duplicate directory person.
+  const internUserIds = visibleInterns.map((intern) => intern.userId || "").filter(Boolean);
+  const { data: paidInternEngagements, error: paidInternError } = internUserIds.length
+    ? await supabaseAdmin
+        .from("staff_engagements")
+        .select("user_id")
+        .eq("status", "active")
+        .in("user_id", internUserIds)
+    : { data: [], error: null };
+  if (paidInternError) {
+    console.warn("[hr] paid intern team memberships unavailable", paidInternError.message);
+  }
+  const paidInternUserIds = new Set(
+    (paidInternEngagements || [])
+      .map((engagement) => text(engagement.user_id))
+      .filter(Boolean),
+  );
+  const managerUserIds = new Set(activeHires.map((hire) => hire.userId));
+  const teamMemberCount = activeHires.length
+    + [...paidInternUserIds].filter((userId) => !managerUserIds.has(userId)).length;
   const photoEmails = [...new Set(
     [
       ...activeHires.map((hire) => hire.email),
@@ -340,6 +361,7 @@ export default async function HumanResourcesDashboard({
         fallback: intern.avatarUrl || internAssetUrl(intern.avatarStoragePath || ""),
       }),
       group: "intern" as const,
+      additionalGroups: paidInternUserIds.has(intern.userId || "") ? (["staff"] as const).slice() : [],
       groupLabel: "Interns",
       role: "Intern",
       organization: school.get(intern.universityId) || "University pending",
@@ -443,7 +465,7 @@ export default async function HumanResourcesDashboard({
     .slice(0, 6);
 
   const groups = [
-    { label: "Staff / Employees", value: activeHires.length, href: "/admin/users", icon: BriefcaseBusiness },
+    { label: "Team Members", value: teamMemberCount, href: "/admin/hr/people", icon: BriefcaseBusiness },
     { label: "Managers", value: activeHires.length, href: ava ? staffAccessPath(ava.userId) : "/admin/hr/team-access", icon: Users },
     { label: "Gurus", value: hr.metrics.activeGuruApplicants, href: "/admin/gurus", icon: PawPrint },
     { label: "Ambassadors", value: hr.metrics.activeAmbassadorDashboards, href: "/admin/ambassadors", icon: Megaphone },
@@ -466,7 +488,7 @@ export default async function HumanResourcesDashboard({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-11">
         <Stat icon={<Users className="h-4 w-4" />} value={String(peopleTotal)} label="Total People" helper="Group records" />
-        <Stat icon={<BriefcaseBusiness className="h-4 w-4" />} value={String(activeHires.length)} label="Active Staff" helper="Manager logins" />
+        <Stat icon={<BriefcaseBusiness className="h-4 w-4" />} value={String(teamMemberCount)} label="Team Members" helper="Managers and paid interns" />
         <Stat icon={<PawPrint className="h-4 w-4" />} value={String(hr.metrics.activeGuruApplicants)} label="Gurus" helper="Guru records" />
         <Stat icon={<Megaphone className="h-4 w-4" />} value={String(hr.metrics.activeAmbassadorDashboards)} label="Ambassadors" helper="Live dashboards" />
         <Stat icon={<GraduationCap className="h-4 w-4" />} value={String(visibleInterns.length)} label="Interns" helper="Internship records" />
@@ -544,7 +566,7 @@ export default async function HumanResourcesDashboard({
           people={directory}
           totals={{
             all: peopleTotal,
-            staff: activeHires.length,
+            staff: teamMemberCount,
             guru: hr.metrics.activeGuruApplicants,
             ambassador: hr.metrics.activeAmbassadorDashboards,
             intern: visibleInterns.length,
