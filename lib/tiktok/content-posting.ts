@@ -21,7 +21,14 @@ export function tiktokDraftUploadDestination(input: string): string {
     console.warn("[tiktok-draft] Rejected malformed provider upload URL.");
     throw new Error("TikTok returned an untrusted upload destination.");
   }
-  if (url.protocol !== "https:" || url.hostname !== "open-upload.tiktokapis.com" || url.username || url.password) {
+  // TikTok's Media Transfer Guide documents regional upload hosts such as
+  // upload.us.tiktokapis.com, in addition to open-upload.tiktokapis.com.
+  // Match only TikTok-owned hostnames with fully anchored labels; never use
+  // endsWith("tiktokapis.com") or permit arbitrary redirect destinations.
+  const officialHost =
+    url.hostname === "open-upload.tiktokapis.com" ||
+    /^upload\.[a-z0-9-]{2,16}\.tiktokapis\.com$/.test(url.hostname);
+  if (url.protocol !== "https:" || !officialHost || url.port !== "" || url.username || url.password) {
     // Host and protocol only: safe for distinguishing unexpected TikTok
     // sandbox hosts from bad provider responses without leaking upload tokens.
     const host = /^[a-z0-9.-]{1,253}$/.test(url.hostname) ? url.hostname : "(invalid)";
@@ -83,9 +90,13 @@ export async function uploadApprovedVideoToTikTokDraft(input: {
     method: "PUT",
     headers: {
       "Content-Type": mime,
+      "Content-Length": String(bytes.byteLength),
       "Content-Range": `bytes 0-${bytes.byteLength - 1}/${bytes.byteLength}`,
     },
     body: body.buffer,
+    // Fail closed: a 3xx response must not redirect SitGuru's private video to
+    // an untrusted server, even when the first URL passed validation.
+    redirect: "error",
     cache: "no-store",
     signal: AbortSignal.timeout(60_000),
   });
