@@ -4,6 +4,7 @@ export const CONTENT_TYPES = [
   { id: "social_post", label: "Social post" },
   { id: "story", label: "Story" },
   { id: "reel", label: "Reel / short video" },
+  { id: "carousel", label: "Carousel (multi-slide images)" },
   { id: "graphic", label: "Promotional graphic" },
   { id: "campaign", label: "Campaign content" },
   { id: "outreach", label: "Community outreach material" },
@@ -11,6 +12,20 @@ export const CONTENT_TYPES = [
 ] as const;
 
 export const CONTENT_PLATFORMS = ["Facebook", "Instagram", "TikTok", "X", "YouTube", "Multiple"] as const;
+
+/** Only safely formed HTTPS draft links are clickable by managers.
+ * An intern's design URL may be from Canva or another approved tool; never
+ * render javascript:, embedded credentials, or redirects masquerading as URLs.
+ */
+export function studioDraftLinkHref(value: string): string {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
 
 export function contentCreativeKey(input: {
   caption: string;
