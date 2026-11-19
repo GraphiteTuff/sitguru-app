@@ -15,6 +15,11 @@ test("TikTok draft transfer accepts only TikTok's official HTTPS upload host", (
     tiktokDraftUploadDestination("https://upload.us.tiktokapis.com/video/?upload_id=test&upload_token=opaque"),
     "https://upload.us.tiktokapis.com/video/?upload_id=test&upload_token=opaque",
   );
+  // Confirmed by secure Vercel logs from official TikTok inbox-init response.
+  assert.equal(
+    tiktokDraftUploadDestination("https://open-upload.tiktokapis.us/video/?upload_id=test&upload_token=opaque"),
+    "https://open-upload.tiktokapis.us/video/?upload_id=test&upload_token=opaque",
+  );
   assert.equal(
     tiktokDraftUploadDestination("https://upload.eu.tiktokapis.com/video/?upload_id=test&upload_token=opaque"),
     "https://upload.eu.tiktokapis.com/video/?upload_id=test&upload_token=opaque",
@@ -31,6 +36,11 @@ test("TikTok draft transfer accepts only TikTok's official HTTPS upload host", (
     "https://upload.us.tiktokapis.com:444/video",
     "http://upload.us.tiktokapis.com/video",
     "https://upload.us.tiktokapis.com.badexample.com/video",
+    "https://open-upload.tiktokapis.us.evil.example/video",
+    "https://open-upload.tiktokapis.us@evil.example/video",
+    "https://evil.open-upload.tiktokapis.us/video",
+    "https://open-upload.tiktokapis.us:444/video",
+    "http://open-upload.tiktokapis.us/video",
   ]) {
     assert.throws(() => tiktokDraftUploadDestination(value));
   }
@@ -145,6 +155,39 @@ test("TikTok regional upload works without leaking or altering the signed upload
     assert.equal(requests[1].url, url);
     assert.equal(requests[1].init?.redirect, "error");
     assert.equal((requests[1].init?.headers as Record<string, string>)["Content-Length"], "12");
+    assert.equal((requests[1].init?.headers as Record<string, string>)["Authorization"], undefined);
+  } finally {
+    global.fetch = previous;
+  }
+});
+
+
+test("TikTok sandbox US inbox upload server can receive approved bytes as a private draft", async () => {
+  const previous = global.fetch;
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const signedUploadUrl = "https://open-upload.tiktokapis.us/video/?upload_id=123&upload_token=test-only-secret";
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: String(input), init });
+    if (requests.length === 1) {
+      return new Response(JSON.stringify({
+        data: { publish_id: "v_inbox_file~v2.us-inbox-test", upload_url: signedUploadUrl },
+        error: { code: "ok" },
+      }), { status: 200 });
+    }
+    return new Response(null, { status: 201 });
+  }) as typeof fetch;
+  try {
+    const result = await uploadApprovedVideoToTikTokDraft({
+      accessToken: "test-only-access",
+      bytes: new Uint8Array(1200),
+      mime: "video/mp4",
+    });
+    assert.equal(result.publishId, "v_inbox_file~v2.us-inbox-test");
+    assert.equal(requests.length, 2);
+    assert.equal(requests[1].url, signedUploadUrl);
+    assert.equal(requests[1].init?.method, "PUT");
+    assert.equal(requests[1].init?.redirect, "error");
+    assert.equal((requests[1].init?.headers as Record<string, string>)["Content-Length"], "1200");
     assert.equal((requests[1].init?.headers as Record<string, string>)["Authorization"], undefined);
   } finally {
     global.fetch = previous;
