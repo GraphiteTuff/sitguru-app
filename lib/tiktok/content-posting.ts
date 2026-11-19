@@ -12,9 +12,24 @@ type TikTokInboxResponse = {
 };
 
 export function tiktokDraftUploadDestination(input: string): string {
-  const url = new URL(input);
-  // Upload URLs contain temporary capabilities: never expose or log them.
+  // TikTok's temporary upload URL contains a bearer capability in its query
+  // string. Never print, return, or include that URL in a diagnostic.
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    console.warn("[tiktok-draft] Rejected malformed provider upload URL.");
+    throw new Error("TikTok returned an untrusted upload destination.");
+  }
   if (url.protocol !== "https:" || url.hostname !== "open-upload.tiktokapis.com" || url.username || url.password) {
+    // Host and protocol only: safe for distinguishing unexpected TikTok
+    // sandbox hosts from bad provider responses without leaking upload tokens.
+    const host = /^[a-z0-9.-]{1,253}$/.test(url.hostname) ? url.hostname : "(invalid)";
+    console.warn("[tiktok-draft] Rejected provider upload destination", {
+      host,
+      scheme: url.protocol,
+      hasUserInfo: Boolean(url.username || url.password),
+    });
     throw new Error("TikTok returned an untrusted upload destination.");
   }
   return url.toString();
