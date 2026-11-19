@@ -28,7 +28,7 @@ const VALID_REASON = /^[a-z0-9_]{1,100}$/;
 
 export function extractTikTokDraftPublishId(auditComment: string): string | null {
   // Never send the identifier to the client or present it as a public post URL.
-  const match = auditComment.match(/(?:^|\s)transfer ID: ([A-Za-z0-9._~-]+)\)/);
+  const match = auditComment.match(/\(transfer ID: ([A-Za-z0-9._~-]+)\)/);
   return match && VALID_ID.test(match[1]) ? match[1] : null;
 }
 
