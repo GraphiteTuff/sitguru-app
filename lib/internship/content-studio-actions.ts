@@ -20,6 +20,7 @@ import { findInternByAccount } from "@/lib/internship/queries";
 import { statusForStage } from "@/lib/internship/review-flow";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { deliveryStateFromAudit } from "@/lib/tiktok/content-posting-status";
 
 export type StudioContentRow = StudioItem & {
   id: string;
@@ -40,6 +41,9 @@ export type StudioContentRow = StudioItem & {
   creativeMime: string;
   creativeName: string;
   createdAt: string;
+  tiktokTransferAt?: string;
+  tiktokDeliveryStatus?: string;
+  tiktokDeliveryCheckedAt?: string;
 };
 
 export type StudioAssetChoice = {
@@ -159,6 +163,41 @@ export async function loadManagerContentStudio(actorUserId: string, isSuperUser:
     .limit(80);
   const links = await assetMap((data || []).map((row) => String(row.id)));
   const items = (data || []).map((row) => mapRow(row, names.get(String(row.intern_id)) || "Intern", links.get(String(row.id)) || []));
+  // The server-only transfer identifier remains in the audit table. Only
+  // expose timestamp and safe TikTok status to the assigned manager/founder.
+  const tiktokIds = items.filter((item) => item.platform === "TikTok").map((item) => item.id);
+  if (tiktokIds.length) {
+    const { data: events, error: eventError } = await supabaseAdmin
+      .from("internship_review_events")
+      .select("target_id,status,created_at,comment")
+      .eq("target_type", "content")
+      .in("target_id", tiktokIds)
+      .in("status", ["tiktok_draft_uploaded", "tiktok_delivery_checked"])
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (!eventError) {
+      const uploaded = new Map<string, string>();
+      const checked = new Map<string, { status: string; at: string }>();
+      for (const event of events || []) {
+        const id = String(event.target_id);
+        if (event.status === "tiktok_draft_uploaded" && !uploaded.has(id)) {
+          uploaded.set(id, String(event.created_at));
+        }
+        if (event.status === "tiktok_delivery_checked" && !checked.has(id)) {
+          const verified = deliveryStateFromAudit(String(event.comment || ""));
+          if (verified) checked.set(id, { status: verified, at: String(event.created_at) });
+        }
+      }
+      for (const item of items) {
+        item.tiktokTransferAt = uploaded.get(item.id);
+        const result = checked.get(item.id);
+        if (result && item.tiktokTransferAt && Date.parse(result.at) >= Date.parse(item.tiktokTransferAt)) {
+          item.tiktokDeliveryStatus = result.status;
+          item.tiktokDeliveryCheckedAt = result.at;
+        }
+      }
+    }
+  }
   const summary = studioSummary(items);
   return { items, summary, escalated: summary.escalated };
 }
