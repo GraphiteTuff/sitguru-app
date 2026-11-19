@@ -75,6 +75,21 @@ export default async function PeopleOnboardingPage({
   const selected = people.find((person) => person.userId === currentPersonId);
   const selectedPaidIntern = paidInterns.find((intern) => intern.userId === currentPersonId);
   const audit = selected ? await loadOnboardingAudit(selected.workspace.instanceId) : [];
+  const { data: profileStatuses } = paidInterns.length
+    ? await supabaseAdmin.from("staff_personal_profiles").select("user_id,submitted_at")
+        .in("user_id", paidInterns.map((intern) => intern.userId))
+    : { data: [] };
+  const personalStatusByUser = new Map(
+    (profileStatuses || []).map((row) => [String(row.user_id), String(row.submitted_at || "")]),
+  );
+  const showRestrictedSheet = selectedPaidIntern &&
+    first(params.viewProfile) === selectedPaidIntern.userId &&
+    Boolean(personalStatusByUser.get(selectedPaidIntern.userId));
+  const { data: restrictedProfile } = showRestrictedSheet
+    ? await supabaseAdmin.from("staff_personal_profiles")
+        .select("legal_name,preferred_name,contact_email,phone,address_line1,address_line2,city,state,postal_code,primary_work_state,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,submitted_at")
+        .eq("user_id", selectedPaidIntern.userId).maybeSingle()
+    : { data: null };
   const assignedUserIds = new Set(people.map((person) => person.userId));
   const unassignedPaidInterns = paidInterns.filter((intern) => !assignedUserIds.has(intern.userId));
 
@@ -126,7 +141,9 @@ export default async function PeopleOnboardingPage({
                   <p className="mt-2 text-xs font-bold text-emerald-900">
                     {intern.rateCents == null ? "Rate pending" : `$${(intern.rateCents / 100).toFixed(2)}/hr`}
                     {" · "}
-                    {assignedUserIds.has(intern.userId) ? "HR package assigned" : "HR package not assigned"}
+                    {assignedUserIds.has(intern.userId) ? "HR package assigned" : "HR agreement pending"}
+                    {" · "}
+                    {personalStatusByUser.has(intern.userId) ? "Personal sheet received" : "Personal sheet pending"}
                   </p>
                 </Link>
               ))}
@@ -165,7 +182,11 @@ export default async function PeopleOnboardingPage({
               >
                 <p className="font-black text-slate-950">{intern.name}</p>
                 <p className="text-xs font-semibold text-slate-500">Paid intern · HR onboarding</p>
-                <p className="mt-2 text-sm font-black text-amber-900">Packet preparation required</p>
+                <p className="mt-2 text-sm font-black text-amber-900">
+                  {personalStatusByUser.has(intern.userId)
+                    ? "Personal sheet received · agreement pending"
+                    : "Personal sheet awaiting submission"}
+                </p>
               </Link>
             ))}
             {!people.length && !unassignedPaidInterns.length ? <p className="text-sm font-semibold text-slate-500">No onboarding packages yet.</p> : null}
@@ -254,11 +275,60 @@ export default async function PeopleOnboardingPage({
                 </div>
               </GrowthCard>
               <GrowthCard>
+                <h3 className="font-black text-slate-950">Secure personal profile sheet</h3>
+                <p className="mt-2 text-sm font-bold text-slate-700">
+                  Status: {personalStatusByUser.has(selectedPaidIntern.userId)
+                    ? "Submitted by team member"
+                    : "Awaiting Lola's submission"}
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                  Lola can use her own authenticated Intern Portal at
+                  {" "}<span className="font-bold">https://www.sitguru.com/intern/hr-onboarding</span>.
+                  Only the person and authorized HR supervisors may access the submitted details.
+                  Do not email SSNs, tax forms, or bank information.
+                </p>
+                {personalStatusByUser.has(selectedPaidIntern.userId) ? (
+                  <Link
+                    href={"/admin/hr/onboarding?person=" + encodeURIComponent(selectedPaidIntern.userId) +
+                      (showRestrictedSheet ? "" : "&viewProfile=" + encodeURIComponent(selectedPaidIntern.userId))}
+                    className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
+                  >
+                    {showRestrictedSheet ? "Hide restricted profile" : "View submitted profile (HR only)"}
+                  </Link>
+                ) : null}
+                {restrictedProfile ? (
+                  <dl className="mt-4 grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                    {[
+                      ["Legal name", restrictedProfile.legal_name],
+                      ["Preferred name", restrictedProfile.preferred_name],
+                      ["Account email", restrictedProfile.contact_email],
+                      ["Phone", restrictedProfile.phone],
+                      ["Mailing address",
+                        [restrictedProfile.address_line1, restrictedProfile.address_line2,
+                         restrictedProfile.city, restrictedProfile.state, restrictedProfile.postal_code]
+                          .filter(Boolean).join(", ")],
+                      ["Work state", restrictedProfile.primary_work_state],
+                      ["Emergency contact", restrictedProfile.emergency_contact_name || "Not provided"],
+                      ["Emergency phone", restrictedProfile.emergency_contact_phone || "Not provided"],
+                      ["Emergency relationship", restrictedProfile.emergency_contact_relationship || "Not provided"],
+                      ["Last submitted", String(restrictedProfile.submitted_at || "").slice(0, 16).replace("T", " ") + " UTC"],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs font-black uppercase tracking-[0.06em] text-slate-500">{label}</dt>
+                        <dd className="mt-1 font-semibold text-slate-900">{value || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </GrowthCard>
+              <GrowthCard>
                 <h3 className="font-black text-slate-950">HR documents to prepare securely</h3>
                 <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
                   {[
                     "Paid-intern compensation agreement — hourly rate, role, and actual work dates",
-                    "Personal profile sheet and emergency-contact information",
+                    personalStatusByUser.has(selectedPaidIntern.userId)
+                      ? "Personal profile sheet — submitted"
+                      : "Personal profile sheet — awaiting submission",
                     "Intern-specific handbook and approved policies",
                     "Signed acknowledgments and verified agreement copies",
                     "Tax forms and bank authorization — only after classification review",
