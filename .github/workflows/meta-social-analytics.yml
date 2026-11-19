@@ -8,6 +8,12 @@ on:
       - "lib/tiktok/**"
       - "app/api/integrations/tiktok/**"
       - "components/manager/ContentStudioBoard.tsx"
+      - "app/intern/content/**"
+      - "app/intern/assignments/**"
+      - "components/internship/InternAssignmentDetailLayout.tsx"
+      - "lib/internship/content-studio.ts"
+      - "lib/internship/content-studio-actions.ts"
+      - "lib/internship/content-studio.test.ts"
       - "lib/growth-center-v2/**"
       - "app/api/cron/**"
       - "app/manager/results/**"
@@ -45,6 +51,8 @@ jobs:
         run: npm run test:meta-social
       - name: Run TikTok OAuth and draft-upload tests (no secrets)
         run: npm run test:tiktok-social
+      - name: Test intern Content Studio reviews and safe creative links
+        run: npx tsx --test lib/internship/content-studio.test.ts
       - name: Check TypeScript compilation
         run: npm run typecheck
       - name: Isolated production build (no real credentials)
