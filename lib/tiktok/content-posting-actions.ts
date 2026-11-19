@@ -208,6 +208,7 @@ export async function checkTikTokDraftDeliveryStatus(formData: FormData) {
     }
   }
 
+  let verdict: ReturnType<typeof describeTikTokDraftDelivery>;
   try {
     const token = await getTikTokDraftUploadAccessToken();
     const delivery = await fetchTikTokDraftDeliveryStatus(token, publishId);
@@ -223,15 +224,16 @@ export async function checkTikTokDraftDeliveryStatus(formData: FormData) {
         (delivery.failReason ? " Reason: " + delivery.failReason + "." : "") +
         " No new upload or public post created.",
     });
-    const verdict = describeTikTokDraftDelivery(delivery);
     if (auditError) {
-      returnToStudio("error", "TikTok delivery was checked, but the audit record could not be saved. No new video was sent.", contentId);
+      throw new Error("TikTok delivery was checked but the audit record could not be saved. No new video was sent.");
     }
-    returnToStudio(verdict.kind, verdict.message, contentId);
+    verdict = describeTikTokDraftDelivery(delivery);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "TikTok status could not be checked.";
     // All errors from this module are constructed locally, without provider
     // response bodies, bearer tokens, upload URLs or transfer identifiers.
     returnToStudio("error", detail, contentId);
   }
+  // Next.js redirect() throws internally; never call it within the catch above.
+  returnToStudio(verdict.kind, verdict.message, contentId);
 }
