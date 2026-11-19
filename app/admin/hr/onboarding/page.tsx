@@ -71,8 +71,9 @@ export default async function PeopleOnboardingPage({
       }),
   );
   const focus = first(params.person);
-  const selected = focus ? people.find((person) => person.userId === focus) : people[0];
-  const selectedPaidIntern = focus ? paidInterns.find((intern) => intern.userId === focus) : null;
+  const currentPersonId = focus || people[0]?.userId || paidInterns[0]?.userId || "";
+  const selected = people.find((person) => person.userId === currentPersonId);
+  const selectedPaidIntern = paidInterns.find((intern) => intern.userId === currentPersonId);
   const audit = selected ? await loadOnboardingAudit(selected.workspace.instanceId) : [];
   const assignedUserIds = new Set(people.map((person) => person.userId));
   const unassignedPaidInterns = paidInterns.filter((intern) => !assignedUserIds.has(intern.userId));
@@ -256,7 +257,7 @@ export default async function PeopleOnboardingPage({
                 <h3 className="font-black text-slate-950">HR documents to prepare securely</h3>
                 <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
                   {[
-                    "Paid-intern compensation agreement — $/hour, role, and actual work dates",
+                    "Paid-intern compensation agreement — hourly rate, role, and actual work dates",
                     "Personal profile sheet and emergency-contact information",
                     "Intern-specific handbook and approved policies",
                     "Signed acknowledgments and verified agreement copies",
