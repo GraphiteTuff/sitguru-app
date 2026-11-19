@@ -5,7 +5,7 @@ import {
   reviewStudioContent,
   type StudioContentRow,
 } from "@/lib/internship/content-studio-actions";
-import { studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
+import { studioDraftLinkHref, studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import { checkTikTokDraftDeliveryStatus, sendApprovedTikTokVideoDraft } from "@/lib/tiktok/content-posting-actions";
 
@@ -91,6 +91,7 @@ export function ContentStudioBoard({
         {items.map((item) => {
           const labels = studioRowLabel(item);
           const platformHref = PLATFORM_LINKS[item.platform] || "";
+          const draftHref = studioDraftLinkHref(item.draftUrl);
           return (
             <article id={`content-${item.id}`} key={item.id} className={`${DESK_UI.card} p-4 ${focusId === item.id ? "ring-2 ring-[#2563EB]" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -104,7 +105,17 @@ export function ContentStudioBoard({
               </div>
               <CreativePreview item={item} />
               {item.caption ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.caption}</p> : null}
-              {item.draftUrl ? <p className="mt-2 break-all text-sm font-semibold text-[#1D4ED8]">{item.draftUrl}</p> : null}
+              {item.draftUrl ? (
+                <div className="mt-2">
+                  {draftHref ? (
+                    <a href={draftHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-black text-[#1D4ED8] underline">
+                      Open submitted design / Canva link
+                    </a>
+                  ) : (
+                    <p className="text-sm font-semibold text-rose-700">This draft link is invalid. Ask the intern for an HTTPS design link.</p>
+                  )}
+                </div>
+              ) : null}
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 {item.assetIds.length} brand asset{item.assetIds.length === 1 ? "" : "s"}
                 {item.plannedAt ? ` · Planned ${item.plannedAt.slice(0, 16).replace("T", " ")}` : ""}
