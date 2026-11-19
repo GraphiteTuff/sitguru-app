@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 
+type DirectoryGroup = "staff" | "guru" | "ambassador" | "intern" | "partner";
+
 export type DirectoryPerson = {
   id: string;
   name: string;
   avatarUrl?: string;
-  group: "staff" | "guru" | "ambassador" | "intern" | "partner";
+  group: DirectoryGroup;
+  additionalGroups?: DirectoryGroup[];
   groupLabel: string;
   role: string;
   organization: string;
@@ -21,7 +24,7 @@ export type DirectoryPerson = {
 
 const tabs = [
   { id: "all", label: "All People" },
-  { id: "staff", label: "Staff" },
+  { id: "staff", label: "Team Members" },
   { id: "guru", label: "Gurus" },
   { id: "ambassador", label: "Ambassadors" },
   { id: "intern", label: "Interns" },
@@ -96,11 +99,16 @@ export default function WorkforceDirectory({
   const [query, setQuery] = useState("");
   const counts = useMemo(() => {
     const base = { all: people.length, staff: 0, guru: 0, ambassador: 0, intern: 0, partner: 0 };
-    for (const person of people) base[person.group] += 1;
+    for (const person of people) {
+      base[person.group] += 1;
+      for (const extraGroup of new Set(person.additionalGroups || [])) {
+        if (extraGroup !== person.group) base[extraGroup] += 1;
+      }
+    }
     return { ...base, ...totals, all: totals?.all ?? base.all };
   }, [people, totals]);
   const visible = people.filter((person) => {
-    if (tab !== "all" && person.group !== tab) return false;
+    if (tab !== "all" && person.group !== tab && !person.additionalGroups?.includes(tab)) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
     return `${person.name} ${person.role} ${person.organization} ${person.groupLabel} ${person.status}`.toLowerCase().includes(needle);
