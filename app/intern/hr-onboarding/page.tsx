@@ -113,7 +113,7 @@ export default async function PaidInternHrOnboardingPage({
           ))}
         </div>
         <p className="mt-4 text-xs font-semibold leading-5 text-slate-600">
-          Your $/hour compensation record is separate from academic course credit.
+          Your hourly compensation record is separate from academic course credit.
           Work classification is still being reviewed by SitGuru, so no W-9 or other
           tax-status document is being requested through this page.
         </p>
