@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   canRecordPublication,
   canReviewAssignedContent,
+  CONTENT_TYPES,
+  studioDraftLinkHref,
   contentCreativeKey,
   contentEditResetsApproval,
   contentReviewNotice,
@@ -107,6 +109,19 @@ describe("content studio workflow", () => {
       }),
       true,
     );
+  });
+
+  it("supports an Instagram carousel as one Canva design and blocks unsafe review links", () => {
+    assert.equal(CONTENT_TYPES.some((type) => type.id === "carousel"), true);
+    assert.equal(
+      studioDraftLinkHref("https://www.canva.com/design/DAFx-123/edit?utm_source=SitGuru"),
+      "https://www.canva.com/design/DAFx-123/edit?utm_source=SitGuru",
+    );
+    assert.equal(studioDraftLinkHref("javascript:alert(1)"), "");
+    assert.equal(studioDraftLinkHref("http://www.canva.com/design/1"), "");
+    assert.equal(studioDraftLinkHref("https://someone:password@www.canva.com/design/1"), "");
+    assert.equal(studioDraftLinkHref("//www.canva.com/design/1"), "");
+    assert.equal(studioDraftLinkHref(""), "");
   });
 
   it("keeps phone-login addresses out of review mail and describes the notice", () => {
