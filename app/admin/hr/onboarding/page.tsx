@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { GrowthCard, GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { listGrowthHires } from "@/lib/admin/growth/hire";
+import { listInterns } from "@/lib/internship/queries";
+import { listActiveEngagements, listCompensationRates } from "@/lib/staff-time/engagement";
+import { currentRate } from "@/lib/staff-time/rates";
+import { isoToday } from "@/lib/staff-time/periods";
 import { canEditRequirements, internshipActorKind } from "@/lib/internship/manager-access";
 import {
   assignGrowthOnboarding,
@@ -32,21 +36,54 @@ export default async function PeopleOnboardingPage({
   const params = searchParams ? await searchParams : {};
   const notice = first(params.ok) || first(params.error);
   const error = Boolean(first(params.error));
-  const [people, hires, documents] = await Promise.all([
+
+  const [people, hires, interns, engagements, documents] = await Promise.all([
     loadOnboardingPeople(),
     listGrowthHires(),
+    listInterns(),
+    listActiveEngagements(),
     supabaseAdmin.from("onboarding_documents").select("id,title").eq("active", true).order("title"),
   ]);
+  // An active paid engagement, not an internship course record, determines whether
+  // an intern belongs in this HR compensation-onboarding section.
+  const paidEngagementByUser = new Map(
+    engagements
+      .filter((engagement) => engagement.userId && engagement.status === "active")
+      .map((engagement) => [engagement.userId, engagement]),
+  );
+  const paidInterns = await Promise.all(
+    interns
+      .filter((intern) => intern.userId && paidEngagementByUser.has(intern.userId))
+      .map(async (intern) => {
+        const engagement = paidEngagementByUser.get(intern.userId || "")!;
+        const rates = await listCompensationRates(engagement.id);
+        const rate = currentRate(rates, isoToday());
+        return {
+          userId: intern.userId || "",
+          internId: intern.id,
+          name: intern.preferredName || intern.fullName,
+          email: intern.email,
+          title: intern.internshipTitle || "Social Media & Community Growth Intern",
+          rateCents: rate?.hourlyRateCents ?? null,
+          classification: engagement.employmentClassification,
+          w9Status: engagement.w9Status,
+        };
+      }),
+  );
   const focus = first(params.person);
-  const selected = people.find((person) => person.userId === focus) || people[0];
+  const currentPersonId = focus || people[0]?.userId || paidInterns[0]?.userId || "";
+  const selected = people.find((person) => person.userId === currentPersonId);
+  const selectedPaidIntern = paidInterns.find((intern) => intern.userId === currentPersonId);
   const audit = selected ? await loadOnboardingAudit(selected.workspace.instanceId) : [];
+  const assignedUserIds = new Set(people.map((person) => person.userId));
+  const unassignedPaidInterns = paidInterns.filter((intern) => !assignedUserIds.has(intern.userId));
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-6">
       <GrowthPageFrame
         kicker="People & onboarding"
-        title="Assign the package. Track the signature. Keep the file restricted."
-        detail="The Growth Manager reviews the handbook and policies, then signs the agreement and the acknowledgment with an approved provider. SitGuru records the status. Executed copies stay in the restricted personnel folder."
+        title="Team onboarding, signatures & confidential records"
+        detail="Manage Growth Manager packages and paid-intern HR preparation separately. Keep signed agreements, tax documents, and banking information in a founder-restricted personnel repository."
       >
         {notice ? (
           <p className={`rounded-2xl px-4 py-3 text-sm font-semibold ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"}`}>
@@ -69,6 +106,42 @@ export default async function PeopleOnboardingPage({
             </button>
           </form>
         </GrowthCard>
+        <GrowthCard>
+          <h2 className="text-lg font-black text-slate-950">Paid Intern HR Onboarding</h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+            Paid interns are also team members. Their compensation paperwork is separate from university
+            internship check-ins and academic-credit documents. A manager agreement must never be assigned
+            to an intern.
+          </p>
+          {paidInterns.length ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {paidInterns.map((intern) => (
+                <Link
+                  key={intern.userId}
+                  href={`/admin/hr/onboarding?person=${encodeURIComponent(intern.userId)}`}
+                  className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 transition hover:border-emerald-300"
+                >
+                  <p className="font-black text-slate-950">{intern.name}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">{intern.title}</p>
+                  <p className="mt-2 text-xs font-bold text-emerald-900">
+                    {intern.rateCents == null ? "Rate pending" : `$${(intern.rateCents / 100).toFixed(2)}/hr`}
+                    {" · "}
+                    {assignedUserIds.has(intern.userId) ? "HR package assigned" : "HR package not assigned"}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm font-semibold text-slate-600">
+              No active paid interns have been linked to an HR engagement yet.
+            </p>
+          )}
+          <p className="mt-3 text-xs font-semibold leading-5 text-amber-900">
+            Intern-specific agreements and the secure profile, tax and banking collection steps must
+            be approved and configured before signature requests are sent. An active paid rate alone
+            does not establish 1099 eligibility.
+          </p>
+        </GrowthCard>
         <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="grid gap-2">
             {people.map((person) => (
@@ -84,7 +157,18 @@ export default async function PeopleOnboardingPage({
                 </p>
               </Link>
             ))}
-            {!people.length ? <p className="text-sm font-semibold text-slate-500">No onboarding packages yet.</p> : null}
+            {unassignedPaidInterns.map((intern) => (
+              <Link
+                key={intern.userId}
+                href={`/admin/hr/onboarding?person=${encodeURIComponent(intern.userId)}`}
+                className={`rounded-2xl border bg-white p-4 ${focus === intern.userId ? "border-emerald-500" : "border-emerald-100"}`}
+              >
+                <p className="font-black text-slate-950">{intern.name}</p>
+                <p className="text-xs font-semibold text-slate-500">Paid intern · HR onboarding</p>
+                <p className="mt-2 text-sm font-black text-amber-900">Packet preparation required</p>
+              </Link>
+            ))}
+            {!people.length && !unassignedPaidInterns.length ? <p className="text-sm font-semibold text-slate-500">No onboarding packages yet.</p> : null}
           </div>
           {selected ? (
             <div className="grid gap-3">
@@ -134,6 +218,63 @@ export default async function PeopleOnboardingPage({
                     <li key={event.id}>{event.at.slice(0, 16).replace("T", " ")} · {event.action} · {event.next}</li>
                   ))}
                 </ul>
+              </GrowthCard>
+            </div>
+          ) : selectedPaidIntern ? (
+            <div className="grid gap-3">
+              <GrowthCard>
+                <h2 className="text-xl font-black text-slate-950">{selectedPaidIntern.name}</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{selectedPaidIntern.title} · {selectedPaidIntern.email}</p>
+                <p className="mt-2 font-black text-slate-950">
+                  {selectedPaidIntern.rateCents == null
+                    ? "Hourly rate not recorded"
+                    : `$${(selectedPaidIntern.rateCents / 100).toFixed(2)}/hour`}
+                </p>
+                <p className="mt-2 text-sm font-bold text-amber-900">
+                  HR compensation packet not yet assigned. Worker classification: {
+                    selectedPaidIntern.classification === "pending_review"
+                      ? "pending legal review"
+                      : selectedPaidIntern.classification.replaceAll("_", " ")
+                  }.
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                  Academic onboarding remains under the separate internship record.
+                  Do not send an independent contractor agreement or W-9 as approved paperwork
+                  before applicable worker-classification review.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href={`/admin/internship/interns/${encodeURIComponent(selectedPaidIntern.internId)}#onboarding`}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
+                    Academic intern onboarding
+                  </Link>
+                  <Link href="/admin/hr/people"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-emerald-200 px-4 text-sm font-black text-emerald-900">
+                    HR & compensation
+                  </Link>
+                </div>
+              </GrowthCard>
+              <GrowthCard>
+                <h3 className="font-black text-slate-950">HR documents to prepare securely</h3>
+                <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
+                  {[
+                    "Paid-intern compensation agreement — hourly rate, role, and actual work dates",
+                    "Personal profile sheet and emergency-contact information",
+                    "Intern-specific handbook and approved policies",
+                    "Signed acknowledgments and verified agreement copies",
+                    "Tax forms and bank authorization — only after classification review",
+                    "Timesheet, manager review, founder approval, and payment record",
+                  ].map((label) => (
+                    <li key={label} className="flex items-start gap-2">
+                      <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
+                      <span>{label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs font-semibold text-slate-600">
+                  This is a preparation checklist, not proof that forms were collected, signed,
+                  stored, or sent. Tax identification and banking information must use restricted
+                  access and a verified secure collection channel, never ordinary email attachments.
+                </p>
               </GrowthCard>
             </div>
           ) : null}
