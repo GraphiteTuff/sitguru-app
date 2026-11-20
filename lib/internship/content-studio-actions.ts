@@ -13,6 +13,7 @@ import {
   contentEditResetsApproval,
   studioDecision,
   studioSummary,
+  studioDraftLinkHref,
   type StudioItem,
 } from "@/lib/internship/content-studio";
 import { notifyContentReview } from "@/lib/internship/content-studio-notify";
@@ -253,6 +254,9 @@ export async function saveStudioContent(formData: FormData) {
   const assetIds = formData.getAll("assetId").map((value) => String(value));
   const caption = text(formData, "caption");
   const draftUrl = text(formData, "draftUrl");
+  if (draftUrl && !studioDraftLinkHref(draftUrl)) {
+    bounce("/intern/content", "error", "Use a valid HTTPS Canva or creative link without embedded login credentials.");
+  }
   const platform = text(formData, "platform");
   const creativePath = text(formData, "creativePath");
   const creativeMime = text(formData, "creativeMime");
@@ -263,6 +267,19 @@ export async function saveStudioContent(formData: FormData) {
   if (creativePath && !(await confirmContentCreative(internId, creativePath))) {
     bounce("/intern/content", "error", "Upload the creative again, then save.");
   }
+  const taskId = text(formData, "taskId");
+  const campaignId = text(formData, "campaignId");
+  if (taskId) {
+    const { data: task, error } = await supabaseAdmin
+      .from("internship_tasks").select("id").eq("id", taskId).eq("intern_id", internId).maybeSingle();
+    if (error || !task) bounce("/intern/content", "error", "Choose an assignment from your own intern work.");
+  }
+  if (campaignId) {
+    const { data: campaign, error } = await supabaseAdmin
+      .from("internship_campaigns").select("id").eq("id", campaignId).eq("intern_id", internId).maybeSingle();
+    if (error || !campaign) bounce("/intern/content", "error", "Choose a campaign from your own intern work.");
+  }
+
   const key = contentCreativeKey({ caption, draftUrl, platform, assetIds, creativePath });
   const existingId = text(formData, "id");
   const payload = {
@@ -273,8 +290,8 @@ export async function saveStudioContent(formData: FormData) {
     draft_url: draftUrl,
     student_notes: text(formData, "notes"),
     planned_at: text(formData, "plannedAt") || null,
-    campaign_id: text(formData, "campaignId") || null,
-    task_id: text(formData, "taskId") || null,
+    campaign_id: campaignId || null,
+    task_id: taskId || null,
     due_on: text(formData, "plannedAt").slice(0, 10) || null,
     creative_path: creativePath,
     creative_mime: creativePath ? creativeMime : "",

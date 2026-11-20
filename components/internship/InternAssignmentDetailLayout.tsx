@@ -149,6 +149,15 @@ export default function InternAssignmentDetailLayout({
           ) : null}
         </div>
 
+        {!adminPreview && /carousel|spotlight/i.test(task.title) ? (
+          <Link
+            href={`/intern/content?taskId=${encodeURIComponent(task.id)}`}
+            className="mt-5 inline-flex min-h-11 items-center rounded-full bg-[#2563EB] px-4 text-sm font-black !text-white"
+          >
+            Create linked carousel in Content Studio
+          </Link>
+        ) : null}
+
         <h2 className="mt-6 text-lg font-black text-slate-950">Assignment instructions</h2>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
           {brief.description || task.businessObjective || "Ask your manager for more details."}

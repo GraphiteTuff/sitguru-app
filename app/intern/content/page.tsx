@@ -25,6 +25,8 @@ export default async function InternContentPage({
   const params = searchParams ? await searchParams : {};
   const studio = await loadInternContentStudio(intern.id);
   const editing = studio.items.find((item) => item.id === first(params.edit)) || null;
+  const linkedTask = !editing ? studio.tasks.find((task) => task.id === first(params.taskId)) : null;
+  const isCarouselTask = Boolean(linkedTask && /carousel|multi.slide/i.test(linkedTask.title));
   const manager = (intern.dayToDayManagerName || "").split(" ")[0] || "your manager";
   const field = "min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900";
 
@@ -42,17 +44,24 @@ export default async function InternContentPage({
           Open Reads &amp; Media Studio
         </Link>
       </header>
+      {linkedTask ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-950">
+          <p className="font-black">Creating content for: {linkedTask.title}</p>
+          <p className="mt-1">The assignment is linked automatically. For a multi-slide Instagram carousel, paste the complete Canva design link and your caption. You can also attach a preview image. Submit to your manager when it is ready for review; do not publish a partner spotlight until the featured business has approved it.</p>
+          <Link href={`/intern/assignments/${linkedTask.id}`} className="mt-2 inline-flex font-black text-blue-800 underline">Back to assignment</Link>
+        </div>
+      ) : null}
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
       <form key={editing?.id || "new"} action={saveStudioContent} className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4">
         <input type="hidden" name="internId" value={intern.id} />
         {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
         <label className="block text-sm font-black text-slate-800">Content title
-          <input name="title" required defaultValue={editing?.title || ""} className={`mt-1 ${field}`} placeholder="Pet Safety Awareness Post" />
+          <input name="title" required defaultValue={editing?.title || linkedTask?.title || ""} className={`mt-1 ${field}`} placeholder="Pet Safety Awareness Post" />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm font-black text-slate-800">Content type
-            <select name="contentType" defaultValue={editing?.contentType || "social_post"} className={`mt-1 ${field}`}>
+            <select name="contentType" defaultValue={editing?.contentType || (isCarouselTask ? "carousel" : "social_post")} className={`mt-1 ${field}`}>
               {CONTENT_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
             </select>
           </label>
@@ -71,8 +80,8 @@ export default async function InternContentPage({
             initial={editing?.creativePath ? { path: editing.creativePath, mime: editing.creativeMime, name: editing.creativeName } : null}
           />
         </div>
-        <label className="block text-sm font-black text-slate-800">Or a Canva link
-          <input name="draftUrl" defaultValue={editing?.draftUrl || ""} className={`mt-1 ${field}`} placeholder="https://" />
+        <label className="block text-sm font-black text-slate-800">Canva design link (all slides in one link)
+          <input type="url" name="draftUrl" defaultValue={editing?.draftUrl || ""} className={`mt-1 ${field}`} placeholder="https://" />
         </label>
         <fieldset>
           <legend className="text-sm font-black text-slate-800">Approved Brand Kit assets</legend>
@@ -91,13 +100,13 @@ export default async function InternContentPage({
           <summary className="cursor-pointer text-sm font-black text-slate-800">Campaign, assignment, and timing</summary>
           <div className="mt-3 grid gap-3">
             <label className="text-sm font-bold text-slate-700">Campaign
-              <select name="campaignId" className={`mt-1 ${field}`}>
+              <select name="campaignId" defaultValue={editing?.campaignId || ""} className={`mt-1 ${field}`}>
                 <option value="">None</option>
                 {studio.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
               </select>
             </label>
             <label className="text-sm font-bold text-slate-700">Assignment
-              <select name="taskId" className={`mt-1 ${field}`}>
+              <select name="taskId" defaultValue={editing?.taskId || linkedTask?.id || ""} className={`mt-1 ${field}`}>
                 <option value="">None</option>
                 {studio.tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
               </select>
@@ -106,7 +115,7 @@ export default async function InternContentPage({
               <input type="datetime-local" name="plannedAt" className={`mt-1 ${field}`} />
             </label>
             <label className="text-sm font-bold text-slate-700">Notes for {manager}
-              <textarea name="notes" rows={2} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <textarea name="notes" rows={2} defaultValue={editing?.notes || ""} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             </label>
           </div>
         </details>
