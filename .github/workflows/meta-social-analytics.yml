@@ -6,6 +6,8 @@ on:
     paths:
       - "lib/meta/**"
       - "lib/tiktok/**"
+      - "lib/x/**"
+      - "app/api/integrations/x/**"
       - "app/api/integrations/tiktok/**"
       - "components/manager/ContentStudioBoard.tsx"
       - "lib/growth-center-v2/**"
@@ -45,6 +47,8 @@ jobs:
         run: npm run test:meta-social
       - name: Run TikTok OAuth and draft-upload tests (no secrets)
         run: npm run test:tiktok-social
+      - name: X OAuth security tests (offline; no paid X API calls)
+        run: npm run test:x-social
       - name: Check TypeScript compilation
         run: npm run typecheck
       - name: Isolated production build (no real credentials)
