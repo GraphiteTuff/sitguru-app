@@ -17,6 +17,7 @@ import {
   WalletCards
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
+import { TrustCredentialHighlights } from '@/components/credentials/TrustCredentialHighlights';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -665,6 +666,13 @@ export default function GuruProfileScreen() {
                     {selectedGuru.bio ||
                       'This Guru has not added a bio yet.'}
                   </Text>
+                  <TrustCredentialHighlights
+                    guruId={String(selectedGuru.id || '')}
+                    ownerUserId={String(
+                      (selectedGuru as { user_id?: string | null }).user_id || '',
+                    )}
+                    isDark={isDark}
+                  />
                 </View>
 
                 <View style={styles.sectionCard}>
