@@ -17,6 +17,7 @@ import DeskPageHero from "@/components/manager/DeskPageHero";
 import LiveResultsClock from "@/components/portal/LiveResultsClock";
 import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
 import MetaSocialSyncControl from "@/components/portal/MetaSocialSyncControl";
+import { refreshXFollowers } from "@/lib/x/refresh-action";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { LiveResultsData } from "@/lib/admin/growth/live-results";
 
@@ -240,6 +241,18 @@ export default function LiveResultsBoard({
                   >
                     Connect X{xIsStaging ? " (staging)" : ""}
                   </Link>
+                ) : null}
+                {canConnectX && manager && card.label === "X" && card.verifiedStatus !== "not_configured" ? (
+                  <form action={refreshXFollowers} className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                    <label className="flex items-start gap-2 text-[11px] font-semibold text-slate-700">
+                      <input name="confirm" type="checkbox" value="yes" required className="mt-0.5" />
+                      I approve one X follower lookup, which may use paid X API credits.
+                    </label>
+                    <button type="submit" className="min-h-9 rounded-lg bg-[#2563EB] px-3 text-xs font-bold text-white">
+                      Refresh X followers
+                    </button>
+                    <p className="text-[10px] text-slate-500">Manual only; no automatic X API polling. Refreshes are rate-limited.</p>
+                  </form>
                 ) : null}
                 {verified && Number.isFinite(updatedAt) && (
                   <p className="mt-1 text-[10px] text-slate-400">
