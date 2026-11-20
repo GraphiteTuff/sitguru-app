@@ -14,7 +14,7 @@ const CURRENT_USER_URL = "https://api.x.com/2/users/me?user.fields=public_metric
 const OFFICIAL_USERNAME = "sitguruofficial";
 const SCOPES = ["tweet.read", "users.read", "offline.access"] as const;
 export const OFFICIAL_X_ENTITY_ID = "brand_x_official";
-const STAGING_X_ENTITY_ID = "brand_x_staging";
+export const STAGING_X_ENTITY_ID = "brand_x_staging";
 
 type XMode = "staging" | "production";
 type XConfig = {
