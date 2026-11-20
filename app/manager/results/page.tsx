@@ -18,6 +18,12 @@ const X_NOTICES: Record<string, string> = {
   invalid_state: "X sign-in could not be verified. Start the connection again.",
   invalid_code: "X did not return an authorization code.",
   connection_failed: "X connection was not completed. Verify the official account, callback address and API credit balance.",
+  synced: "X followers were refreshed from the official API.",
+  too_soon: "X follower data was checked recently. No extra paid X API request was made.",
+  not_connected: "Connect the verified SitGuru X account before refreshing follower metrics.",
+  not_confirmed: "X API refresh was not approved. No request was made.",
+  not_authorized: "Founder authorization is required. No X request was made.",
+  sync_failed: "X follower refresh did not complete. Check API credits, authentication and server diagnostics.",
 };
 
 export default async function ManagerResultsPage({
