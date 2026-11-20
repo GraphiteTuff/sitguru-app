@@ -47,13 +47,19 @@ export default function LiveResultsBoard({
   data,
   canSyncMeta = false,
   canConnectTikTok = false,
+  canConnectX = false,
+  xIsStaging = false,
   tiktokNotice = "",
+  xNotice = "",
 }: {
   audience: "manager" | "intern";
   data: LiveResultsData;
   canSyncMeta?: boolean;
   canConnectTikTok?: boolean;
+  canConnectX?: boolean;
+  xIsStaging?: boolean;
   tiktokNotice?: string;
+  xNotice?: string;
 }) {
   const manager = audience === "manager";
   const base = manager ? "/manager" : "/intern";
@@ -88,6 +94,12 @@ export default function LiveResultsBoard({
       {manager && tiktokNotice ? (
         <p role="status" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-900">
           {tiktokNotice}
+        </p>
+      ) : null}
+
+      {manager && xNotice ? (
+        <p role="status" className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-900">
+          {xNotice}
         </p>
       ) : null}
 
@@ -219,6 +231,14 @@ export default function LiveResultsBoard({
                     className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
                   >
                     Connect TikTok (sandbox)
+                  </Link>
+                ) : null}
+                {canConnectX && manager && card.label === "X" ? (
+                  <Link
+                    href="/api/integrations/x/start"
+                    className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
+                  >
+                    Connect X{xIsStaging ? " (staging)" : ""}
                   </Link>
                 ) : null}
                 {verified && Number.isFinite(updatedAt) && (
