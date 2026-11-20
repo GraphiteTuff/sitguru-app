@@ -716,7 +716,21 @@ export default function FindCareScreen() {
   const routeParams = useLocalSearchParams<{
     service?: string | string[];
     zip?: string | string[];
+    ref?: string | string[];
   }>();
+  const initialRefParam = Array.isArray(routeParams.ref)
+    ? routeParams.ref[0]
+    : routeParams.ref;
+  useEffect(() => {
+    const code = String(initialRefParam || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, "");
+    if (!code) return;
+    void import("@/lib/referrals/lock-signup-referral").then(
+      ({ rememberAmbassadorReferral }) => rememberAmbassadorReferral(code),
+    );
+  }, [initialRefParam]);
 
   const initialServiceParam = Array.isArray(routeParams.service)
     ? routeParams.service[0]

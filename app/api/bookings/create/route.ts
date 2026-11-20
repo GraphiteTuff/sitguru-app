@@ -201,21 +201,10 @@ function getGuruAvatarUrl(guru: Record<string, unknown> | null) {
   ]);
 }
 
-function getPetPhotoUrl(pet: Record<string, unknown> | null) {
-  if (!pet) return "";
-
-  return getFirstText(pet, [
-    "photo_url",
-    "pet_photo_url",
-    "avatar_url",
-    "profile_photo_url",
-  ]);
-}
-
 async function insertBookingWithMissingColumnRetry(
   payload: Record<string, unknown>,
 ) {
-  let insertPayload = { ...payload };
+  const insertPayload = { ...payload };
 
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const { data, error } = await supabaseAdmin
@@ -252,7 +241,7 @@ async function safeUpdateBooking(
   bookingId: string | number,
   payload: Record<string, unknown>,
 ) {
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const { error } = await supabaseAdmin
@@ -748,6 +737,26 @@ export async function POST(req: NextRequest) {
     }
 
     const bookingId = String((booking as Record<string, unknown>).id || "");
+
+    try {
+      const { loadLockedAmbassadorReferral, recordAmbassadorBookingCommission } =
+        await import("@/lib/ambassador/ledger");
+      const locked = await loadLockedAmbassadorReferral(user.id);
+      if (bookingId && locked?.code && locked.ownerUserId !== user.id) {
+        await recordAmbassadorBookingCommission({
+          referralSlug: locked.code,
+          payerUserId: user.id,
+          bookingId,
+          bookingTotal: customerTotal,
+          referredRole: "pet_parent",
+        });
+      }
+    } catch (attributionError) {
+      console.warn(
+        "[bookings/create] ambassador attribution skipped:",
+        attributionError instanceof Error ? attributionError.message : "skipped",
+      );
+    }
 
     if (!bookingId) {
       return NextResponse.json({

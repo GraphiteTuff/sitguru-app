@@ -9,6 +9,16 @@ function cleanPath(pathname: string) {
   return pathname.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function referralCodeFromPath(path: string, host: string, protocol: string) {
+  const fromPath = path.match(/^r\/([A-Za-z0-9_-]{2,64})/i);
+  if (fromPath?.[1]) return fromPath[1].toUpperCase();
+  if (protocol === 'sitgurumobile:' && host === 'r') {
+    const code = path.split('/')[0] || '';
+    if (/^[A-Za-z0-9_-]{2,64}$/.test(code)) return code.toUpperCase();
+  }
+  return '';
+}
+
 function firstQuery(url: URL, keys: string[]) {
   for (const key of keys) {
     const value = url.searchParams.get(key)?.trim();
@@ -63,6 +73,14 @@ export function routeFromSitGuruUrl(rawUrl: string): RouteTarget | null {
         ...(zip ? { zip } : {}),
         ...(service ? { service } : {}),
       },
+    };
+  }
+
+  const referralCode = referralCodeFromPath(path, host, url.protocol);
+  if (referralCode) {
+    return {
+      pathname: '/find-care',
+      params: { ref: referralCode },
     };
   }
 
@@ -182,6 +200,13 @@ export function shouldRemapSitGuruUrl(rawUrl: string) {
 export function openSitGuruDeepLink(rawUrl: string) {
   const target = routeFromSitGuruUrl(rawUrl);
   if (!target) return false;
+
+  const ref = target.params?.ref;
+  if (ref) {
+    void import('@/lib/referrals/lock-signup-referral').then(
+      ({ rememberAmbassadorReferral }) => rememberAmbassadorReferral(ref),
+    );
+  }
 
   router.push({
     pathname: target.pathname,

@@ -26,6 +26,7 @@ import {
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
+import { lockNewAccountReferral } from '@/lib/referrals/lock-signup-referral';
 import {
   normalizeRole,
   roleDashboardPath,
@@ -44,6 +45,7 @@ WebBrowser.maybeCompleteAuthSession();
 type SignupMetadata = {
   first_name?: string;
   signup_intent?: string;
+  referral_code?: string;
 };
 
 type SocialProvider =
@@ -140,6 +142,7 @@ type AuthContextValue = {
     error: string | null;
     needsEmailConfirmation:
       boolean;
+    userId?: string | null;
   }>;
 
   signOut: () => Promise<{
@@ -923,6 +926,18 @@ export function AuthProvider({
             nextSession.user,
           );
 
+          await lockNewAccountReferral({
+            userId: nextSession.user.id,
+            createdAt: nextSession.user.created_at,
+            email: nextSession.user.email,
+            fullName:
+              typeof nextSession.user.user_metadata
+                ?.full_name === 'string'
+                ? nextSession.user.user_metadata
+                    .full_name
+                : null,
+          });
+
           return {
             error: null,
             cancelled: false,
@@ -1230,6 +1245,14 @@ export function AuthProvider({
           await loadProfileAndRoles(
             data.session.user,
           );
+
+          await lockNewAccountReferral({
+            userId: data.session.user.id,
+            createdAt:
+              data.session.user.created_at,
+            email: data.session.user.email,
+            fullName: fullName || null,
+          });
 
           return {
             error: null,
@@ -1797,6 +1820,12 @@ export function AuthProvider({
                       metadata.signup_intent,
                   }
                 : {}),
+              ...(metadata?.referral_code
+                ? {
+                    ambassador_referral_code:
+                      metadata.referral_code.trim(),
+                  }
+                : {}),
             },
             emailRedirectTo:
               oauthRedirectUrl(),
@@ -1840,6 +1869,10 @@ export function AuthProvider({
           needsEmailConfirmation:
             !data.session &&
             Boolean(data.user),
+          userId:
+            data.session?.user.id ||
+            data.user?.id ||
+            null,
         };
       },
       [loadProfileAndRoles],

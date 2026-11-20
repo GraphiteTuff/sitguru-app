@@ -28,6 +28,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
+import ReferralShareCard from "@/components/ambassador/ReferralShareCard";
+import { publicReferralUrl } from "@/lib/ambassador/creator-referral";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import {
@@ -62,6 +64,7 @@ type AmbassadorRecord = {
   login_enabled?: boolean | null;
   dashboard_slug?: string | null;
   status?: string | null;
+  ambassador_type?: string | null;
   referral_status?: string | null;
   onboarding_status?: string | null;
   training_status?: string | null;
@@ -479,11 +482,7 @@ function getCompactDisplayUrl(path: string) {
 }
 
 function getQrImageUrl(path: string) {
-  const destination = `${getSiteUrl()}${path}`;
-
-  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(
-    destination,
-  )}`;
+  return `/api/referrals/qr?path=${encodeURIComponent(path)}`;
 }
 
 function getReferralSocialPlatform(row: AnyRow): SocialPlatformKey | null {
@@ -1140,11 +1139,13 @@ export default async function AmbassadorDashboardPage() {
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <div className="lg:hidden">
-          <AmbassadorSelfServicePortal />
-        </div>
-        <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-4">
+        <ReferralShareCard
+          code={referralCode}
+          url={publicReferralUrl(getSiteUrl(), referralCode)}
+          ambassadorType={ambassadorRecord.ambassador_type}
+        />
         <UniversalRoleDashboard
           role="ambassador"
           userName={firstName}
@@ -1563,7 +1564,7 @@ export default async function AmbassadorDashboardPage() {
           </div>
         </details>
           </div>
-          <aside className="hidden min-w-0 lg:block">
+          <aside className="min-w-0">
             <div className="sticky top-4">
               <AmbassadorSelfServicePortal />
             </div>

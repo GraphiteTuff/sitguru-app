@@ -1,334 +1,270 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAppOrigin } from "@/lib/config/site";
 import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
+import {
+  creatorRoleLabel,
+  isCreatorAmbassadorType,
+  isReservedReferralCode,
+  normalizeReferralCode,
+  publicReferralUrl,
+} from "@/lib/ambassador/creator-referral";
 
-type ReferralCode = {
+export const dynamic = "force-dynamic";
+
+type ReferralHit = {
   id: string;
-  owner_user_id: string | null;
-  owner_type: "customer" | "guru" | "partner" | "affiliate" | "ambassador" | "admin";
-  partner_id: string | null;
-  ambassador_id: string | null;
   code: string;
   slug: string | null;
-  campaign_type:
-    | "general"
-    | "customer_referral"
-    | "guru_referral"
-    | "partner_referral"
-    | "affiliate"
-    | "ambassador"
-    | "rescue_donation";
-  status: "active" | "paused" | "disabled";
-  created_at: string;
-  partners: {
-    id: string;
-    business_name: string;
-    partner_type: string;
-    city: string | null;
-    state: string | null;
-    status: "active" | "paused" | "suspended" | "archived";
-  } | null;
-  ambassadors: {
-    id: string;
-    display_name: string;
-    ambassador_type: string;
-    city: string | null;
-    state: string | null;
-    territory: string | null;
-    tier: "bronze" | "silver" | "gold" | "city_captain";
-    status: "active" | "paused" | "suspended" | "archived";
-  } | null;
+  ambassadorName: string;
+  ambassadorType: string | null;
+  photoUrl: string | null;
+  location: string;
+  active: boolean;
 };
 
 type PageProps = {
-  params: {
-    slug: string;
-  };
-  searchParams?: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<{
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
-  };
+  }>;
 };
 
-function formatLabel(value: string | null | undefined) {
-  if (!value) return "SitGuru Partner";
-
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+function inactive(code: string): ReferralHit {
+  return {
+    id: "",
+    code,
+    slug: null,
+    ambassadorName: "",
+    ambassadorType: null,
+    photoUrl: null,
+    location: "",
+    active: false,
+  };
 }
 
-function getDisplayName(referral: ReferralCode) {
-  if (referral.ambassadors?.display_name) return referral.ambassadors.display_name;
-  if (referral.partners?.business_name) return referral.partners.business_name;
-  return "a SitGuru Partner";
-}
-
-function getProgramLabel(referral: ReferralCode) {
-  if (referral.ambassadors) return formatLabel(referral.ambassadors.ambassador_type);
-  if (referral.partners) return formatLabel(referral.partners.partner_type);
-  return formatLabel(referral.campaign_type);
-}
-
-function getLocation(referral: ReferralCode) {
-  if (referral.ambassadors) {
-    return (
-      referral.ambassadors.territory ||
-      [referral.ambassadors.city, referral.ambassadors.state]
-        .filter(Boolean)
-        .join(", ")
-    );
-  }
-
-  if (referral.partners) {
-    return [referral.partners.city, referral.partners.state]
-      .filter(Boolean)
-      .join(", ");
-  }
-
-  return "";
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const code = normalizeReferralCode(slug);
+  const title = code
+    ? `Find Pet Care with SitGuru — Recommended by ${code}`
+    : "Find Pet Care with SitGuru";
+  const canonical = code ? publicReferralUrl(getAppOrigin(), code) : getAppOrigin();
+  return {
+    title,
+    description: "Trusted pet care, simplified. Find a local Guru on SitGuru.",
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description: "Trusted pet care, simplified.",
+      url: canonical,
+      siteName: "SitGuru",
+    },
+  };
 }
 
 export default async function CustomerReferralPage({
   params,
   searchParams,
 }: PageProps) {
-  const supabase = await createClient();
+  const { slug } = await params;
+  const query = (await searchParams) || {};
+  const requested = normalizeReferralCode(slug);
+  const referral = await loadReferral(requested);
 
-  const { data, error } = await supabase
-    .from("referral_codes")
-    .select(
-      `
-        *,
-        partners (
-          id,
-          business_name,
-          partner_type,
-          city,
-          state,
-          status
-        ),
-        ambassadors (
-          id,
-          display_name,
-          ambassador_type,
-          city,
-          state,
-          territory,
-          tier,
-          status
-        )
-      `
-    )
-    .eq("slug", params.slug)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (error || !data) {
-    notFound();
+  if (referral.active && referral.code) {
+    await trackReferralClick({
+      code: referral.code,
+      landingPage: `/r/${requested || slug}`,
+      utmSource: query.utm_source,
+      utmMedium: query.utm_medium,
+      utmCampaign: query.utm_campaign,
+    });
   }
 
-  const referral = data as ReferralCode;
-
-  if (referral.partners && referral.partners.status !== "active") {
-    notFound();
-  }
-
-  if (referral.ambassadors && referral.ambassadors.status !== "active") {
-    notFound();
-  }
-
-  await trackReferralClick({
-    referralCodeId: referral.id,
-    landingPage: `/r/${params.slug}`,
-    utmSource: searchParams?.utm_source,
-    utmMedium: searchParams?.utm_medium,
-    utmCampaign: searchParams?.utm_campaign,
-  });
-
-  const displayName = getDisplayName(referral);
-  const programLabel = getProgramLabel(referral);
-  const location = getLocation(referral);
-  const findGuruHref = `/find-a-guru?ref=${encodeURIComponent(referral.code)}`;
-  const signupHref = `/signup?ref=${encodeURIComponent(referral.code)}`;
+  const findHref = referral.active
+    ? `/search?ref=${encodeURIComponent(referral.code)}`
+    : "/search";
+  const signupHref = referral.active
+    ? `/signup?ref=${encodeURIComponent(referral.code)}`
+    : "/signup";
+  const roleLabel = creatorRoleLabel(referral.ambassadorType);
+  const qrSrc = referral.active
+    ? `/api/referrals/qr?code=${encodeURIComponent(referral.code)}`
+    : "";
 
   return (
-    <main className="min-h-screen bg-[#fbfaf6] text-slate-950">
-      <section className="border-b border-green-100 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:px-10 lg:py-16">
-          <div className="flex flex-col justify-center">
-            <div className="mb-5 text-sm font-semibold text-green-800">
-              <Link href="/" className="hover:text-green-950">
-                SitGuru
-              </Link>
-              <span className="mx-2 text-slate-400">/</span>
-              Customer Referral
-            </div>
+    <main className="min-h-[100svh] bg-[#f4fbf7] px-4 py-6 text-slate-950 sm:px-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <p className="text-sm font-black text-[#0D5C3A]">SitGuru</p>
 
-            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-sm font-black text-green-800">
-              <span>🎁</span>
-              {programLabel}
-            </div>
-
-            <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight text-green-950 sm:text-6xl lg:text-7xl">
-              {displayName} invited you to SitGuru
-            </h1>
-
-            <p className="mt-6 max-w-2xl text-xl font-semibold leading-8 text-slate-800">
-              Get started with trusted local pet care and use this referral to
-              help SitGuru track rewards for the person or partner who invited
-              you.
+        {referral.active ? (
+          <article className="rounded-[28px] border border-emerald-100 bg-white p-5 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+              Recommended by
             </p>
-
-            {location ? (
-              <p className="mt-4 inline-flex w-fit rounded-full border border-green-100 bg-[#fbfaf6] px-4 py-2 text-sm font-bold text-green-900">
-                📍 {location}
+            <div className="mt-3 flex items-center gap-3">
+              {referral.photoUrl ? (
+                <Image
+                  src={referral.photoUrl}
+                  alt=""
+                  width={56}
+                  height={56}
+                  unoptimized
+                  className="h-14 w-14 rounded-full object-cover"
+                />
+              ) : null}
+              <div>
+                <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-950">
+                  {referral.ambassadorName}
+                </h1>
+                <p className="mt-1 text-sm font-bold text-slate-600">{roleLabel}</p>
+              </div>
+            </div>
+            {referral.location ? (
+              <p className="mt-3 text-sm font-semibold text-slate-600">{referral.location}</p>
+            ) : null}
+            <p className="mt-4 text-base font-semibold leading-7 text-slate-700">
+              Trusted pet care, simplified. Find a local Guru, then book on SitGuru.
+            </p>
+            <Link
+              href={findHref}
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0D5C3A] px-5 text-base font-black text-white"
+            >
+              Find Pet Care
+            </Link>
+            <p className="mt-5 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+              Use referral code
+            </p>
+            <p className="mt-1 text-3xl font-black tracking-wide text-slate-950">{referral.code}</p>
+            <p className="mt-2 break-all text-sm font-bold text-slate-700">
+              {publicReferralUrl(getAppOrigin(), referral.code).replace(/^https?:\/\//, "")}
+            </p>
+            {qrSrc ? (
+              <Image
+                src={qrSrc}
+                alt={`QR code linking to SitGuru.com/r/${referral.code}`}
+                width={220}
+                height={220}
+                unoptimized
+                className="mt-4 h-52 w-52 rounded-2xl border border-slate-200 bg-white p-2"
+              />
+            ) : null}
+            <Link href={signupHref} className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-[#0D5C3A] underline">
+              Create a Pet Parent account
+            </Link>
+            {isCreatorAmbassadorType(referral.ambassadorType) ? (
+              <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">
+                {referral.ambassadorName} may earn a referral reward if you book. SitGuru does not require a post to say anything specific. This is a disclosure reminder, not legal advice.
               </p>
             ) : null}
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={findGuruHref}
-                className="inline-flex items-center justify-center rounded-xl bg-green-800 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-green-900/15 transition hover:bg-green-900"
-              >
-                Find a Guru
-              </Link>
-
-              <Link
-                href={signupHref}
-                className="inline-flex items-center justify-center rounded-xl border border-green-300 bg-white px-6 py-3 text-sm font-bold text-green-900 transition hover:border-green-800 hover:bg-green-50"
-              >
-                Create Pet Parent Account
-              </Link>
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-green-100 bg-green-50 p-5">
-              <p className="text-sm font-black text-green-950">
-                Referral Code: {referral.code}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                This referral code will be passed into SitGuru as you search,
-                sign up, or book.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] border border-green-100 bg-gradient-to-br from-green-50 via-white to-amber-50 p-4 shadow-2xl shadow-green-950/10">
-            <div className="rounded-[1.5rem] bg-white p-5 shadow-sm">
-              <div className="rounded-[1.25rem] bg-[radial-gradient(circle_at_35%_25%,#bbf7d0,transparent_28%),radial-gradient(circle_at_80%_20%,#fed7aa,transparent_30%),linear-gradient(135deg,#f0fdf4,#fff7ed)] p-6">
-                <div className="max-w-md rounded-2xl bg-white/90 p-5 shadow-sm">
-                  <p className="text-sm font-black uppercase tracking-[0.18em] text-green-700">
-                    Pet parent referral
-                  </p>
-                  <h2 className="mt-3 text-3xl font-black text-green-950">
-                    Trusted care starts with a warm introduction.
-                  </h2>
-                  <p className="mt-3 text-sm leading-6 text-slate-700">
-                    Search for local Gurus, connect through SitGuru, and book
-                    trusted pet care when you are ready.
-                  </p>
-                </div>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                  {[
-                    ["Find Gurus", "🔎"],
-                    ["Message", "💬"],
-                    ["Book Care", "📅"],
-                  ].map(([label, icon]) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl bg-white/90 p-4 text-center shadow-sm"
-                    >
-                      <p className="text-3xl">{icon}</p>
-                      <p className="mt-2 text-sm font-black text-green-950">
-                        {label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-green-100 bg-[#fbfaf6] p-5">
-                <p className="text-sm font-black text-green-950">
-                  Better care. Stronger communities. Happier pets.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Referral links help SitGuru reward verified growth.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {[
-            {
-              title: "Search locally",
-              description:
-                "Start by searching for Gurus based on location, availability, and the care your pet needs.",
-              icon: "📍",
-            },
-            {
-              title: "Connect safely",
-              description:
-                "Message through SitGuru and choose a Guru that feels like the right fit.",
-              icon: "🛡️",
-            },
-            {
-              title: "Book confidently",
-              description:
-                "Complete your booking through SitGuru so referral tracking and rewards can qualify.",
-              icon: "✅",
-            },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="rounded-[1.5rem] border border-green-100 bg-white p-6 shadow-sm"
-            >
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-3xl">
-                {item.icon}
-              </div>
-              <h2 className="mt-5 text-2xl font-black text-green-950">
-                {item.title}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                {item.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 pb-14 sm:px-8 lg:px-10">
-        <div className="overflow-hidden rounded-[2rem] bg-green-950 shadow-2xl shadow-green-950/20">
-          <div className="grid gap-8 p-8 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-green-200">
-                Ready to find care?
-              </p>
-              <h2 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                Start your SitGuru search.
-              </h2>
-              <p className="mt-4 max-w-3xl text-lg leading-8 text-green-100">
-                Your referral code will travel with you so SitGuru can connect
-                the activity back to this referral.
-              </p>
-            </div>
-
+          </article>
+        ) : (
+          <article className="rounded-[28px] border border-emerald-100 bg-white p-5 shadow-sm">
+            <h1 className="text-3xl font-black leading-tight text-slate-950">
+              This referral link is no longer active, but you can still find pet care on SitGuru.
+            </h1>
             <Link
-              href={findGuruHref}
-              className="rounded-xl bg-white px-6 py-3 text-center text-sm font-black text-green-950 transition hover:bg-green-50"
+              href={findHref}
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0D5C3A] px-5 text-base font-black text-white"
             >
-              Find a Guru
+              Find Pet Care
             </Link>
-          </div>
-        </div>
-      </section>
+          </article>
+        )}
+      </div>
     </main>
   );
+}
+
+type PublicAmbassadorCard = {
+  referral_code?: string | null;
+  display_name?: string | null;
+  ambassador_type?: string | null;
+  city?: string | null;
+  state?: string | null;
+  territory?: string | null;
+  photo_url?: string | null;
+};
+
+function viewIsMissing(message: string) {
+  return /ambassador_public_referrals|schema cache|does not exist|PGRST205/i.test(message);
+}
+
+async function loadReferral(code: string): Promise<ReferralHit> {
+  if (!code || isReservedReferralCode(code)) return inactive(code);
+  try {
+    const supabase = await createClient();
+
+    const bySlug = await supabase
+      .from("referral_codes")
+      .select("code, slug, status")
+      .ilike("slug", code)
+      .limit(1)
+      .maybeSingle();
+
+    const byCode =
+      bySlug.data ||
+      (
+        await supabase
+          .from("referral_codes")
+          .select("code, slug, status")
+          .ilike("code", code)
+          .limit(1)
+          .maybeSingle()
+      ).data;
+
+    const codeRow = byCode as {
+      code: string;
+      slug: string | null;
+      status: string;
+    } | null;
+
+    if (codeRow && codeRow.status !== "active") {
+      return inactive(normalizeReferralCode(codeRow.code));
+    }
+
+    const cardQuery = await supabase
+      .from("ambassador_public_referrals")
+      .select("referral_code, display_name, ambassador_type, city, state, territory, photo_url")
+      .ilike("referral_code", normalizeReferralCode(codeRow?.code || code))
+      .limit(1)
+      .maybeSingle();
+
+    let card = (cardQuery.data || null) as PublicAmbassadorCard | null;
+    if (cardQuery.error) {
+      if (!viewIsMissing(cardQuery.error.message)) {
+        console.error("[referral-page] public card lookup failed:", cardQuery.error.message);
+      }
+      card = null;
+      if (!viewIsMissing(cardQuery.error.message) || !codeRow) {
+        return inactive(normalizeReferralCode(codeRow?.code || code));
+      }
+    }
+
+    if (!card && !codeRow) return inactive(code);
+    if (!card && codeRow && !cardQuery.error) return inactive(normalizeReferralCode(codeRow.code));
+
+    const publicCode = normalizeReferralCode(card?.referral_code || codeRow?.code || code);
+    return {
+      id: "",
+      code: publicCode,
+      slug: codeRow?.slug || null,
+      ambassadorName: card?.display_name || "a SitGuru Ambassador",
+      ambassadorType: card?.ambassador_type || null,
+      photoUrl: card?.photo_url || null,
+      location: card?.territory || [card?.city, card?.state].filter(Boolean).join(", "),
+      active: true,
+    };
+  } catch (error) {
+    console.error(
+      "[referral-page]",
+      error instanceof Error ? error.message : "lookup_failed",
+    );
+    return inactive(code);
+  }
 }

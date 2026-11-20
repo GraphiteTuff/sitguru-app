@@ -17,6 +17,20 @@
         "EXPO_PUBLIC_SITGURU_APP_CHANNEL": "development"
       }
     },
+    "staging": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SITGURU_APP_CHANNEL": "staging",
+        "EXPO_PUBLIC_SITGURU_API_URL": "https://staging.sitguru.com"
+      },
+      "channel": "staging"
+    },
     "preview": {
       "distribution": "internal",
       "ios": {

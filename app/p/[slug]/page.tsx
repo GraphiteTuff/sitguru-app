@@ -16,61 +16,27 @@ import { createClient } from "@/lib/supabase/server";
 
 type Partner = {
   id: string;
-  application_id: string | null;
-  owner_user_id: string | null;
   partner_type: string | null;
   business_name: string | null;
-  contact_name: string | null;
-  email: string | null;
-  phone: string | null;
   website: string | null;
-  social_url: string | null;
   business_type: string | null;
   city: string | null;
   state: string | null;
-  zip_code: string | null;
   slug: string | null;
   referral_code: string | null;
-  commission_type: "fixed" | "percent" | "donation" | "manual" | null;
-  customer_booking_reward: number | null;
-  guru_referral_reward: number | null;
-  partner_activation_reward: number | null;
-  donation_reward: number | null;
   status: "active" | "paused" | "suspended" | "archived" | null;
-  approved_by: string | null;
-  approved_at: string | null;
-  created_at: string | null;
-  updated_at: string | null;
 };
 
 type ReferralCode = {
-  id: string;
-  owner_user_id: string | null;
-  owner_type:
-    | "customer"
-    | "guru"
-    | "partner"
-    | "affiliate"
-    | "ambassador"
-    | "admin";
-  partner_id: string | null;
-  ambassador_id: string | null;
   code: string;
   slug: string | null;
-  campaign_type:
-    | "general"
-    | "customer_referral"
-    | "guru_referral"
-    | "partner_referral"
-    | "affiliate"
-    | "ambassador"
-    | "rescue_donation";
-  status: "active" | "paused" | "disabled";
-  created_at: string;
-};
-
-type ReferralCodeWithPartners = ReferralCode & {
-  partners: Partner | Partner[] | null;
+  display_name: string | null;
+  public_type: string | null;
+  city: string | null;
+  state: string | null;
+  website: string | null;
+  business_type: string | null;
+  entity_type: string | null;
 };
 
 type PageProps = {
@@ -87,16 +53,56 @@ type PageProps = {
   }>;
 };
 
-function normalizePartnerRelation(
-  partners: Partner | Partner[] | null | undefined
-) {
-  if (!partners) return null;
+const PUBLIC_PARTNER_COLUMNS =
+  "id, partner_type, business_name, website, business_type, city, state, slug, referral_code, status";
 
-  if (Array.isArray(partners)) {
-    return partners[0] || null;
+async function findPartnerByReferralSlug(slug: string) {
+  const supabase = await createClient();
+
+  const referralResponse = await supabase
+    .from("referral_code_public")
+    .select(
+      "code, slug, display_name, public_type, city, state, website, business_type, entity_type",
+    )
+    .eq("slug", slug)
+    .maybeSingle();
+
+  const referralData = (referralResponse.data || null) as ReferralCode | null;
+
+  const partnerBySlug = await supabase
+    .from("partners")
+    .select(PUBLIC_PARTNER_COLUMNS)
+    .eq("slug", slug)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (partnerBySlug.data) {
+    return {
+      partner: partnerBySlug.data as Partner,
+      referralCode: referralData,
+    };
   }
 
-  return partners;
+  if (referralData?.code) {
+    const partnerByCode = await supabase
+      .from("partners")
+      .select(PUBLIC_PARTNER_COLUMNS)
+      .eq("referral_code", referralData.code)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (partnerByCode.data) {
+      return {
+        partner: partnerByCode.data as Partner,
+        referralCode: referralData,
+      };
+    }
+  }
+
+  return {
+    partner: null,
+    referralCode: null,
+  };
 }
 
 function formatLabel(value: string | null | undefined) {
@@ -192,92 +198,6 @@ async function recordPartnerReferralClick({
       partner_type: partner.partner_type,
     },
   });
-}
-
-async function findPartnerByReferralSlug(slug: string) {
-  const supabase = await createClient();
-
-  const referralResponse = await supabase
-    .from("referral_codes")
-    .select(
-      `
-        id,
-        owner_user_id,
-        owner_type,
-        partner_id,
-        ambassador_id,
-        code,
-        slug,
-        campaign_type,
-        status,
-        created_at,
-        partners (
-          id,
-          application_id,
-          owner_user_id,
-          partner_type,
-          business_name,
-          contact_name,
-          email,
-          phone,
-          website,
-          social_url,
-          business_type,
-          city,
-          state,
-          zip_code,
-          slug,
-          referral_code,
-          commission_type,
-          customer_booking_reward,
-          guru_referral_reward,
-          partner_activation_reward,
-          donation_reward,
-          status,
-          approved_by,
-          approved_at,
-          created_at,
-          updated_at
-        )
-      `
-    )
-    .eq("slug", slug)
-    .eq("status", "active")
-    .maybeSingle();
-
-  const referralData =
-    (referralResponse.data as unknown as ReferralCodeWithPartners | null) ||
-    null;
-
-  const relatedPartner = normalizePartnerRelation(referralData?.partners);
-
-  if (relatedPartner) {
-    return {
-      partner: relatedPartner,
-      referralCode: referralData,
-    };
-  }
-
-  const partnerResponse = await supabase
-    .from("partners")
-    .select(
-      "id, application_id, owner_user_id, partner_type, business_name, contact_name, email, phone, website, social_url, business_type, city, state, zip_code, slug, referral_code, commission_type, customer_booking_reward, guru_referral_reward, partner_activation_reward, donation_reward, status, approved_by, approved_at, created_at, updated_at"
-    )
-    .eq("slug", slug)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (partnerResponse.data) {
-    return {
-      partner: partnerResponse.data as Partner,
-      referralCode: null,
-    };
-  }
-
-  return {
-    partner: null,
-    referralCode: null,
-  };
 }
 
 export default async function PublicPartnerReferralPage({

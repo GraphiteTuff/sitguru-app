@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
+  clearReferralSeal,
+  isReferralAcquisition,
+  readTrustedReferralCapture,
+  verifyReferralCapture,
+} from "@/lib/ambassador/referral-capture";
+import { shouldClearPendingReferral } from "@/lib/ambassador/creator-referral";
+import {
   enqueueProfileCompletionReminders,
   sendImmediateProfileCompletionNotice,
   type SupportedRole,
@@ -27,6 +34,8 @@ type ProvisionSignupBody = {
   ambassadorReferralCode?: string;
 
   source?: string;
+  referralCapturedAt?: string;
+  referralCaptureMac?: string;
   referralSource?: string;
   referralPlatform?: string;
   referralMedium?: string;
@@ -123,6 +132,8 @@ type ReferralCaptureResult = {
     | "not_found"
     | "conflict"
     | "self_referral"
+    | "existing_account"
+    | "already_locked"
     | "recording_warning";
   ownerType: ReferralOwnerType | null;
   source: string;
@@ -1149,6 +1160,14 @@ async function updateReferralMetadata({
       referral_attribution_updated_at: new Date().toISOString(),
     };
 
+    if (
+      capture.status === "existing_account" ||
+      capture.status === "already_locked" ||
+      capture.status === "self_referral"
+    ) {
+      return;
+    }
+
     const { error } =
       await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: metadata,
@@ -1564,13 +1583,10 @@ async function writeAmbassadorCompatibility({
 
   const existing = await safeExistingRow({
     table: "ambassador_referrals",
-    filters: [
-      ["ambassador_id", owner.ambassadorId],
-      ["referred_user_id", userId],
-    ],
+    filters: [["referred_user_id", userId]],
   });
 
-  if (existing) return true;
+  if (existing) return false;
 
   const result = await safeInsert({
     table: "ambassador_referrals",
@@ -1617,6 +1633,8 @@ async function recordReferralAttribution({
   referredEmail,
   referredName,
   intent,
+  accountCreatedAt,
+  referralCapturedAt,
 }: {
   resolution: ReferralResolution;
   body: ProvisionSignupBody;
@@ -1625,6 +1643,8 @@ async function recordReferralAttribution({
   referredEmail: string;
   referredName: string;
   intent: AccountIntent;
+  accountCreatedAt?: string | null;
+  referralCapturedAt?: string | null;
 }): Promise<ReferralCaptureResult> {
   const tracking = getTrackingValues(body, metadata);
   const emptyWrites = {
@@ -1680,6 +1700,50 @@ async function recordReferralAttribution({
       campaign: tracking.campaign,
       warning:
         "SitGuru does not allow self-referrals. The account was created without applying this referral code.",
+      writes: emptyWrites,
+    };
+  }
+
+  if (
+    !isReferralAcquisition({
+      accountCreatedAt,
+      referralCapturedAt,
+    })
+  ) {
+    return {
+      submittedCode: resolution.submittedCode,
+      applied: false,
+      status: "existing_account",
+      ownerType: owner.ownerType,
+      source: tracking.source,
+      platform: tracking.platform,
+      medium: tracking.medium,
+      campaign: tracking.campaign,
+      warning:
+        "This SitGuru account was created before the referral, so it is not a new acquisition.",
+      writes: emptyWrites,
+    };
+  }
+
+  const { loadLockedAmbassadorReferral } = await import(
+    "@/lib/ambassador/ledger"
+  );
+  const alreadyLocked = await loadLockedAmbassadorReferral(userId);
+  if (alreadyLocked) {
+    const sameCode =
+      alreadyLocked.code.toUpperCase() === owner.code.toUpperCase();
+    return {
+      submittedCode: resolution.submittedCode,
+      applied: sameCode,
+      status: sameCode ? "applied" : "already_locked",
+      ownerType: owner.ownerType,
+      source: tracking.source,
+      platform: tracking.platform,
+      medium: tracking.medium,
+      campaign: tracking.campaign,
+      warning: sameCode
+        ? ""
+        : "This account already has a locked Ambassador referral.",
       writes: emptyWrites,
     };
   }
@@ -1937,9 +2001,23 @@ export async function POST(request: NextRequest) {
       metadata.ambassador_code,
       metadata.referred_by_code,
     );
+    const trustedCapture = await readTrustedReferralCapture(
+      request.headers.get("cookie"),
+    );
+    const bodyCaptureTrusted = await verifyReferralCapture({
+      code: submittedReferralCode,
+      capturedAt: body.referralCapturedAt,
+      mac: body.referralCaptureMac,
+    });
+    const incomingReferralCode =
+      trustedCapture?.code || submittedReferralCode;
+    const referralCapturedAt =
+      trustedCapture?.capturedAt ||
+      (bodyCaptureTrusted ? cleanText(body.referralCapturedAt) : "") ||
+      new Date().toISOString();
 
     const referralResolution = await resolveReferralCode(
-      submittedReferralCode,
+      incomingReferralCode,
     );
 
     const resolvedAmbassadorReferralCode =
@@ -2004,27 +2082,27 @@ export async function POST(request: NextRequest) {
       referredEmail,
       referredName,
       intent: requestedIntent,
+      accountCreatedAt: authUser.created_at,
+      referralCapturedAt,
     });
 
-    // Brand Ambassador performance ledger (cookie or submitted code)
+    // One locked acquisition per user id. A newer cookie cannot add a second row.
     try {
       const { attributeSignupToAmbassador } = await import(
         "@/lib/ambassador/ledger"
       );
-      const cookieCode = cleanText(
-        request.cookies.get("sitguru_ambassador_code")?.value ||
-          request.cookies.get("sitguru_ambassador_ref")?.value ||
-          "",
-      );
-      const ledgerCode =
-        cookieCode ||
-        resolvedAmbassadorReferralCode ||
-        submittedReferralCode;
-      if (ledgerCode) {
+      if (
+        resolvedAmbassadorReferralCode &&
+        referral.status !== "existing_account" &&
+        referral.status !== "self_referral" &&
+        referral.status !== "already_locked"
+      ) {
         await attributeSignupToAmbassador({
           newUserId: userId,
-          referralSlug: ledgerCode,
+          referralSlug: resolvedAmbassadorReferralCode,
           referredRole: requestedIntent,
+          accountCreatedAt: authUser.created_at,
+          referralCapturedAt,
         });
       }
     } catch (ledgerError) {
@@ -2045,7 +2123,7 @@ export async function POST(request: NextRequest) {
       intent: requestedIntent,
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       userId,
       intent: result.intent || requestedIntent,
@@ -2077,6 +2155,12 @@ export async function POST(request: NextRequest) {
           ? "Your SitGuru Ambassador workspace is ready. Check your email for the next steps."
           : "Your SitGuru account and workspace are ready. Check your email for the next steps.",
     });
+
+    if (shouldClearPendingReferral(referral)) {
+      clearReferralSeal(response);
+    }
+
+    return response;
   } catch (error) {
     return jsonError(
       error instanceof Error
