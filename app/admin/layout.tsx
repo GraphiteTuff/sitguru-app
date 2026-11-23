@@ -30,7 +30,6 @@ import {
   PawPrint,
   Plus,
   Radio,
-  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -49,6 +48,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
+import AdminDeskSearch from "@/components/admin/AdminDeskSearch";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import DeskChatDock from "@/components/messaging/DeskChatDock";
@@ -344,25 +344,6 @@ function AdminLogo({ compact = false }: { compact?: boolean }) {
         }`}
       />
     </Link>
-  );
-}
-
-function SearchBar() {
-  return (
-    <label className="relative flex h-11 w-11 shrink-0 items-center justify-center text-slate-500 transition hover:text-[#2563EB] xl:w-[13.5rem] xl:justify-start 2xl:w-[15.5rem]">
-      <Search
-        size={16}
-        className="pointer-events-none absolute left-3.5 top-1/2 hidden -translate-y-1/2 text-slate-400 xl:block"
-        aria-hidden
-      />
-      <Search size={18} className="shrink-0 xl:hidden" aria-hidden />
-      <input
-        type="search"
-        placeholder="Search HQ…"
-        className={`hidden xl:block ${DESK_UI.search}`}
-        aria-label="Search admin"
-      />
-    </label>
   );
 }
 
@@ -840,6 +821,26 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       : item.href === "/" || isAdminPathAllowedForModules(item.href, modules),
   );
 
+  const headerSearchEntries = [
+    ...visibleHeaderLinks.map((item) => ({ label: item.label, href: item.href, section: "Quick links" })),
+    ...visibleNavSections.flatMap((section) =>
+      section.items.map((item) => ({
+        label: item.label,
+        href: item.href,
+        section: section.title,
+      })),
+    ),
+    ...(isGrowthChrome || (limitNav && !modules?.social_media)
+      ? []
+      : [{ label: "Social Media Manager", href: adminRoutes.growth, section: "Quick actions" }]),
+    ...(isGrowthChrome || (limitNav && !modules?.analytics_admin)
+      ? []
+      : [{ label: "Add Guru", href: "/admin/gurus/new", section: "Quick actions" }]),
+    ...(isGrowthChrome || (limitNav && !modules?.financials)
+      ? []
+      : [{ label: "Financial exports", href: adminRoutes.financialExports, section: "Quick actions" }]),
+  ];
+
   useEffect(() => {
     let cancelled = false;
 
@@ -1013,88 +1014,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className={`flex min-w-0 flex-col overflow-x-hidden ${isMessagesWorkspace ? "h-dvh min-h-0" : ""}`}>
           <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
-            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-2"}`}>
-              <div className="flex min-h-14 items-center gap-2 sm:min-h-[3.75rem] sm:gap-3 xl:gap-4">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="shrink-0 lg:hidden">
-                    <AdminLogo compact />
-                  </div>
+            {/* Mirror the Manager Portal chrome; Admin HQ retains its own
+                role switching, live notifications and permission-scoped routes. */}
+            <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
+              <Link href="/admin" className="min-w-0 flex-1 lg:hidden" aria-label="SitGuru Admin HQ home">
+                <p className="text-[10px] font-black uppercase leading-[1.15] tracking-[0.08em] text-[#2563EB]">
+                  SitGuru · Administration
+                </p>
+                <p className="truncate text-sm font-black leading-tight text-[#0F2744]">
+                  My Admin Portal
+                </p>
+              </Link>
 
-                  <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {visibleHeaderLinks.map((item) => {
-                      const active = isActivePath(pathname, item.href);
+              <AdminDeskSearch
+                entries={headerSearchEntries}
+                placeholder={isGrowthChrome
+                  ? "Search growth, content, team, reporting, and assignments..."
+                  : "Search people, bookings, messages, finance, and growth..."}
+              />
 
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition 2xl:px-3.5 ${
-                            active
-                              ? DESK_UI.sidebarActive
-                              : "text-slate-600 hover:bg-[#EEF2F6] hover:text-[#0F2744]"
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-                  {isGrowthChrome || isMessagesWorkspace || (limitNav && !modules?.social_media) ? null : (
-                    <Link
-                      href={adminRoutes.growth}
-                      className="hidden min-h-11 shrink-0 items-center gap-2 rounded-2xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
-                      style={{ background: DESK_UI.teal }}
-                    >
-                      <Sparkles size={16} />
-                      Social Media Manager
-                    </Link>
-                  )}
-                  <div className={`items-center gap-1 rounded-2xl border border-slate-200/80 bg-white p-0.5 shadow-sm sm:gap-2 sm:p-1 ${isMessagesWorkspace ? "hidden lg:flex" : "hidden sm:flex"}`}>
-                    <SearchBar />
-
-                    {isGrowthChrome || (limitNav && !modules?.financials) ? null : (
-                    <>
-                    <Link
-                      href="/admin/gurus/new"
-                      title="Add Guru"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6] sm:px-3"
-                    >
-                      <UserPlus size={16} className="shrink-0" />
-                      <span className="hidden 2xl:inline">Add Guru</span>
-                    </Link>
-
-                    <Link
-                      href={adminRoutes.financialExports}
-                      title="Export"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-bold text-[#0F2744] transition hover:bg-[#EEF2F6] sm:px-3"
-                    >
-                      <BarChart3 size={16} className="shrink-0" />
-                      <span className="hidden 2xl:inline">Export</span>
-                    </Link>
-                    </>
-                    )}
-                  </div>
-
-                  {/* Desk chat covers messaging on small screens — keep full Messages page on lg+. */}
-                  {isGrowthChrome ? null : (
-                  <Link
-                    href={adminRoutes.messages}
-                    className={`relative hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm transition hover:brightness-95 lg:flex ${DESK_UI.primary}`}
-                    aria-label="Admin messages"
-                    title="Messages"
-                  >
-                    <MessageCircle size={18} />
-                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white" />
-                  </Link>
-                  )}
-
-                  <NotificationBell />
-
-                  <AdminAccountMenu />
-                </div>
+              <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+                <NotificationBell />
+                <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+                <AdminAccountMenu />
               </div>
             </div>
           </header>
