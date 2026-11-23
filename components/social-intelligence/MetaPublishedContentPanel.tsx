@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, ExternalLink, MessageSquareText, Music2, RefreshCw, Video, Youtube } from "lucide-react";
+import { Camera, ExternalLink, MessageSquareText, Music2, RefreshCw, Video } from "lucide-react";
 import type { SocialConnectorStatus } from "@/lib/growth-center-v2/types";
 import type { MetaPublishedSync, SocialChannel, SocialPost } from "@/lib/social-intelligence/types";
 
@@ -9,7 +9,7 @@ const CHANNELS = [
   { id: "instagram", label: "Instagram", icon: Camera, tint: "border-[#F5D0FE] bg-[#FDF4FF]", iconTone: "bg-[#9333EA]", chip: "bg-[#9333EA]" },
   { id: "tiktok", label: "TikTok", icon: Music2, tint: "border-[#D7F5EE] bg-[#F0FDFA]", iconTone: "bg-[#102D38]", chip: "bg-[#102D38]" },
   { id: "x", label: "X", icon: null, tint: "border-slate-200 bg-[#F8FAFC]", iconTone: "bg-[#111827]", chip: "bg-[#111827]" },
-  { id: "youtube", label: "YouTube", icon: Youtube, tint: "border-[#FECACA] bg-[#FFF5F5]", iconTone: "bg-[#DC2626]", chip: "bg-[#DC2626]" },
+  { id: "youtube", label: "YouTube", icon: Video, tint: "border-[#FECACA] bg-[#FFF5F5]", iconTone: "bg-[#DC2626]", chip: "bg-[#DC2626]" },
 ] as const;
 
 function compact(value: number | null) {
