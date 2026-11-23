@@ -18,7 +18,7 @@ create table if not exists public.growth_social_publications (
 );
 -- Staging may not contain the internship tables. Keep the migration reusable
 -- and enforce a foreign key whenever Content Studio is installed.
-do $
+do $social$
 begin
   if to_regclass('public.internship_content') is not null then
     if not exists (
@@ -33,7 +33,7 @@ begin
     end if;
   end if;
 end
-$;
+$social$;
 create index if not exists growth_social_publications_pub_idx
   on public.growth_social_publications (published_at desc);
 create index if not exists growth_social_publications_campaign_idx
