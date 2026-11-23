@@ -92,6 +92,12 @@ function GrowthInsightsBody() {
         <Pressable accessibilityRole="button" onPress={() => router.push('/social-intelligence')} style={styles.socialButton}>
           <Text style={styles.socialButtonText}>Open Social Intelligence · Content rankings →</Text>
         </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/guru-match-share')} style={styles.socialButton}>
+          <Text style={styles.socialButtonText}>Guru Match &amp; Share · Tracked QR / Guru outreach →</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/content-studio')} style={styles.helpButton}>
+          <Text style={styles.helpButtonText}>Content Studio · Current review queue &amp; publications →</Text>
+        </Pressable>
         <Pressable accessibilityRole="button" onPress={() => router.push('/manager-help')} style={styles.helpButton}>
           <Text style={styles.helpButtonText}>Manager Help · How-tos, FAQs & troubleshooting →</Text>
         </Pressable>
