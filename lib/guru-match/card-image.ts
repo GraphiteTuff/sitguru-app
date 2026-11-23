@@ -2,6 +2,7 @@ import sharp from "sharp";
 
 export type GuruMatchCardAssets = {
   guruName: string;
+  promotionType?: "guru"|"community";
   city: string;
   state: string;
   serviceLabel: string;
@@ -24,6 +25,7 @@ function escapeSvgText(value: string, maxLength = 52): string {
  * All dynamic text is XML-escaped and all images are locally encoded PNGs.
  */
 export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
+  const community=input.promotionType==="community";
   const name = escapeSvgText(input.guruName, 35);
   const city = escapeSvgText(input.city, 42);
   const state = escapeSvgText(input.state, 3);
@@ -56,20 +58,20 @@ export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
     <g font-family="Arial,Helvetica,DejaVu Sans,sans-serif">
       <text x="253" y="69" font-size="23" font-weight="800" letter-spacing="2" fill="#BBF7D0">LOCAL PET CARE</text>
       <text x="54" y="149" font-size="50" font-weight="800" fill="#FFFFFF">Need pet care nearby?</text>
-      <text x="56" y="186" font-size="23" fill="#E5F7F0">Meet a local SitGuru Guru and explore their services.</text>
+      <text x="56" y="186" font-size="23" fill="#E5F7F0">${community?"Explore SitGuru pet care in your community.":"Meet a local SitGuru Guru and explore their services."}</text>
       <rect x="46" y="236" width="1108" height="323" rx="28" fill="#FFFFFF" stroke="#DCE8E5" stroke-width="2" />
       <circle cx="180" cy="396" r="81" fill="#DCFCE7" />
       ${photo}
       <text x="285" y="339" font-size="${nameFontSize}" font-weight="800" fill="#0F2744">${name}</text>
       <text x="286" y="388" font-size="25" fill="#475569">${city}, ${state}</text>
       <text x="285" y="438" font-size="30" font-weight="800" fill="#0D5C3A">${service}</text>
-      <text x="286" y="482" font-size="20" font-weight="600" fill="#1D4ED8">Explore services and availability on SitGuru</text>
+      <text x="286" y="482" font-size="20" font-weight="600" fill="#1D4ED8">${community?"Find local pet care options on SitGuru":"Explore services and availability on SitGuru"}</text>
       <rect x="869" y="263" width="245" height="272" rx="18" fill="#F8FAFC" stroke="#E2E8F0" />
       <rect x="888" y="283" width="208" height="208" rx="7" fill="#FFFFFF" />
       <image x="892" y="287" width="200" height="200" preserveAspectRatio="xMidYMid meet"
         href="data:image/png;base64,${qr}" />
-      <text x="992" y="518" text-anchor="middle" font-size="17" font-weight="800" fill="#0F2744">Scan to meet this Guru</text>
-      <text x="60" y="599" font-size="19" fill="#475569">sitguru.com &#8226; Verify availability and your pet's needs with the Guru</text>
+      <text x="992" y="518" text-anchor="middle" font-size="17" font-weight="800" fill="#0F2744">${community?"Scan to explore pet care":"Scan to meet this Guru"}</text>
+      <text x="60" y="599" font-size="19" fill="#475569">${community?"sitguru.com &#8226; Compare providers and confirm availability":"sitguru.com &#8226; Verify availability and your pet's needs with the Guru"}</text>
     </g>
   </svg>`;
 }
