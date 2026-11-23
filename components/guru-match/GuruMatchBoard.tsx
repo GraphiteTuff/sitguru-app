@@ -429,74 +429,65 @@ export default function GuruMatchBoard({role}:{role:Role}){
         </div>
       </div>
     </section>
-    <section aria-label="Saved outreach cards" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-black">Review, share and measure</h2>
-        <span className="text-xs font-semibold text-slate-500">Last 100 cards · activity in last 90 days</span>
-      </div>
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="space-y-3">
-          {!cards.length&&<div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            No Guru promotions yet. Search for a local Guru and generate the first tracked card.
-          </div>}
-          {cards.map(c=><article key={c.id} className={`min-w-0 rounded-2xl border bg-white p-4 shadow-sm ${active?.id===c.id?"border-[#2563EB]":"border-slate-200"}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-base font-black text-[#0F2744]">{c.guru.name} · {c.city}, {c.state}</p>
-                <p className="mt-1 text-xs font-semibold capitalize text-slate-500">{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.pet_type==="any"?"Pet type to confirm":c.pet_type}</p>
-              </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-black ${c.status==="approved"?"bg-[#DCFCE7] text-[#166534]":c.status==="pending_review"?"bg-[#FFF3CD] text-[#92400E]":"bg-[#E2E8F0] text-slate-700"}`}>{c.status.replaceAll("_"," ")}</span>
+    <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      aria-label="Previous Guru outreach and approval history">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-base font-black text-[#0F2744]">
+        <span>Past outreach &amp; approvals <span className="text-xs font-semibold text-slate-500">({cards.length} recent)</span></span>
+        <ChevronDown size={20} className="text-slate-500"/>
+      </summary>
+      <p className="mt-2 text-xs text-slate-500">Historical campaigns are kept for reporting, not displayed as full-size cards. Show at most {HISTORY_PAGE_SIZE} at once.</p>
+      <div className="mt-3 space-y-2">
+        {!cards.length&&<p className="p-3 text-sm text-slate-600">No previous promotions yet.</p>}
+        {shownHistory.map(c=><article key={c.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-[#0F2744]">{c.guru.name} · {c.city}, {c.state}</p>
+              <p className="text-xs text-slate-500">{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profiles · {c.metrics.sharesReported} reported shares</p>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-              {([["Opens",c.metrics.linkOpens+c.metrics.qrOpens],["Profiles",c.metrics.profileClicks],["Inquiries",c.metrics.inquiryClicks],["Shares",c.metrics.sharesReported]] as [string,number][]).map(([k,v])=>
-                <div key={k} className="min-w-0 rounded-lg bg-[#F8FAFC] p-2"><p className="text-lg font-black tabular-nums">{metric(v)}</p><p className="text-[11px] text-slate-600">{k}</p></div>)}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className={secondary} onClick={()=>setCurrentCode(c.code)}>View card</button>
-              {c.status==="pending_review"&&canApprove&&<>
-                <button type="button" disabled={busy} className={primary} onClick={()=>void act(c,"approve")}>Approve</button>
-                <button type="button" disabled={busy} className={secondary} onClick={()=>void act(c,"reject")}>Reject</button>
-              </>}
-              {c.status==="approved"&&<>
-                <button type="button" className={secondary} disabled={busy}
-                  onClick={()=>void act(c,"copy")}><ClipboardCopy size={14}/> Copy reply</button>
-                <button type="button" className={secondary} disabled={busy}
-                  onClick={()=>void act(c,"shared")}>Mark shared</button>
-              </>}
-            </div>
-          </article>)}
-        </div>
-        {active&&<aside className="min-w-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-[#0F2744] to-[#0D5C3A] p-5">
-            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest !text-emerald-100"><PawPrint size={15}/> Guru share card</p>
-            <h3 className="mt-1 text-xl font-black !text-white">{active.guru.name}</h3>
-            <p className="mt-2 text-sm font-semibold !text-emerald-50">{active.city}, {active.state} · {active.channel}</p>
+            <span className={c.status==="approved"?"rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800":"rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800"}>
+              {c.status.replaceAll("_"," ")}
+            </span>
+            {c.status==="pending_review"&&canApprove&&<>
+              <button type="button" disabled={busy} className={primary} onClick={()=>void act(c,"approve")}>Approve</button>
+              <button type="button" disabled={busy} className={secondary} onClick={()=>void act(c,"reject")}>Reject</button>
+            </>}
+            <button type="button" className={secondary}
+              onClick={()=>setCurrentCode(currentCode===c.code?"":c.code)}>
+              {active?.id===c.id?"Collapse":"Details"}
+            </button>
           </div>
-          <div className="space-y-4 p-4 sm:p-5">
+          {active?.id===c.id&&<div className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
             {currentStatus==="approved"?<>
-              <img src={active.cardUrl} alt={`SitGuru promotional card for ${active.guru.name}, including a scannable QR code`}
-                className="w-full rounded-xl border border-slate-200" loading="lazy"/>
+              <img src={c.cardUrl} alt={"Tracked Guru share card for "+c.guru.name}
+                className="block w-full max-w-[600px] rounded-xl border border-slate-200" loading="lazy"/>
               <div className="flex flex-wrap gap-2">
-                <a href={active.cardUrl} download="sitguru-guru-share.png" className={secondary}><Download size={15}/> Download PNG</a>
-                <a href={active.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Preview tracked link</a>
+                <a href={c.cardUrl} download="sitguru-guru-share.png" className={secondary}><Download size={15}/> Download PNG</a>
+                <a href={c.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Tracked link</a>
+                <button type="button" className={secondary} disabled={busy} onClick={()=>void act(c,"copy")}>
+                  <ClipboardCopy size={15}/> Copy reply
+                </button>
+                <button type="button" className={primary} disabled={busy} onClick={()=>void act(c,"shared")}>Mark shared</button>
               </div>
-              <div className="break-all rounded-xl bg-[#EFF6FF] p-3 text-xs font-semibold text-[#1D4ED8]">{active.shareUrl}</div>
-              <div className="rounded-xl border border-[#D1EADD] bg-[#F0FDF4] p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Suggested reply · approved</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#0F2744]">{active.reply_text}</p>
-                <button type="button" disabled={busy} className={primary+" mt-3"}
-                  onClick={()=>void act(active,"copy")}><ClipboardCopy size={15}/> Copy for a relevant social reply</button>
-              </div>
-            </>:<div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="flex items-center gap-2 text-sm font-black text-amber-900"><ShieldCheck size={18}/> Awaiting approval</p>
-              <p className="mt-2 text-xs text-amber-900">The QR image and public share link stay disabled until a Manager approves this card. Interns cannot self-approve.</p>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{active.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,"[tracking link available after approval]")}</p>
-            </div>}
-            <p className="text-xs leading-5 text-slate-500">Counts are recorded actions, not unique visitors. QR opens are recorded when the destination loads. Inquiries are clicks on a booking-intent link, not confirmed requests or paid bookings. Social posting is manual; SitGuru does not publish in groups without permission.</p>
-          </div>
-        </aside>}
+              <p className="break-all rounded-lg bg-[#EFF6FF] p-2 text-xs text-blue-700">{c.shareUrl}</p>
+            </>:<p className="text-sm text-amber-900">
+              {c.status==="pending_review"?"This custom outreach card requires Manager approval before sharing.":"This card is not currently approved for sharing."}
+            </p>}
+            <p className="whitespace-pre-wrap text-sm text-[#0F2744]">
+              {currentStatus==="approved"?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,"[tracking link available after approval]")}
+            </p>
+          </div>}
+        </article>)}
       </div>
-    </section>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Page {historyPage+1} of {historyCount}</span>
+        <div className="flex gap-2">
+          <button type="button" className={secondary} disabled={historyPage===0}
+            onClick={()=>{setHistoryPage(n=>Math.max(0,n-1));setCurrentCode("");}}>Previous</button>
+          <button type="button" className={secondary} disabled={historyPage+1>=historyCount}
+            onClick={()=>{setHistoryPage(n=>n+1);setCurrentCode("");}}>Next</button>
+        </div>
+      </div>
+    </details>
     <p className="pb-5 text-xs font-medium text-slate-500">SitGuru Community Studio · Manager and Admin analytics read the same live event records. Guru availability must be verified on the Guru profile.</p>
   </main>;
 }
