@@ -249,50 +249,8 @@ function Body(){
         {btn('Content Studio',()=>router.push('/content-studio'))}
         {btn('Social Intelligence',()=>router.push('/social-intelligence'))}
       </View>
-      <Text style={styles.heading}>90-day outreach activity</Text>
-      <View style={styles.metrics}>
-        {([
-          ['Link opens',metrics.linkOpens],['QR opens',metrics.qrOpens],
-          ['Profile clicks',metrics.profileClicks],['Inquiry clicks',metrics.inquiryClicks],
-          ['Share reports',metrics.sharesReported],['Reply copies',metrics.copyIntents],
-        ] as [string,number][]).map(([title,n],i)=><View key={title} style={[styles.metric,{width:width>630?'31%':'47%',backgroundColor:i%2===0?'#EFF6FF':'#F0FDF4'}]}>
-          <Text style={styles.metricLabel}>{title}</Text><Text style={styles.metricValue}>{n.toLocaleString('en-US')}</Text>
-        </View>)}
-      </View>
       {!!error&&<Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {!!notice&&<Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
-      <View style={styles.card}>
-        <Text style={styles.heading}>Match a Pet Parent request</Text>
-        <Text style={styles.label}>City</Text>
-        <TextInput value={form.city} onChangeText={v=>setField('city',v)}
-          accessibilityLabel="Pet Parent city" style={styles.input} autoCapitalize="words" maxLength={80}
-          placeholder="Enter city"/>
-        <Text style={styles.label}>State (two-letter code)</Text>
-        <TextInput value={form.state} onChangeText={v=>setField('state',v.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2))}
-          accessibilityLabel="Pet Parent state code" autoCapitalize="characters" autoCorrect={false}
-          style={styles.input} maxLength={2} placeholder="PA"/>
-        <View style={styles.chips}>{states.map(s=><View key={s}>{pill(s,s===form.state,()=>setField('state',s))}</View>)}</View>
-        <Text style={styles.label}>Required service</Text>
-        <View style={styles.chips}>{services.map(([id,title])=><View key={id}>{pill(title,id===form.service,()=>setField('service',id))}</View>)}</View>
-        <Text style={styles.label}>Pet type</Text>
-        <View style={styles.chips}>{(['any','dog','cat'] as Pet[]).map(p=><View key={p}>{pill(p==='any'?'Any / confirm':p==='dog'?'Dog':'Cat',p===form.pet,()=>setField('pet',p))}</View>)}</View>
-        <Text style={styles.label}>Maximum distance</Text>
-        <View style={styles.chips}>{[5,10,15,25,50].map(m=><View key={m}>{pill(m+' mi',m===form.radius,()=>setField('radius',m))}</View>)}</View>
-        <Text style={styles.label}>Sharing channel</Text>
-        <View style={styles.chips}>{channels.map(c=><View key={c}>{pill(c.toUpperCase(),c===form.channel,()=>setField('channel',c))}</View>)}</View>
-        {btn(loading?'Searching...':'Find eligible Gurus',()=>{void reload(true);},loading)}
-        {searched&&<Text style={styles.small}>{dashboard?.matches.length||0} qualified matches. These results must meet service, location and documented pet compatibility rules.</Text>}
-        {searched&&!dashboard?.matches.length&&<Text style={styles.notice}>No eligible matches. Do not promote an unrelated Guru; offer a general SitGuru search instead.</Text>}
-        {searched&&dashboard?.matches.map(g=><TouchTarget key={g.id} accessibilityRole="button" onPress={()=>setSelected(g.id)}
-          style={[styles.guru,selected===g.id&&styles.guruSelected]}>
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
-          <View style={{flex:1}}>
-            <Text style={styles.cardTitle}>{g.name} · {g.city}, {g.state}</Text>
-            <Text style={styles.small}>{g.serviceLabel} · {g.reason}</Text>
-          </View>
-        </TouchTarget>)}
-        {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
-      </View>
       <View style={styles.card}>
         <Text style={styles.heading}>Find & Share a Guru</Text>
         <Text style={styles.small}>{directory.length} listed · {readyToShare} ready. Search by city/state and tap Share next to any approved Guru.</Text>
@@ -422,6 +380,55 @@ function Body(){
         </View>
         <Text style={styles.small}>Page {directoryPage+1} of {listPageCount}</Text>
       </View>
+      <TouchTarget accessibilityRole="button" onPress={()=>setShowAdvanced(v=>!v)}
+        accessibilityState={{expanded:showAdvanced}} style={styles.historyToggle}>
+        <Text style={styles.heading}>Advanced matching & analytics</Text>
+        <Text style={styles.expandIcon}>{showAdvanced?'−':'+'}</Text>
+      </TouchTarget>
+      {showAdvanced&&<View style={{gap:12}}>
+      <Text style={styles.heading}>90-day outreach activity</Text>
+      <View style={styles.metrics}>
+        {([
+          ['Link opens',metrics.linkOpens],['QR opens',metrics.qrOpens],
+          ['Profile clicks',metrics.profileClicks],['Inquiry clicks',metrics.inquiryClicks],
+          ['Share reports',metrics.sharesReported],['Reply copies',metrics.copyIntents],
+        ] as [string,number][]).map(([title,n],i)=><View key={title} style={[styles.metric,{width:width>630?'31%':'47%',backgroundColor:i%2===0?'#EFF6FF':'#F0FDF4'}]}>
+          <Text style={styles.metricLabel}>{title}</Text><Text style={styles.metricValue}>{n.toLocaleString('en-US')}</Text>
+        </View>)}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.heading}>Match a Pet Parent request</Text>
+        <Text style={styles.label}>City</Text>
+        <TextInput value={form.city} onChangeText={v=>setField('city',v)}
+          accessibilityLabel="Pet Parent city" style={styles.input} autoCapitalize="words" maxLength={80}
+          placeholder="Enter city"/>
+        <Text style={styles.label}>State (two-letter code)</Text>
+        <TextInput value={form.state} onChangeText={v=>setField('state',v.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2))}
+          accessibilityLabel="Pet Parent state code" autoCapitalize="characters" autoCorrect={false}
+          style={styles.input} maxLength={2} placeholder="PA"/>
+        <View style={styles.chips}>{states.map(s=><View key={s}>{pill(s,s===form.state,()=>setField('state',s))}</View>)}</View>
+        <Text style={styles.label}>Required service</Text>
+        <View style={styles.chips}>{services.map(([id,title])=><View key={id}>{pill(title,id===form.service,()=>setField('service',id))}</View>)}</View>
+        <Text style={styles.label}>Pet type</Text>
+        <View style={styles.chips}>{(['any','dog','cat'] as Pet[]).map(p=><View key={p}>{pill(p==='any'?'Any / confirm':p==='dog'?'Dog':'Cat',p===form.pet,()=>setField('pet',p))}</View>)}</View>
+        <Text style={styles.label}>Maximum distance</Text>
+        <View style={styles.chips}>{[5,10,15,25,50].map(m=><View key={m}>{pill(m+' mi',m===form.radius,()=>setField('radius',m))}</View>)}</View>
+        <Text style={styles.label}>Sharing channel</Text>
+        <View style={styles.chips}>{channels.map(c=><View key={c}>{pill(c.toUpperCase(),c===form.channel,()=>setField('channel',c))}</View>)}</View>
+        {btn(loading?'Searching...':'Find eligible Gurus',()=>{void reload(true);},loading)}
+        {searched&&<Text style={styles.small}>{dashboard?.matches.length||0} qualified matches. These results must meet service, location and documented pet compatibility rules.</Text>}
+        {searched&&!dashboard?.matches.length&&<Text style={styles.notice}>No eligible matches. Do not promote an unrelated Guru; offer a general SitGuru search instead.</Text>}
+        {searched&&dashboard?.matches.map(g=><TouchTarget key={g.id} accessibilityRole="button" onPress={()=>setSelected(g.id)}
+          style={[styles.guru,selected===g.id&&styles.guruSelected]}>
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
+          <View style={{flex:1}}>
+            <Text style={styles.cardTitle}>{g.name} · {g.city}, {g.state}</Text>
+            <Text style={styles.small}>{g.serviceLabel} · {g.reason}</Text>
+          </View>
+        </TouchTarget>)}
+        {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
+      </View>
+      </View>}
       <TouchTarget accessibilityRole="button"
         onPress={()=>{setHistoryOpen(x=>!x);setActive('');}}
         style={styles.historyToggle}>
@@ -475,8 +482,8 @@ export default function GuruMatchShareScreen(){
 const styles=StyleSheet.create({
   root:{padding:12,gap:13,backgroundColor:'#F4F7FB',borderRadius:20,paddingBottom:40},
   back:{minHeight:44,justifyContent:'center'},backText:{color:'#2563EB',fontWeight:'800'},
-  hero:{padding:21,borderRadius:23,gap:8},kicker:{fontSize:11,color:'#D1FAE5',fontWeight:'900',letterSpacing:1},
-  heroTitle:{fontSize:28,color:'#FFFFFF',fontWeight:'900'},heroCopy:{color:'#E5F7F0',fontSize:14,fontWeight:'600',lineHeight:21},
+  hero:{padding:14,borderRadius:18,gap:4},kicker:{fontSize:11,color:'#D1FAE5',fontWeight:'900',letterSpacing:1},
+  heroTitle:{fontSize:24,color:'#FFFFFF',fontWeight:'900'},heroCopy:{color:'#E5F7F0',fontSize:14,fontWeight:'600',lineHeight:21},
   heading:{fontSize:19,color:'#0F2744',fontWeight:'900',marginTop:5},
   card:{borderWidth:1,borderColor:'#DFE7EE',backgroundColor:'#FFFFFF',borderRadius:21,padding:15,gap:11},
   label:{fontSize:12,fontWeight:'900',color:'#0F2744',marginTop:2},
