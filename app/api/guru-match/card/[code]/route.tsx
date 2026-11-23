@@ -5,6 +5,12 @@ import QRCode from "qrcode";
 import { findApprovedShare, guruMatchQrUrl } from "@/lib/guru-match/service";
 import { GURU_MATCH_SERVICES } from "@/lib/guru-match/matching";
 import { renderGuruMatchCardPng } from "@/lib/guru-match/card-image";
+import {
+  allowedGuruMatchPhotoBytes,
+  GURU_MATCH_PHOTO_TIMEOUT_MS,
+  MAX_GURU_MATCH_PHOTO_PIXELS,
+  trustedGuruMatchPhotoUrl,
+} from "@/lib/guru-match/photo-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,26 +44,38 @@ async function safeBrandLogo(): Promise<Buffer> {
 }
 
 async function safePhoto(raw: string | null): Promise<Buffer | null> {
-  if (!raw) return null;
+  const url = trustedGuruMatchPhotoUrl(raw);
+  if (!url) return null;
   try {
-    const url = new URL(raw);
-    const permitted = url.protocol === "https:" && (
-      (url.hostname === "mmtjhxnzuglbyumbsjhs.supabase.co" &&
-        (url.pathname.startsWith("/storage/v1/object/public/") ||
-         url.pathname.startsWith("/storage/v1/object/sign/"))) ||
-      url.hostname === "lh3.googleusercontent.com" ||
-      url.hostname === "auth.sitguru.com"
-    );
-    if (!permitted) return null;
-    const response = await fetch(url.toString(), { signal: AbortSignal.timeout(4500), cache: "no-store", redirect: "error" });
-    if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) return null;
-    if (Number(response.headers.get("content-length") || 0) > 2_000_000) return null;
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(GURU_MATCH_PHOTO_TIMEOUT_MS),
+      cache: "no-store",
+      redirect: "error",
+    });
+    if (!response.ok || !response.headers.get("content-type")?.toLowerCase().startsWith("image/")) return null;
+    const reportedSize = Number(response.headers.get("content-length") || 0);
+    if (reportedSize > 0 && !allowedGuruMatchPhotoBytes(reportedSize)) return null;
     const original = Buffer.from(await response.arrayBuffer());
-    if (original.byteLength > 2_000_000) return null;
-    return sharp(original, {limitInputPixels:10_000_000}).rotate().resize(304, 304, { fit: "cover" }).png().toBuffer();
+    if (!allowedGuruMatchPhotoBytes(original.byteLength)) return null;
+    // Keep the photo's natural aspect ratio and enough detail for the poster.
+    return sharp(original, { limitInputPixels: MAX_GURU_MATCH_PHOTO_PIXELS })
+      .rotate()
+      .resize(720, 850, { fit: "inside", withoutEnlargement: true })
+      .png()
+      .toBuffer();
   } catch {
     return null;
   }
+}
+
+/** Only use the actual Guru's verified profile photos, trying alternate uploads
+ * if a previously saved URL has expired or become inaccessible. */
+async function safeGuruPhoto(urls: string[]): Promise<Buffer | null> {
+  for (const url of urls) {
+    const image = await safePhoto(url);
+    if (image) return image;
+  }
+  return null;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ code: string }> }) {
@@ -67,7 +85,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
     if (!share) return new Response("Not found", { status: 404 });
     const [logoPng, photoPng, qrPng, dogPng, catPng] = await Promise.all([
       safeBrandLogo(),
-      safePhoto(share.guru.photoUrl),
+      share.promotionType === "guru" ? safeGuruPhoto(share.guru.photoUrls) : Promise.resolve(null),
       QRCode.toBuffer(guruMatchQrUrl(code), { type: "png", width: 620, margin: 4, errorCorrectionLevel: "H" }),
       readFile(path.join(process.cwd(), "public/images/hero/sitguru-dog-walking-hero.jpg")).catch(() => null),
       readFile(path.join(process.cwd(), "public/images/petperks/petperks-pet-parent-cat.jpg")).catch(() => null),
