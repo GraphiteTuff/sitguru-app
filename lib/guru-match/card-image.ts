@@ -70,8 +70,7 @@ export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">',
     '<title>SitGuru local pet care: ' + title + '</title>',
-    '<desc>' + place + '. Scan the actual SitGuru tracking QR code for ' +
-      (community ? 'local pet care options.' : 'this Guru profile.') + '</desc>',
+    '<desc>' + (community ? 'Explore SitGuru pet care in your community. Scan to explore pet care. ' : 'Scan to meet this Guru. ') + place + '.</desc>',
     '<defs>',
     '<linearGradient id="forest" x1="0" y1="0" x2="1" y2="1">',
     '<stop stop-color="#112C43"/><stop offset=".56" stop-color="#0D4E4A"/>',
