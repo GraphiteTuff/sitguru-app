@@ -58,10 +58,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
       safePhoto(share.guru.photoUrl),
       QRCode.toDataURL(guruMatchQrUrl(code), { width: 380, margin: 2, errorCorrectionLevel: "H" }),
     ]);
-    const name = cardText(share.guru.name, 34);
+    const community=share.promotionType==="community";
+    const name = community?"SitGuru Pet Care":cardText(share.guru.name,34);
     const city = cardText(share.city, 42);
     const state = cardText(share.state, 2);
-    const service = cardText(GURU_MATCH_SERVICES.find(s => s.key === share.service_key)?.label || "Pet care", 34);
+    const service = community?"Explore local pet care":cardText(GURU_MATCH_SERVICES.find(s => s.key === share.service_key)?.label || "Pet care", 34);
     const initials = name.split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase() || "SG";
     return new ImageResponse(
       <div style={{ display:"flex",flexDirection:"column",width:"100%",height:"100%",fontFamily:"GuruSans",
@@ -76,7 +77,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <span style={{fontSize:20,letterSpacing:3,color:"#BBF7D0"}}>LOCAL PET CARE</span>
             <span style={{fontSize:44,color:"white"}}>Need pet care nearby?</span>
-            <span style={{fontSize:22,color:"#D1FAE5"}}>Meet a SitGuru Guru in your community.</span>
+            <span style={{fontSize:22,color:"#D1FAE5"}}>{community?"Explore pet care in your community.":"Meet a SitGuru Guru in your community."}</span>
           </div>
         </div>
         <div style={{display:"flex",height:355,margin:"24px 30px 10px",padding:26,borderRadius:24,
@@ -92,17 +93,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
             <span style={{fontSize:name.length > 24 ? 31 : 39,lineHeight:1.15}}>{name}</span>
             <span style={{fontSize:25,color:"#475569"}}>{city}, {state}</span>
             <span style={{fontSize:30,color:"#0D5C3A"}}>{service}</span>
-            <span style={{fontSize:18,color:"#2563EB"}}>Explore services and availability on SitGuru</span>
+            <span style={{fontSize:18,color:"#2563EB"}}>{community?"Find local pet care options on SitGuru":"Explore services and availability on SitGuru"}</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
             padding:12,borderRadius:18,backgroundColor:"#F8FAFC",border:"1px solid #E2E8F0",
             width:222,gap:6,flexShrink:0}}>
             <img src={qr} width={188} height={188} alt="QR code" />
-            <span style={{fontSize:13}}>Scan to meet this Guru</span>
+            <span style={{fontSize:13}}>{community?"Scan to find pet care":"Scan to meet this Guru"}</span>
           </div>
         </div>
         <div style={{display:"flex",padding:"6px 44px",fontSize:18,color:"#475569"}}>
-          sitguru.com · Check availability and pet compatibility with the Guru
+          {community?"sitguru.com · Find providers and confirm services before booking":"sitguru.com · Check availability and pet compatibility with the Guru"}
         </div>
       </div>,
       {width:1200,height:630,fonts:[{name:"GuruSans",data:font,weight:700,style:"normal"}],
