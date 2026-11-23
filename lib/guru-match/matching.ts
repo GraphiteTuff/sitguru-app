@@ -107,6 +107,8 @@ export function matchGuruCandidates(
   const matches:GuruMatch[]=[];
   for(const guru of gurus){
     if(guru.is_active!==true || guru.is_public!==true || guru.is_bookable!==true ||
+      guru.is_public_visible===false || guru.is_accepting_bookings===false ||
+      guru.accepting_bookings===false ||
       guru.is_archived===true || guru.is_test_account===true || guru.is_demo===true ||
       guru.service_area_enabled!==true || clean(guru.status).toLowerCase()!=="active") continue;
     const state=clean(guru.service_state || guru.state).toUpperCase();
