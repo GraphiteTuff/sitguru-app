@@ -97,7 +97,8 @@ async function graphList(
     } catch {
       // Recover from unsupported optional fields without treating follower
       // permission alone as proof of access to published media.
-      const fallback = host === "graph.facebook.com" && path.endsWith("/posts")
+      const fallback = host === "graph.facebook.com" &&
+        (path.endsWith("/posts") || path.endsWith("/published_posts"))
         ? "id,message,permalink_url,created_time"
         : "id,permalink,media_type,timestamp";
       if (fields === fallback) throw new Error("Meta media listing is not authorized.");
@@ -115,6 +116,46 @@ async function graphList(
   }
   return result;
 }
+/**
+ * A system-user token can read the Page identity/follower count while Page
+ * publishing edges still require the Page access token and Page-specific
+ * permissions. Resolve only the official verified SitGuru Page; never log,
+ * return or persist the derived Page token.
+ *
+ * Meta officially supports GET /me/accounts with a system-user token to
+ * retrieve its assigned Page access tokens. Fallback to the Page's own
+ * access_token field where available.
+ */
+async function officialFacebookPageToken(systemToken: string, verifiedPageId: string): Promise<string | null> {
+  const url = new URL("https://graph.facebook.com/v27.0/me/accounts");
+  url.searchParams.set("fields", "id,name,access_token");
+  url.searchParams.set("limit", "100");
+  try {
+    const response = await graphGet(url, systemToken);
+    if (Array.isArray(response.data)) {
+      const official = (response.data as Row[]).find((page) =>
+        string(page.id) === verifiedPageId && string(page.name) === "SitGuru",
+      );
+      const pageToken = string(official?.access_token);
+      if (pageToken) return pageToken;
+    }
+  } catch {
+    // Page listing can be unavailable when pages_show_list has not been
+    // approved. We still verify the exact Page identity in the next call.
+  }
+  try {
+    const direct = new URL("https://graph.facebook.com/v27.0/" + verifiedPageId);
+    direct.searchParams.set("fields", "id,name,access_token");
+    const result = await graphGet(direct, systemToken);
+    if (string(result.id) === verifiedPageId && string(result.name) === "SitGuru") {
+      return string(result.access_token) || null;
+    }
+  } catch {
+    // Do not attempt to use an unverified Page or log token/error bodies.
+  }
+  return null;
+}
+
 async function getInstagramOwner() {
   const system = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
   const instagram = string(process.env.META_INSTAGRAM_ACCESS_TOKEN);
@@ -195,26 +236,59 @@ async function importInstagram(): Promise<ImportedPost[]> {
   return results;
 }
 async function importFacebook(): Promise<ImportedPost[]> {
-  const token = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
-  if (!token) throw new Error("Meta Facebook Page token is not configured.");
-  const identity = await fetchOfficialMetaSnapshot("facebook", { token, authMode: "facebook_login" });
-  const posts = await graphList("graph.facebook.com", identity.accountId + "/posts",
-    "id,message,permalink_url,created_time,shares,likes.summary(true),comments.summary(true)", token);
-  const results: ImportedPost[] = [];
+  const systemToken = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
+  if (!systemToken) throw new Error("Facebook system-user credential is not configured.");
+  // Refuse to import posts from a Page other than the pinned official SitGuru Page.
+  const identity = await fetchOfficialMetaSnapshot("facebook", {
+    token: systemToken, authMode: "facebook_login",
+  });
+  const pageId = identity.accountId;
+  const pageToken = await officialFacebookPageToken(systemToken, pageId);
+
+  const richFields =
+    "id,message,permalink_url,created_time,full_picture,shares,likes.summary(true),comments.summary(true)";
+  const credentials = pageToken && pageToken !== systemToken
+    ? [pageToken, systemToken] : [systemToken];
+  let posts: Row[] | null = null;
+
+  // Prefer the Page's published_posts edge over /posts: it excludes drafts
+  // and ads-only items. Fall back only to official Page posts; never use a
+  // person's timeline, unrelated assets or scraped/public content.
+  for (const token of credentials) {
+    for (const edge of ["published_posts", "posts"] as const) {
+      try {
+        posts = await graphList("graph.facebook.com", pageId + "/" + edge, richFields, token);
+        break;
+      } catch {
+        // Continue to another authorized Page reading strategy.
+      }
+    }
+    if (posts !== null) break;
+  }
+  if (posts === null) {
+    // Return an actionable, non-secret error to the Manager sync UI.
+    throw new Error(pageToken
+      ? "Facebook published-post access failed. Verify pages_read_engagement and pages_read_user_content for the SitGuru Page."
+      : "Facebook Page access token is unavailable. Assign SitGuru Page access to the Meta system user and approve pages_show_list, pages_read_engagement and pages_read_user_content.");
+  }
+  const result: ImportedPost[] = [];
   for (const row of posts) {
     const id = string(row.id);
     const publishedAt = validProviderDate(row.created_time);
     const publishedUrl = string(row.permalink_url);
     if (!id || !publishedAt || !permalinkKey(publishedUrl)) continue;
-    results.push({
+    result.push({
       id, platform: "facebook", publishedUrl,
       title: string(row.message).slice(0, 200) || "Facebook post",
-      publishedAt, thumbnail: null, views: null, reach: null,
-      likes: summaryCount(row.likes), comments: summaryCount(row.comments),
-      shares: number((row.shares as Row | null)?.count), saves: null, follows: null,
+      publishedAt,
+      thumbnail: string(row.full_picture) || null,
+      views: null, reach: null, likes: summaryCount(row.likes),
+      comments: summaryCount(row.comments),
+      shares: number((row.shares as Row | null)?.count),
+      saves: null, follows: null,
     });
   }
-  return results;
+  return result;
 }
 async function importTikTok(): Promise<{ videos: ImportedPost[]; reason: string | null }> {
   const result = await fetchAuthorizedTikTokVideoList();
