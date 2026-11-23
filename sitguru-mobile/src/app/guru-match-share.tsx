@@ -22,7 +22,8 @@ type Card={
   city:string;state:string;service_key:string;channel:Channel;
   reply_text:string;shareUrl:string;cardUrl:string;metrics:Metrics;
 };
-type Payload={ok:boolean;matches:Guru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
+type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
+type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
 const services:[Service,string][]=[
   ['dog_walking','Dog Walking'],['pet_sitting','Pet Sitting'],['drop_in_visits','Drop-In Visits'],
   ['house_sitting','House Sitting'],['doggy_day_care','Doggy Day Care'],['boarding','Boarding'],
@@ -39,6 +40,8 @@ function Body(){
   const [selected,setSelected]=useState('');
   const [active,setActive]=useState('');
   const [searched,setSearched]=useState(false);
+  const [directoryQuery,setDirectoryQuery]=useState('');
+  const [onlyBookable,setOnlyBookable]=useState(false);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -68,6 +71,9 @@ function Body(){
   })();},[]);
   const selectedGuru=dashboard?.matches.find(g=>g.id===selected);
   const card=dashboard?.campaigns.find(c=>c.code===active)||dashboard?.campaigns[0];
+  const directory=dashboard?.directory||[];
+  const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
+    (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
     setForm(old=>({...old,[field]:value}));setSelected('');setSearched(false);
   };
@@ -171,6 +177,26 @@ function Body(){
           </View>
         </TouchTarget>)}
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.heading}>All registered Gurus</Text>
+        <Text style={styles.small}>{directory.length} registered · {directory.filter(g=>g.canPromote).length} bookable. Only local service matches can be shared.</Text>
+        <TextInput value={directoryQuery} onChangeText={setDirectoryQuery} style={styles.input}
+          accessibilityLabel="Search all Guru accounts" placeholder="Search name, city, state or service" />
+        <View style={styles.chips}>
+          {pill('All registered',!onlyBookable,()=>setOnlyBookable(false))}
+          {pill('Bookable only',onlyBookable,()=>setOnlyBookable(true))}
+        </View>
+        <Text style={styles.small}>Showing {listed.length} accounts</Text>
+        {listed.map(g=><View key={g.id} style={styles.guru}>
+          {g.photoUrl?<Image source={{uri:g.photoUrl}} style={styles.avatar}/>:<View style={[styles.avatar,styles.avatarBlank]}><Text style={styles.paw}>SG</Text></View>}
+          <View style={{flex:1}}>
+            <Text style={styles.cardTitle}>{g.name} · {g.city||'Location missing'}, {g.state}</Text>
+            <Text style={styles.small}>{g.canPromote?'Bookable Guru':g.reason}</Text>
+            <Text style={styles.small}>{g.serviceKeys.length?g.serviceKeys.map(k=>k.replace(/_/g,' ')).join(' · '):'No selected services'}</Text>
+            {g.canPromote&&!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
+          </View>
+        </View>)}
       </View>
       <Text style={styles.heading}>Tracked promotions</Text>
       {!dashboard?.campaigns.length&&<View style={styles.card}><Text style={styles.small}>No promotions yet. Choose a matching Guru above.</Text></View>}
