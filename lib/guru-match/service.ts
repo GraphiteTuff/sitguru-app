@@ -197,13 +197,22 @@ export async function updateGuruShare(actor:CommunityActor,input:Record<string,u
 export async function findApprovedShare(code:string){
   if(!isCode(code))return null;
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns")
-    .select("id,code,guru_id,status,city,state,service_key,pet_type,channel").eq("code",code).eq("status","approved").maybeSingle();
+    .select("id,code,guru_id,status,city,state,radius_miles,service_key,pet_type,channel").eq("code",code).eq("status","approved").maybeSingle();
   if(error||!data)return null;
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
     .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,is_active,is_public,is_bookable,status")
     .eq("id",data.guru_id).maybeSingle();
   if(gError||!g||g.is_active!==true||g.is_public!==true||g.is_bookable!==true||g.status!=="active")return null;
   const slug=safeGuruSlug(g.slug);if(!slug)return null;
+  // An approved card must stop working if the Guru later disables a service
+  // or leaves the original service radius. Never silently promote stale coverage.
+  const filters=normalizeMatchFilters({
+    city:data.city,state:data.state,service:data.service_key,pet:data.pet_type,
+    radius:data.radius_miles,
+  });
+  if(!filters)return null;
+  const eligible=await findEligibleGuruMatches(filters);
+  if(!eligible.some(item=>item.id===data.guru_id))return null;
   return {...data,guru:{slug,name:initialsName(g.display_name||g.full_name||g.name),
     city:clean(g.city),state:clean(g.state),photoUrl:photoUrl(g.profile_photo_url||g.avatar_url)}};
 }
