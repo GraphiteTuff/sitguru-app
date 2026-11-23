@@ -2,11 +2,15 @@
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {ArrowUpRight,BarChart3,CheckCircle2,ClipboardCopy,Download,
-  HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw} from "lucide-react";
-import {GURU_MATCH_SERVICES,type GuruMatch,type MatchFilters} from "@/lib/guru-match/matching";
+  HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw,ChevronDown,ChevronUp,Share2} from "lucide-react";
+import {GURU_MATCH_SERVICES,type GuruMatch,type GuruDirectoryEntry,type MatchFilters} from "@/lib/guru-match/matching";
 import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel} from "@/lib/guru-match/service";
 
 type Role="manager"|"admin"|"intern";
+type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
+type PreparedMiniCard={guruId:string;service:string;channel:ShareChannel;share:PreparedShare};
+const MINI_PAGE_SIZE=12;
+const HISTORY_PAGE_SIZE=8;
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
 const SOURCES:[ShareChannel,string][]=[
   ["facebook","Facebook"],["instagram","Instagram"],["tiktok","TikTok"],
@@ -64,6 +68,12 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState("");
   const [directoryStatus,setDirectoryStatus]=useState<"all"|"ready"|"setup">("all");
+  const [directoryPage,setDirectoryPage]=useState(0);
+  const [historyPage,setHistoryPage]=useState(0);
+  const [expandedGuru,setExpandedGuru]=useState<string>("");
+  const [preparedMini,setPreparedMini]=useState<PreparedMiniCard|null>(null);
+  const [miniChannel,setMiniChannel]=useState<ShareChannel>("facebook");
+  const [miniService,setMiniService]=useState<string>("");
   const load=useCallback(async(search:boolean)=>{
     setLoading(true);setError("");
     try{
@@ -99,7 +109,11 @@ export default function GuruMatchBoard({role}:{role:Role}){
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
       (!q||`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(" ")}`.toLowerCase().includes(q));
   });
-  const active=cards.find(c=>c.code===currentCode)||cards[0];
+  const active=cards.find(c=>c.code===currentCode);
+  const pageCount=Math.max(1,Math.ceil(directoryItems.length/MINI_PAGE_SIZE));
+  const shownDirectory=directoryItems.slice(directoryPage*MINI_PAGE_SIZE,(directoryPage+1)*MINI_PAGE_SIZE);
+  const historyCount=Math.max(1,Math.ceil(cards.length/HISTORY_PAGE_SIZE));
+  const shownHistory=cards.slice(historyPage*HISTORY_PAGE_SIZE,(historyPage+1)*HISTORY_PAGE_SIZE);
   const postTotals=payload?.totals||blank;
   const canApprove=role!=="intern";
   const generate=async()=>{
@@ -135,6 +149,58 @@ export default function GuruMatchBoard({role}:{role:Role}){
     }catch(e){setError(e instanceof Error?e.message:"Could not complete this action.");}
     finally{setBusy(false);}
   };
+  // Card templates become available from approved Guru records without manual creation.
+  // Materialize a tracked campaign only when staff opens a card, and reuse it thereafter.
+  const prepareMini=async(g:GuruDirectoryEntry,nextChannel:ShareChannel,nextService:string)=>{
+    if(!g.canPromote || !nextService)return;
+    setBusy(true);setError("");setPreparedMini(null);
+    try{
+      const result=await api<{share:PreparedShare}>("POST","/api/guru-match",{
+        action:"prepare",guruId:g.id,channel:nextChannel,service:nextService,
+      });
+      if(result.share.status!=="approved")throw new Error("This Guru card is awaiting approval.");
+      setPreparedMini({guruId:g.id,service:nextService,channel:nextChannel,share:result.share});
+    }catch(e){setError(e instanceof Error?e.message:"Unable to prepare the Guru card.");}
+    finally{setBusy(false);}
+  };
+  const toggleGuru=(g:GuruDirectoryEntry)=>{
+    if(expandedGuru===g.id){setExpandedGuru("");setPreparedMini(null);return;}
+    setExpandedGuru(g.id);setMiniChannel("facebook");
+    const service=g.serviceKeys[0]||"";
+    setMiniService(service);setPreparedMini(null);
+    if(g.canPromote && service)void prepareMini(g,"facebook",service);
+  };
+  const copyMini=async()=>{
+    if(!preparedMini)return;
+    try{
+      await navigator.clipboard.writeText(preparedMini.share.replyText);
+      await api("POST","/api/guru-match",{action:"copy",id:preparedMini.share.id});
+      setNotice("Tracked reply copied. Publish only where relevant social replies are allowed.");
+    }catch(e){setError(e instanceof Error?e.message:"Could not copy share reply.");}
+  };
+  const markMiniShared=async()=>{
+    if(!preparedMini)return;
+    try{
+      await api("POST","/api/guru-match",{action:"shared",id:preparedMini.share.id});
+      setNotice("Manual social share recorded for this Guru and channel.");
+      await load(searched);
+    }catch(e){setError(e instanceof Error?e.message:"Unable to log the share.");}
+  };
+  const nativeMiniShare=async()=>{
+    if(!preparedMini)return;
+    const share=preparedMini.share;
+    try{
+      if(navigator.share)await navigator.share({title:"Meet a SitGuru Guru",text:share.replyText,url:share.shareUrl});
+      else await copyMini();
+    }catch{/* Sharing can be canceled by staff. */}
+  };
+  const changeMiniChannel=(g:GuruDirectoryEntry,nextChannel:ShareChannel)=>{
+    setMiniChannel(nextChannel);void prepareMini(g,nextChannel,miniService);
+  };
+  const changeMiniService=(g:GuruDirectoryEntry,nextService:string)=>{
+    setMiniService(nextService);void prepareMini(g,miniChannel,nextService);
+  };
+
   const currentStatus=active?.status;
   return <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 px-3 py-5 text-[#0F2744] sm:px-5 lg:px-7">
     <header className="on-dark-surface overflow-hidden rounded-[1.6rem] p-5 shadow-[0_12px_30px_rgba(15,39,68,.14)] sm:p-7"
