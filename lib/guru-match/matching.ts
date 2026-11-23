@@ -10,6 +10,7 @@ export const GURU_MATCH_SERVICES = [
   { key: "pet_taxi", label: "Pet Taxi" },
   { key: "medication_help", label: "Medication Help" },
   { key: "training_support", label: "Training Support" },
+  { key: "custom_care", label: "Custom Care" },
 ] as const;
 export type ServiceKey = typeof GURU_MATCH_SERVICES[number]["key"];
 export type PetType = "any" | "dog" | "cat";
@@ -23,6 +24,11 @@ export type GuruMatch = {
 };
 export type GuruCandidate = Record<string, unknown> & { id: string };
 export type ServiceRow = { guru_id: string; service_key: string; is_enabled: boolean };
+export type GuruDirectoryEntry = {
+  id: string; name: string; slug: string; city: string; state: string;
+  photoUrl: string | null; serviceKeys: ServiceKey[]; serviceRadiusMiles: number;
+  canPromote: boolean; reason: string;
+};
 
 export const KNOWN_CITY_COORDINATES: Record<string, [number, number]> = {
   "quakertown:PA": [40.4418, -75.3416],
@@ -69,26 +75,56 @@ export function normalizeMatchFilters(query: Record<string, unknown>): MatchFilt
     !Number.isInteger(radius) || radius < 1 || radius > 50) return null;
   return {city,state,service,pet:pet as PetType,radius};
 }
-function serviceKeys(g: GuruCandidate, rows: ServiceRow[]) {
+/** Current service-rate selections take precedence over legacy profile labels. */
+export function serviceKeys(g: GuruCandidate, rows: ServiceRow[]) {
+  const configured = new Map<string, boolean>();
+  for (const row of rows) if (row.guru_id === g.id)
+    configured.set(row.service_key.toLowerCase(), row.is_enabled === true);
   const set = new Set<string>();
-  for(const row of rows) if(row.guru_id === g.id && row.is_enabled) set.add(row.service_key.toLowerCase());
-  const labels = Array.isArray(g.services) ? g.services : [];
-  for (const label of labels) {
+  for (const [key, enabled] of configured) if (enabled && isServiceKey(key)) set.add(key);
+  for (const label of Array.isArray(g.services) ? g.services : []) {
     if (typeof label !== "string") continue;
-    const value = label.toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/_+$/,"");
-    if (value === "cat_care") set.add("cat_care");
-    if (value === "dog_walking") set.add("dog_walking");
-    if (value === "doggy_day_care") set.add("doggy_day_care");
-    if (value === "pet_sitting") set.add("pet_sitting");
-    if (value === "drop_in_visits") set.add("drop_in_visits");
-    if (value === "house_sitting") set.add("house_sitting");
-    if (value === "boarding") set.add("boarding");
-    if (value === "pet_taxi") set.add("pet_taxi");
-    if (value === "medication_help") set.add("medication_help");
-    if (value === "training_support") set.add("training_support");
+    const key = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/_+$/, "");
+    if (isServiceKey(key) && !configured.has(key)) set.add(key);
   }
   return set;
 }
+function guruNotReady(guru:GuruCandidate) {
+  if (guru.is_archived === true || guru.is_test_account === true || guru.is_demo === true)
+    return "Excluded account";
+  if (guru.is_active !== true || clean(guru.status).toLowerCase() !== "active")
+    return "Awaiting active approval";
+  if (guru.is_public !== true || guru.is_public_visible === false)
+    return "Profile not public";
+  if (guru.is_bookable !== true || guru.is_accepting_bookings === false ||
+      guru.accepting_bookings === false) return "Not accepting bookings";
+  if (guru.service_area_enabled !== true) return "Service area not enabled";
+  if (!/^[a-z0-9][a-z0-9-]{0,120}$/i.test(clean(guru.slug))) return "Profile link missing";
+  if (!clean(guru.service_state || guru.state) || !clean(guru.service_city || guru.city))
+    return "Service location missing";
+  if ((num(guru.service_radius_miles) ?? 0) <= 0) return "Service radius missing";
+  return "";
+}
+export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[]):GuruDirectoryEntry[] {
+  return gurus.map(guru=>{
+    const keys=serviceKeys(guru,services);
+    const notReady=guruNotReady(guru);
+    const names=clean(guru.display_name || guru.full_name || guru.name).split(/\s+/).filter(Boolean);
+    const name=names.length>1?`${names[0]} ${names[names.length-1][0]}.`:names[0]||"SitGuru Guru";
+    const photo=clean(guru.profile_photo_url || guru.avatar_url || guru.photo_url || guru.image_url);
+    const serviceOptions=GURU_MATCH_SERVICES.map(s=>s.key).filter(k=>keys.has(k));
+    return {
+      id:guru.id,name,slug:clean(guru.slug),
+      city:clean(guru.service_city || guru.city),state:clean(guru.service_state || guru.state).toUpperCase(),
+      photoUrl:photo.startsWith("https://")?photo:null,
+      serviceKeys:serviceOptions,
+      serviceRadiusMiles:num(guru.service_radius_miles)??0,
+      canPromote:!notReady && serviceOptions.length>0,
+      reason:notReady || (serviceOptions.length===0?"Service selection needed":"Ready for local matching"),
+    };
+  }).sort((a,b)=>Number(b.canPromote)-Number(a.canPromote)||a.name.localeCompare(b.name));
+}
+
 /**
  * Generic sitting services do NOT prove dog/cat compatibility. Require an
  * explicit dog-walking/daycare or cat-care service elsewhere on the Guru profile.
@@ -101,16 +137,21 @@ function petCompatible(keys:Set<string>, pet:PetType){
 export function matchGuruCandidates(
   filters:MatchFilters, gurus:GuruCandidate[], services:ServiceRow[],
 ): GuruMatch[] {
-  const center = KNOWN_CITY_COORDINATES[`${filters.city.toLowerCase()}:${filters.state}`]
+  const knownCenter = KNOWN_CITY_COORDINATES[`${filters.city.toLowerCase()}:${filters.state}`]
     || KNOWN_CITY_COORDINATES[`${filters.city}:${filters.state}`];
+  // A matching Guru's recorded service coordinates can anchor an otherwise unknown city.
+  // We never invent coordinates for a city with no locally registered service record.
+  const localAnchor = gurus.find(g=>
+    same(g.service_city || g.city,filters.city) &&
+    clean(g.service_state || g.state).toUpperCase()===filters.state &&
+    num(g.service_latitude)!=null && num(g.service_longitude)!=null &&
+    Math.abs(num(g.service_latitude)!)<=90 && Math.abs(num(g.service_longitude)!)<=180);
+  const center: [number,number] | undefined = knownCenter ||
+    (localAnchor?[num(localAnchor.service_latitude)!,num(localAnchor.service_longitude)!]:undefined);
   const serviceLabel=GURU_MATCH_SERVICES.find(s=>s.key===filters.service)?.label || filters.service;
   const matches:GuruMatch[]=[];
   for(const guru of gurus){
-    if(guru.is_active!==true || guru.is_public!==true || guru.is_bookable!==true ||
-      guru.is_public_visible===false || guru.is_accepting_bookings===false ||
-      guru.accepting_bookings===false ||
-      guru.is_archived===true || guru.is_test_account===true || guru.is_demo===true ||
-      guru.service_area_enabled!==true || clean(guru.status).toLowerCase()!=="active") continue;
+    if (guruNotReady(guru)) continue;
     const state=clean(guru.service_state || guru.state).toUpperCase();
     if(state!==filters.state) continue;
     const city=clean(guru.service_city || guru.city);
@@ -143,5 +184,5 @@ export function matchGuruCandidates(
       reason:distance!=null?`Within ${radius} mi Guru service area`:`Serves ${filters.city}, ${filters.state}`,
     });
   }
-  return matches.sort((a,b)=>(a.distanceMiles??999)-(b.distanceMiles??999)).slice(0,35);
+  return matches.sort((a,b)=>(a.distanceMiles??999)-(b.distanceMiles??999));
 }
