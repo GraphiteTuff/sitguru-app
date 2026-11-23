@@ -318,28 +318,115 @@ export default function GuruMatchBoard({role}:{role:Role}){
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input aria-label="Search listed Gurus" placeholder="Search Guru, city, state or service"
-          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/>
+          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>{setDirectoryQuery(e.target.value);setDirectoryPage(0);}}/>
         <select aria-label="Filter Guru directory status" className={control+" sm:max-w-60"} value={directoryStatus}
-          onChange={e=>setDirectoryStatus(e.target.value as "all"|"ready"|"setup")}>
+          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"ready"|"setup");setDirectoryPage(0);}}>
           <option value="all">All listed Gurus</option>
           <option value="ready">Ready to promote</option>
           <option value="setup">Not currently promotable</option>
         </select>
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
-      <div className="mt-3 grid max-h-[560px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
-        {directoryItems.map(g=><article key={g.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 p-3">
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-black text-[#0F2744]">{g.name}</p>
-            <p className="text-xs text-slate-600">{g.city||"Location missing"}{g.state?", "+g.state:""}</p>
-            <p className={`mt-1 text-xs font-bold ${g.canPromote?"text-emerald-700":"text-amber-700"}`}>
-              {g.canPromote?"Ready for local matching":g.reason}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(s=>s.key===k)?.label||k).join(" · "):"No selected services"}</p>
-            {g.slug&&g.canPromote&&<a href={`/guru/${g.slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-bold text-blue-700 underline">View public profile</a>}
-          </div>
-        </article>)}
+      <div className="mt-3 space-y-2" data-mini-guru-card-library>
+        {shownDirectory.map(g=>{
+          const expanded=expandedGuru===g.id;
+          const ready=preparedMini?.guruId===g.id && preparedMini?.service===miniService &&
+            preparedMini?.channel===miniChannel ? preparedMini.share : null;
+          return <article key={g.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <button type="button" aria-expanded={expanded} aria-controls={"guru-card-"+g.id}
+              onClick={()=>toggleGuru(g)}
+              className="flex min-h-20 w-full min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-[#F8FAFC] sm:px-4">
+              <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-black text-[#0F2744]">{g.name}</span>
+                <span className="block truncate text-xs font-semibold text-slate-500">
+                  {g.city||"Location missing"}{g.state?", "+g.state:""} · {g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(v=>v.key===k)?.label||k).slice(0,3).join(" · "):"Services not configured"}
+                </span>
+                <span className={g.canPromote?"mt-1 block text-xs font-bold text-emerald-700":"mt-1 block text-xs font-bold text-amber-700"}>
+                  {g.canPromote?"Approved Guru · Card ready":g.reason}
+                </span>
+              </span>
+              <span className="shrink-0 rounded-lg bg-[#EFF6FF] p-2 text-blue-700" aria-hidden>
+                {expanded?<ChevronUp size={19}/>:<ChevronDown size={19}/>}
+              </span>
+            </button>
+            {expanded&&<div id={"guru-card-"+g.id} className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
+              {g.canPromote && g.serviceKeys.length>0 ? <>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Guru service
+                    <select className={control+" mt-1"} value={miniService}
+                      onChange={e=>changeMiniService(g,e.target.value)}>
+                      {g.serviceKeys.map(key=><option key={key} value={key}>{GURU_MATCH_SERVICES.find(v=>v.key===key)?.label||key}</option>)}
+                    </select>
+                  </label>
+                  <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Social channel
+                    <select className={control+" mt-1"} value={miniChannel}
+                      onChange={e=>changeMiniChannel(g,e.target.value as ShareChannel)}>
+                      {SOURCES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
+                {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
+                    <img src={ready.cardUrl} alt={"Branded SitGuru card for "+g.name+" with profile details and QR code"}
+                      className="block w-full max-w-[560px] rounded-xl border border-slate-200" loading="lazy"/>
+                    <div className="flex flex-wrap gap-2">
+                      <a className={secondary} href={ready.cardUrl} download={"sitguru-"+g.slug+"-card.png"}>
+                        <Download size={16}/> Download image
+                      </a>
+                      <a className={secondary} href={ready.shareUrl} target="_blank" rel="noopener noreferrer">
+                        <ArrowUpRight size={16}/> Test tracked link
+                      </a>
+                    </div>
+                  </div>
+                  <div className="min-w-0 space-y-3">
+                    <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved Guru card</p>
+                    <div className="flex flex-wrap gap-2">
+                      <a className={secondary}
+                        href={"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(ready.shareUrl)}
+                        target="_blank" rel="noopener noreferrer">Facebook</a>
+                      <a className={secondary}
+                        href={"https://twitter.com/intent/tweet?text="+encodeURIComponent(ready.replyText)}
+                        target="_blank" rel="noopener noreferrer">X</a>
+                      <button type="button" className={secondary} onClick={()=>void nativeMiniShare()}><Share2 size={16}/> Share</button>
+                      <button type="button" className={secondary} onClick={()=>void copyMini()}><ClipboardCopy size={16}/> Copy reply</button>
+                    </div>
+                    <p className="text-xs leading-5 text-slate-500">
+                      For Instagram and TikTok, download the PNG and use their native posting tools.
+                      Copy the tracked link into the caption or permitted reply. Posting is not automatic.
+                    </p>
+                    <div className="break-all rounded-lg bg-[#EFF6FF] p-3 text-xs font-semibold text-[#1D4ED8]">{ready.shareUrl}</div>
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-[#0F2744]">
+                      {ready.replyText}
+                    </div>
+                    <button type="button" className={primary} onClick={()=>void markMiniShared()} disabled={busy}>
+                      Mark social post as shared
+                    </button>
+                  </div>
+                </div>}
+                {!ready&&!busy&&<p className="text-xs text-slate-600">
+                  The approved Guru card becomes available automatically when opened. Use Refresh if it does not load.
+                  <button type="button" className="ml-2 font-black text-blue-700 underline"
+                    onClick={()=>void prepareMini(g,miniChannel,miniService)}>Retry</button>
+                </p>}
+              </> : <p className="text-sm font-semibold text-amber-800">
+                {g.canPromote?"This Guru must enable a service before a card can be shared.":g.reason}
+              </p>}
+              {!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
+                className="inline-flex text-xs font-black text-blue-700 underline">View Guru profile</Link>}
+            </div>}
+          </article>;
+        })}
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+        <span>Page {Math.min(directoryPage+1,pageCount)} of {pageCount} · {directoryItems.length} profiles</span>
+        <div className="flex gap-2">
+          <button type="button" className={secondary} disabled={directoryPage===0}
+            onClick={()=>{setDirectoryPage(n=>Math.max(0,n-1));setExpandedGuru("");}}>Previous</button>
+          <button type="button" className={secondary} disabled={directoryPage+1>=pageCount}
+            onClick={()=>{setDirectoryPage(n=>n+1);setExpandedGuru("");}}>Next</button>
+        </div>
       </div>
     </section>
     <section aria-label="Saved outreach cards" className="space-y-3">
