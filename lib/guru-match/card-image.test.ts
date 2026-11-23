@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
 import QRCode from "qrcode";
-import { guruMatchCardSvg, renderGuruMatchCardPng } from "./card-image";
+import { SHARE_QR_SIZE, guruMatchCardSvg, renderGuruMatchCardPng } from "./card-image";
 
 test("Guru share image renders a 1080x1350 portrait downloadable PNG with a QR code", async () => {
   const logo = await sharp({ create: { width: 120, height: 50, channels: 4, background: "#FFFFFF" } }).png().toBuffer();
@@ -19,6 +19,8 @@ test("Guru share image renders a 1080x1350 portrait downloadable PNG with a QR c
   assert.equal(meta.format, "png");
   assert.equal(meta.width, 1080);
   assert.equal(meta.height, 1350);
+  assert.ok(SHARE_QR_SIZE >= 300, "QR should remain readable on a phone-sized social graphic");
+  assert.match(guruMatchCardSvg(input), /rect x="690" y="932" width="351" height="337"/);
   assert.ok(image.byteLength > 10000);
   assert.match(guruMatchCardSvg(input), /Scan to meet this Guru/);
   assert.doesNotMatch(guruMatchCardSvg(input), /<text\b/); // All visible text uses bundled font, not missing SVG fonts.

@@ -5,6 +5,8 @@ import path from "node:path";
 
 export const SHARE_POSTER_WIDTH = 1080;
 export const SHARE_POSTER_HEIGHT = 1350;
+/** Large enough to remain readable in the exported social-poster PNG. */
+export const SHARE_QR_SIZE = 306;
 
 export type GuruMatchCardAssets = {
   guruName: string;
@@ -57,36 +59,49 @@ function cardFont(): Promise<string> {
   return loadedFont;
 }
 
-/** Background shapes only; actual words are rendered independently with the
- * bundled font, so no deployed system font can turn their letters into boxes. */
+/** Portrait adaptation of the approved SitGuru local-Guru promotional mockup.
+ * Images and QR are composited after the SVG base. Do not use SVG <text>:
+ * production serverless images must render using our explicitly bundled font. */
 export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
   const community = input.promotionType === "community";
-  const subject = escapeMarkup(input.guruName, 42);
-  const city = escapeMarkup(input.city, 50);
-  const state = escapeMarkup(input.state, 3);
-  const service = escapeMarkup(input.serviceLabel, 50);
-  const label = community ? "Scan to explore pet care" : "Scan to meet this Guru";
+  const title = escapeMarkup(input.guruName, 45);
+  const place = escapeMarkup(input.city, 45) + ", " + escapeMarkup(input.state, 2);
+  const service = escapeMarkup(input.serviceLabel, 55);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">',
-    '<title>' + subject + '</title>',
-    '<desc>' + (community ? "Explore SitGuru pet care in your community. " : "") + city + ', ' + state + ' - ' + service + '. ' + label + '.</desc>',
+    '<title>SitGuru local pet care: ' + title + '</title>',
+    '<desc>' + (community ? 'Explore SitGuru pet care in your community. Scan to explore pet care. ' : 'Scan to meet this Guru. ') + place + '. ' + service + '.</desc>',
     '<defs>',
-    '<linearGradient id="navy" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#102B43"/><stop offset="1" stop-color="#076346"/></linearGradient>',
-    '<linearGradient id="photoBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#CAEDDB"/><stop offset="1" stop-color="#72BCA7"/></linearGradient>',
+    '<linearGradient id="forest" x1="0" y1="0" x2="1" y2="1">',
+    '<stop stop-color="#112C43"/><stop offset=".56" stop-color="#0D4E4A"/>',
+    '<stop offset="1" stop-color="#00613C"/></linearGradient>',
+    '<linearGradient id="lime" x1="0" y1="0" x2="1" y2="1">',
+    '<stop stop-color="#EFFDC8"/><stop offset="1" stop-color="#D1F29C"/></linearGradient>',
     '</defs>',
-    '<rect width="1080" height="1350" fill="#F6F9FA"/>',
-    '<rect width="1080" height="343" fill="url(#navy)"/>',
-    '<circle cx="1022" cy="82" r="235" fill="#51B79D" opacity=".12"/>',
-    '<circle cx="970" cy="270" r="170" fill="#7CD9B5" opacity=".10"/>',
-    '<rect x="65" y="45" width="258" height="93" rx="23" fill="#FFFFFF"/>',
-    '<rect x="66" y="354" width="948" height="258" rx="28" fill="#C9D8DA" opacity=".35"/>',
-    '<rect x="62" y="348" width="948" height="258" rx="28" fill="#FFFFFF" stroke="#D9E6E7" stroke-width="2"/>',
-    '<circle cx="190" cy="478" r="100" fill="#DEF6E9"/>',
-    '<rect x="63" y="651" width="954" height="440" rx="30" fill="url(#photoBg)"/>',
-    '<rect x="62" y="1111" width="956" height="211" rx="27" fill="#EAF7EE" stroke="#CFE7D8" stroke-width="2"/>',
-    '<rect x="781" y="1121" width="212" height="191" rx="22" fill="#FFFFFF"/>',
-    '<rect x="58" y="1338" width="964" height="3" rx="1.5" fill="#0B6546" opacity=".25"/>',
+    '<rect width="1080" height="1350" fill="#F9FBF8"/>',
+    '<rect width="1080" height="940" fill="url(#forest)"/>',
+    '<circle cx="1025" cy="95" r="230" fill="#53BD98" opacity=".11"/>',
+    '<circle cx="944" cy="334" r="175" fill="#70CB9C" opacity=".08"/>',
+    '<path d="M0 0 H679 C664 105 599 200 469 239 H0 Z" fill="#FFFFFF"/>',
+    '<path d="M461 243 C580 205 655 110 687 0" fill="none" stroke="#80CE22" stroke-width="20"/>',
+    '<rect x="54" y="259" width="574" height="648" rx="34" fill="#D4ECDF"/>',
+    '<rect x="661" y="510" width="365" height="88" rx="36" fill="url(#lime)"/>',
+    '<circle cx="681" cy="652" r="16" fill="#75D72C"/>',
+    '<path d="M673 652 l6 6 11 -14" stroke="#0C5939" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<circle cx="681" cy="724" r="16" fill="#75D72C"/>',
+    '<path d="M673 724 l6 6 11 -14" stroke="#0C5939" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<circle cx="681" cy="796" r="16" fill="#75D72C"/>',
+    '<path d="M673 796 l6 6 11 -14" stroke="#0C5939" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M0 922 C205 879 450 918 631 931 C785 946 934 900 1080 893 L1080 1278 L0 1278 Z" fill="#FFFFFF"/>',
+    '<path d="M0 922 C205 879 450 918 631 931" fill="none" stroke="#7AD528" stroke-width="12"/>',
+    '<path d="M162 1144 Q318 1107 558 1126" stroke="#7BD123" stroke-width="8" fill="none" stroke-linecap="round"/>',
+    '<rect x="690" y="932" width="351" height="337" rx="31" fill="#79C914"/>',
+    '<rect x="698" y="940" width="335" height="321" rx="25" fill="#FFFFFF"/>',
+    '<rect x="0" y="1278" width="1080" height="72" fill="url(#forest)"/>',
+    '<circle cx="74" cy="1316" r="12" fill="#84D828"/>',
+    '<circle cx="104" cy="1316" r="12" fill="#84D828"/>',
+    '<circle cx="89" cy="1300" r="9" fill="#84D828"/>',
     '</svg>',
   ].join("");
 }
@@ -127,86 +142,65 @@ async function cropImage(input: Buffer, width: number, height: number, radius = 
   return img;
 }
 
+/** The Guru's own photo is the hero, as in the reference mockup.
+ * When it is unavailable, the approved SitGuru pet-care hero image is used,
+ * never a fabricated Guru portrait. */
 async function petPhotoPanel(input: GuruMatchCardAssets): Promise<Buffer|null> {
-  if (!input.dogPng && !input.catPng) return null;
-  const layers: {input: Buffer;left:number;top:number}[] = [];
-  if (input.dogPng) layers.push({
-    input:await cropImage(input.dogPng,600,440), left:0,top:0,
-  });
-  if (input.catPng) layers.push({
-    input:await cropImage(input.catPng,348,440),left:607,top:0,
-  });
-  // Show one pet image across the entire area when only one is available.
-  if (layers.length===1) {
-    layers[0].input=await cropImage(input.dogPng||input.catPng!,954,440);
-    layers[0].left=0;
-  }
-  const photo = await sharp({
-    create:{width:954,height:440,channels:4,background:"#C2E8D6"},
-  }).composite(layers).png().toBuffer();
-  const overlay = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="954" height="440">' +
-    '<defs><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#102B43" stop-opacity="0"/>' +
-    '<stop offset=".55" stop-color="#102B43" stop-opacity=".02"/>' +
-    '<stop offset="1" stop-color="#102B43" stop-opacity=".88"/></linearGradient></defs>' +
-    '<rect width="954" height="440" fill="url(#shade)"/></svg>');
-  const shaded=await sharp(photo).composite([{input:overlay,left:0,top:0}]).png().toBuffer();
-  return sharp(shaded).composite([{
-    input:roundedMask(954,440,30),blend:"dest-in",
-  }]).png().toBuffer();
+  const source = (input.promotionType !== "community" && input.photoPng)
+    || input.dogPng || input.catPng;
+  if (!source) return null;
+  return cropImage(source, 574, 648, 34);
 }
 
-/** Finished, high-resolution 4:5 social poster. Text is rasterized by Sharp
- * against a private bundled TTF, never by SVG's missing font fallback. */
+/** Actual, high-resolution 4:5 social graphic. The QR is always encoded
+ * by qrcode upstream, scaled with nearest-neighbor and given a quiet white tile. */
 export async function renderGuruMatchCardPng(input: GuruMatchCardAssets): Promise<Buffer> {
-  const community=input.promotionType==="community";
-  const fontfile=await cardFont();
-  const name=tidy(input.guruName,42);
-  const service=tidy(input.serviceLabel,50);
-  const location=tidy(input.city,45) + ", " + tidy(input.state,2);
-  const personalTitle=name.length>22?42:52;
-  const textItems:TextItem[]=[
-    {value:"LOCAL CARE. BIG HEART.",left:356,top:82,size:25,color:"#C7F5D9",bold:true,maxWidth:670},
-    {value:"Great pet care",left:75,top:168,size:76,color:"#FFFFFF",bold:true,maxWidth:900,maxHeight:90},
-    {value:"starts close to home.",left:75,top:252,size:65,color:"#C8F7D6",bold:true,maxWidth:910,maxHeight:82},
-    {value:community?"Explore pet care":"Meet " + name,left:326,top:387,size:personalTitle,
-      color:"#102B43",bold:true,maxWidth:635,maxHeight:74},
-    {value:location,left:329,top:466,size:33,color:"#42576B",bold:true,maxWidth:640,maxHeight:50},
-    {value:community?"Find sitters, walkers and more":service,left:329,top:523,size:27,
-      color:"#116A4B",bold:true,maxWidth:638,maxHeight:42},
-    {value:"Real people. Happier pets.",left:102,top:1001,size:47,color:"#FFFFFF",
-      bold:true,maxWidth:855,maxHeight:58},
-    {value:community?"Discover pet care nearby":"Connect with your Guru",left:94,top:1158,size:45,
-      color:"#102B43",bold:true,maxWidth:640,maxHeight:60},
-    {value:community?"Explore local providers and availability.":"Check services, availability and fit.",
-      left:96,top:1219,size:24,color:"#326B58",maxWidth:646,maxHeight:40},
-    {value:"sitguru.com",left:95,top:1270,size:30,color:"#086446",bold:true,maxWidth:535,maxHeight:45},
+  const community = input.promotionType === "community";
+  const fontfile = await cardFont();
+  const name = tidy(input.guruName, 42);
+  const service = tidy(input.serviceLabel, 50);
+  const place = tidy(input.city, 42) + ", " + tidy(input.state, 2);
+  const textItems: TextItem[] = [
+    {value:"MEET YOUR",left:734,top:75,size:36,color:"#FFFFFF",bold:true,maxWidth:300,maxHeight:55},
+    {value:"LOCAL GURU!",left:698,top:124,size:44,color:"#D8FFAE",bold:true,maxWidth:326,maxHeight:65},
+    {value:community?"Find local care":name,left:676,top:293,
+      size:name.length>18?52:74,color:"#FFFFFF",bold:true,maxWidth:352,maxHeight:115},
+    {value:place,left:678,top:412,size:34,color:"#ECFFF0",bold:true,maxWidth:342,maxHeight:53},
+    {value:community?"Explore local pet care":service,left:686,top:535,
+      size:36,color:"#102F3F",bold:true,maxWidth:329,maxHeight:60},
+    {value:"Explore services",left:714,top:627,size:25,color:"#FFFFFF",bold:true,maxWidth:306,maxHeight:43},
+    {value:"Check availability",left:714,top:699,size:25,color:"#FFFFFF",bold:true,maxWidth:306,maxHeight:43},
+    {value:community?"Find care near you":(input.experienceYears && input.experienceYears>0
+      ? input.experienceYears+" years of experience" : "Get to know your Guru"),
+      left:714,top:771,size:24,color:"#FFFFFF",bold:true,maxWidth:310,maxHeight:43},
+    {value:"Reliable care",left:68,top:991,size:55,color:"#0F2744",bold:true,maxWidth:590,maxHeight:81},
+    {value:"for happier pets!",left:68,top:1052,size:53,color:"#0F2744",bold:true,maxWidth:597,maxHeight:85},
+    {value:community?"SCAN TO EXPLORE CARE":"SCAN TO VIEW THIS GURU",left:72,top:1163,
+      size:29,color:"#0D5C3A",bold:true,maxWidth:588,maxHeight:50},
+    {value:"See profile & booking options",left:72,top:1210,
+      size:25,color:"#42576B",maxWidth:583,maxHeight:49},
+    {value:"sitguru.com",left:138,top:1294,size:35,color:"#FFFFFF",bold:true,
+      maxWidth:330,maxHeight:52},
+    {value:"LOCAL PET CARE. BIG HEART.",left:516,top:1298,size:28,color:"#D8FFAE",bold:true,
+      maxWidth:520,maxHeight:48},
   ];
-  if (!community && input.experienceYears && input.experienceYears>0) {
-    textItems.push({value:input.experienceYears+" years of experience",left:330,top:568,size:21,
-      color:"#4B6475",maxWidth:570,maxHeight:32});
-  }
   const overlays: {input:Buffer;left:number;top:number}[] = [];
-  overlays.push({input:await sharp(input.logoPng).resize(228,83,{
+  const logo = await sharp(input.logoPng).resize(480,170,{
     fit:"contain",background:{r:255,g:255,b:255,alpha:0},
-  }).png().toBuffer(),left:81,top:50});
-  if (input.photoPng && !community) {
-    const avatar=await cropImage(input.photoPng,182,182,91);
-    overlays.push({input:avatar,left:99,top:388});
-  } else {
-    textItems.push({value:"SG",left:144,top:443,size:69,
-      color:"#0D674B",bold:true,maxWidth:94,maxHeight:82});
-  }
-  const photo=await petPhotoPanel(input);
-  if (photo) overlays.push({input:photo,left:63,top:651});
-  // Put the QR on a white tile so it remains scannable when saved or resized.
-  overlays.push({input:await sharp(input.qrPng).resize(178,178,{
-    fit:"contain",background:"#FFFFFF",
-  }).png().toBuffer(),left:798,top:1129});
-  // Text is composed last, above all photograph content and shadows.
+  }).png().toBuffer();
+  overlays.push({input:logo,left:60,top:37});
+  const portrait=await petPhotoPanel(input);
+  if(portrait) overlays.push({input:portrait,left:54,top:259});
+  else textItems.push({value:"SITGURU PET CARE",left:100,top:533,size:43,
+    color:"#0D5C3A",bold:true,maxWidth:480,maxHeight:65});
+  // QR image is not AI art. These are exact QRCode bytes for this saved campaign.
+  overlays.push({input:await sharp(input.qrPng)
+    .resize(SHARE_QR_SIZE,SHARE_QR_SIZE,{fit:"contain",kernel:"nearest",background:"#FFFFFF"})
+    .png().toBuffer(),left:712,top:947});
   const textLayers=await Promise.all(textItems.map(item=>renderedText(item,fontfile)));
   overlays.push(...textLayers);
   return sharp(Buffer.from(guruMatchCardSvg(input)),{density:144})
-    .resize(SHARE_POSTER_WIDTH,SHARE_POSTER_HEIGHT).composite(overlays)
+    .resize(SHARE_POSTER_WIDTH,SHARE_POSTER_HEIGHT)
+    .composite(overlays)
     .png({compressionLevel:9}).toBuffer();
 }
