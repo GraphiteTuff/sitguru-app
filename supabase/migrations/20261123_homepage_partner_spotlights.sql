@@ -6,6 +6,7 @@ create table if not exists public.homepage_partner_spotlights (
  title text not null,
  subtitle text not null default '',
  description text not null default '',
+ article_body text not null default '',
  image_url text not null default '',
  image_alt text not null default '',
  image_path text not null default '',
@@ -18,6 +19,7 @@ create table if not exists public.homepage_partner_spotlights (
  updated_at timestamptz not null default now()
 );
 alter table public.homepage_partner_spotlights add column if not exists image_path text not null default '';
+alter table public.homepage_partner_spotlights add column if not exists article_body text not null default '';
 alter table public.homepage_partner_spotlights enable row level security;
 revoke all on public.homepage_partner_spotlights from anon,authenticated;
 grant all on public.homepage_partner_spotlights to service_role;
