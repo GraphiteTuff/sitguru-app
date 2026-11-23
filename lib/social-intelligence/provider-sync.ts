@@ -99,7 +99,7 @@ async function graphList(
       // permission alone as proof of access to published media.
       const fallback = host === "graph.facebook.com" && path.endsWith("/posts")
         ? "id,message,permalink_url,created_time"
-        : "id,caption,permalink,media_type,timestamp";
+        : "id,permalink,media_type,timestamp";
       if (fields === fallback) throw new Error("Meta media listing is not authorized.");
       response = await graphGet(graphUrl(host, path, fallback, after), token);
     }
@@ -180,7 +180,7 @@ async function importInstagram(): Promise<ImportedPost[]> {
     if (!/^\d+$/.test(id) || !publishedAt || !permalinkKey(publishedUrl)) continue;
     // Supplement list fields only for the latest video posts to limit API load.
     const video = string(row.media_type) === "VIDEO" || string(row.media_product_type) === "REELS";
-    const extra = video && results.length < 12
+    const extra = video && results.length < 3
       ? await optionalInstagramViews(id, owner.token, owner.host) : null;
     const caption = string(row.caption);
     results.push({
