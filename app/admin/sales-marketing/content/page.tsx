@@ -1,62 +1,36 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
-  AlertCircle,
   ArrowLeft,
-  CalendarCheck,
-  Camera,
+  ArrowUpRight,
+  BarChart3,
+  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
+  ExternalLink,
   FileText,
   ImageIcon,
-  Images,
-  Lightbulb,
   Megaphone,
-  MessageSquareText,
-  Palette,
   PawPrint,
-  Send,
-  Share2,
-  Target,
+  ShieldCheck,
   Users,
   Video,
+  type LucideIcon,
 } from "lucide-react";
 
+import { getAdminIdentity } from "@/lib/admin/access";
+import { canUseGrowthPortal } from "@/lib/admin/growth/access";
+import { loadManagerContentStudio } from "@/lib/internship/content-studio-actions";
+import { studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
+import { resolveDateRange } from "@/lib/growth-center-v2/date-range";
+import { loadSocialIntelligenceSnapshot } from "@/lib/social-intelligence/dashboard";
+import type { SocialPost } from "@/lib/social-intelligence/types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-type StatusTone = "emerald" | "amber" | "blue" | "rose" | "slate" | "purple";
+export const dynamic = "force-dynamic";
 
-type ContentStatus =
-  | "Idea"
-  | "Draft"
-  | "Needs Asset"
-  | "Ready"
-  | "Scheduled"
-  | "Posted"
-  | "Needs CEO Review"
-  | "Needs Follow-Up";
-
-type ContentPlatform =
-  | "Facebook"
-  | "Instagram"
-  | "Stories"
-  | "Reels"
-  | "Local Group"
-  | "Flyer"
-  | "Email"
-  | "Website";
-
-type ContentAudience =
-  | "Pet Parents"
-  | "Gurus"
-  | "Ambassadors"
-  | "Groomers"
-  | "Trainers"
-  | "Vet Techs"
-  | "Local Partners"
-  | "Friends & Family"
-  | "Mixed";
-
-type ContentItem = {
+type LegacyContent = {
   id: string;
   title: string | null;
   platform: string | null;
@@ -64,734 +38,422 @@ type ContentItem = {
   campaign: string | null;
   status: string | null;
   planned_date: string | null;
-  asset_needed: string | null;
   caption_direction: string | null;
+  asset_needed: string | null;
   ceo_review: string | null;
   performance_note: string | null;
   owner_name: string | null;
-  created_at: string | null;
   updated_at: string | null;
 };
 
-type StatCard = {
-  title: string;
-  value: string;
-  description: string;
-  icon: typeof ClipboardCheck;
-  tone: StatusTone;
-};
+type Tone = "blue" | "amber" | "green" | "violet" | "teal" | "slate";
 
-type ContentPlay = {
-  title: string;
-  description: string;
-  icon: typeof ClipboardCheck;
-  tone: StatusTone;
-};
-
-const toneStyles: Record<
-  StatusTone,
-  {
-    card: string;
-    icon: string;
-    pill: string;
-    text: string;
-    border: string;
-  }
-> = {
-  emerald: {
-    card: "border-emerald-200 bg-emerald-50",
-    icon: "bg-emerald-600 text-white",
-    pill: "bg-emerald-100 text-emerald-800",
-    text: "text-emerald-800",
-    border: "border-emerald-200",
+const toneStyles: Record<Tone, { surface: string; number: string; icon: string }> = {
+  blue: {
+    surface: "border-[#DBEAFE] bg-[#EFF6FF]",
+    number: "text-[#1D4ED8]",
+    icon: "bg-[#DBEAFE] text-[#1D4ED8]",
   },
   amber: {
-    card: "border-amber-200 bg-amber-50",
-    icon: "bg-amber-500 text-white",
-    pill: "bg-amber-100 text-amber-800",
-    text: "text-amber-800",
-    border: "border-amber-200",
+    surface: "border-[#FFEDD5] bg-[#FFF4ED]",
+    number: "text-[#C2410C]",
+    icon: "bg-[#FFEDD5] text-[#C2410C]",
   },
-  blue: {
-    card: "border-sky-200 bg-sky-50",
-    icon: "bg-sky-600 text-white",
-    pill: "bg-sky-100 text-sky-800",
-    text: "text-sky-800",
-    border: "border-sky-200",
+  green: {
+    surface: "border-[#DCFCE7] bg-[#F0FDF4]",
+    number: "text-[#166534]",
+    icon: "bg-[#DCFCE7] text-[#166534]",
   },
-  rose: {
-    card: "border-rose-200 bg-rose-50",
-    icon: "bg-rose-600 text-white",
-    pill: "bg-rose-100 text-rose-800",
-    text: "text-rose-800",
-    border: "border-rose-200",
+  violet: {
+    surface: "border-[#EDE9FE] bg-[#F5F3FF]",
+    number: "text-[#6D28D9]",
+    icon: "bg-[#EDE9FE] text-[#6D28D9]",
+  },
+  teal: {
+    surface: "border-[#CCFBF1] bg-[#F0FDFA]",
+    number: "text-[#0F766E]",
+    icon: "bg-[#CCFBF1] text-[#0F766E]",
   },
   slate: {
-    card: "border-slate-200 bg-slate-50",
-    icon: "bg-slate-700 text-white",
-    pill: "bg-slate-100 text-slate-700",
-    text: "text-slate-700",
-    border: "border-slate-200",
-  },
-  purple: {
-    card: "border-violet-200 bg-violet-50",
-    icon: "bg-violet-600 text-white",
-    pill: "bg-violet-100 text-violet-800",
-    text: "text-violet-800",
-    border: "border-violet-200",
+    surface: "border-[#E2E8F0] bg-[#F8FAFC]",
+    number: "text-[#0F2744]",
+    icon: "bg-[#E2E8F0] text-[#0F2744]",
   },
 };
 
-const statusToneMap: Record<ContentStatus, StatusTone> = {
-  Idea: "slate",
-  Draft: "blue",
-  "Needs Asset": "amber",
-  Ready: "emerald",
-  Scheduled: "purple",
-  Posted: "emerald",
-  "Needs CEO Review": "rose",
-  "Needs Follow-Up": "rose",
-};
-
-const platformToneMap: Record<ContentPlatform, StatusTone> = {
-  Facebook: "blue",
-  Instagram: "purple",
-  Stories: "amber",
-  Reels: "rose",
-  "Local Group": "emerald",
-  Flyer: "slate",
-  Email: "blue",
-  Website: "emerald",
-};
-
-const audienceToneMap: Record<ContentAudience, StatusTone> = {
-  "Pet Parents": "emerald",
-  Gurus: "blue",
-  Ambassadors: "purple",
-  Groomers: "amber",
-  Trainers: "blue",
-  "Vet Techs": "rose",
-  "Local Partners": "slate",
-  "Friends & Family": "emerald",
-  Mixed: "purple",
-};
-
-const contentPlays: ContentPlay[] = [
-  {
-    title: "Keep every post tied to a goal",
-    description:
-      "Each post should push a clear action: sign up, apply as a Guru, join the Ambassador Program, book care, refer someone, or visit SitGuru.com.",
-    icon: Target,
-    tone: "emerald",
-  },
-  {
-    title: "Use SitGuru-specific visuals",
-    description:
-      "Prioritize SitGuru logos, avatars, pet photos, screenshots, and brand colors so the content feels ownable and recognizable.",
-    icon: Palette,
-    tone: "purple",
-  },
-  {
-    title: "Create by audience",
-    description:
-      "Separate content for Pet Parents, Gurus, Ambassadors, groomers, trainers, vet techs, local partners, and friends/family.",
-    icon: Users,
-    tone: "blue",
-  },
-  {
-    title: "Capture questions as future posts",
-    description:
-      "Questions from DMs, comments, outreach, and signup conversations should become FAQs, captions, reels, and website copy improvements.",
-    icon: MessageSquareText,
-    tone: "amber",
-  },
-];
-
-function normalizeContentStatus(status: string | null | undefined): ContentStatus {
-  const cleanStatus = (status || "Idea").trim();
-
-  if (
-    cleanStatus === "Idea" ||
-    cleanStatus === "Draft" ||
-    cleanStatus === "Needs Asset" ||
-    cleanStatus === "Ready" ||
-    cleanStatus === "Scheduled" ||
-    cleanStatus === "Posted" ||
-    cleanStatus === "Needs CEO Review" ||
-    cleanStatus === "Needs Follow-Up"
-  ) {
-    return cleanStatus;
-  }
-
-  if (cleanStatus === "CEO Review") return "Needs CEO Review";
-  if (cleanStatus === "Needs Follow Up") return "Needs Follow-Up";
-
-  return "Idea";
-}
-
-function normalizeContentPlatform(platform: string | null | undefined): ContentPlatform {
-  const cleanPlatform = (platform || "Website").trim();
-
-  if (
-    cleanPlatform === "Facebook" ||
-    cleanPlatform === "Instagram" ||
-    cleanPlatform === "Stories" ||
-    cleanPlatform === "Reels" ||
-    cleanPlatform === "Local Group" ||
-    cleanPlatform === "Flyer" ||
-    cleanPlatform === "Email" ||
-    cleanPlatform === "Website"
-  ) {
-    return cleanPlatform;
-  }
-
-  return "Website";
-}
-
-function normalizeContentAudience(audience: string | null | undefined): ContentAudience {
-  const cleanAudience = (audience || "Mixed").trim();
-
-  if (
-    cleanAudience === "Pet Parents" ||
-    cleanAudience === "Gurus" ||
-    cleanAudience === "Ambassadors" ||
-    cleanAudience === "Groomers" ||
-    cleanAudience === "Trainers" ||
-    cleanAudience === "Vet Techs" ||
-    cleanAudience === "Local Partners" ||
-    cleanAudience === "Friends & Family" ||
-    cleanAudience === "Mixed"
-  ) {
-    return cleanAudience;
-  }
-
-  return "Mixed";
-}
-
-function formatDate(dateValue: string | null | undefined) {
-  if (!dateValue) return "Not scheduled";
-
-  return new Date(`${dateValue}T00:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-async function getContentItems(): Promise<ContentItem[]> {
-  const { data, error } = await supabaseAdmin
-    .from("admin_marketing_content_calendar")
-    .select(
-      [
-        "id",
-        "title",
-        "platform",
-        "audience",
-        "campaign",
-        "status",
-        "planned_date",
-        "asset_needed",
-        "caption_direction",
-        "ceo_review",
-        "performance_note",
-        "owner_name",
-        "created_at",
-        "updated_at",
-      ].join(", "),
-    )
-    .order("planned_date", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Sales & Marketing Content Planner fetch error:", error.message);
-    return [];
-  }
-
-  return (data ?? []) as unknown as ContentItem[];
-}
-
-function buildStatCards(contentItems: ContentItem[]): StatCard[] {
-  const needsCeoReview = contentItems.filter((item) => {
-    const status = normalizeContentStatus(item.status);
-    return status === "Needs CEO Review";
-  }).length;
-
-  const readyOrScheduled = contentItems.filter((item) => {
-    const status = normalizeContentStatus(item.status);
-    return status === "Ready" || status === "Scheduled";
-  }).length;
-
-  const needsAsset = contentItems.filter((item) => {
-    const status = normalizeContentStatus(item.status);
-    return status === "Needs Asset" || Boolean(item.asset_needed);
-  }).length;
-
-  return [
-    {
-      title: "Content Items",
-      value: String(contentItems.length),
-      description: "Live Supabase count of planned posts, ads, captions, and content assets.",
-      icon: FileText,
-      tone: "emerald",
-    },
-    {
-      title: "Needs CEO Review",
-      value: String(needsCeoReview),
-      description: "Posts or captions that should be approved before publishing.",
-      icon: ClipboardCheck,
-      tone: "rose",
-    },
-    {
-      title: "Ready / Scheduled",
-      value: String(readyOrScheduled),
-      description: "Content that can be posted, scheduled, or reused in campaign pushes.",
-      icon: CalendarCheck,
-      tone: "purple",
-    },
-    {
-      title: "Needs Asset",
-      value: String(needsAsset),
-      description: "Posts waiting on logos, avatars, dog images, screenshots, or final creatives.",
-      icon: ImageIcon,
-      tone: "amber",
-    },
-  ];
-}
-
-function StatusBadge({ status }: { status: ContentStatus }) {
-  const tone = statusToneMap[status];
-
-  return (
-    <span
-      className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${toneStyles[tone].pill}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function PlatformBadge({ platform }: { platform: ContentPlatform }) {
-  const tone = platformToneMap[platform];
-
-  return (
-    <span
-      className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${toneStyles[tone].pill}`}
-    >
-      {platform}
-    </span>
-  );
-}
-
-function AudienceBadge({ audience }: { audience: ContentAudience }) {
-  const tone = audienceToneMap[audience];
-
-  return (
-    <span
-      className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${toneStyles[tone].pill}`}
-    >
-      {audience}
-    </span>
-  );
-}
-
-function CardIcon({
-  icon: Icon,
-  tone,
+function MetricTile({
+  title, value, detail, icon: Icon, tone,
 }: {
-  icon: typeof ClipboardCheck;
-  tone: StatusTone;
+  title: string;
+  value: number;
+  detail: string;
+  icon: LucideIcon;
+  tone: Tone;
+}) {
+  const visual = toneStyles[tone];
+  return (
+    <article className={"min-w-0 rounded-2xl border p-4 shadow-[0_6px_20px_rgba(15,39,68,0.04)] " + visual.surface}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-black uppercase tracking-wide text-[#0F2744]">{title}</p>
+        <span className={"inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full " + visual.icon}>
+          <Icon size={17} aria-hidden="true" />
+        </span>
+      </div>
+      <p className={"mt-2 text-3xl font-black tabular-nums " + visual.number}>
+        {value.toLocaleString("en-US")}
+      </p>
+      <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{detail}</p>
+    </article>
+  );
+}
+
+function labelDate(value: string | null | undefined) {
+  if (!value) return "Date not recorded";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "Date not recorded";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function numberOrDash(value: number | null | undefined) {
+  return value == null ? "—" : value.toLocaleString("en-US");
+}
+
+function trustedSocialHref(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (
+      url.protocol === "https:" &&
+      ["facebook.com", "instagram.com", "m.facebook.com"].includes(hostname)
+    ) {
+      return url.toString();
+    }
+  } catch {
+    // Refuse invalid or untrusted destinations from provider metadata.
+  }
+  return null;
+}
+
+function FeedPost({ post }: { post: SocialPost }) {
+  const facebook = post.channel === "facebook";
+  const externalUrl = trustedSocialHref(post.publishedUrl);
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_6px_20px_rgba(15,39,68,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={"rounded-full px-3 py-1 text-xs font-black " +
+          (facebook ? "bg-[#EFF6FF] text-[#1D4ED8]" : "bg-[#F5F3FF] text-[#6D28D9]")}>
+          {facebook ? "Facebook" : "Instagram"}
+        </span>
+        <span className="text-xs font-semibold text-slate-500">{labelDate(post.publishedAt)}</span>
+      </div>
+      <h3 className="mt-3 line-clamp-2 text-sm font-black text-[#0F2744]">{post.title || "Published SitGuru content"}</h3>
+      <p className="mt-1 text-xs text-slate-600">
+        {post.studioContentId ? "Linked to Content Studio" : "Published through Meta · not linked to a creator"}
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#F8FAFC] p-3 text-center">
+        <div>
+          <p className="text-lg font-black tabular-nums text-[#0F2744]">{numberOrDash(post.metrics.views)}</p>
+          <p className="text-[11px] font-semibold text-slate-600">Views</p>
+        </div>
+        <div>
+          <p className="text-lg font-black tabular-nums text-[#0F2744]">{numberOrDash(post.metrics.likes)}</p>
+          <p className="text-[11px] font-semibold text-slate-600">Likes</p>
+        </div>
+        <div>
+          <p className="text-lg font-black tabular-nums text-[#0F2744]">{numberOrDash(post.metrics.comments)}</p>
+          <p className="text-[11px] font-semibold text-slate-600">Comments</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={"/admin/growth/social-intelligence?preset=last_90&post=" + encodeURIComponent(post.id)}
+          className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-3 py-2 text-xs font-black text-[#0D5C3A] hover:bg-[#DCFCE7]"
+        >
+          Insights <BarChart3 size={14} aria-hidden="true" />
+        </Link>
+        {externalUrl ? (
+          <a href={externalUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-[#EEF2F6] px-3 py-2 text-xs font-bold text-[#0F2744] hover:bg-[#DBEAFE]">
+            Open post <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function DestinationCard({
+  href, title, description, icon: Icon, featured = false,
+}: {
+  href: string; title: string; description: string;
+  icon: LucideIcon; featured?: boolean;
 }) {
   return (
-    <div
-      className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm ${toneStyles[tone].icon}`}
-    >
-      <Icon className="h-5 w-5" aria-hidden="true" />
-    </div>
+    <Link href={href} className={
+      "group flex min-w-0 gap-3 rounded-2xl border p-4 shadow-[0_5px_18px_rgba(15,39,68,0.04)] transition hover:-translate-y-0.5 hover:shadow-md " +
+      (featured ? "border-[#DBEAFE] bg-[#EFF6FF]" : "border-slate-200 bg-white")
+    }>
+      <span className={"inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl " +
+        (featured ? "bg-[#2563EB] text-white" : "bg-[#F0FDF4] text-[#0D5C3A]")}>
+        <Icon size={19} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-black text-[#0F2744]">{title}</p>
+        <p className="mt-1 text-xs font-medium leading-5 text-slate-600">{description}</p>
+      </div>
+      <ArrowUpRight size={16} className="shrink-0 text-[#2563EB] group-hover:translate-x-0.5" aria-hidden="true" />
+    </Link>
   );
-}
-
-function PlatformIcon({ platform }: { platform: ContentPlatform }) {
-  if (platform === "Facebook") return Share2;
-  if (platform === "Instagram") return Images;
-  if (platform === "Reels") return Video;
-  if (platform === "Stories") return Camera;
-  if (platform === "Flyer") return FileText;
-  if (platform === "Email") return Send;
-  return Megaphone;
 }
 
 export default async function SalesMarketingContentPage() {
-  const contentItems = await getContentItems();
-  const statCards = buildStatCards(contentItems);
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) redirect("/admin/login");
+
+  // Admin content is an oversight surface, never a third approval pipeline.
+  // Manager/intern content remains governed by the existing assignment rules.
+  const canSeeStudio = canUseGrowthPortal(actor);
+  const [legacyResult, studio, social] = await Promise.all([
+    supabaseAdmin.from("admin_marketing_content_calendar")
+      .select("id,title,platform,audience,campaign,status,planned_date,caption_direction,asset_needed,ceo_review,performance_note,owner_name,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(30),
+    canSeeStudio ? loadManagerContentStudio(actor.id, actor.isSuperUser) : Promise.resolve(null),
+    actor.isSuperUser
+      ? loadSocialIntelligenceSnapshot({ filters: resolveDateRange({ preset: "last_90" }) })
+      : Promise.resolve(null),
+  ]);
+
+  const legacy = (legacyResult.data || []) as LegacyContent[];
+  const summary = studio?.summary || studioSummary([]);
+  const studioItems = studio?.items || [];
+  const importedPosts = (social?.posts || []).filter(
+    (post) => post.channel === "facebook" || post.channel === "instagram",
+  ).sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || "")).slice(0, 6);
+  const facebook = social?.metaSync.find((entry) => entry.platform === "facebook");
+  const instagram = social?.metaSync.find((entry) => entry.platform === "instagram");
+  const faceFollower = social?.channels.find((entry) => entry.channel === "facebook");
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/admin/sales-marketing"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Back to Sales & Marketing
-                </Link>
-                <Link
-                  href="/admin/growth/reads"
-                  className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-900 transition hover:bg-orange-100"
-                >
-                  Reads & Media Content Studio
-                </Link>
-                <Link
-                  href="/manager/reads"
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100"
-                >
-                  Manager Reads
-                </Link>
-                <Link
-                  href="/intern/content/reads"
-                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-900 transition hover:bg-sky-100"
-                >
-                  Intern Reads
-                </Link>
-              </div>
-
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
-                <Megaphone className="h-4 w-4" aria-hidden="true" />
-                Content Planner
-              </div>
-
-              <h1 className="mt-4 max-w-4xl text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-                Plan SitGuru posts, ads, captions, and campaign content.
+    <main className="min-h-screen min-w-0 bg-[#F4F7FB] px-3 py-5 text-[#0F2744] sm:px-5 lg:px-7">
+      <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5">
+        <div role="banner" className="on-dark-surface rounded-[1.6rem] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] sm:p-7"
+          style={{ background: "linear-gradient(112deg,#0F2744 0%,#164B61 48%,#0D5C3A 100%)", color: "#FFFFFF" }}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] !text-emerald-100">
+                <PawPrint size={16} aria-hidden="true" /> SitGuru · Admin HQ · Sales & Marketing
+              </p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
+                Content Hub
               </h1>
-
-              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-                This page is now reading live content records from Supabase.
-                Danette can organize Facebook posts, Instagram posts, reels,
-                stories, Ambassador ads, Guru signup content, Pet Parent signup
-                content, campaign captions, and CEO review notes.
+              <p className="mt-2 max-w-2xl text-sm font-semibold !text-emerald-50 sm:text-base">
+                One view of content planning, Ava's review workflow, published posts, and measurable growth.
               </p>
             </div>
+            <span className="rounded-full border border-white/25 bg-white/15 px-3 py-2 text-xs font-black !text-white">
+              Read-only administration
+            </span>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/admin/sales-marketing"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-[#EFF6FF]">
+              <ArrowLeft size={15} aria-hidden="true" /> Sales & Marketing
+            </Link>
+            {canSeeStudio ? (
+              <Link href="/admin/growth/content"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-3 py-2 text-sm font-black !text-white hover:bg-white/25">
+                Open approvals <ClipboardCheck size={15} aria-hidden="true" />
+              </Link>
+            ) : null}
+            {actor.isSuperUser ? (
+              <Link href="/admin/growth/social-intelligence?preset=last_90"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-3 py-2 text-sm font-black !text-white hover:bg-white/25">
+                Social Intelligence <BarChart3 size={15} aria-hidden="true" />
+              </Link>
+            ) : null}
+          </div>
+        </div>
 
-            <aside className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5 lg:w-[22rem]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Content goal
-                  </p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-emerald-950">
-                    Clear action
-                  </h2>
-                </div>
-                <CardIcon icon={Target} tone="emerald" />
-              </div>
+        <section aria-labelledby="hub-metrics-title" className="space-y-3">
+          <div>
+            <h2 id="hub-metrics-title" className="text-xl font-black text-[#0F2744]">Content operations overview</h2>
+            <p className="mt-1 text-sm text-slate-600">Live records from existing SitGuru systems. Scheduled and approved statuses may overlap.</p>
+          </div>
+          {canSeeStudio ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <MetricTile title="Studio drafts" value={summary.drafts} detail="Intern-created, not submitted" icon={FileText} tone="blue" />
+              <MetricTile title="Ava review" value={summary.pending} detail="Awaiting manager review" icon={Clock3} tone="amber" />
+              <MetricTile title="CEO escalations" value={summary.escalated} detail="Need leadership decision" icon={ShieldCheck} tone="violet" />
+              <MetricTile title="Scheduled" value={summary.scheduled} detail="Approved with planned date" icon={CalendarDays} tone="teal" />
+              <MetricTile title="Published links" value={summary.published} detail="Recorded in Content Studio" icon={CheckCircle2} tone="green" />
+              <MetricTile title="Meta imports" value={(facebook?.importedPosts || 0) + (instagram?.importedPosts || 0)}
+                detail="Provider posts, not new Studio drafts" icon={Video} tone="slate" />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+              Content Studio metrics are restricted to the assigned growth team and super administrators. The historical planning notes remain available below.
+            </div>
+          )}
+        </section>
 
-              <p className="mt-4 text-sm leading-6 text-emerald-900">
-                Every post should make the next step obvious: sign up, apply,
-                join as an Ambassador, book care, refer someone, or visit SitGuru.com.
-              </p>
-
-              <div className="mt-5 rounded-2xl border border-emerald-200 bg-white/80 p-4">
-                <p className="text-sm font-semibold text-emerald-900">
-                  Supabase status
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-700">
-                  Connected · {contentItems.length} content rows loaded
-                </p>
-              </div>
-            </aside>
+        <section aria-labelledby="hub-workflows-title" className="space-y-3">
+          <h2 id="hub-workflows-title" className="text-xl font-black text-[#0F2744]">Your connected workspaces</h2>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {canSeeStudio ? (
+              <>
+                <DestinationCard href="/admin/growth/content" title="Content approvals"
+                  description="Review intern drafts, manager approvals and CEO escalations. Uses the existing workflow." icon={ClipboardCheck} featured />
+                <DestinationCard href="/manager/campaigns-content" title="Manager Content Studio"
+                  description="Ava's existing publishing and approval workspace; no duplicate workflow." icon={Users} />
+              </>
+            ) : null}
+            {actor.isSuperUser ? (
+              <DestinationCard href="/admin/growth/social-intelligence?preset=last_90" title="Social Intelligence"
+                description="Verified Facebook and Instagram content, rankings, link clicks, and attributed events." icon={BarChart3} featured />
+            ) : null}
+            <DestinationCard href="/admin/growth/reads" title="Reads & Media"
+              description="SitGuru community stories, media and approved editorial resources." icon={ImageIcon} />
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {statCards.map((card) => (
-            <article
-              key={card.title}
-              className={`rounded-[1.5rem] border p-5 shadow-sm ${toneStyles[card.tone].card}`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-slate-600">{card.title}</p>
-                  <p className="mt-2 text-3xl font-extrabold text-slate-950">
-                    {card.value}
-                  </p>
-                </div>
-                <CardIcon icon={card.icon} tone={card.tone} />
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-700">
-                {card.description}
-              </p>
-            </article>
-          ))}
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Content Rules
-              </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                How Danette should plan content
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Content should feel local, trustworthy, SitGuru-specific, and tied
-                to a clear business goal.
-              </p>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              {contentPlays.map((item) => (
-                <div
-                  key={item.title}
-                  className={`rounded-2xl border p-4 ${toneStyles[item.tone].card}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <CardIcon icon={item.icon} tone={item.tone} />
-                    <div>
-                      <h3 className="font-extrabold text-slate-950">
-                        {item.title}
-                      </h3>
-                      <p className="mt-1 text-sm leading-6 text-slate-700">
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {canSeeStudio ? (
+          <section aria-labelledby="hub-review-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                  CEO Content View
-                </p>
-                <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                  What Jason should review
-                </h2>
+                <h2 id="hub-review-title" className="text-lg font-black text-[#0F2744]">Latest Content Studio activity</h2>
+                <p className="mt-1 text-xs font-medium text-slate-600">Live assigned-team items. Actions and notifications remain in Content Studio.</p>
               </div>
-
-              <Link
-                href="/admin/sales-marketing/ceo-review"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800"
-              >
-                CEO Review
-                <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+              <Link href="/admin/growth/content"
+                className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-black text-white hover:bg-[#1D4ED8]">
+                Review queue <ArrowUpRight size={15} aria-hidden="true" />
               </Link>
             </div>
-
-            <div className="mt-6 grid gap-3">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2
-                    className="mt-1 h-5 w-5 text-emerald-700"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <h3 className="font-extrabold text-emerald-950">
-                      Content ready to publish
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-emerald-900">
-                      Confirm the CTA, audience, landing page, and visuals before
-                      Danette posts important campaign content.
-                    </p>
+            <div className="mt-4 divide-y divide-slate-100">
+              {studioItems.slice(0, 6).map((item) => {
+                const labels = studioRowLabel(item);
+                return (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-[#0F2744]">{item.title}</p>
+                      <p className="mt-1 text-xs text-slate-600">{item.internName} · {item.platform || "Platform not selected"} · {labels.status}</p>
+                    </div>
+                    <Link href={"/admin/growth/content?content=" + encodeURIComponent(item.id)}
+                      className="inline-flex min-h-10 items-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-xs font-black text-[#1D4ED8] hover:bg-[#DBEAFE]">
+                      View record
+                    </Link>
                   </div>
-                </div>
+                );
+              })}
+              {!studioItems.length ? (
+                <p className="py-4 text-sm text-slate-600">No assigned Content Studio submissions yet. New intern submissions will appear here automatically.</p>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {actor.isSuperUser && social ? (
+          <section aria-labelledby="hub-meta-title" className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 id="hub-meta-title" className="text-xl font-black text-[#0F2744]">Published Facebook &amp; Instagram content</h2>
+                <p className="mt-1 text-sm text-slate-600">Verified official-account imports for the last 90 days, not duplicated into the approval queue.</p>
               </div>
-
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="mt-1 h-5 w-5 text-rose-700" aria-hidden="true" />
-                  <div>
-                    <h3 className="font-extrabold text-rose-950">
-                      Assets or approval needed
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-rose-900">
-                      Some content may wait on SitGuru logos, avatars, pet photos,
-                      approved screenshots, ad creative, or final wording.
-                    </p>
-                  </div>
+              <Link href="/admin/growth/social-intelligence?preset=last_90"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white hover:bg-[#1D4ED8]">
+                Open analytics &amp; sync posts <BarChart3 size={16} aria-hidden="true" />
+              </Link>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#DBEAFE] bg-[#EFF6FF] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[#0F2744]">Facebook · SitGuru Page</p>
+                  <span className={"rounded-full px-3 py-1 text-xs font-black " +
+                    (facebook?.status === "success" ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#FFF0DF] text-[#9A3412]")}>
+                    {facebook?.status === "success" ? "Posts imported" : "Post import needs attention"}
+                  </span>
                 </div>
+                <p className="mt-2 text-sm font-bold text-slate-700">
+                  {numberOrDash(faceFollower?.followers)} followers (latest available) · {facebook?.importedPosts || 0} imported posts
+                </p>
+                <p className="mt-1 text-xs text-slate-600">Follower reporting and published-post API access are separate. An active follower feed does not confirm post permissions.</p>
               </div>
-
-              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <div className="flex items-start gap-3">
-                  <Lightbulb className="mt-1 h-5 w-5 text-sky-700" aria-hidden="true" />
-                  <div>
-                    <h3 className="font-extrabold text-sky-950">
-                      Turn questions into content
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-sky-900">
-                      Repeated questions about trust, booking, pricing, Gurus,
-                      service areas, and applications should become future posts.
-                    </p>
-                  </div>
+              <div className="rounded-2xl border border-[#EDE9FE] bg-[#F5F3FF] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[#0F2744]">Instagram · SitGuru</p>
+                  <span className={"rounded-full px-3 py-1 text-xs font-black " +
+                    (instagram?.status === "success" ? "bg-[#DCFCE7] text-[#166534]" : "bg-white text-[#475569]")}>
+                    {instagram?.status === "success" ? "Posts imported" : "Awaiting import"}
+                  </span>
                 </div>
+                <p className="mt-2 text-sm font-bold text-slate-700">{instagram?.importedPosts || 0} imported posts</p>
+                <p className="mt-1 text-xs text-slate-600">Content published through Meta is displayed here, but individual creator attribution requires a linked Studio record.</p>
               </div>
             </div>
-          </article>
-        </section>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {importedPosts.map((post) => <FeedPost key={post.id} post={post} />)}
+            </div>
+            {!importedPosts.length ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+                No imported posts fall within the last 90 days. Use Social Intelligence to sync official accounts or choose a different date range.
+              </div>
+            ) : null}
+            <p className="text-xs font-medium text-slate-500">
+              Unavailable provider metrics show a dash, not a zero. Tracked signup/booking events are not proof of paid bookings or revenue.
+            </p>
+          </section>
+        ) : null}
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <section id="historical-planner" aria-labelledby="legacy-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Content Calendar
-              </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                Live Supabase content records
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                This is a read-only live view of the content calendar table. Next
-                we can add safe Admin actions for adding content, changing status,
-                assigning CEO review, and marking posts ready.
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">Reference only</p>
+              <h2 id="legacy-title" className="mt-1 text-lg font-black text-[#0F2744]">Historical marketing calendar</h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                Existing planning notes from the earlier Sales & Marketing calendar are preserved here. New approvals, publishing and results belong in the connected workspaces above.
               </p>
             </div>
-
-            <Link
-              href="/admin/sales-marketing/proof-library"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-            >
+            <Link href="/admin/sales-marketing/proof-library"
+              className="inline-flex min-h-10 items-center rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-xs font-bold text-[#0F2744] hover:bg-[#EFF6FF]">
               Proof Library
-              <PawPrint className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
-
-          <div className="mt-6 space-y-4">
-            {contentItems.length > 0 ? (
-              contentItems.map((item) => {
-                const status = normalizeContentStatus(item.status);
-                const platform = normalizeContentPlatform(item.platform);
-                const audience = normalizeContentAudience(item.audience);
-                const Icon = PlatformIcon({ platform });
-
-                return (
-                  <article
-                    key={item.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200">
-                          <Icon className="h-5 w-5" aria-hidden="true" />
-                        </div>
-
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge status={status} />
-                            <PlatformBadge platform={platform} />
-                            <AudienceBadge audience={audience} />
-                          </div>
-
-                          <h3 className="mt-3 text-xl font-extrabold text-slate-950">
-                            {item.title || "Untitled content item"}
-                          </h3>
-
-                          <p className="mt-1 text-sm font-bold text-emerald-800">
-                            {item.campaign || "No campaign assigned"}
-                          </p>
-
-                          <p className="mt-1 text-xs font-semibold text-slate-500">
-                            Owner: {item.owner_name || "Danette"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-white bg-white p-3 lg:min-w-[17rem]">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Planned Date
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                          {formatDate(item.planned_date)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                      <div className="rounded-xl border border-white bg-white p-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Caption Direction
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-slate-700">
-                          {item.caption_direction || "No caption direction entered yet."}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                          Asset Needed
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-amber-950">
-                          {item.asset_needed || "No asset requirement entered."}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-rose-100 bg-rose-50 p-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-rose-700">
-                          CEO Review
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-rose-950">
-                          {item.ceo_review || "No CEO review note entered."}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-sky-700">
-                          Performance Note
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-sky-950">
-                          {item.performance_note || "No performance note entered yet."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-bold text-white">
-                        Future button: Mark Ready
-                      </span>
-                      <span className="inline-flex rounded-full bg-violet-100 px-4 py-2 text-xs font-bold text-violet-800">
-                        Future button: Schedule
-                      </span>
-                      <span className="inline-flex rounded-full bg-rose-100 px-4 py-2 text-xs font-bold text-rose-800">
-                        Future button: Needs CEO Review
-                      </span>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <h3 className="font-extrabold text-amber-950">
-                  No content records found.
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  The page is connected to Supabase, but there are no rows in
-                  admin_marketing_content_calendar yet.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start gap-3">
-            <MessageSquareText className="mt-1 h-5 w-5 text-emerald-700" aria-hidden="true" />
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-950">
-                Supabase Wiring Note
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                This page now reads from admin_marketing_content_calendar. It does
-                not write to Supabase yet and does not affect public pages, customer
-                flows, Guru flows, auth, bookings, payments, or financial logic.
-              </p>
+          {legacyResult.error ? (
+            <p className="mt-4 rounded-xl border border-[#FFEDD5] bg-[#FFF4ED] p-3 text-sm font-semibold text-[#9A3412]">
+              Historical records could not be loaded. Existing content and social analytics are separate and unaffected.
+            </p>
+          ) : legacy.length ? (
+            <div className="mt-4 space-y-3">
+              {legacy.map((entry) => (
+                <article key={entry.id} className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[#E2E8F0] px-2.5 py-1 text-xs font-black text-[#0F2744]">{entry.status || "Uncategorized"}</span>
+                    <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-xs font-bold text-[#1D4ED8]">{entry.platform || "Platform not set"}</span>
+                  </div>
+                  <h3 className="mt-2 text-sm font-black text-[#0F2744]">{entry.title || "Untitled planning note"}</h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {entry.owner_name || "Unassigned"} · {entry.campaign || "No campaign"} · Last updated {labelDate(entry.updated_at)}
+                  </p>
+                  <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                    <div><dt className="font-black text-slate-700">Audience</dt><dd className="mt-1 text-slate-600">{entry.audience || "Not set"}</dd></div>
+                    <div><dt className="font-black text-slate-700">Planned date</dt><dd className="mt-1 text-slate-600">{entry.planned_date || "Not scheduled"}</dd></div>
+                    {entry.caption_direction ? <div><dt className="font-black text-slate-700">Caption direction</dt><dd className="mt-1 text-slate-600">{entry.caption_direction}</dd></div> : null}
+                    {entry.asset_needed ? <div><dt className="font-black text-slate-700">Asset needed</dt><dd className="mt-1 text-slate-600">{entry.asset_needed}</dd></div> : null}
+                    {entry.ceo_review ? <div><dt className="font-black text-slate-700">CEO note</dt><dd className="mt-1 text-slate-600">{entry.ceo_review}</dd></div> : null}
+                    {entry.performance_note ? <div><dt className="font-black text-slate-700">Performance note</dt><dd className="mt-1 text-slate-600">{entry.performance_note}</dd></div> : null}
+                  </dl>
+                </article>
+              ))}
             </div>
-          </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-600">No historical planning entries are recorded.</p>
+          )}
         </section>
+        <div className="flex flex-wrap items-center gap-2 pb-5 text-xs font-medium text-slate-600">
+          <Megaphone size={15} className="text-[#0D5C3A]" aria-hidden="true" />
+          SitGuru Admin Content Hub · Live source data, existing approval permissions, no duplicated content workflow.
+        </div>
       </div>
     </main>
   );
