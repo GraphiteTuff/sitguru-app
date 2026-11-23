@@ -19,6 +19,7 @@ export const INTERN_PORTAL_SIDEBAR = [
   { id: "content", href: INTERN_ROUTES.content, label: "Create Content", match: "content" as const },
   { id: "reads", href: INTERN_ROUTES.reads, label: "Reads & Media", match: "prefix" as const },
   { id: "community", href: INTERN_ROUTES.communityStudio, label: "Community Studio", match: "prefix" as const },
+  { id: "guruMatch", href: "/intern/community-studio/guru-match", label: "Guru Match & Share", match: "prefix" as const },
   {
     id: "assignments",
     href: INTERN_ROUTES.assignments,
@@ -68,6 +69,7 @@ export const INTERN_PORTAL_SIDEBAR = [
     label: "Insights",
     match: "prefix" as const,
   },
+  { id: "socialIntelligence", href: "/intern/social-intelligence", label: "Social Intelligence", match: "prefix" as const },
   {
     id: "growth",
     href: INTERN_ROUTES.growth,
@@ -112,12 +114,14 @@ export const INTERN_PORTAL_MOBILE_PRIMARY = [
 export const INTERN_PORTAL_MOBILE_MORE = [
   { href: INTERN_ROUTES.content, label: "Create Content" },
   { href: INTERN_ROUTES.communityStudio, label: "Community Studio" },
+  { href: "/intern/community-studio/guru-match", label: "Guru Match & Share" },
   { href: INTERN_ROUTES.assignments, label: "My Assignments" },
   { href: INTERN_ROUTES.milestones, label: "My Milestones" },
   { href: INTERN_ROUTES.messages, label: "Messages" },
   { href: INTERN_ROUTES.results, label: "Live Results" },
   { href: INTERN_ROUTES.calendar, label: "Calendar" },
   { href: INTERN_ROUTES.metrics, label: "Metrics" },
+  { href: "/intern/social-intelligence", label: "Social Intelligence" },
   { href: INTERN_ROUTES.insights, label: "Insights" },
   { href: INTERN_ROUTES.growth, label: "Growth Report" },
   { href: INTERN_ROUTES.toolkit, label: "Toolkit" },
