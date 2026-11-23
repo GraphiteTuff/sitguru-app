@@ -93,6 +93,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const selected=payload?.matches.find(g=>g.id===selectedId);
   const cards=payload?.campaigns||[];
   const directory=payload?.directory||[];
+  const readyToShare=directory.filter(g=>g.canPromote).length;
   const directoryItems=directory.filter(g=>{
     const q=directoryQuery.toLowerCase().trim();
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
@@ -244,22 +245,22 @@ export default function GuruMatchBoard({role}:{role:Role}){
     <section aria-label="Registered Guru directory" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-[#0F2744]">Bookable Gurus</h2>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Browse every bookable Guru. Local service, radius and pet compatibility determine who can be shared for a request.</p>
+          <h2 className="text-xl font-black text-[#0F2744]">All listed Gurus</h2>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Browse every publicly listed Guru, including profiles still being set up. Only bookable Gurus with matching local services may be promoted.</p>
         </div>
-        <p className="text-sm font-bold text-[#0F2744]">{directory.length} bookable Gurus</p>
+        <p className="text-sm font-bold text-[#0F2744]">{directory.length} listed · {readyToShare} ready to share</p>
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input aria-label="Search bookable Gurus" placeholder="Search Guru, city, state or service"
+        <input aria-label="Search listed Gurus" placeholder="Search Guru, city, state or service"
           className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/>
         <select aria-label="Filter Guru directory status" className={control+" sm:max-w-60"} value={directoryStatus}
           onChange={e=>setDirectoryStatus(e.target.value as "all"|"ready"|"setup")}>
-          <option value="all">All bookable Gurus</option>
-          <option value="ready">Ready to match</option>
-          <option value="setup">Needs review or setup</option>
+          <option value="all">All listed Gurus</option>
+          <option value="ready">Ready to promote</option>
+          <option value="setup">Not currently promotable</option>
         </select>
       </div>
-      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} bookable Gurus.</p>
+      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
       <div className="mt-3 grid max-h-[560px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
         {directoryItems.map(g=><article key={g.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 p-3">
           <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
