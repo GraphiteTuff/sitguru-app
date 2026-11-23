@@ -71,16 +71,28 @@ function graphUrl(
   if (after) url.searchParams.set("after", after);
   return url;
 }
+/** Structured errors preserve safe numeric Meta codes, never raw API text. */
+class MetaGraphRequestError extends Error {
+  constructor(readonly status: number, readonly apiCode: number | null) {
+    super("Meta Graph API request failed.");
+    this.name = "MetaGraphRequestError";
+  }
+}
 async function graphGet(url: URL, token: string) {
   const response = await fetch(url.toString(), {
     headers: { Authorization: "Bearer " + token },
     cache: "no-store",
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(8000),
   });
-  if (!response.ok) throw new Error("Meta Graph API request returned HTTP " + response.status);
-  const payload: unknown = await response.json();
-  if (!payload || typeof payload !== "object") throw new Error("Meta Graph API response is invalid.");
-  return payload as Row;
+  const payload: unknown = await response.json().catch(() => null);
+  const data = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Row : null;
+  if (!response.ok || !data || data.error) {
+    const apiError = data?.error && typeof data.error === "object" ? data.error as Row : null;
+    const apiCode = typeof apiError?.code === "number" && Number.isSafeInteger(apiError.code)
+      ? apiError.code : null;
+    throw new MetaGraphRequestError(response.status, apiCode);
+  }
+  return data;
 }
 async function graphList(
   host: "graph.facebook.com" | "graph.instagram.com",
@@ -94,14 +106,16 @@ async function graphList(
     let response: Row;
     try {
       response = await graphGet(graphUrl(host, path, fields, after), token);
-    } catch {
-      // Recover from unsupported optional fields without treating follower
-      // permission alone as proof of access to published media.
+    } catch (error) {
+      // Retry with basic fields only for unsupported Graph fields, not when
+      // a credential is expired, Page permission is missing, or rate limited.
+      if (error instanceof MetaGraphRequestError && error.apiCode !== 100 &&
+        error.apiCode !== 3001) throw error;
       const fallback = host === "graph.facebook.com" &&
         (path.endsWith("/posts") || path.endsWith("/published_posts"))
         ? "id,message,permalink_url,created_time"
         : "id,permalink,media_type,timestamp";
-      if (fields === fallback) throw new Error("Meta media listing is not authorized.");
+      if (fields === fallback) throw error;
       response = await graphGet(graphUrl(host, path, fallback, after), token);
     }
     if (!Array.isArray(response.data)) throw new Error("Meta media list response did not contain media.");
@@ -250,6 +264,7 @@ async function importFacebook(): Promise<ImportedPost[]> {
   const credentials = pageToken && pageToken !== systemToken
     ? [pageToken, systemToken] : [systemToken];
   let posts: Row[] | null = null;
+  let lastFailure: unknown = null;
 
   // Prefer the Page's published_posts edge over /posts: it excludes drafts
   // and ads-only items. Fall back only to official Page posts; never use a
@@ -259,16 +274,26 @@ async function importFacebook(): Promise<ImportedPost[]> {
       try {
         posts = await graphList("graph.facebook.com", pageId + "/" + edge, richFields, token);
         break;
-      } catch {
-        // Continue to another authorized Page reading strategy.
+      } catch (error) {
+        lastFailure = error;
       }
     }
     if (posts !== null) break;
   }
   if (posts === null) {
-    // Return an actionable, non-secret error to the Manager sync UI.
+    if (lastFailure instanceof MetaGraphRequestError) {
+      if (lastFailure.apiCode === 190 || lastFailure.status === 401) {
+        throw new Error("Facebook Page credential expired or was revoked. Reauthorize SitGuru's official Page.");
+      }
+      if (lastFailure.status === 429 || lastFailure.apiCode === 80001) {
+        throw new Error("Meta rate-limited Facebook post import. Retry after the rate-limit window.");
+      }
+      if ([200, 283, 10].includes(lastFailure.apiCode ?? 0) || lastFailure.status === 403) {
+        throw new Error("Facebook Page post permissions are missing. Grant the official SitGuru Page pages_read_engagement and pages_read_user_content.");
+      }
+    }
     throw new Error(pageToken
-      ? "Facebook published-post access failed. Verify pages_read_engagement and pages_read_user_content for the SitGuru Page."
+      ? "The SitGuru Facebook Page did not return published posts. Check the Page's Meta app permissions."
       : "Facebook Page access token is unavailable. Assign SitGuru Page access to the Meta system user and approve pages_show_list, pages_read_engagement and pages_read_user_content.");
   }
   const result: ImportedPost[] = [];
