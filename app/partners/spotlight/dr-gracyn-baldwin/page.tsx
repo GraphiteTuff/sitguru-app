@@ -15,7 +15,7 @@ export default async function DrBaldwinSpotlightPage() {
     <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{item.title}</h1>
     <p className="mt-2 text-xl font-semibold text-slate-700">{item.subtitle}</p>
     <div className="mt-8 overflow-hidden rounded-3xl bg-emerald-50"><img src={item.image_url} alt={item.image_alt} className="max-h-[560px] w-full object-cover" /></div>
-    <p className="mt-8 whitespace-pre-line text-base leading-8 text-slate-700 sm:text-lg">{item.description}</p>
+    <p className="mt-8 whitespace-pre-line text-base leading-8 text-slate-700 sm:text-lg">{item.article_body || item.description}</p>
     <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50 p-5"><h2 className="text-lg font-black text-emerald-900">Plan a first visit</h2><p className="mt-2 text-sm text-slate-700">Veterinary approval and proof of a current rabies vaccination are required before animal chiropractic visits. Discuss your pet’s needs with their veterinarian.</p><a href={item.secondary_href} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-bold text-white">{item.secondary_label} ↗</a></div>
   </main>;
 }
