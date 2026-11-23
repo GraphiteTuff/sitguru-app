@@ -67,26 +67,27 @@ export default function GrowthWorkstreamSwitcher({role}:{role:Role}) {
   if(!visible)return null;
   const tabs=NAV[role];
   const active=selected(path);
-  const base="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:px-4 sm:text-sm";
+  const base="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:px-3";
   return <nav aria-label="SitGuru workspaces: switch between events, Gurus, content and reporting"
-    className="sticky top-[64px] z-30 mb-4 w-full min-w-0 max-w-full rounded-2xl border border-emerald-100 bg-white/95 p-2 shadow-sm backdrop-blur sm:top-[72px] sm:p-3">
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-      <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">SitGuru · Quick Switch</span>
-      <Link href={previous||tabs[0][1]}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-black text-[#0F2744] hover:bg-blue-50"
-        title={previous?"Return to previous workspace":"Return to Community Studio"}>
-        <ArrowLeft size={15} aria-hidden="true"/>{previous?"Previous workspace":"Studio home"}
-      </Link>
-    </div>
-    <div className="flex w-full min-w-0 gap-2 overflow-x-auto pb-1">
+    className="relative mb-3 flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-emerald-100 bg-white px-2 py-2 shadow-sm sm:px-3">
+    <span className="hidden shrink-0 text-[10px] font-black uppercase tracking-wide text-emerald-800 lg:inline">
+      Quick Switch
+    </span>
+    <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto overscroll-x-contain">
       {tabs.map(([label,href,Icon],index)=>
         <Link key={href} href={href} aria-current={active===index?"page":undefined}
           className={base+" "+(active===index
             ?"border-emerald-800 bg-[#0D5C3A] text-white shadow-sm"
             :"border-emerald-100 bg-[#F0FDF4] text-[#0D5C3A] hover:bg-emerald-100")}>
-          <Icon size={16} aria-hidden="true"/>{label}
+          <Icon size={15} aria-hidden="true"/>{label}
         </Link>
       )}
     </div>
+    <Link href={previous||tabs[0][1]}
+      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-black text-[#0F2744] hover:bg-blue-50"
+      aria-label={previous?"Previous workspace":"Community Studio home"}
+      title={previous?"Return to previous workspace":"Return to Community Studio"}>
+      <ArrowLeft size={15} aria-hidden="true"/><span className="hidden sm:inline">{previous?"Back":"Home"}</span>
+    </Link>
   </nav>;
 }
