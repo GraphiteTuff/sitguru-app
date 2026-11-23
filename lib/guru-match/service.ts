@@ -388,7 +388,7 @@ export async function findApprovedShare(code:string){
   const publicName=initialsName(g.display_name||g.full_name||g.name);
   const firstName=guruFirstName(publicName);
   return {...data,promotionType,guru:{slug,
-    name:publicName,firstName,intro:guruPublicIntro(g.bio,firstName),
+    name:publicName.replace(/^\S+/,firstName),firstName,intro:guruPublicIntro(g.bio,firstName),
     city:clean(g.city),state:clean(g.state),
     photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url),
     experienceYears:(()=>{
