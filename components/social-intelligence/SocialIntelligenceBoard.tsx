@@ -132,7 +132,32 @@ export default function SocialIntelligenceBoard({ snapshot }: { snapshot: Social
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selectedMetric, setSelectedMetric] = useState<SeriesMetric>("pageViews");
-  const [sort, setSort] = useState<"views" | "visits" | "signups">("views");
+  type LeaderboardKey = "views" | "clicks" | "shares" | "saves" | "engagement" | "follows" | "visits" | "signups" | "bookings";
+  const [sort, setSort] = useState<LeaderboardKey>("views");
+  const [limit, setLimit] = useState<10 | 25 | 0>(10);
+  const LEADERBOARDS: Array<{ key: LeaderboardKey; label: string }> = [
+    { key: "views", label: "Most watched" },
+    { key: "clicks", label: "Most clicked" },
+    { key: "shares", label: "Most shared" },
+    { key: "saves", label: "Most saved" },
+    { key: "engagement", label: "Most engaged" },
+    { key: "follows", label: "Most follows" },
+    { key: "visits", label: "Most site visits" },
+    { key: "signups", label: "Most signups" },
+    { key: "bookings", label: "Most booking events" },
+  ];
+  const score = (post: SocialPost, key: LeaderboardKey): number | null => {
+    if (key === "views") return post.metrics.views;
+    if (key === "shares") return post.metrics.shares;
+    if (key === "saves") return post.metrics.saves;
+    if (key === "follows") return post.metrics.follows;
+    if (key === "clicks") return post.trackingKey ? post.impact.linkClicks : null;
+    if (key === "visits") return post.trackingKey ? post.impact.pageViews : null;
+    if (key === "signups") return post.trackingKey ? post.impact.signupEvents : null;
+    if (key === "bookings") return post.trackingKey ? post.impact.bookingEvents : null;
+    const values = [post.metrics.likes, post.metrics.comments, post.metrics.shares, post.metrics.saves];
+    return values.every((value) => value == null) ? null : values.reduce<number>((sum, value) => sum + (value || 0), 0);
+  };
   const [loading, transition] = useTransition();
   const selected = useMemo(() => snapshot.posts.find((post) => post.id === searchParams.get("post")), [snapshot.posts, searchParams]);
 
@@ -150,11 +175,13 @@ export default function SocialIntelligenceBoard({ snapshot }: { snapshot: Social
     p.delete("post");
     return "/api/social-intelligence/export?" + p.toString();
   }
-  const sorted = useMemo(() => [...snapshot.posts].sort((a, b) => (
-    sort === "views" ? (b.metrics.views ?? -1) - (a.metrics.views ?? -1)
-    : sort === "visits" ? b.impact.pageViews - a.impact.pageViews
-    : b.impact.signupEvents - a.impact.signupEvents
-  )), [snapshot.posts, sort]);
+  const sorted = [...snapshot.posts].sort((a, b) => {
+    const left = score(a, sort);
+    const right = score(b, sort);
+    return (right ?? -1) - (left ?? -1);
+  });
+  const leaderboardRows = limit ? sorted.slice(0, limit) : sorted;
+  const leaderboardTitle = LEADERBOARDS.find((item) => item.key === sort)?.label || "Content performance";
 
   return (
     <main className="space-y-5 pb-10">
@@ -239,29 +266,39 @@ export default function SocialIntelligenceBoard({ snapshot }: { snapshot: Social
           </section>
           <section className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div><h2 className="text-lg font-black text-slate-900">Published content & Reel drill-downs</h2><p className="text-xs text-slate-500">Open any post for media insights and attributable SitGuru activity.</p></div>
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">Sort by
-                <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="min-h-10 rounded-xl border border-slate-200 px-2 text-sm">
-                  <option value="views">Provider views</option><option value="visits">Site visits</option><option value="signups">Signups</option>
+              <div><h2 className="text-lg font-black text-slate-900">Content leaderboards · {leaderboardTitle}</h2><p className="text-xs text-slate-500">Rank verified content results, then open each post for a detailed performance history and attributable SitGuru activity.</p></div>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">Show
+                <select value={limit} onChange={(event) => setLimit(Number(event.target.value) as 10 | 25 | 0)} className="min-h-10 rounded-xl border border-slate-200 px-2 text-sm">
+                  <option value="10">Top 10</option><option value="25">Top 25</option><option value="0">All posts</option>
                 </select>
               </label>
             </div>
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Choose content ranking">
+              {LEADERBOARDS.map((board) => (
+                <button type="button" key={board.key} onClick={() => setSort(board.key)} aria-pressed={sort === board.key}
+                  className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-bold ${sort === board.key ? "border-emerald-800 bg-[#0D5C3A] text-white" : "border-slate-200 bg-white text-slate-700"}`}>
+                  {board.label}
+                </button>
+              ))}
+            </div>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-sm">
-                <thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="p-3">Post</th><th className="p-3">Platform</th><th className="p-3">Views</th><th className="p-3">Site visits</th><th className="p-3">Signups</th><th className="p-3">Published</th><th className="p-3">Details</th></tr></thead>
-                <tbody>{sorted.map((post) => (
+                <thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="p-3">Rank</th><th className="p-3">Post</th><th className="p-3">Platform</th><th className="p-3">{leaderboardTitle}</th><th className="p-3">Views</th><th className="p-3">Site visits</th><th className="p-3">Published</th><th className="p-3">Details</th></tr></thead>
+                <tbody>{leaderboardRows.map((post, index) => (
                   <tr key={post.id} className="border-b border-slate-100">
+                    <td className="p-3 text-slate-500">{index + 1}</td>
                     <td className="max-w-[220px] truncate p-3 font-semibold text-slate-900">{post.title}</td>
                     <td className="p-3 capitalize text-slate-700">{post.channel}</td>
+                    <td className="p-3 font-black tabular-nums text-emerald-900">{fmt(score(post, sort))}</td>
                     <td className="p-3 tabular-nums">{fmt(post.metrics.views)}</td>
-                    <td className="p-3 tabular-nums">{fmt(post.impact.pageViews)}</td>
-                    <td className="p-3 tabular-nums">{fmt(post.impact.signupEvents)}</td>
+                    <td className="p-3 tabular-nums">{post.trackingKey ? fmt(post.impact.pageViews) : "—"}</td>
                     <td className="p-3 text-xs text-slate-600">{post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : "—"}</td>
                     <td className="p-3"><button type="button" onClick={() => setFilter("post",post.id)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-900">Open <ArrowUpRight size={14}/></button></td>
                   </tr>
                 ))}</tbody>
               </table>
               {!sorted.length ? <p className="py-6 text-center text-sm text-slate-600">No published posts are cataloged for these filters yet. Once SitGuru publishes or connects its official post IDs, performance will appear here.</p> : null}
+              {sorted.length && sorted.every((post) => score(post, sort) == null) ? <p className="py-3 text-xs font-semibold text-amber-800">No verified {leaderboardTitle.toLowerCase()} data yet. A dash means unavailable, not zero. Provider permissions or tracked post links may be required.</p> : null}
             </div>
           </section>
           <section className="rounded-2xl border border-slate-200 bg-white p-4">
