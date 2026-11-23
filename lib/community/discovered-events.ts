@@ -172,6 +172,8 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
   homepageEligibleOnly?: boolean;
   /** Minimum effective pet relevance (default 40 for public surfaces). */
   minPetScore?: number;
+  /** Include events already in progress when used for staff promotion. */
+  from?: string;
 }) {
   const limit = opts?.limit ?? 12;
   const minPetScore = opts?.minPetScore ?? 40;
@@ -216,7 +218,7 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       `,
       )
       .eq("status", "active")
-      .gte("start_at", now)
+      .gte("start_at", opts?.from||now)
       .order("start_at", { ascending: true })
       .limit(Math.max(limit * 4, 48));
 
@@ -240,7 +242,7 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       const fallback = await supabaseAdmin
         .from("community_event_discoveries")
         .select("*")
-        .gte("start_at", now)
+        .gte("start_at", opts?.from||now)
         .order("start_at", { ascending: true })
         .limit(Math.max(limit * 4, 48));
 

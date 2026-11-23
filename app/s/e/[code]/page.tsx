@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { CalendarDays,MapPin,ArrowRight,PawPrint,CheckCircle2 } from "lucide-react";
 import { findApprovedEventShare,logEventShareActivity,eventSocialImage } from "@/lib/event-match/service";
 import { getPublicEventUrl } from "@/lib/community/slug";
@@ -36,7 +36,7 @@ export async function generateMetadata({params}:Props):Promise<Metadata>{
 export default async function EventShareLanding({params,searchParams}:Props){
   const {code}=await params;
   const share=await findApprovedEventShare(code);
-  if(!share)notFound();
+  if(!share)redirect("/events");
   const query=await searchParams;
   const source=(sources.has(query.via||"")?query.via:"other") as
     "facebook"|"instagram"|"tiktok"|"x"|"other"|"qr";

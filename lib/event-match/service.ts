@@ -80,9 +80,10 @@ export function filterEventPromotions(events:EventPromotionItem[],query:Record<s
 }
 async function loadPromotionEvents():Promise<EventPromotionItem[]> {
   // The homepage includes discovered events, not only manually published partner events.
+  const from=new Date(Date.now()-72*3600000).toISOString();
   const [partner,discovered] = await Promise.all([
-    fetchPublicEvents({limit:250}),
-    fetchDiscoveredHomepageEvents({limit:250,homepageEligibleOnly:false}),
+    fetchPublicEvents({limit:250,from}),
+    fetchDiscoveredHomepageEvents({limit:250,homepageEligibleOnly:false,from}),
   ]);
   const found = new Map<string,EventPromotionItem>();
   for(const event of [...partner,...discovered.events]){
@@ -139,7 +140,9 @@ export async function loadEventShareDashboard(actor:CommunityActor,filters:Recor
   return {
     events:filterEventPromotions(eventList,filters),
     campaigns:campaigns.map(c=>({
-      ...c,event:eventMap.get(c.event_slug)||null,
+      ...c,
+      status:c.status==="approved"&&!eventMap.has(c.event_slug)?"archived":c.status,
+      event:eventMap.get(c.event_slug)||null,
       metrics:metricsByCampaign.get(c.id)||emptyMetrics(),
       shareUrl:eventShareUrl(c.code,c.channel),
       qrUrl:eventQrImageUrl(c.code),cardUrl:eventCardImageUrl(c.code),
