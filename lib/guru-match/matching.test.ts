@@ -71,6 +71,9 @@ test("every publicly listed Guru has a safe marketing option without changing bo
   assert.equal(privateEntry.canPromote,false);
   assert.equal(privateEntry.canFeatureGuru,false);
   assert.equal(privateEntry.reason,"Public listing or location unavailable");
+  const bookableNoServices=buildGuruDirectory([{...base,services:[]}],[])[0];
+  assert.equal(bookableNoServices.canPromote,true);
+  assert.equal(bookableNoServices.canFeatureGuru,true); // Generic profile link makes no service claim.
   // Booking matcher is intentionally still strict: marketing does not enable booking.
   assert.equal(matchGuruCandidates(filters,[{...base,is_bookable:false}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,0);
