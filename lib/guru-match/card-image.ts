@@ -151,14 +151,17 @@ async function cropImage(input: Buffer, width: number, height: number, radius = 
   return img;
 }
 
-/** An individual Guru poster must feature that actual Guru's photo.
- * When it is missing, use a branded initials tile instead of stock imagery
- * that could wrongly represent a different person. Community discovery cards
- * may still use the approved generic SitGuru pet-care photography. */
+/**
+ * Use the Guru's own photo whenever available. If no profile image exists,
+ * display SitGuru's standard woman-and-man-walking-dogs marketing photo.
+ * The same renderer powers the manager/intern preview and exported PNG.
+ * Keep a neutral initials tile only if the bundled marketing image itself
+ * is unavailable. Do not substitute another Guru's personal profile photo.
+ */
 async function petPhotoPanel(input: GuruMatchCardAssets): Promise<Buffer|null> {
   const source = input.promotionType === "community"
     ? input.dogPng || input.catPng
-    : input.photoPng;
+    : input.photoPng || input.dogPng || input.catPng;
   if (!source) return null;
   return cropImage(source, 574, 648, 34);
 }
@@ -203,8 +206,8 @@ export async function renderGuruMatchCardPng(input: GuruMatchCardAssets): Promis
   const portrait=await petPhotoPanel(input);
   if(portrait) overlays.push({input:portrait,left:54,top:259});
   else {
-    // A missing or inaccessible Guru photo must never display an unrelated
-    // person. Keep the poster recognizable with the Guru's actual initials.
+    // Only used when neither the Guru photo nor SitGuru's approved
+    // standard lifestyle image is available.
     textItems.push({
       value:community?"SITGURU PET CARE":guruCardInitials(input.guruName),
       left:community?92:198,top:480,size:community?50:170,
