@@ -272,7 +272,9 @@ async function importFacebook(): Promise<ImportedPost[]> {
   for (const token of credentials) {
     for (const edge of ["published_posts", "posts"] as const) {
       try {
-        posts = await graphList("graph.facebook.com", pageId + "/" + edge, richFields, token);
+        const retrieved = await graphList("graph.facebook.com", pageId + "/" + edge, richFields, token);
+        if (edge === "published_posts" && retrieved.length === 0) continue;
+        posts = retrieved;
         break;
       } catch (error) {
         lastFailure = error;
