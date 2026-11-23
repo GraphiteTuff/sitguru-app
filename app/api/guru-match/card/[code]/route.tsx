@@ -69,9 +69,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
       safePhoto(share.guru.photoUrl),
       QRCode.toBuffer(guruMatchQrUrl(code), { type: "png", width: 460, margin: 2, errorCorrectionLevel: "H" }),
     ]);
-    const serviceLabel = GURU_MATCH_SERVICES.find(item => item.key === share.service_key)?.label || "Pet Care";
+    const serviceLabel = share.promotionType==="community"?"Explore local care":share.service_key==="custom_care"?"Explore Guru services":GURU_MATCH_SERVICES.find(item => item.key === share.service_key)?.label || "Pet Care";
     const png = await renderGuruMatchCardPng({
       guruName: share.guru.name,
+      promotionType: share.promotionType,
       city: share.city,
       state: share.state,
       serviceLabel,
