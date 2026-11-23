@@ -1,4 +1,5 @@
 import Link from "next/link";
+import {headers} from "next/headers";
 import { notFound } from "next/navigation";
 import { PawPrint,MapPin,ShieldCheck,ArrowRight,HeartHandshake } from "lucide-react";
 import { findApprovedShare,logPublicShareEvent } from "@/lib/guru-match/service";
@@ -15,7 +16,12 @@ export default async function SharedGuruLanding({
   if(!share)notFound();
   const search=await searchParams;
   const via=channels.has(search.via||"")?search.via!:"other";
-  await logPublicShareEvent(share.id,via==="qr"?"qr_open":"link_open",via);
+  // Social preview crawlers and speculative prefetches are not human clicks.
+  const requestHeaders=await headers();
+  const agent=requestHeaders.get("user-agent")||"";
+  const crawler=/bot|crawler|spider|facebookexternalhit|facebot|whatsapp|discord|pinterest|linkedin|slack|telegram|preview|embed|curl|wget/i.test(agent);
+  const prefetch=Boolean(requestHeaders.get("next-router-prefetch")||requestHeaders.get("purpose")==="prefetch");
+  if(!crawler&&!prefetch)await logPublicShareEvent(share.id,via==="qr"?"qr_open":"link_open",via);
   const label=GURU_MATCH_SERVICES.find(s=>s.key===share.service_key)?.label||"Pet care";
   return (
     <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 text-[#0F2744] sm:py-12">
