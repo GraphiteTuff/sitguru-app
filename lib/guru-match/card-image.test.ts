@@ -4,7 +4,7 @@ import sharp from "sharp";
 import QRCode from "qrcode";
 import { guruMatchCardSvg, renderGuruMatchCardPng } from "./card-image";
 
-test("Guru share image renders a 1200x630 downloadable PNG with a QR code", async () => {
+test("Guru share image renders a 1080x1350 portrait downloadable PNG with a QR code", async () => {
   const logo = await sharp({ create: { width: 120, height: 50, channels: 4, background: "#FFFFFF" } }).png().toBuffer();
   const qr = await QRCode.toBuffer("https://www.sitguru.com/s/g/ABCDEFGHIJKLMNOPQRSTUV?via=qr", {
     type: "png", width: 460, margin: 2, errorCorrectionLevel: "H",
@@ -17,8 +17,8 @@ test("Guru share image renders a 1200x630 downloadable PNG with a QR code", asyn
   assert.equal(image.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   const meta = await sharp(image).metadata();
   assert.equal(meta.format, "png");
-  assert.equal(meta.width, 1200);
-  assert.equal(meta.height, 630);
+  assert.equal(meta.width, 1080);
+  assert.equal(meta.height, 1350);
   assert.ok(image.byteLength > 10000);
   assert.match(guruMatchCardSvg(input), /Scan to meet this Guru/);
 });
@@ -48,8 +48,8 @@ test("Guru card also renders a real PNG when a profile photo is present", async 
   });
   assert.equal(bytes.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
   const meta=await sharp(bytes).metadata();
-  assert.equal(meta.width,1200);
-  assert.equal(meta.height,630);
+  assert.equal(meta.width,1080);
+  assert.equal(meta.height,1350);
   assert.ok(bytes.length>10000);
 });
 
