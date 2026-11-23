@@ -18,14 +18,15 @@ type Guru={
 };
 type Metrics={linkOpens:number;qrOpens:number;profileClicks:number;inquiryClicks:number;sharesReported:number;copyIntents:number};
 type Card={
-  id:string;code:string;status:string;guru:{name:string;city:string;state:string};
+  id:string;code:string;status:string;group_id:string|null;guru:{name:string;city:string;state:string};
   city:string;state:string;service_key:string;channel:Channel;
   reply_text:string;shareUrl:string;cardUrl:string;metrics:Metrics;
 };
 type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
-type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
+type SocialGroup={id:string;name:string;city:string;state:string;channel:Channel;group_url:string;created_at:string};
+type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];groups:SocialGroup[];campaigns:Card[];totals:Metrics;matchesNotice:string};
 type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
-type ReadyMini={guruId:string;service:string;channel:Channel;share:PreparedShare};
+type ReadyMini={guruId:string;service:string;channel:Channel;groupId:string;share:PreparedShare};
 const PAGE_SIZE=10;
 const services:[Service,string][]=[
   ['dog_walking','Dog Walking'],['pet_sitting','Pet Sitting'],['drop_in_visits','Drop-In Visits'],
@@ -56,6 +57,13 @@ function Body(){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState('');
   const [onlyBookable,setOnlyBookable]=useState(false);
+  const [directoryState,setDirectoryState]=useState('all');
+  const [directorySort,setDirectorySort]=useState<'state'|'name'>('state');
+  const [groupSearch,setGroupSearch]=useState('');
+  const [selectedGroupId,setSelectedGroupId]=useState('');
+  const [groupFormOpen,setGroupFormOpen]=useState(false);
+  const [groupForm,setGroupForm]=useState({name:'',city:'',state:'PA',channel:'facebook' as Channel,groupUrl:''});
+  const [showAdvanced,setShowAdvanced]=useState(false);
   const [directoryPage,setDirectoryPage]=useState(0);
   const [historyPage,setHistoryPage]=useState(0);
   const [historyOpen,setHistoryOpen]=useState(false);
@@ -94,28 +102,35 @@ function Body(){
   const card=dashboard?.campaigns.find(c=>c.code===active);
   const directory=dashboard?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
-  const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
-    (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
+  const groups=dashboard?.groups||[];
+  const selectedGroup=groups.find(group=>group.id===selectedGroupId);
+  const statesInDirectory=[...new Set([...directory.map(g=>g.state),...groups.map(g=>g.state)].filter(Boolean))].sort();
+  const filteredGroups=groups.filter(g=>!groupSearch.trim()||
+    (g.name+' '+g.city+' '+g.state).toLowerCase().includes(groupSearch.toLowerCase().trim()));
+  const listed=directory.filter(g=>(directoryState==='all'||g.state===directoryState)&&(!onlyBookable||g.canPromote)&&
+    (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())))
+    .sort((a,b)=>directorySort==='name'?a.name.localeCompare(b.name):
+      a.state.localeCompare(b.state)||a.city.localeCompare(b.city)||a.name.localeCompare(b.name));
   const listPageCount=Math.max(1,Math.ceil(listed.length/PAGE_SIZE));
   const visibleDirectory=listed.slice(directoryPage*PAGE_SIZE,(directoryPage+1)*PAGE_SIZE);
   const historyCount=Math.max(1,Math.ceil((dashboard?.campaigns.length||0)/PAGE_SIZE));
   const recentCampaigns=(dashboard?.campaigns||[]).slice(historyPage*PAGE_SIZE,(historyPage+1)*PAGE_SIZE);
-  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string)=>{
+  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string,groupId=selectedGroupId)=>{
     if(!g.canPromote||!service)return;
     setBusy(true);setError('');setReadyMini(null);
     const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
-      method:'POST',body:{action:'prepare',guruId:g.id,channel,service},cache:'no-store',
+      method:'POST',body:{action:'prepare',guruId:g.id,channel,service,groupId:groupId||undefined},cache:'no-store',
     });
     setBusy(false);
     if(result.error||!result.data?.share){setError(result.error||'Unable to prepare this Guru card.');return;}
-    setReadyMini({guruId:g.id,channel,service,share:result.data.share});
+    setReadyMini({guruId:g.id,channel,service,groupId,share:result.data.share});
   };
   const toggleMini=(g:DirectoryGuru)=>{
     if(expandedGuru===g.id){setExpandedGuru('');setReadyMini(null);return;}
-    setExpandedGuru(g.id);setMiniChannel('facebook');
+    setExpandedGuru(g.id);setMiniChannel(selectedGroup?.channel||'facebook');
     const service=g.serviceKeys[0]||'';
     setMiniService(service);setReadyMini(null);
-    if(g.canPromote&&service)void prepareMini(g,'facebook',service);
+    if(g.canPromote&&service)void prepareMini(g,selectedGroup?.channel||'facebook',service);
   };
   const logMiniShared=async()=>{
     if(!readyMini)return;
@@ -132,6 +147,47 @@ function Body(){
     if(!readyMini)return;
     try{await Share.share({title:'Meet a SitGuru Guru',message:readyMini.share.replyText,url:readyMini.share.shareUrl});}
     catch{setNotice('Share canceled. Your Guru card is still available.');}
+  };
+  const quickShare=async(g:DirectoryGuru)=>{
+    if(!g.canPromote||busy)return;
+    const service=g.serviceKeys[0];
+    if(!service){setError("This Guru needs an enabled service to share.");return;}
+    const channel=selectedGroup?.channel||form.channel;
+    setExpandedGuru(g.id);setMiniService(service);setMiniChannel(channel);
+    setReadyMini(null);setBusy(true);setError("");
+    const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
+      method:'POST',body:{action:'prepare',guruId:g.id,service,channel,groupId:selectedGroupId||undefined},
+      cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.share){setError(result.error||"The share card is unavailable.");return;}
+    const share=result.data.share;
+    setReadyMini({guruId:g.id,service,channel,groupId:selectedGroupId,share});
+    if(selectedGroup){
+      setNotice("Use the share sheet to copy the prepared message. The group will open afterward so staff can post it.");
+      try{
+        await Share.share({title:'SitGuru local Guru',message:share.replyText,url:share.shareUrl});
+        await Linking.openURL(selectedGroup.group_url);
+      }catch{setNotice("The local group and ready-to-copy message are available in the expanded card.");}
+    }else{
+      try{await Share.share({title:'Meet a SitGuru Guru',message:share.replyText,url:share.shareUrl});}
+      catch{setNotice("The approved card is ready for sharing.");}
+    }
+  };
+  const saveLocalGroup=async()=>{
+    if(!groupForm.name.trim()||!groupForm.city.trim()||!groupForm.groupUrl.trim()){
+      setError("Group name, city and URL are required.");return;
+    }
+    setBusy(true);setError("");
+    const result=await sitguruApiFetch<{ok:boolean;id:string}>('/api/guru-match',{
+      method:'POST',body:{action:'add_group',...groupForm},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.id){setError(result.error||"Could not save the local group.");return;}
+    setSelectedGroupId(result.data.id);setDirectoryState(groupForm.state);
+    setGroupFormOpen(false);setGroupForm({name:'',city:'',state:'PA',channel:'facebook',groupUrl:''});
+    setDirectoryPage(0);setNotice("Local social group saved for all authorized staff.");
+    await reload(searched);
   };
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
     setForm(old=>({...old,[field]:value}));setSelected('');setSearched(false);
@@ -193,6 +249,146 @@ function Body(){
         {btn('Content Studio',()=>router.push('/content-studio'))}
         {btn('Social Intelligence',()=>router.push('/social-intelligence'))}
       </View>
+      {!!error&&<Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      {!!notice&&<Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
+      <View style={styles.card}>
+        <Text style={styles.heading}>Find & Share a Guru</Text>
+        <Text style={styles.small}>{directory.length} listed · {readyToShare} ready. Search by city/state and tap Share next to any approved Guru.</Text>
+        <Text style={styles.label}>Local social groups</Text>
+        <TextInput value={groupSearch} onChangeText={setGroupSearch} style={styles.input}
+          accessibilityLabel="Search saved social groups by name or city"
+          placeholder="Search social group or city"/>
+        <View style={styles.chips}>
+          {pill('No group',!selectedGroupId,()=>{
+            setSelectedGroupId('');setReadyMini(null);setExpandedGuru('');
+          })}
+          {filteredGroups.slice(0,10).map(group=><View key={group.id}>
+            {pill(group.city+', '+group.state+' · '+group.name,selectedGroupId===group.id,()=>{
+              setSelectedGroupId(group.id);setDirectoryState(group.state);
+              setForm(old=>({...old,channel:group.channel}));setDirectoryPage(0);
+              setReadyMini(null);setExpandedGuru('');
+            })}
+          </View>)}
+        </View>
+        {selectedGroup&&<View style={styles.groupNotice}>
+          <Text style={styles.small}>{selectedGroup.name} · {selectedGroup.city}, {selectedGroup.state}</Text>
+          {btn('Open selected group',()=>{void Linking.openURL(selectedGroup.group_url);})}
+        </View>}
+        {!groups.length&&<Text style={styles.small}>There are no saved groups yet. A Manager or Admin can add group links for staff to reuse.</Text>}
+        {role!=='intern'&&btn(groupFormOpen?'Close Add Group':'Add a local group',()=>setGroupFormOpen(v=>!v))}
+        {groupFormOpen&&role!=='intern'&&<View style={styles.miniExpanded}>
+          <Text style={styles.label}>Group name</Text>
+          <TextInput value={groupForm.name} onChangeText={v=>setGroupForm(o=>({...o,name:v}))}
+            style={styles.input} placeholder="Community group name"/>
+          <Text style={styles.label}>City</Text>
+          <TextInput value={groupForm.city} onChangeText={v=>setGroupForm(o=>({...o,city:v}))}
+            style={styles.input} placeholder="City"/>
+          <Text style={styles.label}>State (two-letter code)</Text>
+          <TextInput value={groupForm.state} style={styles.input}
+            accessibilityLabel="Social group state code" maxLength={2}
+            autoCapitalize="characters" autoCorrect={false} placeholder="PA"
+            onChangeText={v=>setGroupForm(o=>({...o,state:v.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2)}))}/>
+          <Text style={styles.label}>Community platform</Text>
+          <View style={styles.chips}>{(['facebook','x','other'] as Channel[]).map(v=><View key={v}>
+            {pill(v.toUpperCase(),groupForm.channel===v,()=>setGroupForm(o=>({...o,channel:v})))}
+          </View>)}</View>
+          <Text style={styles.label}>Direct group URL</Text>
+          <TextInput value={groupForm.groupUrl} onChangeText={v=>setGroupForm(o=>({...o,groupUrl:v}))}
+            style={styles.input} placeholder="https://www.facebook.com/groups/..."
+            autoCapitalize="none" autoCorrect={false} keyboardType="url"/>
+          {btn('Save group for staff',()=>{void saveLocalGroup();},busy,true)}
+        </View>}
+        <Text style={styles.label}>Filter by state</Text>
+        <View style={styles.chips}>
+          {pill('All states',directoryState==='all',()=>{
+            setDirectoryState('all');setDirectoryPage(0);setSelectedGroupId('');setExpandedGuru('');
+          })}
+          {statesInDirectory.map(v=><View key={v}>{pill(v,directoryState===v,()=>{
+            setDirectoryState(v);setDirectoryPage(0);setExpandedGuru('');
+            if(selectedGroup?.state!==v)setSelectedGroupId('');
+          })}</View>)}
+        </View>
+        <View style={styles.chips}>
+          {pill('Sort state A–Z',directorySort==='state',()=>{setDirectorySort('state');setDirectoryPage(0);})}
+          {pill('Sort by name',directorySort==='name',()=>{setDirectorySort('name');setDirectoryPage(0);})}
+        </View>
+        <TextInput value={directoryQuery} onChangeText={value=>{setDirectoryQuery(value);setDirectoryPage(0);}}
+          style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
+        <View style={styles.chips}>
+          {pill('All listed',!onlyBookable,()=>{setOnlyBookable(false);setDirectoryPage(0);})}
+          {pill('Ready to promote',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
+        </View>
+        <Text style={styles.small}>Showing {visibleDirectory.length} of {listed.length} Gurus</Text>
+        {visibleDirectory.map(g=>{
+          const expanded=expandedGuru===g.id;
+          const mini=readyMini?.guruId===g.id && readyMini.service===miniService &&
+            readyMini.channel===miniChannel && readyMini.groupId===selectedGroupId ? readyMini.share : null;
+          return <View key={g.id} style={styles.guruMini}>
+            <TouchTarget accessibilityRole="button" accessibilityState={{expanded}}
+              onPress={()=>toggleMini(g)} style={styles.guruMiniHeader}>
+              <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
+              <View style={{flex:1,gap:3}}>
+                <Text style={styles.cardTitle}>{g.name}</Text>
+                <Text style={styles.small}>{g.city||'Location missing'}, {g.state}</Text>
+                <Text style={g.canPromote?styles.good:styles.warning}>
+                  {g.canPromote?'Approved · Ready to share':g.reason}
+                </Text>
+              </View>
+              <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
+            </TouchTarget>
+            {g.canPromote&&g.serviceKeys.length>0&&
+              <View style={styles.quickShareRow}>
+                {btn(selectedGroup?'Share to local group':'Share Guru',()=>{void quickShare(g);},busy,true)}
+              </View>}
+            {expanded&&<View style={styles.miniExpanded}>
+              {g.canPromote && g.serviceKeys.length ? <>
+                <Text style={styles.label}>Choose Guru service</Text>
+                <View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
+                  {pill(s.replace(/_/g,' '),miniService===s,()=>{
+                    setMiniService(s);void prepareMini(g,miniChannel,s);
+                  })}
+                </View>)}</View>
+                <Text style={styles.label}>Choose social channel</Text>
+                {selectedGroup
+                  ? <Text style={styles.small}>{selectedGroup.channel.toUpperCase()} · {selectedGroup.name}</Text>
+                  : <View style={styles.chips}>{channels.map(c=><View key={c}>
+                    {pill(c.toUpperCase(),miniChannel===c,()=>{
+                      setMiniChannel(c);void prepareMini(g,c,miniService);
+                    })}
+                  </View>)}</View>}
+                {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
+                {mini&&<>
+                  <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
+                    accessibilityLabel={g.name+' promotional card and QR code'}/>
+                  <View style={styles.inlineRow}>
+                    {btn('Share to social app',()=>{void shareMini();})}
+                    {btn('Open PNG',()=>{void Linking.openURL(mini.cardUrl);})}
+                  </View>
+                  <Text selectable style={styles.reply}>{mini.replyText}</Text>
+                  <Text selectable style={styles.small}>{mini.shareUrl}</Text>
+                  <Text style={styles.small}>For Instagram and TikTok, post the image using the native app and add the tracked link to a permitted caption or reply. Posting is not automatic.</Text>
+                  {btn('Mark post as shared',()=>{void logMiniShared();},busy,true)}
+                </>}
+                {!mini&&!busy&&btn('Retry preparing card',()=>{void prepareMini(g,miniChannel,miniService);})}
+              </>:<Text style={styles.warning}>
+                {g.canPromote?'A Guru service must be enabled before sharing.':g.reason}
+              </Text>}
+              {!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
+            </View>}
+          </View>;
+        })}
+        <View style={styles.inlineRow}>
+          {btn('Previous',()=>{setDirectoryPage(v=>Math.max(0,v-1));setExpandedGuru('');},directoryPage===0)}
+          {btn('Next',()=>{setDirectoryPage(v=>v+1);setExpandedGuru('');},directoryPage+1>=listPageCount)}
+        </View>
+        <Text style={styles.small}>Page {directoryPage+1} of {listPageCount}</Text>
+      </View>
+      <TouchTarget accessibilityRole="button" onPress={()=>setShowAdvanced(v=>!v)}
+        accessibilityState={{expanded:showAdvanced}} style={styles.historyToggle}>
+        <Text style={styles.heading}>Advanced matching & analytics</Text>
+        <Text style={styles.expandIcon}>{showAdvanced?'−':'+'}</Text>
+      </TouchTarget>
+      {showAdvanced&&<View style={{gap:12}}>
       <Text style={styles.heading}>90-day outreach activity</Text>
       <View style={styles.metrics}>
         {([
@@ -203,8 +399,6 @@ function Body(){
           <Text style={styles.metricLabel}>{title}</Text><Text style={styles.metricValue}>{n.toLocaleString('en-US')}</Text>
         </View>)}
       </View>
-      {!!error&&<Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-      {!!notice&&<Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
       <View style={styles.card}>
         <Text style={styles.heading}>Match a Pet Parent request</Text>
         <Text style={styles.label}>City</Text>
@@ -237,75 +431,7 @@ function Body(){
         </TouchTarget>)}
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
-      <View style={styles.card}>
-        <Text style={styles.heading}>Guru Card Library</Text>
-        <Text style={styles.small}>{directory.length} listed profiles · {readyToShare} approved for promotion.</Text>
-        <Text style={styles.small}>Tap one mini card to expand its ready-to-share image and QR. Only one expands at a time.</Text>
-        <TextInput value={directoryQuery} onChangeText={value=>{setDirectoryQuery(value);setDirectoryPage(0);}}
-          style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
-        <View style={styles.chips}>
-          {pill('All listed',!onlyBookable,()=>{setOnlyBookable(false);setDirectoryPage(0);})}
-          {pill('Ready to promote',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
-        </View>
-        <Text style={styles.small}>Showing {visibleDirectory.length} of {listed.length} Gurus</Text>
-        {visibleDirectory.map(g=>{
-          const expanded=expandedGuru===g.id;
-          const mini=readyMini?.guruId===g.id && readyMini.service===miniService &&
-            readyMini.channel===miniChannel ? readyMini.share : null;
-          return <View key={g.id} style={styles.guruMini}>
-            <TouchTarget accessibilityRole="button" accessibilityState={{expanded}}
-              onPress={()=>toggleMini(g)} style={styles.guruMiniHeader}>
-              <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
-              <View style={{flex:1,gap:3}}>
-                <Text style={styles.cardTitle}>{g.name}</Text>
-                <Text style={styles.small}>{g.city||'Location missing'}, {g.state}</Text>
-                <Text style={g.canPromote?styles.good:styles.warning}>
-                  {g.canPromote?'Approved · Ready to share':g.reason}
-                </Text>
-              </View>
-              <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
-            </TouchTarget>
-            {expanded&&<View style={styles.miniExpanded}>
-              {g.canPromote && g.serviceKeys.length ? <>
-                <Text style={styles.label}>Choose Guru service</Text>
-                <View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
-                  {pill(s.replace(/_/g,' '),miniService===s,()=>{
-                    setMiniService(s);void prepareMini(g,miniChannel,s);
-                  })}
-                </View>)}</View>
-                <Text style={styles.label}>Choose social channel</Text>
-                <View style={styles.chips}>{channels.map(c=><View key={c}>
-                  {pill(c.toUpperCase(),miniChannel===c,()=>{
-                    setMiniChannel(c);void prepareMini(g,c,miniService);
-                  })}
-                </View>)}</View>
-                {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
-                {mini&&<>
-                  <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
-                    accessibilityLabel={g.name+' promotional card and QR code'}/>
-                  <View style={styles.inlineRow}>
-                    {btn('Share to social app',()=>{void shareMini();})}
-                    {btn('Open PNG',()=>{void Linking.openURL(mini.cardUrl);})}
-                  </View>
-                  <Text selectable style={styles.reply}>{mini.replyText}</Text>
-                  <Text selectable style={styles.small}>{mini.shareUrl}</Text>
-                  <Text style={styles.small}>For Instagram and TikTok, post the image using the native app and add the tracked link to a permitted caption or reply. Posting is not automatic.</Text>
-                  {btn('Mark post as shared',()=>{void logMiniShared();},busy,true)}
-                </>}
-                {!mini&&!busy&&btn('Retry preparing card',()=>{void prepareMini(g,miniChannel,miniService);})}
-              </>:<Text style={styles.warning}>
-                {g.canPromote?'A Guru service must be enabled before sharing.':g.reason}
-              </Text>}
-              {!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
-            </View>}
-          </View>;
-        })}
-        <View style={styles.inlineRow}>
-          {btn('Previous',()=>{setDirectoryPage(v=>Math.max(0,v-1));setExpandedGuru('');},directoryPage===0)}
-          {btn('Next',()=>{setDirectoryPage(v=>v+1);setExpandedGuru('');},directoryPage+1>=listPageCount)}
-        </View>
-        <Text style={styles.small}>Page {directoryPage+1} of {listPageCount}</Text>
-      </View>
+      </View>}
       <TouchTarget accessibilityRole="button"
         onPress={()=>{setHistoryOpen(x=>!x);setActive('');}}
         style={styles.historyToggle}>
@@ -319,7 +445,7 @@ function Body(){
             onPress={()=>setActive(active===c.code?'':c.code)} style={styles.guruMiniHeader}>
             <View style={{flex:1}}>
               <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
-              <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
+              <Text style={styles.small}>{groups.find(g=>g.id===c.group_id)?.name||c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
             </View>
             <Text style={styles.expandIcon}>{card?.id===c.id?'−':'+'}</Text>
           </TouchTarget>
@@ -359,8 +485,8 @@ export default function GuruMatchShareScreen(){
 const styles=StyleSheet.create({
   root:{padding:12,gap:13,backgroundColor:'#F4F7FB',borderRadius:20,paddingBottom:40},
   back:{minHeight:44,justifyContent:'center'},backText:{color:'#2563EB',fontWeight:'800'},
-  hero:{padding:21,borderRadius:23,gap:8},kicker:{fontSize:11,color:'#D1FAE5',fontWeight:'900',letterSpacing:1},
-  heroTitle:{fontSize:28,color:'#FFFFFF',fontWeight:'900'},heroCopy:{color:'#E5F7F0',fontSize:14,fontWeight:'600',lineHeight:21},
+  hero:{padding:14,borderRadius:18,gap:4},kicker:{fontSize:11,color:'#D1FAE5',fontWeight:'900',letterSpacing:1},
+  heroTitle:{fontSize:24,color:'#FFFFFF',fontWeight:'900'},heroCopy:{color:'#E5F7F0',fontSize:14,fontWeight:'600',lineHeight:21},
   heading:{fontSize:19,color:'#0F2744',fontWeight:'900',marginTop:5},
   card:{borderWidth:1,borderColor:'#DFE7EE',backgroundColor:'#FFFFFF',borderRadius:21,padding:15,gap:11},
   label:{fontSize:12,fontWeight:'900',color:'#0F2744',marginTop:2},
@@ -387,6 +513,8 @@ const styles=StyleSheet.create({
   good:{fontSize:12,fontWeight:'800',color:'#166534'},
   warning:{fontSize:12,fontWeight:'800',color:'#92400E'},
   historyToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:'#E2E8F0',borderRadius:16,padding:13,backgroundColor:'#FFFFFF'},
+  quickShareRow:{paddingHorizontal:12,paddingBottom:10,flexDirection:'row'},
+  groupNotice:{gap:6,padding:10,borderRadius:12,backgroundColor:'#EFF6FF'},
   avatar:{height:58,width:58,borderRadius:12},avatarBlank:{backgroundColor:'#DCFCE7',alignItems:'center',justifyContent:'center'},
   paw:{fontSize:24},cardTitle:{fontSize:15,fontWeight:'900',color:'#0F2744'},
   small:{fontSize:12,fontWeight:'600',lineHeight:19,color:'#64748B'},

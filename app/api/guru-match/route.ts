@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { communityJson } from "@/lib/community-studio/api-access";
 import {
-  guruMatchActor,loadCampaignDashboard,makeGuruShare,prepareGuruMiniCard,
+  guruMatchActor,loadCampaignDashboard,makeGuruShare,prepareGuruMiniCard,addGuruSocialGroup,
   readMatchBody,updateGuruShare,
 } from "@/lib/guru-match/service";
 import { normalizeMatchFilters } from "@/lib/guru-match/matching";
@@ -32,6 +32,8 @@ export async function POST(request:NextRequest){
       return communityJson(request,await updateGuruShare(actor,input));
     if(input.action==="prepare")
       return communityJson(request,{ok:true,share:await prepareGuruMiniCard(actor,input)});
+    if(input.action==="add_group")
+      return communityJson(request,await addGuruSocialGroup(actor,input));
     if(input.action && input.action!=="create")
       return communityJson(request,{ok:false,error:"Unsupported action."},400);
     return communityJson(request,{ok:true,share:await makeGuruShare(actor,input)},201);

@@ -12,9 +12,10 @@ const SITE="https://www.sitguru.com";
 const CHANNELS = ["facebook","instagram","tiktok","x","other"] as const;
 export type ShareChannel = typeof CHANNELS[number];
 export type CampaignStatus = "pending_review"|"approved"|"rejected"|"archived";
+export type GuruSocialGroup = {id:string;name:string;city:string;state:string;channel:ShareChannel;group_url:string;created_at:string};
 export type CampaignRow = {
   id:string; code:string; guru_id:string; created_by_user_id:string;
-  intern_id:string|null; city:string; state:string;radius_miles:number;
+  intern_id:string|null; group_id:string|null; city:string; state:string;radius_miles:number;
   service_key:string; pet_type:string;channel:ShareChannel;
   reply_text:string;status:CampaignStatus;approved_at:string|null;
   created_at:string;shared_reported_at:string|null;
@@ -28,7 +29,7 @@ export type CampaignView = CampaignRow & {
   metrics:CampaignMetrics; shareUrl:string; qrUrl:string; cardUrl:string;
 };
 export type GuruMatchDashboard = {
-  matches:GuruMatch[]; directory:GuruDirectoryEntry[]; campaigns:CampaignView[]; totals:CampaignMetrics;
+  matches:GuruMatch[]; directory:GuruDirectoryEntry[]; groups:GuruSocialGroup[]; campaigns:CampaignView[]; totals:CampaignMetrics;
   period:"90d"; matchesNotice:string;
 };
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -102,8 +103,12 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const ids=await permittedCreatorIds(actor);
   let q=supabaseAdmin.from("guru_match_share_campaigns").select("*").order("created_at",{ascending:false}).limit(100);
   if(ids)q=q.in("created_by_user_id",ids);
-  const [{data:rows,error:campaignError}, candidates]=await Promise.all([
+  const [{data:rows,error:campaignError}, candidates, groupResult]=await Promise.all([
     q,loadAllGuruCandidates(),
+    supabaseAdmin.from("guru_match_social_groups")
+      .select("id,name,city,state,channel,group_url,created_at")
+      .order("state",{ascending:true}).order("city",{ascending:true})
+      .order("name",{ascending:true}).limit(1500),
   ]);
   // Match the Admin Dashboard public-listing count, not its booking-readiness count.
   // Bookability is a separate permission: pending, suspended and incomplete accounts
@@ -111,6 +116,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const directory=buildGuruDirectory(candidates.gurus.filter(g=>g.is_public===true),candidates.rates);
   const matches=filters?matchGuruCandidates(filters,candidates.gurus,candidates.rates):[];
   if(campaignError)throw new Error("Guru outreach reporting is not configured.");
+  if(groupResult.error)throw new Error("Local social group directory is unavailable.");
   const campaigns=(rows||[]) as CampaignRow[];
   const guruIds=[...new Set(campaigns.map(c=>c.guru_id))];
   const [guruResult,eventResult]=await Promise.all([
@@ -137,7 +143,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     metric[key]++;totals[key]++;
   }
   return {
-    matches,directory,
+    matches,directory,groups:(groupResult.data||[]) as GuruSocialGroup[],
     campaigns:campaigns.map(c=>{
       const g=guruMap.get(c.guru_id);
       return {...c,
@@ -157,6 +163,8 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const filters=normalizeMatchFilters(input);
   const guruId=clean(input.guruId);
   const channel=channelOf(input.channel);
+  const groupId=clean(input.groupId);
+  if(groupId&&!isUuid(groupId))throw new Error("Invalid local group.");
   if(!filters||!isUuid(guruId))throw new Error("Choose a city, state, service and eligible Guru.");
   const matches=await findEligibleGuruMatches(filters);
   const guru=matches.find(g=>g.id===guruId);
@@ -164,10 +172,11 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const code=randomBytes(16).toString("base64url");
   const reply=`Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
   const manager=actor.canModerate;
-  // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.\n  const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
+  // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.
+  const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns").insert({
     code,guru_id:guru.id,created_by_user_id:actor.user.id,
-    intern_id:!manager&&actor.intern?actor.intern.id:null,
+    intern_id:!manager&&actor.intern?actor.intern.id:null,group_id:groupId||null,
     city:filters.city,state:filters.state,radius_miles:filters.radius,
     service_key:filters.service,pet_type:filters.pet,channel,reply_text:reply,
     status,approved_by_user_id:manager?actor.user.id:null,
@@ -185,6 +194,14 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
   const guruId=clean(input.guruId);
   if(!isUuid(guruId)) throw new Error("Choose a valid Guru.");
   const channel=channelOf(input.channel);
+  const groupId=clean(input.groupId);
+  if(groupId && !isUuid(groupId))throw new Error("Select a valid local social group.");
+  const groupLookup=groupId?await supabaseAdmin.from("guru_match_social_groups")
+    .select("id,name,city,state,channel").eq("id",groupId).maybeSingle():null;
+  if(groupLookup?.error || (groupId && !groupLookup?.data))
+    throw new Error("The selected local group no longer exists.");
+  const group=groupLookup?.data||null;
+  if(group&&group.channel!==channel)throw new Error("Choose the same channel as the selected group.");
   const candidates=await loadAllGuruCandidates();
   const guru=candidates.gurus.find(g=>g.id===guruId);
   if(!guru || guru.is_bookable!==true || guru.is_public!==true ||
@@ -195,18 +212,20 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
   const service=requested || GURU_MATCH_SERVICES.find(item=>available.has(item.key))?.key || "";
   if(!isServiceKey(service) || !available.has(service))
     throw new Error("This Guru needs an enabled service before a share card can be used.");
-  const city=clean(guru.service_city||guru.city);
-  const state=clean(guru.service_state||guru.state).toUpperCase();
+  const city=clean(group?.city||guru.service_city||guru.city);
+  const state=clean(group?.state||guru.service_state||guru.state).toUpperCase();
   const radiusValue=Number(guru.service_radius_miles);
   const radius=Number.isFinite(radiusValue)?Math.min(50,Math.floor(radiusValue)):0;
   const filters=normalizeMatchFilters({city,state,service,pet:"any",radius});
   if(!filters || !matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
     throw new Error("Complete this Guru's service location and coverage before sharing.");
-  const {data:existing,error:queryError}=await supabaseAdmin.from("guru_match_share_campaigns")
+  let existingQuery=supabaseAdmin.from("guru_match_share_campaigns")
     .select("id,code,reply_text").eq("guru_id",guruId)
     .eq("created_by_user_id",actor.user.id).eq("channel",channel)
     .eq("service_key",service).eq("city",city).eq("state",state)
-    .eq("pet_type","any").eq("status","approved")
+    .eq("pet_type","any").eq("status","approved");
+  existingQuery=groupId?existingQuery.eq("group_id",groupId):existingQuery.is("group_id",null);
+  const {data:existing,error:queryError}=await existingQuery
     .order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(queryError) throw new Error("Unable to retrieve the approved Guru card.");
   if(existing) return {
@@ -215,8 +234,44 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
     cardUrl:guruMatchCardImage(existing.code),qrUrl:guruMatchQrImage(existing.code),
   };
   return makeGuruShare(actor,{
-    guruId,city,state,service,pet:"any",radius,channel,
+    guruId,city,state,service,pet:"any",radius,channel,groupId,
   },true);
+}
+
+/** Staff-maintained destination links. Browsing/opening groups is a manual flow;
+ * the platform does not assume permission to post in any third-party group. */
+export async function addGuruSocialGroup(actor:CommunityActor,input:Record<string,unknown>){
+  if(!actor.canModerate)throw new Error("A Manager or Admin must approve group destinations.");
+  const name=clean(input.name),city=clean(input.city),state=clean(input.state).toUpperCase();
+  const channel=channelOf(input.channel);
+  if(name.length<3||name.length>110||city.length<2||city.length>90||
+    !/^[A-Z]{2}$/.test(state))throw new Error("Provide a group name, city, and two-letter state.");
+  let url:URL;
+  try{url=new URL(clean(input.groupUrl));}
+  catch{throw new Error("Enter a valid HTTPS group URL.");}
+  if(url.protocol!=="https:"||url.username||url.password)throw new Error("Use a secure HTTPS group link.");
+  const host=url.hostname.toLowerCase();
+  if(channel==="facebook"&&!(
+    ["facebook.com","www.facebook.com","m.facebook.com"].includes(host)&&
+    /^\/groups\/[^/]+/.test(url.pathname)))
+    throw new Error("Please use a direct Facebook group URL (facebook.com/groups/…).");
+  if(channel==="x"&&!(
+    ["x.com","www.x.com","twitter.com","www.twitter.com"].includes(host)&&
+    /^\/i\/communities\/[^/]+/.test(url.pathname)))
+    throw new Error("Please use an X Community URL (x.com/i/communities/…).");
+  if(channel==="other" && !["facebook.com","www.facebook.com","m.facebook.com","x.com","www.x.com","twitter.com","www.twitter.com","nextdoor.com","www.nextdoor.com","reddit.com","www.reddit.com"].includes(host))
+    throw new Error("Use a recognized social community link.");
+  url.hash="";
+  const normalized=url.toString();
+  const {data:existing,error:findError}=await supabaseAdmin.from("guru_match_social_groups")
+    .select("id").eq("group_url",normalized).limit(1).maybeSingle();
+  if(findError)throw new Error("Unable to check existing local groups.");
+  if(existing)return {ok:true,alreadyExists:true,id:existing.id};
+  const {data,error}=await supabaseAdmin.from("guru_match_social_groups")
+    .insert({name,city,state,channel,group_url:normalized,created_by_user_id:actor.user.id})
+    .select("id").single();
+  if(error||!data)throw new Error("Could not save the local social group.");
+  return {ok:true,id:data.id};
 }
 
 export async function updateGuruShare(actor:CommunityActor,input:Record<string,unknown>){
