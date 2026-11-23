@@ -50,15 +50,14 @@ export default async function AdminContentOverviewPage({
 
   return (
     <main className="mx-auto max-w-4xl space-y-4 px-4 py-8">
-      <header>
-        <h1 className="text-3xl font-black text-slate-950">Content overview</h1>
-        <p className="mt-1 text-sm font-semibold text-slate-600">
-          Read-only view of intern content. Routine approval stays with the assigned manager. Escalations can be decided here.
-        </p>
+      <header className="rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] public-dark-section" data-brand-green>
+        <p className="text-xs font-black uppercase tracking-widest !text-emerald-100">SitGuru · Admin HQ</p>
+        <h1 className="mt-1 text-3xl font-black !text-white">Content overview</h1>
+        <p className="mt-2 text-sm font-semibold !text-emerald-50">Review intern submissions and handle escalations. Routine approvals remain with the assigned manager.</p>
       </header>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
-      <Link href="/admin/growth/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">Open Social Intelligence dashboard →</Link>
+      <Link href="/admin/growth/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">Open Social Intelligence dashboard →</Link>
       <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {[
           ["Drafts", counts.drafts],
@@ -67,19 +66,29 @@ export default async function AdminContentOverviewPage({
           ["Approved", counts.approved],
           ["Scheduled", counts.scheduled],
           ["Published", counts.published],
-        ].map(([label, count]) => (
-          <article key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-3">
-            <p className="text-2xl font-black text-slate-950">{count}</p>
-            <p className="text-xs font-semibold text-slate-600">{label}</p>
-          </article>
-        ))}
+        ].map(([label, count], index) => {
+          const tones = [
+            "border-[#DBEAFE] bg-[#EFF6FF] text-[#1D4ED8]",
+            "border-[#FFEDD5] bg-[#FFF4ED] text-[#C2410C]",
+            "border-[#FFEDD5] bg-[#FFF7ED] text-[#C2410C]",
+            "border-[#DCFCE7] bg-[#F0FDF4] text-[#166534]",
+            "border-[#EDE9FE] bg-[#F5F3FF] text-[#6D28D9]",
+            "border-[#CCFBF1] bg-[#F0FDFA] text-[#0F766E]",
+          ] as const;
+          return (
+            <article key={String(label)} className={`rounded-2xl border p-3 shadow-sm ${tones[index]}`}>
+              <p className="text-2xl font-black tabular-nums">{count}</p>
+              <p className="text-xs font-bold text-[#0F2744]">{label}</p>
+            </article>
+          );
+        })}
       </div>
       <nav className="flex flex-wrap gap-2">
         {FILTERS.map(([id, label]) => (
           <Link
             key={id || "all"}
             href={id ? `/admin/growth/content?queue=${id}` : "/admin/growth/content"}
-            className={`rounded-full px-3 py-2 text-xs font-black ${filter === id ? "bg-[#0D5C3A] !text-white" : "bg-white text-slate-700"}`}
+            className={`rounded-full px-3 py-2 text-xs font-black ${filter === id ? "bg-[#2563EB] !text-white shadow-sm" : "bg-[#EEF2F6] text-[#0F2744] hover:bg-[#DBEAFE]"}`}
           >
             {label}
           </Link>
