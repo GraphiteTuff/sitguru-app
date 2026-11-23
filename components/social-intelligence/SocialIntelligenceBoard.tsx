@@ -5,11 +5,13 @@ import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowUpRight, BarChart3, CalendarDays, CheckCircle2,
+  Activity, Target, Sparkles,
   ExternalLink, FileDown, MousePointerClick, RefreshCw,
   TrendingUp, Users, Video, PawPrint, Trophy,
 } from "lucide-react";
 import type { SocialIntelligenceSnapshot, SocialPost } from "@/lib/social-intelligence/types";
 import { DESK_STAT, DESK_UI } from "@/lib/portal/desk-ui";
+import MetaPublishedContentPanel from "./MetaPublishedContentPanel";
 
 type SeriesMetric = "pageViews" | "linkClicks" | "signupEvents" | "bookingEvents";
 const TIME_WINDOWS = [
@@ -150,6 +152,30 @@ export default function SocialIntelligenceBoard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selectedMetric, setSelectedMetric] = useState<SeriesMetric>("pageViews");
+  const [metaRefreshing, setMetaRefreshing] = useState(false);
+  const [metaFeedback, setMetaFeedback] = useState<string | null>(null);
+  async function refreshMetaPosts() {
+    if (metaRefreshing) return;
+    setMetaRefreshing(true);
+    setMetaFeedback(null);
+    try {
+      const response = await fetch("/api/social-intelligence/sync-meta", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json() as { error?: string; results?: Array<{ platform: string; posts: number; note: string }> };
+      if (!response.ok) throw new Error(data.error || "Meta post import unavailable.");
+      setMetaFeedback(data.results?.map((r) =>
+        r.platform + ": " + r.note + " (" + r.posts + " posts)"
+      ).join(" · ") || "Meta import checked.");
+      router.refresh();
+    } catch (error) {
+      setMetaFeedback(error instanceof Error ? error.message : "Meta sync could not complete.");
+    } finally {
+      setMetaRefreshing(false);
+    }
+  }
   type LeaderboardKey = "views" | "clicks" | "shares" | "saves" | "engagement" | "follows" | "visits" | "signups" | "bookings";
   const [sort, setSort] = useState<LeaderboardKey>("views");
   const [limit, setLimit] = useState<10 | 25 | 0>(10);
@@ -203,25 +229,25 @@ export default function SocialIntelligenceBoard({
 
   return (
     <main className="min-w-0 space-y-5 rounded-[1.75rem] bg-[#F4F7FB] px-3 py-4 pb-10 sm:px-5 lg:px-6">
-      <header className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 text-white shadow-[0_12px_32px_rgba(15,39,68,0.16)] sm:p-6 public-dark-section" data-brand-green>
+      <div role="banner" aria-label="SitGuru Social Intelligence" className="relative isolate min-h-44 overflow-hidden rounded-[1.5rem] p-5 shadow-[0_16px_36px_rgba(15,39,68,0.22)] sm:p-6" style={{ background: "linear-gradient(112deg, #0F2744 0%, #164B61 47%, #0D5C3A 100%)", color: "#FFFFFF" }}>
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] !text-emerald-100">
+            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em]" style={{ color: "#BBF7D0" }}>
               <PawPrint size={16} aria-hidden="true" /> SitGuru · Growth Center Insights
             </p>
-            <h1 className="mt-2 text-2xl font-black !text-white sm:text-3xl">Social Intelligence</h1>
-            <p className="mt-2 max-w-3xl text-sm !text-emerald-50">Content performance, community growth, and measurable SitGuru activity in one familiar workspace.</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl" style={{ color: "#FFFFFF" }}>Social Intelligence</h1>
+            <p className="mt-2 max-w-3xl text-sm font-semibold sm:text-base" style={{ color: "#E5F7F0" }}>Content performance, community growth, and measurable SitGuru activity in one familiar workspace.</p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-xs font-black !text-white ring-1 ring-white/20">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-xs font-black ring-1 ring-white/30" style={{ color: "#FFFFFF" }}>
             <Trophy size={15} aria-hidden="true" /> Content rankings
           </span>
         </div>
         <div className="relative mt-4 flex flex-wrap gap-2">
           {["Create", "Publish", "Measure", "Grow SitGuru"].map((step) => (
-            <span key={step} className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold !text-white">{step}</span>
+            <span key={step} className="rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-xs font-bold" style={{ color: "#FFFFFF" }}>{step}</span>
           ))}
         </div>
-      </header>
+      </div>
       <div className={`${DESK_UI.card} flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4`}>
         <div className="flex flex-wrap gap-2">
           <Link href={overviewHref} className="inline-flex min-h-10 items-center rounded-xl bg-[#EEF2F6] px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-[#E2E8F0] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Growth Center overview</Link>
@@ -260,7 +286,7 @@ export default function SocialIntelligenceBoard({
             <StatCard label="Signup events" value={fmt(snapshot.total.signupEvents)} detail={changeLabel(snapshot.total.signupEvents, snapshot.prior.signupEvents)} icon={Users} tone="green"/>
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 xl:col-span-2">
+            <section className="min-w-0 rounded-2xl border border-[#DBEAFE] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EFF6FF] p-5 shadow-[0_10px_30px_rgba(37,99,235,0.06)] xl:col-span-2">
               <div className="flex flex-wrap justify-between gap-2">
                 <div>
                   <h2 className="text-lg font-black text-[#0F2744]">Content-to-SitGuru activity</h2>
@@ -276,16 +302,19 @@ export default function SocialIntelligenceBoard({
                 <span>{snapshot.daily.at(-1)?.date || "End"}</span>
               </div>
             </section>
-            <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-              <h2 className="text-lg font-black text-[#0F2744]">Business impact</h2>
+            <section className="space-y-3 rounded-2xl border border-[#D1EADD] bg-gradient-to-b from-[#F0FDF4] via-white to-[#F8FAFC] p-5 shadow-[0_10px_30px_rgba(13,92,58,0.07)]">
+              <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]"><Target size={19} className="text-[#0D5C3A]" /> Business impact</h2>
               <div><p className="text-xs text-slate-500">Tracked booking events</p><p className="text-3xl font-black text-[#0F2744]">{fmt(snapshot.total.bookingEvents)}</p></div>
               <div><p className="text-xs text-slate-500">Verified paid bookings</p><p className="text-2xl font-black text-[#0F2744]">—</p></div>
               <div><p className="text-xs text-slate-500">Attributed net revenue</p><p className="text-2xl font-black text-[#0F2744]">—</p></div>
               <p className="text-xs text-slate-500">Revenue and verified bookings will populate after attributed post, booking, and payment IDs are connected. No estimates are shown as facts.</p>
             </section>
           </div>
+          <MetaPublishedContentPanel posts={snapshot.posts} sync={snapshot.metaSync}
+            canRefresh={role !== "intern"} refreshing={metaRefreshing} feedback={metaFeedback}
+            onRefresh={refreshMetaPosts} onOpen={(id) => setFilter("post", id)} />
           <section className={DESK_SECTION}>
-            <h2 className="text-lg font-black text-[#0F2744]">Connected channels</h2>
+            <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]"><Activity size={19} className="text-[#2563EB]" /> Connected channels</h2>
             <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
               {snapshot.channels.map((item) => (
                 <button type="button" onClick={() => setFilter("platform",item.channel)} key={item.channel} className="min-h-24 rounded-xl border border-[#DBEAFE] bg-[#F8FAFC] p-3 text-left shadow-sm transition hover:border-[#2563EB] hover:bg-[#EFF6FF] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">
@@ -298,7 +327,7 @@ export default function SocialIntelligenceBoard({
           </section>
           <section className={DESK_SECTION}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div><h2 className="text-lg font-black text-[#0F2744]">Content leaderboards · {leaderboardTitle}</h2><p className="text-xs text-slate-500">Rank verified content results, then open each post for a detailed performance history and attributable SitGuru activity.</p></div>
+              <div><h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]"><Trophy size={20} className="text-[#D97706]" /> Content leaderboards · {leaderboardTitle}</h2><p className="text-xs text-slate-500">Rank verified content results, then open each post for a detailed performance history and attributable SitGuru activity.</p></div>
               <label className="flex items-center gap-2 text-xs font-bold text-slate-600">Show
                 <select value={limit} onChange={(event) => setLimit(Number(event.target.value) as 10 | 25 | 0)} className="min-h-10 rounded-xl border border-slate-200 bg-[#F8FAFC] px-2 text-sm font-bold text-[#0F2744] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">
                   <option value="10">Top 10</option><option value="25">Top 25</option><option value="0">All posts</option>
@@ -343,7 +372,7 @@ export default function SocialIntelligenceBoard({
             </div>
           </section>
           <section className={DESK_SECTION}>
-            <h2 className="text-lg font-black text-[#0F2744]">Data coverage and accuracy</h2>
+            <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]"><Sparkles size={19} className="text-[#7C3AED]" /> Data coverage and accuracy</h2>
             <p className="mt-1 text-xs text-slate-500">Tracked events loaded: {snapshot.sourceCoverage.eventsLoaded.toLocaleString()} · Matched post events: {snapshot.sourceCoverage.matchedPostEvents} · Provider metric freshness: {snapshot.postMetricsAt || "Unavailable"}</p>
             {snapshot.notices.length ? <div className="mt-3 space-y-2">{snapshot.notices.map((notice) => <p key={notice} className="rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600">{notice}</p>)}</div> : (
               <p className="mt-3 flex items-center gap-2 text-sm text-emerald-800"><CheckCircle2 size={16}/> All verified sources are current.</p>
