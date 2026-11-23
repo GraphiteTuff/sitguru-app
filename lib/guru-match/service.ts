@@ -155,8 +155,8 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "All publicly listed Gurus appear in the directory. Only bookable profiles with verified local service and pet compatibility qualify for sharing.":
-      "Browse all publicly listed Gurus below, then enter a city, state and service to find genuinely bookable local matches.",
+      "All publicly listed profiles can be promoted through the staff library. Individual Guru cards require valid booking and local service eligibility; incomplete profiles use SitGuru discovery cards.":
+      "Browse the 72 publicly listed profiles. Guru cards link to verified bookable profiles; the remaining records use tracked SitGuru discovery cards without booking claims.",
   };
 }
 export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>,approvedGuruTemplate=false){
@@ -166,16 +166,44 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const groupId=clean(input.groupId);
   if(groupId&&!isUuid(groupId))throw new Error("Invalid local group.");
   if(!filters||!isUuid(guruId))throw new Error("Choose a city, state, service and eligible Guru.");
-  const matches=await findEligibleGuruMatches(filters);
+  const promotionType: "guru"|"community" =
+    approvedGuruTemplate && input.promotionType==="community"?"community":"guru";
+  const matches=promotionType==="guru"?await findEligibleGuruMatches(filters):[];
   const guru=matches.find(g=>g.id===guruId);
-  if(!guru)throw new Error("This Guru does not currently meet the selected location, service and pet requirements.");
+  let unspecifiedGuruName="";
+  if(promotionType==="guru"&&!guru){
+    if(!approvedGuruTemplate||filters.service!=="custom_care")
+      throw new Error("This Guru does not currently meet the selected location, service and pet requirements.");
+    const {data:profile,error:profileError}=await supabaseAdmin.from("gurus")
+      .select("display_name,full_name,name,slug,service_city,service_state,city,state,is_public,is_bookable,is_archived,status")
+      .eq("id",guruId).maybeSingle();
+    if(profileError||!profile||profile.is_bookable!==true||profile.is_public!==true||
+      profile.is_archived===true||clean(profile.status).toLowerCase()!=="active"||
+      !safeGuruSlug(profile.slug))
+      throw new Error("The Guru's profile is not ready for public sharing.");
+    const localCity=clean(profile.service_city||profile.city);
+    const localState=clean(profile.service_state||profile.state).toUpperCase();
+    if(localCity.toLowerCase()!==filters.city.toLowerCase()||localState!==filters.state)
+      throw new Error("Choose the Guru's actual city before sharing a general profile card.");
+    unspecifiedGuruName=initialsName(profile.display_name||profile.full_name||profile.name);
+  }
+  if(promotionType==="community"){
+    const {data:listed,error:listError}=await supabaseAdmin.from("gurus")
+      .select("id,is_public,is_archived").eq("id",guruId).maybeSingle();
+    if(listError||!listed||listed.is_public!==true||listed.is_archived===true)
+      throw new Error("This profile is not available for a SitGuru discovery promotion.");
+  }
   const code=randomBytes(16).toString("base64url");
-  const reply=`Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
+  const reply=promotionType==="guru"&&guru
+    ? `Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`
+    : promotionType==="guru"&&unspecifiedGuruName
+      ? `Hi! Meet ${unspecifiedGuruName} on SitGuru near ${filters.city}, ${filters.state}. View their profile to check offered services and current availability: ${guruMatchPublicUrl(code,channel)} 🐾`
+      : `Hi! Looking for pet care near ${filters.city}, ${filters.state}? Explore SitGuru to find pet care providers, compare services and check availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
   const manager=actor.canModerate;
   // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.
   const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns").insert({
-    code,guru_id:guru.id,created_by_user_id:actor.user.id,
+    code,guru_id:guruId,promotion_type:promotionType,created_by_user_id:actor.user.id,
     intern_id:!manager&&actor.intern?actor.intern.id:null,group_id:groupId||null,
     city:filters.city,state:filters.state,radius_miles:filters.radius,
     service_key:filters.service,pet_type:filters.pet,channel,reply_text:reply,
@@ -204,26 +232,39 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
   if(group&&group.channel!==channel)throw new Error("Choose the same channel as the selected group.");
   const candidates=await loadAllGuruCandidates();
   const guru=candidates.gurus.find(g=>g.id===guruId);
-  if(!guru || guru.is_bookable!==true || guru.is_public!==true ||
-    clean(guru.status).toLowerCase()!=="active")
-    throw new Error("This Guru is not currently approved for public sharing.");
+  if(!guru || guru.is_public!==true || guru.is_archived===true)
+    throw new Error("This profile is not publicly listed for SitGuru promotion.");
   const available=serviceKeys(guru,candidates.rates);
   const requested=clean(input.service);
-  const service=requested || GURU_MATCH_SERVICES.find(item=>available.has(item.key))?.key || "";
-  if(!isServiceKey(service) || !available.has(service))
-    throw new Error("This Guru needs an enabled service before a share card can be used.");
+  const service=isServiceKey(requested)?requested:
+    GURU_MATCH_SERVICES.find(item=>available.has(item.key))?.key || "custom_care";
+  const slug=safeGuruSlug(guru.slug);
+  const named=Boolean(clean(guru.display_name||guru.full_name||guru.name));
+  const canFeatureGuru=guru.is_bookable===true &&
+    clean(guru.status).toLowerCase()==="active" && Boolean(slug) && named;
+  const promotionType: "guru"|"community"=canFeatureGuru?"guru":"community";
+  const unspecifiedPersonal=canFeatureGuru && available.size===0 && service==="custom_care";
+  if(canFeatureGuru&&!available.has(service)&&!unspecifiedPersonal)
+    throw new Error("The selected Guru service is not enabled.");
   const city=clean(group?.city||guru.service_city||guru.city);
   const state=clean(group?.state||guru.service_state||guru.state).toUpperCase();
   const radiusValue=Number(guru.service_radius_miles);
-  const radius=Number.isFinite(radiusValue)?Math.min(50,Math.floor(radiusValue)):0;
+  const radius=Number.isFinite(radiusValue)&&radiusValue>0
+    ?Math.max(1,Math.min(50,Math.floor(radiusValue))):10;
   const filters=normalizeMatchFilters({city,state,service,pet:"any",radius});
-  if(!filters || !matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
-    throw new Error("Complete this Guru's service location and coverage before sharing.");
+  if(!filters)throw new Error("This listing needs a valid city and state before sharing.");
+  if(canFeatureGuru&&!unspecifiedPersonal&&
+    !matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
+    throw new Error("This Guru does not serve the selected local area or service. Choose a local group.");
+  if(unspecifiedPersonal&&(
+    city.toLowerCase()!==clean(guru.service_city||guru.city).toLowerCase()||
+    state!==clean(guru.service_state||guru.state).toUpperCase()))
+    throw new Error("This Guru needs service information before sharing outside their listed city.");
   let existingQuery=supabaseAdmin.from("guru_match_share_campaigns")
     .select("id,code,reply_text").eq("guru_id",guruId)
     .eq("created_by_user_id",actor.user.id).eq("channel",channel)
     .eq("service_key",service).eq("city",city).eq("state",state)
-    .eq("pet_type","any").eq("status","approved");
+    .eq("pet_type","any").eq("status","approved").eq("promotion_type",promotionType);
   existingQuery=groupId?existingQuery.eq("group_id",groupId):existingQuery.is("group_id",null);
   const {data:existing,error:queryError}=await existingQuery
     .order("created_at",{ascending:false}).limit(1).maybeSingle();
@@ -234,7 +275,7 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
     cardUrl:guruMatchCardImage(existing.code),qrUrl:guruMatchQrImage(existing.code),
   };
   return makeGuruShare(actor,{
-    guruId,city,state,service,pet:"any",radius,channel,groupId,
+    guruId,city,state,service,pet:"any",radius,channel,groupId,promotionType,
   },true);
 }
 
@@ -311,24 +352,42 @@ export async function updateGuruShare(actor:CommunityActor,input:Record<string,u
 export async function findApprovedShare(code:string){
   if(!isCode(code))return null;
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns")
-    .select("id,code,guru_id,status,city,state,radius_miles,service_key,pet_type,channel").eq("code",code).eq("status","approved").maybeSingle();
+    .select("id,code,guru_id,promotion_type,status,city,state,radius_miles,service_key,pet_type,channel")
+    .eq("code",code).eq("status","approved").maybeSingle();
   if(error||!data)return null;
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
-    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,status")
+    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_archived,status")
     .eq("id",data.guru_id).maybeSingle();
-  if(gError||!g||g.is_bookable!==true)return null;
-  const slug=safeGuruSlug(g.slug);if(!slug)return null;
-  // An approved card must stop working if the Guru later disables a service
-  // or leaves the original service radius. Never silently promote stale coverage.
+  if(gError||!g||g.is_public!==true||g.is_archived===true)return null;
+  const promotionType=data.promotion_type==="community"?"community" as const:"guru" as const;
+  if(promotionType==="community"){
+    // Do not expose a pending, suspended, unbookable or incomplete Guru as available.
+    // The branded card directs visitors to general SitGuru care discovery instead.
+    return {...data,promotionType,guru:{
+      slug:"",name:"SitGuru Pet Care",city:clean(data.city),state:clean(data.state),
+      photoUrl:null,
+    }};
+  }
+  if(g.is_bookable!==true||clean(g.status).toLowerCase()!=="active")return null;
+  const slug=safeGuruSlug(g.slug);
+  if(!slug)return null;
+  // A personal Guru card must stop working when booking or documented services change.
   const filters=normalizeMatchFilters({
     city:data.city,state:data.state,service:data.service_key,pet:data.pet_type,
     radius:data.radius_miles,
   });
   if(!filters)return null;
-  const eligible=await findEligibleGuruMatches(filters);
-  if(!eligible.some(item=>item.id===data.guru_id))return null;
-  return {...data,guru:{slug,name:initialsName(g.display_name||g.full_name||g.name),
-    city:clean(g.city),state:clean(g.state),photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
+  const genericPersonalCard=data.service_key==="custom_care" &&
+    clean(data.city).toLowerCase()===clean(g.service_city||g.city).toLowerCase() &&
+    clean(data.state).toUpperCase()===clean(g.service_state||g.state).toUpperCase();
+  if(!genericPersonalCard){
+    const eligible=await findEligibleGuruMatches(filters);
+    if(!eligible.some(item=>item.id===data.guru_id))return null;
+  }
+  return {...data,promotionType,guru:{slug,
+    name:initialsName(g.display_name||g.full_name||g.name),
+    city:clean(g.city),state:clean(g.state),
+    photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
 }
 export async function logPublicShareEvent(shareId:string,eventType:"link_open"|"qr_open"|"profile_click"|"inquiry_click",source:ShareChannel|"qr"){
   const {error}=await supabaseAdmin.from("guru_match_share_events").insert({
