@@ -51,7 +51,7 @@ export default async function ManagerResultsPage({
     <LiveResultsBoard
       audience="manager"
       data={data}
-      canSyncMeta={access.actor.isSuperUser}
+      canSyncSocials={access.actor.isSuperUser}
       canConnectTikTok={canConnectTikTok}
       canConnectX={canConnectX}
       xIsStaging={xIsStaging}

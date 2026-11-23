@@ -5,6 +5,8 @@ on:
     branches: [sitguru-main]
     paths:
       - "lib/meta/**"
+      - "lib/social/**"
+      - "components/portal/SocialSyncControl.tsx"
       - "lib/tiktok/**"
       - "lib/x/**"
       - "app/api/integrations/x/**"
@@ -49,6 +51,8 @@ jobs:
         run: npm run test:tiktok-social
       - name: X OAuth security tests (offline; no paid X API calls)
         run: npm run test:x-social
+      - name: Unified social sync safety tests (no API calls)
+        run: npm run test:social-sync
       - name: Check TypeScript compilation
         run: npm run typecheck
       - name: Isolated production build (no real credentials)
