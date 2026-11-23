@@ -252,7 +252,7 @@ function Body(){
       {!!notice&&<Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
       <View style={styles.card}>
         <Text style={styles.heading}>Find & Share a Guru</Text>
-        <Text style={styles.small}>{directory.length} listed · {readyToShare} ready. Search by city/state and tap Share next to any approved Guru.</Text>
+        <Text style={styles.small}>{directory.length} listed · {readyToShare} ready to share. Guru cards link to bookable profiles; other records use safe SitGuru discovery cards.</Text>
         <Text style={styles.label}>Local social groups</Text>
         <TextInput value={groupSearch} onChangeText={setGroupSearch} style={styles.input}
           accessibilityLabel="Search saved social groups by name or city"
@@ -394,7 +394,7 @@ function Body(){
       <View style={styles.metrics}>
         {([
           ['Link opens',metrics.linkOpens],['QR opens',metrics.qrOpens],
-          ['Profile clicks',metrics.profileClicks],['Inquiry clicks',metrics.inquiryClicks],
+          ['Care page clicks',metrics.profileClicks],['Inquiry clicks',metrics.inquiryClicks],
           ['Share reports',metrics.sharesReported],['Reply copies',metrics.copyIntents],
         ] as [string,number][]).map(([title,n],i)=><View key={title} style={[styles.metric,{width:width>630?'31%':'47%',backgroundColor:i%2===0?'#EFF6FF':'#F0FDF4'}]}>
           <Text style={styles.metricLabel}>{title}</Text><Text style={styles.metricValue}>{n.toLocaleString('en-US')}</Text>
