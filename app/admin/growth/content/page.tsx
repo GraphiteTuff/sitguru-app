@@ -58,6 +58,7 @@ export default async function AdminContentOverviewPage({
       </header>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
+      <Link href="/admin/growth/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">Open Social Intelligence dashboard →</Link>
       <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {[
           ["Drafts", counts.drafts],
