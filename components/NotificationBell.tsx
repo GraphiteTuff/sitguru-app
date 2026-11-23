@@ -330,12 +330,32 @@ export default function NotificationBell() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [panelPosition, setPanelPosition] = useState<{ left: number; maxHeight: number } | null>(null);
 
   const unreadCount = useMemo(() => {
     return notifications.filter((notification) => !notification.is_read).length;
   }, [notifications]);
 
   const hasUnreadNotifications = unreadCount > 0;
+
+  // Keep the anchored panel inside the viewport, even when the bell sits near
+  // the right edge of a phone or the left edge of a narrow tablet.
+  const positionDropdown = useCallback(() => {
+    if (typeof window === "undefined" || !dropdownRef.current) return;
+
+    const anchor = dropdownRef.current.getBoundingClientRect();
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const gutter = 16;
+    const panelWidth = Math.min(390, Math.max(0, viewportWidth - gutter * 2));
+    const desiredLeft = anchor.right - panelWidth;
+    const left = Math.max(gutter, Math.min(desiredLeft, viewportWidth - panelWidth - gutter));
+
+    setPanelPosition({
+      left: left - anchor.left,
+      maxHeight: Math.max(180, viewportHeight - anchor.bottom - 28),
+    });
+  }, []);
 
   const clearVoiceTimeout = useCallback(() => {
     if (voiceTimeoutRef.current !== null) {
@@ -530,6 +550,21 @@ export default function NotificationBell() {
     };
   }, [clearVoiceTimeout]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    positionDropdown();
+    window.addEventListener("resize", positionDropdown);
+    window.visualViewport?.addEventListener("resize", positionDropdown);
+    window.addEventListener("orientationchange", positionDropdown);
+
+    return () => {
+      window.removeEventListener("resize", positionDropdown);
+      window.visualViewport?.removeEventListener("resize", positionDropdown);
+      window.removeEventListener("orientationchange", positionDropdown);
+    };
+  }, [open, positionDropdown]);
+
   async function markNotificationRead(notificationId: string) {
     setNotifications((currentNotifications) =>
       currentNotifications.map((notification) =>
@@ -637,6 +672,7 @@ export default function NotificationBell() {
         type="button"
         onClick={() => {
           audioUnlockedRef.current = true;
+          positionDropdown();
 
           setOpen((current) => {
             const nextOpen = !current;
@@ -648,6 +684,7 @@ export default function NotificationBell() {
             return nextOpen;
           });
         }}
+        aria-expanded={open}
         aria-label={
           hasUnreadNotifications
             ? `${unreadCount} unread notifications`
@@ -681,15 +718,18 @@ export default function NotificationBell() {
 
       {open ? (
         <div
-          className="absolute right-0 z-[9999] mt-3 w-[min(390px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-emerald-100 shadow-[0_24px_90px_rgba(15,23,42,0.30)] ring-1 ring-slate-900/10"
+          className="absolute right-0 z-[9999] mt-3 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.5rem] border border-emerald-100 shadow-[0_24px_90px_rgba(15,23,42,0.30)] ring-1 ring-slate-900/10"
           style={{
+            left: panelPosition ? `${panelPosition.left}px` : undefined,
+            right: panelPosition ? "auto" : undefined,
+            maxHeight: panelPosition ? `${panelPosition.maxHeight}px` : undefined,
             backgroundColor: "#ffffff",
             color: "#020617",
             textShadow: "none",
           }}
         >
           <div
-            className="border-b border-slate-200 px-4 py-4"
+            className="shrink-0 border-b border-slate-200 px-4 py-4"
             style={{
               backgroundColor: "#ffffff",
               color: "#020617",
@@ -770,7 +810,7 @@ export default function NotificationBell() {
           </div>
 
           <div
-            className="max-h-[390px] overflow-y-auto"
+            className="min-h-0 flex-1 overflow-y-auto"
             style={{
               backgroundColor: "#ffffff",
               color: "#020617",
@@ -868,7 +908,7 @@ export default function NotificationBell() {
 
                           {body ? (
                             <p
-                              className="mt-1 line-clamp-2 text-sm font-bold leading-5"
+                              className="mt-1 line-clamp-2 break-words text-sm font-bold leading-5"
                               style={{
                                 color: "#334155",
                                 opacity: 1,
@@ -879,7 +919,7 @@ export default function NotificationBell() {
                           ) : null}
 
                           <p
-                            className="mt-2 text-xs font-black uppercase tracking-[0.16em]"
+                            className="mt-2 break-words text-xs font-black uppercase tracking-[0.16em]"
                             style={{
                               color: "#047857",
                               opacity: 1,
@@ -897,7 +937,7 @@ export default function NotificationBell() {
           </div>
 
           <div
-            className="border-t border-slate-200 px-4 py-3"
+            className="shrink-0 border-t border-slate-200 px-4 py-3"
             style={{
               backgroundColor: "#f8fafc",
               color: "#475569",
