@@ -111,7 +111,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const campaigns=(rows||[]) as CampaignRow[];
   const guruIds=[...new Set(campaigns.map(c=>c.guru_id))];
   const [guruResult,eventResult]=await Promise.all([
-    guruIds.length?supabaseAdmin.from("gurus").select("id,slug,display_name,full_name,name,city,state,profile_photo_url,avatar_url").in("id",guruIds)
+    guruIds.length?supabaseAdmin.from("gurus").select("id,slug,display_name,full_name,name,city,state,profile_photo_url,avatar_url,photo_url,image_url").in("id",guruIds)
       :Promise.resolve({data:[],error:null}),
     campaigns.length?supabaseAdmin.from("guru_match_share_events").select("share_id,event_type")
       .in("share_id",campaigns.map(c=>c.id))
@@ -139,7 +139,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
       const g=guruMap.get(c.guru_id);
       return {...c,
         guru:{name:initialsName(g?.display_name||g?.full_name||g?.name),city:clean(g?.city),
-          state:clean(g?.state),slug:safeGuruSlug(g?.slug),photoUrl:photoUrl(g?.profile_photo_url||g?.avatar_url)},
+          state:clean(g?.state),slug:safeGuruSlug(g?.slug),photoUrl:photoUrl(g?.profile_photo_url||g?.avatar_url||g?.photo_url||g?.image_url)},
         metrics:byCampaign.get(c.id)||emptyMetrics(),
         shareUrl:guruMatchPublicUrl(c.code,c.channel),qrUrl:guruMatchQrImage(c.code),cardUrl:guruMatchCardImage(c.code),
       };
@@ -214,7 +214,7 @@ export async function findApprovedShare(code:string){
     .select("id,code,guru_id,status,city,state,radius_miles,service_key,pet_type,channel").eq("code",code).eq("status","approved").maybeSingle();
   if(error||!data)return null;
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
-    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,is_active,is_public,is_bookable,status")
+    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,status")
     .eq("id",data.guru_id).maybeSingle();
   if(gError||!g||g.is_bookable!==true)return null;
   const slug=safeGuruSlug(g.slug);if(!slug)return null;
@@ -228,7 +228,7 @@ export async function findApprovedShare(code:string){
   const eligible=await findEligibleGuruMatches(filters);
   if(!eligible.some(item=>item.id===data.guru_id))return null;
   return {...data,guru:{slug,name:initialsName(g.display_name||g.full_name||g.name),
-    city:clean(g.city),state:clean(g.state),photoUrl:photoUrl(g.profile_photo_url||g.avatar_url)}};
+    city:clean(g.city),state:clean(g.state),photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
 }
 export async function logPublicShareEvent(shareId:string,eventType:"link_open"|"qr_open"|"profile_click"|"inquiry_click",source:ShareChannel|"qr"){
   const {error}=await supabaseAdmin.from("guru_match_share_events").insert({
