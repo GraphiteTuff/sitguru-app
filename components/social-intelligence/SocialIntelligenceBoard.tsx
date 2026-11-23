@@ -257,6 +257,8 @@ export default function SocialIntelligenceBoard({
           <Link href={contentHref} className="inline-flex min-h-10 items-center rounded-xl bg-[#EEF2F6] px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-[#E2E8F0] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Content Studio</Link>
           <Link href={role === "admin" ? "/admin/growth/guru-match" : role === "intern" ? "/intern/community-studio/guru-match" : "/manager/community-studio/guru-match"}
             className="inline-flex min-h-10 items-center rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-3 py-2 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">Guru Match tracking</Link>
+          <Link href={role === "admin" ? "/admin/growth/event-match" : role === "intern" ? "/intern/community-studio/event-match" : "/manager/community-studio/event-match"}
+            className="inline-flex min-h-10 items-center rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-3 py-2 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D5C3A]/40">Event Match &amp; Share</Link>
         </div>
         <div className="flex flex-wrap gap-2">
           <a href={makeExportUrl()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-[#EFF6FF] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30"><FileDown size={16} /> Export CSV</a>
