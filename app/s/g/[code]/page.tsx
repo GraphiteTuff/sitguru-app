@@ -81,7 +81,22 @@ export default async function SharedGuruLanding({
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-3 font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">
             <HeartHandshake size={18}/> Explore booking with {firstName}
           </Link>}
-          <p className="text-center text-xs text-slate-500">SitGuru · People. Happier pets. No booking or availability is guaranteed by this promotion.</p>
+          <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border border-[#D1EADD] bg-[#F0FDF4] p-4 text-center sm:p-5">
+            <p className="text-sm font-black text-[#0F2744]">
+              {community?"Scan to explore local pet care":`Scan to meet ${firstName} on SitGuru`}
+            </p>
+            <div className="rounded-2xl border border-[#D1EADD] bg-white p-3 shadow-sm">
+              <img
+                src={`/api/guru-match/qr/${encodeURIComponent(share.code)}`}
+                width={224} height={224}
+                alt={community?"Scannable QR code to explore SitGuru pet care":`Scannable QR code to meet ${firstName} on SitGuru`}
+                className="block h-56 w-56 max-w-full rounded-lg"
+                loading="eager"
+              />
+            </div>
+            <p className="text-xs font-semibold text-[#326B58]">Share this QR code or scan it from another device.</p>
+          </div>
+          <p className="text-center text-sm font-bold text-[#0D5C3A]">Trusted Pet Care. Simplified.</p>
         </div>
       </div>
     </main>
