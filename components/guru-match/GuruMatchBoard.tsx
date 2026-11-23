@@ -68,7 +68,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [currentCode,setCurrentCode]=useState("");
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState("");
-  const [directoryStatus,setDirectoryStatus]=useState<"all"|"ready"|"setup">("all");
+  const [directoryStatus,setDirectoryStatus]=useState<"all"|"guru"|"community">("all");
   const [directoryState,setDirectoryState]=useState("all");
   const [directorySort,setDirectorySort]=useState<"state-asc"|"state-desc"|"name">("state-asc");
   const [quickChannel,setQuickChannel]=useState<ShareChannel>("facebook");
@@ -117,7 +117,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const availableGroups=groups;
   const directoryItems=directory.filter(g=>{
     const q=directoryQuery.toLowerCase().trim();
-    return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
+    return (directoryStatus==="all"||(directoryStatus==="guru"?g.canFeatureGuru:!g.canFeatureGuru)) &&
       (directoryState==="all"||g.state===directoryState) &&
       (!q||`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(" ")}`.toLowerCase().includes(q));
   }).sort((a,b)=>directorySort==="name"?a.name.localeCompare(b.name):
@@ -170,7 +170,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
     setBusy(true);setError("");setPreparedMini(null);
     try{
       const result=await api<{share:PreparedShare}>("POST","/api/guru-match",{
-        action:"prepare",guruId:g.id,channel:nextChannel,service:nextService,
+        action:"prepare",guruId:g.id,channel:nextChannel,service:nextService,groupId:selectedGroup?.id,
       });
       if(result.share.status!=="approved")throw new Error("This Guru card is awaiting approval.");
       setPreparedMini({guruId:g.id,service:nextService,channel:nextChannel,share:result.share});
@@ -179,10 +179,12 @@ export default function GuruMatchBoard({role}:{role:Role}){
   };
   const toggleGuru=(g:GuruDirectoryEntry)=>{
     if(expandedGuru===g.id){setExpandedGuru("");setPreparedMini(null);return;}
-    setExpandedGuru(g.id);setMiniChannel("facebook");
-    const service=g.serviceKeys[0]||"";
+    setExpandedGuru(g.id);
+    const service=g.serviceKeys[0]||"custom_care";
+    const nextChannel=selectedGroup?.channel||quickChannel;
+    setMiniChannel(nextChannel);
     setMiniService(service);setPreparedMini(null);
-    if(g.canPromote && service)void prepareMini(g,"facebook",service);
+    if(g.canPromote)void prepareMini(g,nextChannel,service);
   };
   const copyMini=async()=>{
     if(!preparedMini)return;
@@ -220,8 +222,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const quickShare=async(g:GuruDirectoryEntry)=>{
     if(!g.canPromote||busy)return;
     const group=selectedGroup;
-    const service=g.serviceKeys[0];
-    if(!service){setError("This Guru needs an enabled service to share.");return;}
+    const service=g.serviceKeys[0]||"custom_care";
     const nextChannel=group?.channel||quickChannel;
     const socialComposer=Boolean(group)||nextChannel==="facebook"||nextChannel==="x";
     const popup=socialComposer?window.open("about:blank","_blank"):null;
@@ -338,10 +339,10 @@ export default function GuruMatchBoard({role}:{role:Role}){
           <option value="name">Name A–Z</option>
         </select>
         <select aria-label="Filter Guru readiness" className={control} value={directoryStatus}
-          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"ready"|"setup");setDirectoryPage(0);}}>
+          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"guru"|"community");setDirectoryPage(0);}}>
           <option value="all">All listed</option>
-          <option value="ready">Ready to share</option>
-          <option value="setup">Needs setup</option>
+          <option value="guru">Guru profile cards</option>
+          <option value="community">SitGuru discovery cards</option>
         </select>
       </div>
       <div className="mt-3 rounded-xl border border-blue-100 bg-[#F4F8FF] p-3">
@@ -424,7 +425,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
         </select>
         <span className="text-xs font-semibold text-slate-600">Choose a channel once, then Share. Saved groups automatically use their platform.</span>
       </div>
-      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
+      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} listed profiles. All {readyToShare} have share cards; booking eligibility is unchanged.</p>
       <div className="mt-3 space-y-2" data-mini-guru-card-library>
         {shownDirectory.map(g=>{
           const expanded=expandedGuru===g.id;
@@ -442,27 +443,31 @@ export default function GuruMatchBoard({role}:{role:Role}){
                   {g.city||"Location missing"}{g.state?", "+g.state:""} · {g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(v=>v.key===k)?.label||k).slice(0,3).join(" · "):"Services not configured"}
                 </span>
                 <span className={g.canPromote?"mt-1 block text-xs font-bold text-emerald-700":"mt-1 block text-xs font-bold text-amber-700"}>
-                  {g.canPromote?"Approved Guru · Share template available":g.reason}
+                  {g.canFeatureGuru?"Guru profile card ready":g.canPromote?"SitGuru discovery card ready":g.reason}
                 </span>
               </span>
               <span className="shrink-0 rounded-lg bg-[#EFF6FF] p-2 text-blue-700" aria-hidden>
                 {expanded?<ChevronUp size={19}/>:<ChevronDown size={19}/>}
               </span>
               </button>
-              {g.canPromote&&g.serviceKeys.length>0&&
+              {g.canPromote&&
                 <button type="button" className={primary+" !min-h-10 shrink-0 !px-3 sm:!px-4"}
                   disabled={busy} onClick={()=>void quickShare(g)}>
                   <Share2 size={15}/> {selectedGroup?"Open group & copy":"Share"}
                 </button>}
             </div>
             {expanded&&<div id={"guru-card-"+g.id} className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
-              {g.canPromote && g.serviceKeys.length>0 ? <>
+              {g.canPromote ? <>
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Guru service
-                    <select className={control+" mt-1"} value={miniService}
-                      onChange={e=>changeMiniService(g,e.target.value)}>
-                      {g.serviceKeys.map(key=><option key={key} value={key}>{GURU_MATCH_SERVICES.find(v=>v.key===key)?.label||key}</option>)}
-                    </select>
+                    {g.serviceKeys.length>0?
+                      <select className={control+" mt-1"} value={miniService}
+                        onChange={e=>changeMiniService(g,e.target.value)}>
+                        {g.serviceKeys.map(key=><option key={key} value={key}>{GURU_MATCH_SERVICES.find(v=>v.key===key)?.label||key}</option>)}
+                      </select>:
+                      <div className="mt-1 rounded-lg bg-[#EFF6FF] p-2 text-xs text-blue-700">
+                        {g.canFeatureGuru?"General Guru profile · no specific service claim":"SitGuru discovery · no booking claim"}
+                      </div>}
                   </label>
                   <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Social channel
                     <select className={control+" mt-1"} value={miniChannel}
@@ -475,14 +480,15 @@ export default function GuruMatchBoard({role}:{role:Role}){
                 {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
                 {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
                   <div className="min-w-0 space-y-2">
-                    <GuruCardPreview url={ready.cardUrl} guruName={g.name}
-                      filename={"sitguru-"+g.slug+"-card.png"} />
+                    <GuruCardPreview url={ready.cardUrl}
+                      guruName={g.canFeatureGuru?g.name:"SitGuru Pet Care"}
+                      filename={"sitguru-"+(g.slug||g.id)+"-card.png"} />
                     <a className={secondary} href={ready.shareUrl} target="_blank" rel="noopener noreferrer">
                       <ArrowUpRight size={16}/> Test tracked link
                     </a>
                   </div>
                   <div className="min-w-0 space-y-3">
-                    <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved Guru card</p>
+                    <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved {g.canFeatureGuru?"Guru":"SitGuru discovery"} card</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedGroup&&<a className={primary} href={selectedGroup.group_url}
                         target="_blank" rel="noopener noreferrer">Open local group</a>}
@@ -514,9 +520,9 @@ export default function GuruMatchBoard({role}:{role:Role}){
                     onClick={()=>void prepareMini(g,miniChannel,miniService)}>Retry</button>
                 </p>}
               </> : <p className="text-sm font-semibold text-amber-800">
-                {g.canPromote?"This Guru must enable a service before a card can be shared.":g.reason}
+                {g.reason}
               </p>}
-              {!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
+              {g.canFeatureGuru&&!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
                 className="inline-flex text-xs font-black text-blue-700 underline">View Guru profile</Link>}
             </div>}
           </article>;
@@ -541,7 +547,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
     <section aria-label="Outreach activity in past 90 days" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       <Kpi label="Link opens" count={postTotals.linkOpens} subtitle="Page visits, not unique people" tone="border-[#E0E7FF] bg-[#F0F4FF]" icon={Users}/>
       <Kpi label="QR scans" count={postTotals.qrOpens} subtitle="QR landing opens" tone="border-[#DDD6FE] bg-[#F5F3FF]" icon={QrCode}/>
-      <Kpi label="Profile clicks" count={postTotals.profileClicks} subtitle="Click-through to a Guru" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
+      <Kpi label="Care page clicks" count={postTotals.profileClicks} subtitle="Guru profile or care search" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
       <Kpi label="Inquiries started" count={postTotals.inquiryClicks} subtitle="Booking-intent link clicks" tone="border-[#FDE68A] bg-[#FFFBEB]" icon={HeartHandshake}/>
       <Kpi label="Share reports" count={postTotals.sharesReported} subtitle="Staff-confirmed manual share" tone="border-[#BBF7D0] bg-[#F0FDF4]" icon={CheckCircle2}/>
       <Kpi label="Copy intents" count={postTotals.copyIntents} subtitle="Approved reply copies" tone="border-[#FED7AA] bg-[#FFF7ED]" icon={ClipboardCopy}/>
@@ -655,7 +661,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
           {active?.id===c.id&&<div className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
             {currentStatus==="approved"?<>
               <GuruCardPreview url={c.cardUrl} guruName={c.guru.name}
-                filename="sitguru-guru-share.png" />
+                filename={"sitguru-"+c.code+"-card.png"} />
               <div className="flex flex-wrap gap-2">
                 <a href={c.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Tracked link</a>
                 <button type="button" className={secondary} disabled={busy} onClick={()=>void act(c,"copy")}>

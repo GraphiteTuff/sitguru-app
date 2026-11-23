@@ -52,3 +52,19 @@ test("Guru card also renders a real PNG when a profile photo is present", async 
   assert.equal(meta.height,630);
   assert.ok(bytes.length>10000);
 });
+
+test("SitGuru community cards do not advertise a suspended or unbookable individual Guru", async () => {
+  const image = await sharp({create:{
+    width:32,height:32,channels:4,background:"#0D5C3A"
+  }}).png().toBuffer();
+  const svg = guruMatchCardSvg({
+    guruName:"SitGuru Pet Care",promotionType:"community",
+    city:"Grand Rapids",state:"MI",serviceLabel:"Explore local care",
+    logoPng:image,qrPng:image,photoPng:null,
+  });
+  assert.match(svg,/Scan to explore pet care/);
+  assert.match(svg,/Explore SitGuru pet care in your community/);
+  assert.ok(!svg.includes("Scan to meet this Guru"));
+  const output=await sharp(Buffer.from(svg)).png().toBuffer();
+  assert.equal(output.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+});
