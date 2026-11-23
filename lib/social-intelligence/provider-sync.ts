@@ -7,6 +7,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchOfficialMetaSnapshot } from "@/lib/meta/social-analytics";
+import { verifiedSitGuruFacebookPageToken } from "@/lib/meta/facebook-page-access";
 import { fetchAuthorizedTikTokVideoList } from "@/lib/tiktok/social-analytics";
 import type { SocialChannel } from "./types";
 
@@ -71,16 +72,28 @@ function graphUrl(
   if (after) url.searchParams.set("after", after);
   return url;
 }
+/** Structured errors preserve safe numeric Meta codes, never raw API text. */
+class MetaGraphRequestError extends Error {
+  constructor(readonly status: number, readonly apiCode: number | null) {
+    super("Meta Graph API request failed.");
+    this.name = "MetaGraphRequestError";
+  }
+}
 async function graphGet(url: URL, token: string) {
   const response = await fetch(url.toString(), {
     headers: { Authorization: "Bearer " + token },
     cache: "no-store",
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(8000),
   });
-  if (!response.ok) throw new Error("Meta Graph API request returned HTTP " + response.status);
-  const payload: unknown = await response.json();
-  if (!payload || typeof payload !== "object") throw new Error("Meta Graph API response is invalid.");
-  return payload as Row;
+  const payload: unknown = await response.json().catch(() => null);
+  const data = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Row : null;
+  if (!response.ok || !data || data.error) {
+    const apiError = data?.error && typeof data.error === "object" ? data.error as Row : null;
+    const apiCode = typeof apiError?.code === "number" && Number.isSafeInteger(apiError.code)
+      ? apiError.code : null;
+    throw new MetaGraphRequestError(response.status, apiCode);
+  }
+  return data;
 }
 async function graphList(
   host: "graph.facebook.com" | "graph.instagram.com",
@@ -94,13 +107,16 @@ async function graphList(
     let response: Row;
     try {
       response = await graphGet(graphUrl(host, path, fields, after), token);
-    } catch {
-      // Recover from unsupported optional fields without treating follower
-      // permission alone as proof of access to published media.
-      const fallback = host === "graph.facebook.com" && path.endsWith("/posts")
+    } catch (error) {
+      // Retry with basic fields only for unsupported Graph fields, not when
+      // a credential is expired, Page permission is missing, or rate limited.
+      if (error instanceof MetaGraphRequestError && error.apiCode !== 100 &&
+        error.apiCode !== 3001) throw error;
+      const fallback = host === "graph.facebook.com" &&
+        (path.endsWith("/posts") || path.endsWith("/published_posts"))
         ? "id,message,permalink_url,created_time"
         : "id,permalink,media_type,timestamp";
-      if (fields === fallback) throw new Error("Meta media listing is not authorized.");
+      if (fields === fallback) throw error;
       response = await graphGet(graphUrl(host, path, fallback, after), token);
     }
     if (!Array.isArray(response.data)) throw new Error("Meta media list response did not contain media.");
@@ -115,6 +131,41 @@ async function graphList(
   }
   return result;
 }
+/**
+ * A system-user token can read the Page identity/follower count while Page
+ * publishing edges still require the Page access token and Page-specific
+ * permissions. Resolve only the official verified SitGuru Page; never log,
+ * return or persist the derived Page token.
+ *
+ * Meta officially supports GET /me/accounts with a system-user token to
+ * retrieve its assigned Page access tokens. Fallback to the Page's own
+ * access_token field where available.
+ */
+async function officialFacebookPageToken(systemToken: string, verifiedPageId: string): Promise<string | null> {
+  const url = new URL("https://graph.facebook.com/v27.0/me/accounts");
+  url.searchParams.set("fields", "id,name,access_token");
+  url.searchParams.set("limit", "100");
+  try {
+    const response = await graphGet(url, systemToken);
+    const pageToken = verifiedSitGuruFacebookPageToken(response.data, verifiedPageId);
+    if (pageToken) return pageToken;
+  } catch {
+    // Page listing can be unavailable when pages_show_list has not been
+    // approved. We still verify the exact Page identity in the next call.
+  }
+  try {
+    const direct = new URL("https://graph.facebook.com/v27.0/" + verifiedPageId);
+    direct.searchParams.set("fields", "id,name,access_token");
+    const result = await graphGet(direct, systemToken);
+    if (string(result.id) === verifiedPageId && string(result.name) === "SitGuru") {
+      return string(result.access_token) || null;
+    }
+  } catch {
+    // Do not attempt to use an unverified Page or log token/error bodies.
+  }
+  return null;
+}
+
 async function getInstagramOwner() {
   const system = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
   const instagram = string(process.env.META_INSTAGRAM_ACCESS_TOKEN);
@@ -195,26 +246,72 @@ async function importInstagram(): Promise<ImportedPost[]> {
   return results;
 }
 async function importFacebook(): Promise<ImportedPost[]> {
-  const token = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
-  if (!token) throw new Error("Meta Facebook Page token is not configured.");
-  const identity = await fetchOfficialMetaSnapshot("facebook", { token, authMode: "facebook_login" });
-  const posts = await graphList("graph.facebook.com", identity.accountId + "/posts",
-    "id,message,permalink_url,created_time,shares,likes.summary(true),comments.summary(true)", token);
-  const results: ImportedPost[] = [];
+  const systemToken = string(process.env.META_SYSTEM_USER_ACCESS_TOKEN);
+  if (!systemToken) throw new Error("Facebook system-user credential is not configured.");
+  // Refuse to import posts from a Page other than the pinned official SitGuru Page.
+  const identity = await fetchOfficialMetaSnapshot("facebook", {
+    token: systemToken, authMode: "facebook_login",
+  });
+  const pageId = identity.accountId;
+  const pageToken = await officialFacebookPageToken(systemToken, pageId);
+
+  const richFields =
+    "id,message,permalink_url,created_time,full_picture,shares,likes.summary(true),comments.summary(true)";
+  const credentials = pageToken && pageToken !== systemToken
+    ? [pageToken, systemToken] : [systemToken];
+  let posts: Row[] | null = null;
+  let lastFailure: unknown = null;
+
+  // Prefer the Page's published_posts edge over /posts: it excludes drafts
+  // and ads-only items. Fall back only to official Page posts; never use a
+  // person's timeline, unrelated assets or scraped/public content.
+  for (const token of credentials) {
+    for (const edge of ["published_posts", "posts"] as const) {
+      try {
+        const retrieved = await graphList("graph.facebook.com", pageId + "/" + edge, richFields, token);
+        if (edge === "published_posts" && retrieved.length === 0) continue;
+        posts = retrieved;
+        break;
+      } catch (error) {
+        lastFailure = error;
+      }
+    }
+    if (posts !== null) break;
+  }
+  if (posts === null) {
+    if (lastFailure instanceof MetaGraphRequestError) {
+      if (lastFailure.apiCode === 190 || lastFailure.status === 401) {
+        throw new Error("Facebook Page credential expired or was revoked. Reauthorize SitGuru's official Page.");
+      }
+      if (lastFailure.status === 429 || lastFailure.apiCode === 80001) {
+        throw new Error("Meta rate-limited Facebook post import. Retry after the rate-limit window.");
+      }
+      if ([200, 283, 10].includes(lastFailure.apiCode ?? 0) || lastFailure.status === 403) {
+        throw new Error("Facebook Page post permissions are missing. Grant the official SitGuru Page pages_read_engagement and pages_read_user_content.");
+      }
+    }
+    throw new Error(pageToken
+      ? "The SitGuru Facebook Page did not return published posts. Check the Page's Meta app permissions."
+      : "Facebook Page access token is unavailable. Assign SitGuru Page access to the Meta system user and approve pages_show_list, pages_read_engagement and pages_read_user_content.");
+  }
+  const result: ImportedPost[] = [];
   for (const row of posts) {
     const id = string(row.id);
     const publishedAt = validProviderDate(row.created_time);
     const publishedUrl = string(row.permalink_url);
     if (!id || !publishedAt || !permalinkKey(publishedUrl)) continue;
-    results.push({
+    result.push({
       id, platform: "facebook", publishedUrl,
       title: string(row.message).slice(0, 200) || "Facebook post",
-      publishedAt, thumbnail: null, views: null, reach: null,
-      likes: summaryCount(row.likes), comments: summaryCount(row.comments),
-      shares: number((row.shares as Row | null)?.count), saves: null, follows: null,
+      publishedAt,
+      thumbnail: string(row.full_picture) || null,
+      views: null, reach: null, likes: summaryCount(row.likes),
+      comments: summaryCount(row.comments),
+      shares: number((row.shares as Row | null)?.count),
+      saves: null, follows: null,
     });
   }
-  return results;
+  return result;
 }
 async function importTikTok(): Promise<{ videos: ImportedPost[]; reason: string | null }> {
   const result = await fetchAuthorizedTikTokVideoList();

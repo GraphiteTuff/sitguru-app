@@ -66,13 +66,29 @@ async function syncOne(platform: MetaPlatform, automated: boolean): Promise<Meta
     };
   } catch (error) {
     // Provider Graph errors and auth headers must never be exposed to users.
-    console.warn("Meta post import failed", platform, error instanceof Error ? error.name : "unknown");
+    const safeCategory = error instanceof Error && error.message.startsWith("Facebook Page post permissions")
+      ? "page_permissions"
+      : error instanceof Error && error.message.startsWith("Facebook Page access token")
+        ? "page_access_token"
+        : error instanceof Error && error.message.startsWith("Facebook Page credential")
+          ? "credential_revoked"
+          : error instanceof Error && error.message.startsWith("Meta rate-limited")
+            ? "rate_limited"
+            : "provider_or_database";
+    console.warn("Meta post import failed", platform, safeCategory);
     await supabaseAdmin.from("growth_social_meta_sync_status")
       .update({ status: "error", updated_at: new Date().toISOString() })
       .eq("platform", platform);
+    const pageError = platform === "facebook" && error instanceof Error ? error.message : "";
+    const safeFacebookMessage = pageError.startsWith("Facebook Page ") ||
+      pageError.startsWith("Facebook published-") ||
+      pageError.startsWith("Meta rate-limited") ||
+      pageError.startsWith("The SitGuru Facebook Page ");
     return {
       platform, status: "unavailable", posts: 0,
-      note: "Meta could not supply this Page's post list. Check access scopes and connection.",
+      note: safeFacebookMessage
+        ? pageError
+        : "Meta could not supply this Page's post list. Check access scopes and connection.",
     };
   }
 }
