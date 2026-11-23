@@ -238,49 +238,114 @@ function Body(){
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>All listed Gurus</Text>
-        <Text style={styles.small}>{directory.length} publicly listed Gurus · {readyToShare} ready to promote. Only bookable local service matches may be shared.</Text>
-        <TextInput value={directoryQuery} onChangeText={setDirectoryQuery} style={styles.input}
-          accessibilityLabel="Search all publicly listed Gurus" placeholder="Search name, city, state or service" />
+        <Text style={styles.heading}>Guru Card Library</Text>
+        <Text style={styles.small}>{directory.length} listed profiles · {readyToShare} approved for promotion.</Text>
+        <Text style={styles.small}>Tap one mini card to expand its ready-to-share image and QR. Only one expands at a time.</Text>
+        <TextInput value={directoryQuery} onChangeText={value=>{setDirectoryQuery(value);setDirectoryPage(0);}}
+          style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
         <View style={styles.chips}>
-          {pill('All listed',!onlyBookable,()=>setOnlyBookable(false))}
-          {pill('Ready to promote',onlyBookable,()=>setOnlyBookable(true))}
+          {pill('All listed',!onlyBookable,()=>{setOnlyBookable(false);setDirectoryPage(0);})}
+          {pill('Ready to promote',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
         </View>
-        <Text style={styles.small}>Showing {listed.length} accounts</Text>
-        {listed.map(g=><View key={g.id} style={styles.guru}>
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
-          <View style={{flex:1}}>
-            <Text style={styles.cardTitle}>{g.name} · {g.city||'Location missing'}, {g.state}</Text>
-            <Text style={styles.small}>{g.canPromote?'Ready for local matching':g.reason}</Text>
-            <Text style={styles.small}>{g.serviceKeys.length?g.serviceKeys.map(k=>k.replace(/_/g,' ')).join(' · '):'No selected services'}</Text>
-            {g.canPromote&&!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
-          </View>
-        </View>)}
+        <Text style={styles.small}>Showing {visibleDirectory.length} of {listed.length} Gurus</Text>
+        {visibleDirectory.map(g=>{
+          const expanded=expandedGuru===g.id;
+          const mini=readyMini?.guruId===g.id && readyMini.service===miniService &&
+            readyMini.channel===miniChannel ? readyMini.share : null;
+          return <View key={g.id} style={styles.guruMini}>
+            <TouchTarget accessibilityRole="button" accessibilityState={{expanded}}
+              onPress={()=>toggleMini(g)} style={styles.guruMiniHeader}>
+              <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
+              <View style={{flex:1,gap:3}}>
+                <Text style={styles.cardTitle}>{g.name}</Text>
+                <Text style={styles.small}>{g.city||'Location missing'}, {g.state}</Text>
+                <Text style={g.canPromote?styles.good:styles.warning}>
+                  {g.canPromote?'Approved · Ready to share':g.reason}
+                </Text>
+              </View>
+              <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
+            </TouchTarget>
+            {expanded&&<View style={styles.miniExpanded}>
+              {g.canPromote && g.serviceKeys.length ? <>
+                <Text style={styles.label}>Choose Guru service</Text>
+                <View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
+                  {pill(s.replace(/_/g,' '),miniService===s,()=>{
+                    setMiniService(s);void prepareMini(g,miniChannel,s);
+                  })}
+                </View>)}</View>
+                <Text style={styles.label}>Choose social channel</Text>
+                <View style={styles.chips}>{channels.map(c=><View key={c}>
+                  {pill(c.toUpperCase(),miniChannel===c,()=>{
+                    setMiniChannel(c);void prepareMini(g,c,miniService);
+                  })}
+                </View>)}</View>
+                {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
+                {mini&&<>
+                  <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
+                    accessibilityLabel={g.name+' promotional card and QR code'}/>
+                  <View style={styles.inlineRow}>
+                    {btn('Share to social app',()=>{void shareMini();})}
+                    {btn('Open PNG',()=>{void Linking.openURL(mini.cardUrl);})}
+                  </View>
+                  <Text selectable style={styles.reply}>{mini.replyText}</Text>
+                  <Text selectable style={styles.small}>{mini.shareUrl}</Text>
+                  <Text style={styles.small}>For Instagram and TikTok, post the image using the native app and add the tracked link to a permitted caption or reply. Posting is not automatic.</Text>
+                  {btn('Mark post as shared',()=>{void logMiniShared();},busy,true)}
+                </>}
+                {!mini&&!busy&&btn('Retry preparing card',()=>{void prepareMini(g,miniChannel,miniService);})}
+              </>:<Text style={styles.warning}>
+                {g.canPromote?'A Guru service must be enabled before sharing.':g.reason}
+              </Text>}
+              {!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
+            </View>}
+          </View>;
+        })}
+        <View style={styles.inlineRow}>
+          {btn('Previous',()=>{setDirectoryPage(v=>Math.max(0,v-1));setExpandedGuru('');},directoryPage===0)}
+          {btn('Next',()=>{setDirectoryPage(v=>v+1);setExpandedGuru('');},directoryPage+1>=listPageCount)}
+        </View>
+        <Text style={styles.small}>Page {directoryPage+1} of {listPageCount}</Text>
       </View>
-      <Text style={styles.heading}>Tracked promotions</Text>
-      {!dashboard?.campaigns.length&&<View style={styles.card}><Text style={styles.small}>No promotions yet. Choose a matching Guru above.</Text></View>}
-      {dashboard?.campaigns.map(c=><View key={c.id} style={styles.card}>
-        <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
-        <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')}</Text>
-        <Text style={styles.small}>{c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profile clicks · {c.metrics.inquiryClicks} inquiry clicks</Text>
-        {btn('View promotion',()=>setActive(c.code))}
-        {c.status==='pending_review'&&role!=='intern'&&<View style={styles.inlineRow}>
-          {btn('Approve',()=>{void action(c,'approve');},busy,true)}
-          {btn('Reject',()=>{void action(c,'reject');},busy)}
-        </View>}
-        {c.status==='approved'&&<View style={styles.inlineRow}>
-          {btn('Share reply',()=>{void shareReply(c);})}
-          {btn('Mark shared',()=>{void action(c,'shared');},busy,true)}
-        </View>}
-        {card?.id===c.id&&<>
-          {c.status==='approved'?<>
-            <Image source={{uri:c.cardUrl}} resizeMode="contain" style={styles.shareImage}/>
-            {btn('Open downloadable card',()=>{void Linking.openURL(c.cardUrl);})}
-            {btn('Preview tracked link',()=>{void Linking.openURL(c.shareUrl);})}
-          </>:<Text style={styles.notice}>Public QR and sharing unlock only after manager approval.</Text>}
-          <Text style={styles.reply}>{c.status==='approved'?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,'[link unlocks after approval]')}</Text>
-        </>}
-      </View>)}
+      <TouchTarget accessibilityRole="button"
+        onPress={()=>{setHistoryOpen(x=>!x);setActive('');}}
+        style={styles.historyToggle}>
+        <Text style={styles.heading}>Past outreach & approvals ({dashboard?.campaigns.length||0})</Text>
+        <Text style={styles.expandIcon}>{historyOpen?'−':'+'}</Text>
+      </TouchTarget>
+      {historyOpen&&<View style={styles.card}>
+        <Text style={styles.small}>Compact history with {PAGE_SIZE} items per page. Campaign metrics remain tracked.</Text>
+        {recentCampaigns.map(c=><View key={c.id} style={styles.guruMini}>
+          <TouchTarget accessibilityRole="button" accessibilityState={{expanded:card?.id===c.id}}
+            onPress={()=>setActive(active===c.code?'':c.code)} style={styles.guruMiniHeader}>
+            <View style={{flex:1}}>
+              <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
+              <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
+            </View>
+            <Text style={styles.expandIcon}>{card?.id===c.id?'−':'+'}</Text>
+          </TouchTarget>
+          {c.status==='pending_review'&&role!=='intern'&&<View style={styles.inlineRow}>
+            {btn('Approve',()=>{void action(c,'approve');},busy,true)}
+            {btn('Reject',()=>{void action(c,'reject');},busy)}
+          </View>}
+          {card?.id===c.id&&<View style={styles.miniExpanded}>
+            {c.status==='approved'?<>
+              <Image source={{uri:c.cardUrl}} resizeMode="contain" style={styles.shareImage}/>
+              <View style={styles.inlineRow}>
+                {btn('Share',()=>{void shareReply(c);})}
+                {btn('Mark shared',()=>{void action(c,'shared');},busy,true)}
+              </View>
+              {btn('Open PNG',()=>{void Linking.openURL(c.cardUrl);})}
+              {btn('Open tracked link',()=>{void Linking.openURL(c.shareUrl);})}
+            </>:<Text style={styles.warning}>Content requires Manager approval to publish.</Text>}
+            <Text selectable style={styles.reply}>{c.status==='approved'?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,'[link available after approval]')}</Text>
+          </View>}
+        </View>)}
+        <View style={styles.inlineRow}>
+          {btn('Previous',()=>{setHistoryPage(v=>Math.max(0,v-1));setActive('');},historyPage===0)}
+          {btn('Next',()=>{setHistoryPage(v=>v+1);setActive('');},historyPage+1>=historyCount)}
+        </View>
+        <Text style={styles.small}>Page {historyPage+1} of {historyCount}</Text>
+      </View>}
       {loading&&<ActivityIndicator color={SocialDeskColors.primary}/>}
       <Text style={styles.small}>Counts are recorded actions, not unique people. Inquiry clicks do not mean confirmed requests, bookings or revenue. Availability must be confirmed with the Guru.</Text>
     </View>
