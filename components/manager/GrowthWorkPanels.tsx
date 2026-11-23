@@ -173,7 +173,7 @@ export function CampaignPanel({
           <button className={button}>Save campaign</button>
         </form>
       </article>
-      <article className={`${DESK_UI.card} p-4`}>
+      <article id="create-own-post" className={`${DESK_UI.card} scroll-mt-44 p-4`}>
         <h2 className="text-lg font-black text-[#0F2744]">Content you will publish yourself</h2>
         <p className="mt-1 text-sm text-slate-600">Marking something published stores your link. SitGuru does not post it to the network.</p>
         <form action={saveContent} className="mt-3 grid gap-2">

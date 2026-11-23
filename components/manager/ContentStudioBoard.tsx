@@ -34,6 +34,7 @@ export function ContentStudioBoard({
   notice,
   error,
   focusId = "",
+  queue = "action",
 }: {
   items: StudioContentRow[];
   summary: ReturnType<typeof studioSummary>;
@@ -41,9 +42,38 @@ export function ContentStudioBoard({
   notice?: string;
   error?: string;
   focusId?: string;
+  queue?: "action" | "review" | "publish" | "published" | "all";
 }) {
   const draftUploadPilotEnabled = process.env.TIKTOK_DRAFT_UPLOAD_ENABLED === "true";
+  const actionFor = (item: StudioContentRow) => studioRowLabel(item).action;
+  const counts = {
+    action: items.filter(item => ["Review", "Publish", "CEO review"].includes(actionFor(item))).length,
+    review: items.filter(item => actionFor(item) === "Review").length,
+    publish: items.filter(item => actionFor(item) === "Publish").length,
+    published: items.filter(item => Boolean(item.publishedUrl)).length,
+    all: items.length,
+  };
+  const queueTabs = [
+    {id:"action", label:"Needs action"},
+    {id:"review", label:"Review drafts"},
+    {id:"publish", label:"Ready to publish"},
+    {id:"all", label:"All content"},
+    {id:"published", label:"Published"},
+  ] as const;
+  const visibleItems = items.filter(item => {
+    const next = actionFor(item);
+    if (queue === "review") return next === "Review";
+    if (queue === "publish") return next === "Publish";
+    if (queue === "published") return Boolean(item.publishedUrl);
+    if (queue === "action") return ["Review", "Publish", "CEO review"].includes(next);
+    return true;
+  }).sort((a,b) => {
+    const priority = (action: string) =>
+      action === "Review" ? 0 : action === "Publish" ? 1 : action === "CEO review" ? 2 : 3;
+    return priority(actionFor(a)) - priority(actionFor(b));
+  });
   const cards = [
+
     ["Drafts", summary.drafts, "sky"],
     ["Pending my approval", summary.pending, "amber"],
     ["Changes requested", summary.changes, "peach"],
@@ -54,31 +84,34 @@ export function ContentStudioBoard({
 
   return (
     <div className="space-y-4">
-      <header className="rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] public-dark-section" data-brand-green>
-        <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-100">SitGuru · Manager's Desk</p>
-        <h2 className="mt-1 text-2xl font-black !text-white">Content Studio</h2>
-        <p className="mt-2 max-w-3xl text-sm font-semibold !text-emerald-50">Create, review, approve and measure what grows our community.</p>
-      </header>
       {notice ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{notice}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{error}</p> : null}
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <Link href="/manager/create" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2563EB] px-4 py-3 text-sm font-black !text-white shadow-sm hover:bg-[#1D4ED8] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Create content</Link>
-        <Link href="/manager/reads" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-3 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">Reads &amp; Media</Link>
-        <Link href="/manager/toolkit/brand" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Brand Kit</Link>
-        <a href="#review" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Review queue</a>
-        <Link href="/manager/calendar" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Content calendar</Link>
+      <div aria-label="One-click Content Studio actions"
+        className="flex min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <Link href="/manager/campaigns-content?tool=create#create-own-post"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white hover:bg-[#1D4ED8]">
+          + Create post
+        </Link>
+        <Link href="/manager/campaigns-content?tool=create#campaign-tools"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-900 hover:bg-emerald-100">
+          New campaign
+        </Link>
+        <Link href="/manager/calendar" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-slate-50">Calendar</Link>
+        <Link href="/manager/toolkit/brand" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-slate-50">Brand Kit</Link>
+        <Link href="/manager/reads" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-slate-50">Reads &amp; Media</Link>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map(([label, count, tone]) => {
-          const accent = DESK_STAT[tone];
-          return (
-            <article key={label} className={`rounded-2xl border p-4 shadow-[0_8px_24px_rgba(15,39,68,0.05)] ${accent.wrap}`}>
-              <p className={`text-2xl font-black tabular-nums ${accent.value}`}>{count}</p>
-              <p className="text-sm font-bold text-[#0F2744]">{label}</p>
-            </article>
-          );
-        })}
-      </div>
+      <nav aria-label="Filter team Content Studio work" className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+        {queueTabs.map(tab => (
+          <Link key={tab.id} href={"/manager/campaigns-content?queue=" + tab.id + "#review"}
+            aria-current={queue === tab.id ? "page" : undefined}
+            className={"inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black sm:text-sm " +
+              (queue === tab.id
+                ? "border-[#0D5C3A] bg-[#0D5C3A] text-white"
+                : "border-slate-200 bg-white text-[#0F2744] hover:bg-[#F0FDF4]")}>
+            {tab.label} <span className="tabular-nums opacity-75">({counts[tab.id]})</span>
+          </Link>
+        ))}
+      </nav>
       {isSuperUser && draftUploadPilotEnabled ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
           <p className="text-sm font-bold text-sky-950">TikTok draft-upload pilot</p>
@@ -91,9 +124,24 @@ export function ContentStudioBoard({
           {summary.escalated} escalation{summary.escalated === 1 ? "" : "s"} waiting for Admin. Routine posts stay with the assigned manager.
         </p>
       ) : null}
-      <section id="review" className="space-y-3">
-        <h3 className="text-lg font-black text-slate-950">My team&apos;s content</h3>
-        {items.map((item) => {
+      <section id="review" className="scroll-mt-44 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              {queue === "action" ? "Next steps for your team" :
+                queue === "review" ? "Drafts waiting for review" :
+                queue === "publish" ? "Approved posts ready to publish" :
+                queue === "published" ? "Published content" : "All team content"}
+            </h2>
+            <p className="text-xs font-semibold text-slate-600">
+              {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"} ·
+              Review and publishing actions are available directly on each card.
+            </p>
+          </div>
+          <Link href="/manager/campaigns-content?queue=all#review"
+            className="text-sm font-black text-blue-700 hover:underline">Show all content</Link>
+        </div>
+        {visibleItems.map((item) => {
           const labels = studioRowLabel(item);
           const platformHref = PLATFORM_LINKS[item.platform] || "";
           return (
@@ -207,12 +255,35 @@ export function ContentStudioBoard({
             </article>
           );
         })}
-        {!items.length ? (
-          <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500">
-            No intern content is waiting. New drafts show up here after an intern submits them.
-          </p>
+        {!visibleItems.length ? (
+          <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
+            <p className="text-sm font-bold text-[#0D5C3A]">
+              {queue === "action" ? "You're all caught up — no reviews or publishing tasks are waiting." :
+               "No content matches this filter yet."}
+            </p>
+            <Link href="/manager/campaigns-content?queue=all#review"
+              className="mt-2 inline-flex min-h-10 items-center text-sm font-black text-blue-700 underline">
+              Browse all content
+            </Link>
+          </div>
         ) : null}
       </section>
+      <details className="rounded-2xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-black text-[#0F2744]">
+          View Content Studio totals · {summary.pending} awaiting review · {summary.approved} approved
+        </summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map(([label, count, tone]) => {
+            const accent = DESK_STAT[tone];
+            return (
+              <article key={label} className={`rounded-xl border p-3 ${accent.wrap}`}>
+                <p className={`text-xl font-black tabular-nums ${accent.value}`}>{count}</p>
+                <p className="text-xs font-bold text-[#0F2744]">{label}</p>
+              </article>
+            );
+          })}
+        </div>
+      </details>
       <p className="text-xs font-semibold text-slate-500">
         Opening a social network or copying a caption does not mark a post published. Sending a TikTok video transfers it for draft processing; inbox delivery must be verified separately. It does not create a public post. SitGuru does not automatically publish to Facebook, Instagram, TikTok, X, or YouTube. Approving a post does not complete internship hours.
       </p>

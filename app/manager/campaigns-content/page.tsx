@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ContentStudioBoard } from "@/components/manager/ContentStudioBoard";
-import { CampaignPanel, GrowthFrame } from "@/components/manager/GrowthWorkPanels";
+import { CampaignPanel } from "@/components/manager/GrowthWorkPanels";
+import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerContentStudio } from "@/lib/internship/content-studio-actions";
 import { loadCampaignDesk } from "@/lib/manager-growth/data";
@@ -23,26 +23,36 @@ export default async function CampaignsContentPage({
     loadCampaignDesk(access.actor.id),
     loadManagerContentStudio(access.actor.id, access.actor.isSuperUser),
   ]);
+  const requestedQueue = first(params.queue);
+  const queue = requestedQueue === "review" || requestedQueue === "publish" ||
+    requestedQueue === "published" || requestedQueue === "all" || requestedQueue === "action"
+    ? requestedQueue : first(params.content) ? "all" : "action";
+
   return (
-    <GrowthFrame title="Content Studio" subtitle="Review intern content, then keep your own campaigns beside it." notice={first(params.ok)}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#DBEAFE] bg-gradient-to-r from-[#EFF6FF] via-[#F0FDF4] to-white p-4 shadow-[0_8px_24px_rgba(15,39,68,0.05)]">
-        <div>
-          <p className="text-sm font-black text-[#0F2744]">Your content, measured</p>
-          <p className="text-xs font-semibold text-slate-600">After publishing, compare watched, clicked, shared and SitGuru growth results.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/manager/community-studio/guru-match" className="inline-flex min-h-11 items-center rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">Guru Match &amp; Share</Link>
-          <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">View Content Analytics</Link>
-        </div>
-      </div>
+    <ManagerSectionScaffold
+      title="Content Studio"
+      subtitle="Create posts, review team drafts, approve content and track what gets published."
+    >
+      {first(params.ok) ? (
+        <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p>
+      ) : null}
       <ContentStudioBoard
         items={studio.items}
         summary={studio.summary}
         isSuperUser={access.actor.isSuperUser}
+        queue={queue}
         error={first(params.error)}
         focusId={first(params.content)}
       />
-      <CampaignPanel campaigns={desk.campaigns} content={desk.content} />
-    </GrowthFrame>
+      <details id="campaign-tools" open={first(params.tool) === "create" ? true : undefined}
+        className="scroll-mt-40 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer px-4 py-4 text-sm font-black text-[#0F2744] hover:bg-slate-50 sm:px-5">
+          More tools · Plan an organic campaign or create your own post
+        </summary>
+        <div className="border-t border-slate-100 p-3 sm:p-5">
+          <CampaignPanel campaigns={desk.campaigns} content={desk.content} />
+        </div>
+      </details>
+    </ManagerSectionScaffold>
   );
 }
