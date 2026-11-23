@@ -24,6 +24,7 @@ export default async function SharedGuruLanding({
   const prefetch=Boolean(requestHeaders.get("next-router-prefetch")||requestHeaders.get("purpose")==="prefetch");
   if(!crawler&&!prefetch)await logPublicShareEvent(share.id,via==="qr"?"qr_open":"link_open",via);
   const community=share.promotionType==="community";
+  const firstName=community?"":share.guru.firstName;
   const label=share.service_key==="custom_care"?"Pet care":GURU_MATCH_SERVICES.find(s=>s.key===share.service_key)?.label||"Pet care";
   return (
     <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 text-[#0F2744] sm:py-12">
@@ -32,7 +33,7 @@ export default async function SharedGuruLanding({
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-100">
             <PawPrint size={16}/> SITGURU · LOCAL PET CARE
           </p>
-          <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">{community?"Find pet care with SitGuru":"Meet your local Guru"}</h1>
+          <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">{community?"Find pet care with SitGuru":`Meet ${firstName}, your local Guru`}</h1>
           <p className="mt-2 text-sm font-medium !text-emerald-50">{community?"Browse pet care options and confirm availability before booking.":"Find care closer to home, with the flexibility your pets deserve."}</p>
         </div>
         <div className="space-y-4 p-5 sm:p-7">
@@ -45,7 +46,7 @@ export default async function SharedGuruLanding({
               </div>
             )}
             <div>
-              <h2 className="text-xl font-black">{share.guru.name}</h2>
+              <h2 className="text-xl font-black">{share.guru.name.replace(/^\S+/,firstName)}</h2>
               <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-slate-600"><MapPin size={15}/>{share.city}, {share.state}</p>
               <p className="mt-1 text-sm font-bold text-[#0D5C3A]">{label}</p>
             </div>
@@ -56,15 +57,29 @@ export default async function SharedGuruLanding({
           </div>}
           <div className="rounded-xl border border-[#D1EADD] bg-[#F0FDF4] p-4">
             <p className="flex items-center gap-2 text-sm font-bold"><ShieldCheck size={18}/> {community?"Explore SitGuru care options.":"See services, experience and availability on SitGuru."}</p>
-            <p className="mt-1 text-xs text-slate-600">{community?"Compare providers and verify their availability and services before booking.":"A match is an invitation to explore. Confirm availability and your pet’s needs directly with the Guru."}</p>
+            {community ? (
+              <p className="mt-1 text-xs text-slate-600">
+                Compare providers and verify their availability and services before booking.
+              </p>
+            ) : (
+              <div className="mt-3 border-t border-[#D1EADD] pt-3">
+                <p className="text-lg font-black leading-snug text-[#0F2744]">
+                  Hi, I’m {firstName}! <span aria-hidden="true">👋</span>
+                </p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#36534A]">
+                  {share.guru.intro ||
+                    "Take a look at my SitGuru profile to learn more about the care I offer and see if I’m a good fit for your pet."}
+                </p>
+              </div>
+            )}
           </div>
           <Link prefetch={false} href={`/go/guru-match/${share.code}?intent=profile`}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 font-black !text-white hover:bg-[#1D4ED8]">
-            {community?"Find local pet care":"View Guru profile"} <ArrowRight size={18}/>
+            {community?"Find local pet care":`View ${firstName}’s profile`} <ArrowRight size={18}/>
           </Link>
           {!community&&<Link prefetch={false} href={`/go/guru-match/${share.code}?intent=inquiry`}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-3 font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">
-            <HeartHandshake size={18}/> Explore booking this Guru
+            <HeartHandshake size={18}/> Explore booking with {firstName}
           </Link>}
           <p className="text-center text-xs text-slate-500">SitGuru · People. Happier pets. No booking or availability is guaranteed by this promotion.</p>
         </div>
