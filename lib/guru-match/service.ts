@@ -5,7 +5,7 @@ import type { CommunityActor } from "@/lib/community-studio/service";
 import { getInternOnboarding } from "@/lib/internship/queries";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
-  matchGuruCandidates,normalizeMatchFilters,type GuruMatch,type MatchFilters,type GuruCandidate,type ServiceRow,
+  matchGuruCandidates,buildGuruDirectory,normalizeMatchFilters,type GuruDirectoryEntry,type GuruMatch,type MatchFilters,type GuruCandidate,type ServiceRow,
 } from "./matching";
 
 const SITE="https://www.sitguru.com";
@@ -28,7 +28,7 @@ export type CampaignView = CampaignRow & {
   metrics:CampaignMetrics; shareUrl:string; qrUrl:string; cardUrl:string;
 };
 export type GuruMatchDashboard = {
-  matches:GuruMatch[]; campaigns:CampaignView[]; totals:CampaignMetrics;
+  matches:GuruMatch[]; directory:GuruDirectoryEntry[]; campaigns:CampaignView[]; totals:CampaignMetrics;
   period:"90d"; matchesNotice:string;
 };
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -73,26 +73,40 @@ async function permittedCreatorIds(actor:CommunityActor){
 
 const GURU_SELECT="id,slug,display_name,full_name,name,city,state,service_city,service_state,service_latitude,service_longitude,service_radius_miles,service_area_enabled,services,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_public_visible,is_accepting_bookings,accepting_bookings,is_archived,is_test_account,is_demo,status";
 
+async function loadAllGuruCandidates():Promise<{gurus:GuruCandidate[]; rates:ServiceRow[]}>{
+  const gurus:GuruCandidate[]=[];
+  // Explicitly paginate: a hard .limit(300) silently hides Gurus as the marketplace grows.
+  for(let start=0;start<10000;start+=500){
+    const {data,error}=await supabaseAdmin.from("gurus").select(GURU_SELECT)
+      .order("id",{ascending:true}).range(start,start+499);
+    if(error)throw new Error("Could not load SitGuru's Guru directory.");
+    gurus.push(...(data||[]) as GuruCandidate[]);
+    if((data||[]).length<500)break;
+  }
+  const rates:ServiceRow[]=[];
+  for(let start=0;start<20000;start+=500){
+    const {data,error}=await supabaseAdmin.from("guru_service_rates")
+      .select("guru_id,service_key,is_enabled").order("guru_id",{ascending:true})
+      .order("service_key",{ascending:true}).range(start,start+499);
+    if(error)throw new Error("Could not load Guru service selections.");
+    rates.push(...(data||[]) as ServiceRow[]);
+    if((data||[]).length<500)break;
+  }
+  return {gurus,rates};
+}
 export async function findEligibleGuruMatches(filters:MatchFilters):Promise<GuruMatch[]>{
-  const {data,error}=await supabaseAdmin.from("gurus").select(GURU_SELECT)
-    .eq("is_active",true).eq("is_public",true).eq("is_bookable",true)
-    .eq("status","active").eq("service_area_enabled",true).limit(300);
-  if(error)throw new Error("Could not load eligible Guru profiles.");
-  const gurus=(data||[]) as unknown as GuruCandidate[];
-  if(!gurus.length)return [];
-  const {data:rates,error:rateError}=await supabaseAdmin.from("guru_service_rates")
-    .select("guru_id,service_key,is_enabled").in("guru_id",gurus.map(g=>g.id))
-    .eq("is_enabled",true).limit(1000);
-  if(rateError)throw new Error("Could not load current Guru services.");
-  return matchGuruCandidates(filters,gurus,(rates||[]) as ServiceRow[]);
+  const {gurus,rates}=await loadAllGuruCandidates();
+  return matchGuruCandidates(filters,gurus,rates);
 }
 export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFilters|null):Promise<GuruMatchDashboard>{
   const ids=await permittedCreatorIds(actor);
   let q=supabaseAdmin.from("guru_match_share_campaigns").select("*").order("created_at",{ascending:false}).limit(100);
   if(ids)q=q.in("created_by_user_id",ids);
-  const [{data:rows,error:campaignError}, matches]=await Promise.all([
-    q,filters?findEligibleGuruMatches(filters):Promise.resolve([]),
+  const [{data:rows,error:campaignError}, candidates]=await Promise.all([
+    q,loadAllGuruCandidates(),
   ]);
+  const directory=buildGuruDirectory(candidates.gurus,candidates.rates);
+  const matches=filters?matchGuruCandidates(filters,candidates.gurus,candidates.rates):[];
   if(campaignError)throw new Error("Guru outreach reporting is not configured.");
   const campaigns=(rows||[]) as CampaignRow[];
   const guruIds=[...new Set(campaigns.map(c=>c.guru_id))];
@@ -120,7 +134,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     metric[key]++;totals[key]++;
   }
   return {
-    matches,
+    matches,directory,
     campaigns:campaigns.map(c=>{
       const g=guruMap.get(c.guru_id);
       return {...c,
@@ -132,8 +146,8 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "Only active, public, bookable Gurus offering the selected service and documented pet compatibility are shown. Radius results require verified location coordinates; unknown cities use exact city/state.":
-      "Enter a city, state and service to find eligible local Gurus.",
+      "The full directory is listed separately. Only approved, public, bookable Gurus matching the chosen service, pet needs and recorded coverage can be promoted.":
+      "Browse the complete Guru directory below, then enter a city, state and service to find promotable local matches.",
   };
 }
 export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>){
