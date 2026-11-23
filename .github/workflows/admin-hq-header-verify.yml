@@ -1,0 +1,39 @@
+name: Verify Admin HQ Manager-Style Header
+
+on:
+  pull_request:
+    branches: [sitguru-main]
+    paths:
+      - "app/admin/layout.tsx"
+      - "components/admin/AdminDeskSearch.tsx"
+      - "lib/portal/desk-ui.ts"
+      - ".github/workflows/admin-hq-header-verify.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-hq-header-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Typecheck and build Admin HQ header
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Isolated production build
+        run: npm run build:isolated
