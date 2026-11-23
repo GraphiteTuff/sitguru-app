@@ -349,7 +349,9 @@ export default function NotificationBell() {
     const gutter = 16;
     const panelWidth = Math.min(390, Math.max(0, viewportWidth - gutter * 2));
     const desiredLeft = anchor.right - panelWidth;
-    const left = Math.max(gutter, Math.min(desiredLeft, viewportWidth - panelWidth - gutter));
+    const left = viewportWidth < 640
+      ? (viewportWidth - panelWidth) / 2
+      : Math.max(gutter, Math.min(desiredLeft, viewportWidth - panelWidth - gutter));
 
     setPanelPosition({
       left: left - anchor.left,
