@@ -1,7 +1,8 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
-import {ArrowUpRight,BarChart3,CheckCircle2,ClipboardCopy,Download,
+import GuruCardPreview from "./GuruCardPreview";
+import {ArrowUpRight,BarChart3,CheckCircle2,ClipboardCopy,
   HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw,ChevronDown,ChevronUp,Share2} from "lucide-react";
 import {GURU_MATCH_SERVICES,type GuruMatch,type GuruDirectoryEntry,type MatchFilters} from "@/lib/guru-match/matching";
 import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel,GuruSocialGroup} from "@/lib/guru-match/service";
@@ -441,7 +442,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
                   {g.city||"Location missing"}{g.state?", "+g.state:""} · {g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(v=>v.key===k)?.label||k).slice(0,3).join(" · "):"Services not configured"}
                 </span>
                 <span className={g.canPromote?"mt-1 block text-xs font-bold text-emerald-700":"mt-1 block text-xs font-bold text-amber-700"}>
-                  {g.canPromote?"Approved Guru · Card ready":g.reason}
+                  {g.canPromote?"Approved Guru · Share template available":g.reason}
                 </span>
               </span>
               <span className="shrink-0 rounded-lg bg-[#EFF6FF] p-2 text-blue-700" aria-hidden>
@@ -474,16 +475,11 @@ export default function GuruMatchBoard({role}:{role:Role}){
                 {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
                 {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
                   <div className="min-w-0 space-y-2">
-                    <img src={ready.cardUrl} alt={"Branded SitGuru card for "+g.name+" with profile details and QR code"}
-                      className="block w-full max-w-[560px] rounded-xl border border-slate-200" loading="lazy"/>
-                    <div className="flex flex-wrap gap-2">
-                      <a className={secondary} href={ready.cardUrl} download={"sitguru-"+g.slug+"-card.png"}>
-                        <Download size={16}/> Download image
-                      </a>
-                      <a className={secondary} href={ready.shareUrl} target="_blank" rel="noopener noreferrer">
-                        <ArrowUpRight size={16}/> Test tracked link
-                      </a>
-                    </div>
+                    <GuruCardPreview url={ready.cardUrl} guruName={g.name}
+                      filename={"sitguru-"+g.slug+"-card.png"} />
+                    <a className={secondary} href={ready.shareUrl} target="_blank" rel="noopener noreferrer">
+                      <ArrowUpRight size={16}/> Test tracked link
+                    </a>
                   </div>
                   <div className="min-w-0 space-y-3">
                     <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved Guru card</p>
@@ -658,10 +654,9 @@ export default function GuruMatchBoard({role}:{role:Role}){
           </div>
           {active?.id===c.id&&<div className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
             {currentStatus==="approved"?<>
-              <img src={c.cardUrl} alt={"Tracked Guru share card for "+c.guru.name}
-                className="block w-full max-w-[600px] rounded-xl border border-slate-200" loading="lazy"/>
+              <GuruCardPreview url={c.cardUrl} guruName={c.guru.name}
+                filename="sitguru-guru-share.png" />
               <div className="flex flex-wrap gap-2">
-                <a href={c.cardUrl} download="sitguru-guru-share.png" className={secondary}><Download size={15}/> Download PNG</a>
                 <a href={c.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Tracked link</a>
                 <button type="button" className={secondary} disabled={busy} onClick={()=>void act(c,"copy")}>
                   <ClipboardCopy size={15}/> Copy reply
