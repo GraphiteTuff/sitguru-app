@@ -6,6 +6,7 @@ import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGr
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
 import DrBaldwinPartnerSpotlight from "@/components/partners/DrBaldwinPartnerSpotlight";
+import HomepagePawReportExperience from "@/components/pawreport/HomepagePawReportExperience";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -1303,137 +1304,6 @@ function GuruCardView({
         </div>
       </div>
     </Link>
-  );
-}
-
-function PawReportSection({
-  onTrack,
-}: {
-  onTrack: (label: string, destination: string) => void;
-}) {
-  const benefits = [
-    {
-      icon: "🚶",
-      title: "Follow walks",
-      body: "See walk time, progress, distance, and available route details.",
-    },
-    {
-      icon: "📸",
-      title: "Receive updates",
-      body: "Get photos and notes about food, water, potty, medication, and play.",
-    },
-    {
-      icon: "🗂️",
-      title: "Keep history",
-      body: "Review completed PawReports from past bookings in one place.",
-    },
-  ];
-
-  return (
-    <section className="bg-gradient-to-br from-emerald-50 via-white to-sky-50 py-12 sm:py-16">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_22px_60px_rgba(15,23,42,0.09)] lg:grid-cols-[0.9fr_1.1fr]">
-          {/* Marketing mock only — live PawReport lives on booking dashboards */}
-          <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-700 p-6 sm:p-8 lg:p-10">
-            <div className="mx-auto max-w-md overflow-hidden rounded-[28px] border border-white/15 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
-              <div className="border-b border-slate-100 bg-emerald-50 p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  PawReport Live
-                </p>
-                <h3 className="mt-1 text-2xl font-black text-slate-950">
-                  Scout&apos;s Walk
-                </h3>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Live care updates from your Guru
-                </p>
-              </div>
-
-              <div className="space-y-3 p-5">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                        Walk in progress
-                      </p>
-                      <p className="mt-1 text-xl font-black text-slate-950">
-                        0.8 mi · 18 min
-                      </p>
-                    </div>
-                    <span className="text-3xl">🚶</span>
-                  </div>
-                  <div className="relative mt-4 h-32 overflow-hidden rounded-2xl border border-emerald-100 bg-[radial-gradient(circle_at_18%_72%,#10b981_0_3px,transparent_4px),radial-gradient(circle_at_42%_48%,#38bdf8_0_3px,transparent_4px),radial-gradient(circle_at_70%_30%,#10b981_0_3px,transparent_4px),linear-gradient(135deg,#ecfdf5,#f8fafc)]">
-                    <div className="absolute left-[19%] top-[68%] h-[2px] w-[29%] -rotate-[25deg] rounded-full bg-emerald-400" />
-                    <div className="absolute left-[43%] top-[49%] h-[2px] w-[32%] -rotate-[18deg] rounded-full bg-sky-400" />
-                  </div>
-                </div>
-
-                {[
-                  ["📸", "3 new photos"],
-                  ["💧", "Water refreshed"],
-                  ["📝", "Scout loved the park"],
-                ].map(([icon, label]) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <p className="text-sm font-bold text-slate-800">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 sm:p-8 lg:p-12">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-              The SitGuru care experience
-            </p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-5xl">
-              Know how every visit went.
-            </h2>
-            <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-slate-600">
-              PawReport keeps walk progress, photos, care notes, and completed
-              visit history connected to the booking.
-            </p>
-
-            <div className="mt-8 grid gap-5 sm:grid-cols-3">
-              {benefits.map((benefit) => (
-                <div key={benefit.title}>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-xl">
-                    {benefit.icon}
-                  </span>
-                  <h3 className="mt-3 font-black text-slate-950">
-                    {benefit.title}
-                  </h3>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                    {benefit.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/search"
-                onClick={() => onTrack("Find a Guru PawReport", "/search")}
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
-              >
-                Find a Guru
-              </Link>
-              <Link
-                href="/pawreport-live"
-                onClick={() =>
-                  onTrack("See how PawReport works", "/pawreport-live")
-                }
-                className="inline-flex min-h-12 items-center justify-center px-3 py-3 text-sm font-black text-emerald-800 hover:underline"
-              >
-                See how PawReport works →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -2950,7 +2820,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <PawReportSection onTrack={trackHomepageClick} />
+      <HomepagePawReportExperience onTrack={trackHomepageClick} />
 
       <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
