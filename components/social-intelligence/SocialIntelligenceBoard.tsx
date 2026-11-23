@@ -316,6 +316,8 @@ export default function SocialIntelligenceBoard({
             </section>
           </div>
           <MetaPublishedContentPanel posts={snapshot.posts} sync={snapshot.metaSync}
+            connections={snapshot.connections} publishedChannelCounts={snapshot.publishedChannelCounts}
+            selectedPlatform={snapshot.platform} onSelectPlatform={(channel) => setFilter("platform", channel)}
             canRefresh={role !== "intern"} refreshing={metaRefreshing} feedback={metaFeedback}
             onRefresh={refreshMetaPosts} onOpen={(id) => setFilter("post", id)} />
           <section className={DESK_SECTION}>
