@@ -25,6 +25,10 @@
     {
       "path": "/api/cron/growth-reports",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/social-intelligence-sync",
+      "schedule": "20 * * * *"
     }
   ]
 }
