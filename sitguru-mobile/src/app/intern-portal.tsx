@@ -239,6 +239,19 @@ export default function InternPortalScreen() {
           <Text style={styles.body}>Create Pack stories, nominate Pet of the Week, and follow manager feedback.</Text>
         </TouchTarget>
 
+        <TouchTarget accessibilityRole="button" onPress={() => router.push('/guru-match-share')} style={styles.card}>
+          <Text style={styles.cardTitle}>Guru Match &amp; Share</Text>
+          <Text style={styles.body}>Find local Gurus by city, state and service, prepare tracked QR cards, and request Ava's approval.</Text>
+        </TouchTarget>
+        <TouchTarget accessibilityRole="button" onPress={() => router.push('/content-studio')} style={styles.card}>
+          <Text style={styles.cardTitle}>Content Studio · Live work</Text>
+          <Text style={styles.body}>See the same content review stages and published status as the desktop portal.</Text>
+        </TouchTarget>
+        <TouchTarget accessibilityRole="button" onPress={() => router.push('/social-intelligence')} style={styles.card}>
+          <Text style={styles.cardTitle}>Content Analytics</Text>
+          <Text style={styles.body}>Compare verified views, clicks and content rankings on mobile.</Text>
+        </TouchTarget>
+
         {payload?.mode === 'supervisor' && !payload.workspace ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Employer HQ</Text>
