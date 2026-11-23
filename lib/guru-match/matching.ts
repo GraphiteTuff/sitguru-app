@@ -90,7 +90,9 @@ export function serviceKeys(g: GuruCandidate, rows: ServiceRow[]) {
   return set;
 }
 function guruNotReady(guru:GuruCandidate) {
+  if (clean(guru.status).toLowerCase() === "suspended") return "Account suspended — not eligible";
   if (guru.is_bookable !== true) return "Not currently bookable";
+  if (guru.is_public !== true) return "Public profile is not listed";
   if (!/^[a-z0-9][a-z0-9-]{0,120}$/i.test(clean(guru.slug))) return "Public profile link missing";
   return "";
 }
@@ -99,7 +101,7 @@ export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[])
     const keys=serviceKeys(guru,services);
     const notReady=guruNotReady(guru);
     const names=clean(guru.display_name || guru.full_name || guru.name).split(/\s+/).filter(Boolean);
-    const name=names.length>1?`${names[0]} ${names[names.length-1][0]}.`:names[0]||"SitGuru Guru";
+    const name=names.length>1?`${names[0]} ${names[names.length-1][0]}.`:names[0]||`Incomplete Guru profile (${guru.id.slice(0,8)})`;
     const photo=clean(guru.profile_photo_url || guru.avatar_url || guru.photo_url || guru.image_url);
     const serviceOptions=GURU_MATCH_SERVICES.map(s=>s.key).filter(k=>keys.has(k));
     return {
