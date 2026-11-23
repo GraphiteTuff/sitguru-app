@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     color: SitGuruColors.textMuted,
     marginBottom: 4,
   },
-  socialButton: { minHeight: TOUCH_MIN, borderRadius: 14, backgroundColor: '#0D5C3A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  socialButton: { minHeight: TOUCH_MIN, borderRadius: 14, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   socialButtonText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
   helpButton: { minHeight: TOUCH_MIN, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   helpButtonText: { fontSize: 13, fontWeight: '900', color: '#1D4ED8', textAlign: 'center' },
