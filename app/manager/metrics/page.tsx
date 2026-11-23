@@ -43,9 +43,12 @@ export default async function ManagerMetricsPage({
   return (
     <div className="space-y-5">
       <LiveSocialAutoRefresh intervalMs={90_000} />
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div><p className="font-black text-emerald-950">Social Intelligence & Content Performance</p><p className="text-xs font-semibold text-emerald-800">Explore Meta-style post insights, platform traffic, campaigns and tracked SitGuru conversions.</p></div>
-        <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#0D5C3A] px-4 text-sm font-black text-white">Open Social Intelligence</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D1EADD] bg-gradient-to-r from-[#EFF6FF] via-[#F0FDF4] to-white p-4 shadow-[0_8px_24px_rgba(15,39,68,0.05)]">
+        <div>
+          <p className="font-black text-[#0F2744]">Social Intelligence &amp; Content Performance</p>
+          <p className="text-xs font-semibold text-slate-600">Rank your best posts, compare social engagement, and measure tracked SitGuru activity.</p>
+        </div>
+        <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">Open Social Intelligence</Link>
       </div>
       <GrowthCenterInsightsBoard
         snapshot={snapshot}
