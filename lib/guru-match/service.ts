@@ -146,7 +146,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "The full directory is listed separately. Only approved, public, bookable Gurus matching the chosen service, pet needs and recorded coverage can be promoted.":
+      "All registered Gurus are in the directory. Only currently bookable Gurus matching the chosen service, pet needs and recorded coverage can be promoted.":
       "Browse the complete Guru directory below, then enter a city, state and service to find promotable local matches.",
   };
 }
@@ -216,7 +216,7 @@ export async function findApprovedShare(code:string){
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
     .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,is_active,is_public,is_bookable,status")
     .eq("id",data.guru_id).maybeSingle();
-  if(gError||!g||g.is_active!==true||g.is_public!==true||g.is_bookable!==true||g.status!=="active")return null;
+  if(gError||!g||g.is_bookable!==true)return null;
   const slug=safeGuruSlug(g.slug);if(!slug)return null;
   // An approved card must stop working if the Guru later disables a service
   // or leaves the original service radius. Never silently promote stale coverage.
