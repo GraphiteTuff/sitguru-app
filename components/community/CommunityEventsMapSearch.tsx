@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {useRouter} from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -34,7 +35,7 @@ import {
 import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
-import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
+import {EVENT_PROMOTION_CATEGORIES,getEventPromotionInfo,getEventPromotionCategoryId,eventPromotionExpiry} from "@/lib/community/event-taxonomy";
 import { placeGlyph } from "@/lib/community/place-icons";
 import {
   LANE_SEARCH_PLACEHOLDERS,
@@ -135,8 +136,9 @@ function EventListCard({
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const curated = isHomepageDemoEvent(event.id);
+  const categoryInfo=getEventPromotionInfo(event);
   const sourceLabel =
-    googleDiscovery || curated ? "Pet Event" : "SitGuru Partner Event";
+    googleDiscovery || curated ? "Featured by SitGuru" : "SitGuru Partner Event";
   const description = (
     event.short_description ||
     event.description ||
@@ -227,14 +229,7 @@ function EventListCard({
               Pet Friendly
             </span>
           ) : null}
-          {(event.categories || []).slice(0, 2).map((category) => (
-            <span
-              key={category}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700"
-            >
-              {category}
-            </span>
-          ))}
+          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-800">{categoryInfo.label}</span>
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -356,12 +351,22 @@ export default function CommunityEventsMapSearch({
   initialView = "events",
   initialLane = "",
   initialCategory = "",
+  initialEventCategory = "",
 }: {
   events: CommunityEventWithPartner[];
   initialView?: "events" | "places";
   initialLane?: PlaceLane | "";
   initialCategory?: PlaceCategoryId | "";
+  initialEventCategory?: string;
 }) {
+  const router=useRouter();
+  const [clock,setClock]=useState(0);
+  useEffect(()=>{
+    setClock(Date.now());
+    const timer=setInterval(()=>setClock(Date.now()),60000);
+    const refresh=setInterval(()=>{if(!document.hidden)router.refresh();},3600000);
+    return ()=>{clearInterval(timer);clearInterval(refresh);};
+  },[router]);
   const [view, setView] = useState<"events" | "places">(initialView);
   const [lane, setLane] = useState<PlaceLane | "">(initialLane);
   const [placeCategory, setPlaceCategory] = useState<PlaceCategoryId | "">(
@@ -375,8 +380,8 @@ export default function CommunityEventsMapSearch({
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [placesErrorCode, setPlacesErrorCode] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>({...EMPTY_FILTERS,category:initialEventCategory});
+  const [draft, setDraft] = useState<Filters>({...EMPTY_FILTERS,category:initialEventCategory});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [locationReady, setLocationReady] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -541,9 +546,10 @@ export default function CommunityEventsMapSearch({
       Math.max(events.length, 1),
     );
     const matched = unique.filter((event) => {
+      if(clock && eventPromotionExpiry(event)<=clock)return false;
       if (
         filters.category &&
-        !(event.categories || []).includes(filters.category)
+        getEventPromotionCategoryId(event)!==filters.category
       ) {
         return false;
       }
@@ -586,7 +592,7 @@ export default function CommunityEventsMapSearch({
       if (byCounty !== 0) return byCounty;
       return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
     });
-  }, [events, filters]);
+  }, [events, filters,clock]);
 
   const groupedByCounty = useMemo(() => {
     const groups: { county: string; events: CommunityEventWithPartner[] }[] =
@@ -661,6 +667,12 @@ export default function CommunityEventsMapSearch({
       setDraft(normalized);
     }
     setFilters(normalized);
+    if(view==="events" && typeof window!=="undefined"){
+      const url=new URL(window.location.href);
+      if(normalized.category)url.searchParams.set("category",normalized.category);
+      else url.searchParams.delete("category");
+      window.history.replaceState({},"",url.pathname+url.search);
+    }
     if (normalized.county || normalized.city || normalized.state) {
       saveCommunityLocationPreference({
         county: normalized.county,
@@ -776,6 +788,17 @@ export default function CommunityEventsMapSearch({
           </div>
         </div>
 
+        {view==="events"?<div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <p className="mb-3 text-xs font-black uppercase tracking-wider text-emerald-900">Explore events by type · Powered by SitGuru</p>
+          <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Browse pet event categories">
+            <button type="button" aria-pressed={!filters.category} onClick={()=>{setDraft(v=>({...v,category:""}));applySearch({...filters,category:""});}}
+              className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-black ${!filters.category?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-200 bg-white text-emerald-900"}`}>All Events</button>
+            {EVENT_PROMOTION_CATEGORIES.filter(item=>item.id==="other"||events.some(e=>getEventPromotionCategoryId(e)===item.id && (!clock||eventPromotionExpiry(e)>clock))).map(item=>
+              <button type="button" key={item.id} aria-pressed={filters.category===item.id} onClick={()=>{setDraft(v=>({...v,category:item.id}));applySearch({...filters,category:item.id});}}
+                className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-black ${filters.category===item.id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-200 bg-white text-emerald-900"}`}>{item.label}</button>)}
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Events are listed by their organizers and discovered by SitGuru; filters refresh as new events are added.</p>
+        </div>:null}
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] sm:p-6">
           <form
             className="space-y-3"
@@ -801,9 +824,9 @@ export default function CommunityEventsMapSearch({
                   className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 >
                   <option value="">All categories</option>
-                  {COMMUNITY_EVENT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
+                  {EVENT_PROMOTION_CATEGORIES.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.label}
                     </option>
                   ))}
                 </select>

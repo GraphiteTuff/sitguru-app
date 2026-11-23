@@ -17,6 +17,12 @@ export default async function InternCommunityStudioPage() {
       <span className="mt-1 block text-sm font-semibold text-slate-600">Match local Gurus by city, state and service. Generate QR cards and track clicks.</span></span>
       <span className="rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white">Open tool →</span>
     </Link>
+    <Link href="/intern/community-studio/event-match"
+      className="flex min-h-20 flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D1EADD] bg-gradient-to-r from-[#F0FDF4] via-[#EFF6FF] to-white p-5 shadow-sm hover:border-[#0D5C3A]">
+      <span><span className="block text-lg font-black text-[#0F2744]">📅 Event Match &amp; Share</span>
+      <span className="mt-1 block text-sm font-semibold text-slate-600">Promote current local pet events with tracked social links, graphics and QR codes. Expired events are removed automatically.</span></span>
+      <span className="rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white">Open tool →</span>
+    </Link>
     <CommunityStudioBoard workspace={workspace} mode="intern" />
     <CommunityWorkLinks mode="intern" />
   </div>;

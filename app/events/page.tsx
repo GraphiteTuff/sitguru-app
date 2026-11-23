@@ -3,6 +3,7 @@ import { CalendarDays, PawPrint, Users } from "lucide-react";
 import CommunityEventsMapSearch from "@/components/community/CommunityEventsMapSearch";
 import CommunityFeaturedSection from "@/components/community/CommunityFeaturedSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
+import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
 import { getUpcomingCuratedBucksMontgomeryPetEvents } from "@/lib/community/homepage-demo-events";
@@ -10,6 +11,7 @@ import {
   fetchFeaturedCommunityPageEvents,
   fetchPublicEvents,
 } from "@/lib/community/queries";
+import { EVENT_PROMOTION_CATEGORIES } from "@/lib/community/event-taxonomy";
 import {
   getPlaceCategory,
   parsePlaceLane,
@@ -72,6 +74,7 @@ export default async function CommunityPage({ searchParams }: PageProps) {
   const initialCategory = (
     getPlaceCategory(categoryParam) ? categoryParam : ""
   ) as PlaceCategoryId | "";
+  const initialEventCategory = EVENT_PROMOTION_CATEGORIES.some(c=>c.id===categoryParam)?categoryParam:"";
   const [featuredEvents, partnerEvents, discovered] = await Promise.all([
     fetchFeaturedCommunityPageEvents({ limit: 3 }),
     fetchPublicEvents({ limit: 200 }),
@@ -94,11 +97,12 @@ export default async function CommunityPage({ searchParams }: PageProps) {
             SitGuru Pet Events
           </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight !text-white sm:text-4xl lg:text-5xl">
-            Pet friendly events near you
+            Discover pet events. Powered by SitGuru.
           </h1>
           <p className="mt-3 max-w-2xl text-base font-semibold text-emerald-50">
-            Search like Find Care — events on the left, map on the right. Partner
-            events always lead.
+            Find local adoption days, pet meetups, fundraisers, and more. Explore events,
+            RSVP, and join the SitGuru community as a Pet Parent or Guru. Events are
+            organized by their listed hosts; SitGuru helps you discover them.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -114,6 +118,12 @@ export default async function CommunityPage({ searchParams }: PageProps) {
               Manage events
             </Link>
           </div>
+          <div className="mt-6 max-w-3xl rounded-2xl border border-white/20 bg-white/95 p-4 text-[#0F2744]">
+            <p className="mb-2 text-sm font-black text-emerald-900">Love pets? Join the SitGuru community — free.</p>
+            <p className="mb-3 text-xs font-semibold text-slate-600">Find care as a Pet Parent, grow your pet care business as a Guru, or help neighbors connect as an Ambassador.</p>
+            <CommunityJoinOptions variant="compact" source="event_directory" campaign="event_directory_join" />
+          </div>
+          <p className="mt-3 text-xs font-semibold !text-emerald-100">Featured by SitGuru does not mean SitGuru organizes or sponsors third-party events.</p>
         </div>
       </section>
 
@@ -122,6 +132,7 @@ export default async function CommunityPage({ searchParams }: PageProps) {
         initialView={view}
         initialLane={initialLane}
         initialCategory={initialCategory}
+        initialEventCategory={initialEventCategory}
       />
 
       <CommunityFeaturedSection events={featuredEvents} />
