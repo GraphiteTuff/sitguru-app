@@ -6,14 +6,11 @@ import { PawPrint } from "lucide-react";
 import {
   classifyTapFeedback,
   tapFeedbackLifetime,
-  tapPawPosition,
   type TapFeedbackIntent,
 } from "@/lib/pawpulse/tap-feedback";
 
 type VisiblePaw = {
   id: number;
-  left: number;
-  top: number;
   intent: TapFeedbackIntent;
 };
 
@@ -41,16 +38,10 @@ export default function GlobalTapPawFeedback() {
   }, [pathname, clearPaw]);
 
   useEffect(() => {
-    const show = (element: Element, intent: TapFeedbackIntent, x?: number, y?: number) => {
-      const rect = element.getBoundingClientRect();
-      // Keyboard activation has no pointer coordinates; anchor the paw near
-      // the activated control instead.
-      const pointX = x !== undefined && x > 0 ? x : rect.left + Math.min(rect.width / 2, 60);
-      const pointY = y !== undefined && y > 0 ? y : rect.top + rect.height / 2;
-      const position = tapPawPosition(pointX, pointY, window.innerWidth, window.innerHeight);
+    const show = (intent: TapFeedbackIntent) => {
       if (timer.current !== null) window.clearTimeout(timer.current);
       id.current += 1;
-      setPaw({ id: id.current, ...position, intent });
+      setPaw({ id: id.current, intent });
       timer.current = window.setTimeout(() => {
         timer.current = null;
         setPaw(null);
@@ -80,9 +71,8 @@ export default function GlobalTapPawFeedback() {
         skip: Boolean(target.closest('[data-sitguru-no-click-feedback], [data-action-feedback="off"]')),
       });
       if (!intent) return;
-      // Let the real browser/React click execute. This only paints a tiny
-      // pointer-events-none paw beside the selected control.
-      show(target, intent, event.detail > 0 ? event.clientX : undefined, event.detail > 0 ? event.clientY : undefined);
+      // Keep the normal click behavior; the centered loader never traps taps.
+      show(intent);
     };
 
     const onSubmit = (event: SubmitEvent) => {
@@ -93,7 +83,7 @@ export default function GlobalTapPawFeedback() {
       if (submitter.matches(":disabled")) return;
       // Also covers Enter-to-submit and React server actions with no button
       // click. Native validation failures do not dispatch the submit event.
-      show(submitter, "submit");
+      show("submit");
     };
 
     document.addEventListener("click", onClick, true);
@@ -107,15 +97,18 @@ export default function GlobalTapPawFeedback() {
   }, []);
 
   return paw ? (
-    <span
+    <div
       key={paw.id}
       data-sitguru-tap-paw=""
       data-feedback-intent={paw.intent}
       aria-hidden="true"
-      className="pointer-events-none fixed z-[250] grid h-7 w-7 place-items-center rounded-full border border-emerald-100 bg-white/95 text-[#0D5C3A] shadow-[0_3px_12px_rgba(15,39,68,0.16)]"
-      style={{ left: paw.left, top: paw.top }}
+      className="pointer-events-none fixed inset-0 z-[250] grid place-items-center"
     >
-      <PawPrint className="h-[17px] w-[17px] animate-spin motion-reduce:animate-none" strokeWidth={2.3} />
-    </span>
+      <div className="absolute inset-0 bg-[#0F2744]/10" />
+      <div className="relative grid h-24 w-24 place-items-center rounded-full border border-[#D1FAE5] bg-white/95 text-[#0D5C3A] shadow-[0_18px_50px_rgba(15,39,68,0.25)] sm:h-28 sm:w-28 lg:h-36 lg:w-36">
+        <span className="absolute inset-2 animate-spin rounded-full border-[7px] border-[#D1FAE5] border-t-[#059669] motion-reduce:animate-none sm:inset-2.5 sm:border-[8px] lg:inset-3 lg:border-[9px]" />
+        <PawPrint className="relative h-11 w-11 sm:h-12 sm:w-12 lg:h-16 lg:w-16" strokeWidth={2.3} />
+      </div>
+    </div>
   ) : null;
 }
