@@ -16,13 +16,14 @@ export const dynamic = "force-dynamic";
  */
 async function safeBrandLogo(): Promise<Buffer> {
   for (const file of [
+    "public/images/sitguru-logo-cropped.png",
     "public/images/sitguru-logo-final.png",
     "public/images/sitguru-logo-mark.png",
     "public/apple-touch-icon.png",
   ]) {
     try {
       const image = await readFile(path.join(process.cwd(), file));
-      return await sharp(image).resize(304, 116, {
+      return await sharp(image).trim({background:"#FFFFFF",threshold:12}).resize(304, 116, {
         fit: "contain", background: "#FFFFFF",
       }).png().toBuffer();
     } catch {
@@ -64,10 +65,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
   try {
     const share = await findApprovedShare(code);
     if (!share) return new Response("Not found", { status: 404 });
-    const [logoPng, photoPng, qrPng] = await Promise.all([
+    const [logoPng, photoPng, qrPng, dogPng, catPng] = await Promise.all([
       safeBrandLogo(),
       safePhoto(share.guru.photoUrl),
       QRCode.toBuffer(guruMatchQrUrl(code), { type: "png", width: 460, margin: 2, errorCorrectionLevel: "H" }),
+      readFile(path.join(process.cwd(), "public/images/hero/sitguru-dog-walking-hero.jpg")).catch(() => null),
+      readFile(path.join(process.cwd(), "public/images/petperks/petperks-pet-parent-cat.jpg")).catch(() => null),
     ]);
     const serviceLabel = share.promotionType==="community"?"Explore local care":share.service_key==="custom_care"?"Explore Guru services":GURU_MATCH_SERVICES.find(item => item.key === share.service_key)?.label || "Pet Care";
     const png = await renderGuruMatchCardPng({
@@ -79,6 +82,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
       logoPng,
       qrPng,
       photoPng,
+      dogPng,
+      catPng,
+      experienceYears:share.guru.experienceYears,
     });
     return new Response(new Uint8Array(png), {
       headers: {
@@ -86,7 +92,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
         "Content-Length": String(png.byteLength),
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, no-store",
-        "Content-Disposition": 'inline; filename="sitguru-guru-share.png"',
+        "Content-Disposition": 'inline; filename="sitguru-guru-social-portrait.png"',
       },
     });
   } catch (error) {

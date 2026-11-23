@@ -356,7 +356,7 @@ export async function findApprovedShare(code:string){
     .eq("code",code).eq("status","approved").maybeSingle();
   if(error||!data)return null;
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
-    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_archived,status")
+    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_archived,status")
     .eq("id",data.guru_id).maybeSingle();
   if(gError||!g||g.is_public!==true||g.is_archived===true)return null;
   const promotionType=data.promotion_type==="community"?"community" as const:"guru" as const;
@@ -365,7 +365,7 @@ export async function findApprovedShare(code:string){
     // The branded card directs visitors to general SitGuru care discovery instead.
     return {...data,promotionType,guru:{
       slug:"",name:"SitGuru Pet Care",city:clean(data.city),state:clean(data.state),
-      photoUrl:null,
+      photoUrl:null,experienceYears:null,
     }};
   }
   if(g.is_bookable!==true||clean(g.status).toLowerCase()!=="active")return null;
@@ -387,7 +387,12 @@ export async function findApprovedShare(code:string){
   return {...data,promotionType,guru:{slug,
     name:initialsName(g.display_name||g.full_name||g.name),
     city:clean(g.city),state:clean(g.state),
-    photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
+    photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url),
+    experienceYears:(()=>{
+      const years=Number(g.experience_years??g.years_experience);
+      return Number.isFinite(years)&&years>0&&years<70?Math.floor(years):null;
+    })(),
+  }};
 }
 export async function logPublicShareEvent(shareId:string,eventType:"link_open"|"qr_open"|"profile_click"|"inquiry_click",source:ShareChannel|"qr"){
   const {error}=await supabaseAdmin.from("guru_match_share_events").insert({
