@@ -348,7 +348,7 @@ function Body(){
                       setMiniService(s);void prepareMini(g,miniChannel,s);
                     })}
                   </View>)}</View>
-                  :<Text style={styles.small}>General SitGuru pet-care discovery · no booking claim</Text>}
+                  :<Text style={styles.small}>{g.canFeatureGuru?"General Guru profile · services to be confirmed":"SitGuru pet-care discovery · no booking claim"}</Text>}
                 <Text style={styles.label}>Choose social channel</Text>
                 {selectedGroup
                   ? <Text style={styles.small}>{selectedGroup.channel.toUpperCase()} · {selectedGroup.name}</Text>
