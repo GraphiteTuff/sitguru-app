@@ -250,6 +250,9 @@ export default function SocialIntelligenceBoard({
       </div>
       <div className={`${DESK_UI.card} flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4`}>
         <div className="flex flex-wrap gap-2">
+          {role === "admin" ? (
+            <Link href="/admin/sales-marketing/content" className="inline-flex min-h-10 items-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-[#DBEAFE]">Admin Content Hub</Link>
+          ) : null}
           <Link href={overviewHref} className="inline-flex min-h-10 items-center rounded-xl bg-[#EEF2F6] px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-[#E2E8F0] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Growth Center overview</Link>
           <Link href={contentHref} className="inline-flex min-h-10 items-center rounded-xl bg-[#EEF2F6] px-3 py-2 text-sm font-bold text-[#0F2744] hover:bg-[#E2E8F0] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Content Studio</Link>
         </div>
