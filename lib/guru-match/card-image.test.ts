@@ -72,7 +72,7 @@ test("SitGuru community cards do not advertise a suspended or unbookable individ
   assert.equal(output.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
 });
 
-test("personal Guru posters never substitute generic marketing people for a missing Guru photo", async () => {
+test("Guru posters use the standard dog-walking image when missing a photo; real photos still win", async () => {
   assert.equal(guruCardInitials("Yatziri r."), "YR");
   const redStockPhoto = await sharp({create:{
     width:180,height:180,channels:4,background:"#FF0000"
@@ -88,13 +88,24 @@ test("personal Guru posters never substitute generic marketing people for a miss
     promotionType:"guru" as const,logoPng:greenGuruPhoto,qrPng:qr,dogPng:redStockPhoto,
   };
   const missingPhotoPoster = await renderGuruMatchCardPng({...base,photoPng:null});
-  // x=100/y=350 is within the photo panel, away from overlay text. It must
-  // remain SitGuru's mint background, not the bright-red unrelated stock photo.
+  // x=100/y=350 is inside the photo panel and away from labels. The solid red
+  // fixture represents the shared SitGuru lifestyle hero supplied as dogPng.
   const missingPixel = await sharp(missingPhotoPoster)
     .extract({left:100,top:350,width:1,height:1}).removeAlpha().raw().toBuffer();
-  assert.ok(missingPixel[1] > missingPixel[0], "missing image uses a branded tile");
+  assert.ok(missingPixel[0] > 200 && missingPixel[1] < 75,
+    "no Guru photo uses the standard dog-walking lifestyle asset");
   const genuinePhotoPoster = await renderGuruMatchCardPng({...base,photoPng:greenGuruPhoto});
   const actualPixel = await sharp(genuinePhotoPoster)
     .extract({left:100,top:350,width:1,height:1}).removeAlpha().raw().toBuffer();
-  assert.ok(actualPixel[1] > 200 && actualPixel[0] < 75, "actual Guru photo wins over stock");
+  assert.ok(actualPixel[1] > 200 && actualPixel[0] < 75,
+    "Guru's actual image takes precedence over the standard fallback");
+
+  // A missing/broken shared lifestyle image must still produce a branded
+  // card instead of a blank or broken image.
+  const noMarketingImage = await renderGuruMatchCardPng({
+    ...base, photoPng:null, dogPng:undefined
+  });
+  const emptyPixel = await sharp(noMarketingImage)
+    .extract({left:100,top:350,width:1,height:1}).removeAlpha().raw().toBuffer();
+  assert.ok(emptyPixel[1] > emptyPixel[0], "initials tile remains last-resort fallback");
 });
