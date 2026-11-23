@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ContentStudioBoard } from "@/components/manager/ContentStudioBoard";
 import { CampaignPanel } from "@/components/manager/GrowthWorkPanels";
 import ManagerSectionScaffold from "@/components/manager/ManagerSectionScaffold";

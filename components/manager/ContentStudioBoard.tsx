@@ -274,7 +274,7 @@ export function ContentStudioBoard({
       </section>
       <details className="rounded-2xl border border-slate-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-black text-[#0F2744]">
-          View Content Studio totals · ${summary.pending} awaiting review · ${summary.approved} approved
+          View Content Studio totals · {summary.pending} awaiting review · {summary.approved} approved
         </summary>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map(([label, count, tone]) => {
