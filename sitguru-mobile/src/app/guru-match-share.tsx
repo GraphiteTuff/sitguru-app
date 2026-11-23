@@ -179,12 +179,12 @@ function Body(){
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>All registered Gurus</Text>
-        <Text style={styles.small}>{directory.length} registered · {directory.filter(g=>g.canPromote).length} bookable. Only local service matches can be shared.</Text>
+        <Text style={styles.heading}>Bookable Gurus</Text>
+        <Text style={styles.small}>{directory.length} bookable Gurus. Only local service matches can be shared.</Text>
         <TextInput value={directoryQuery} onChangeText={setDirectoryQuery} style={styles.input}
-          accessibilityLabel="Search all Guru accounts" placeholder="Search name, city, state or service" />
+          accessibilityLabel="Search bookable Guru accounts" placeholder="Search name, city, state or service" />
         <View style={styles.chips}>
-          {pill('All registered',!onlyBookable,()=>setOnlyBookable(false))}
+          {pill('All bookable',!onlyBookable,()=>setOnlyBookable(false))}
           {pill('Bookable only',onlyBookable,()=>setOnlyBookable(true))}
         </View>
         <Text style={styles.small}>Showing {listed.length} accounts</Text>
