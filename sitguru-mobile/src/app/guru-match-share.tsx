@@ -18,7 +18,7 @@ type Guru={
 };
 type Metrics={linkOpens:number;qrOpens:number;profileClicks:number;inquiryClicks:number;sharesReported:number;copyIntents:number};
 type Card={
-  id:string;code:string;status:string;guru:{name:string;city:string;state:string};
+  id:string;code:string;status:string;group_id:string|null;guru:{name:string;city:string;state:string};
   city:string;state:string;service_key:string;channel:Channel;
   reply_text:string;shareUrl:string;cardUrl:string;metrics:Metrics;
 };
@@ -445,7 +445,7 @@ function Body(){
             onPress={()=>setActive(active===c.code?'':c.code)} style={styles.guruMiniHeader}>
             <View style={{flex:1}}>
               <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
-              <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
+              <Text style={styles.small}>{groups.find(g=>g.id===c.group_id)?.name||c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
             </View>
             <Text style={styles.expandIcon}>{card?.id===c.id?'−':'+'}</Text>
           </TouchTarget>
