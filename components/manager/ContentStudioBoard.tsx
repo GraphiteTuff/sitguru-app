@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyTextButton } from "@/components/manager/CopyTextButton";
+import { getPublicSiteUrl } from "@/lib/admin/growth/constants";
 import {
   recordStudioPublication,
   reviewStudioContent,
@@ -113,6 +114,17 @@ export function ContentStudioBoard({
               {item.feedback ? <p className="mt-2 text-sm font-semibold text-amber-900">Last note: {item.feedback}</p> : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 {item.caption ? <CopyTextButton text={item.caption} label="Copy caption" /> : null}
+                {labels.action === "Publish" || item.publishedUrl ? (
+                  item.platform === "Multiple" ? (
+                    ["Facebook", "Instagram", "TikTok", "X", "YouTube"].map((network) => (
+                      <CopyTextButton key={network} label={`Copy ${network} tracking link`}
+                        text={`${getPublicSiteUrl()}/go/post/${item.id}?platform=${network.toLowerCase()}`} />
+                    ))
+                  ) : (
+                    <CopyTextButton label="Copy SitGuru tracking link"
+                      text={`${getPublicSiteUrl()}/go/post/${item.id}?platform=${item.platform.toLowerCase()}`} />
+                  )
+                ) : null}
                 {platformHref ? (
                   <a href={platformHref} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center rounded-full border border-slate-200 px-3 text-xs font-black text-slate-700">
                     Open {item.platform}

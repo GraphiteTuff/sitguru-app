@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { parseFiltersFromSearch } from "@/lib/growth-center-v2/date-range";
 import { loadGrowthCenterSnapshot } from "@/lib/growth-center-v2/snapshot";
@@ -25,10 +26,13 @@ export default async function InternInsightsPage({
   exportQuery.set("audience", filters.audience);
 
   return (
-    <GrowthCenterInsightsBoard
-      snapshot={snapshot}
-      userId={access.actor.id}
-      exportHref={`/api/growth-center/v2/export?${exportQuery.toString()}`}
-    />
+    <div className="space-y-4">
+      <Link href="/intern/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-950">View my Content Studio performance and leaderboards →</Link>
+      <GrowthCenterInsightsBoard
+        snapshot={snapshot}
+        userId={access.actor.id}
+        exportHref={`/api/growth-center/v2/export?${exportQuery.toString()}`}
+      />
+    </div>
   );
 }

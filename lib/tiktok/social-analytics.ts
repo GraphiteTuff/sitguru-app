@@ -86,7 +86,10 @@ export function makeTikTokAuthorizationUrl(clientKey: string, state: string, inc
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
   url.searchParams.set("client_key", clientKey);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", [...REQUIRED_SCOPES, ...(includeUpload ? [TIKTOK_UPLOAD_SCOPE] : [])].join(","));
+  // Request video.list only after TikTok approves the scope for this app;
+  // preserve existing Login Kit and draft-upload auth when it is unavailable.
+  url.searchParams.set("scope", [...REQUIRED_SCOPES, ...(includeUpload ? [TIKTOK_UPLOAD_SCOPE] : []),
+    ...(process.env.TIKTOK_VIDEO_LIST_SCOPE_APPROVED === "true" ? ["video.list"] : [])].join(","));
   url.searchParams.set("redirect_uri", TIKTOK_REDIRECT_URI);
   url.searchParams.set("state", state);
   return url.toString();
@@ -401,4 +404,104 @@ export async function getTikTokDraftUploadAccessToken(): Promise<string> {
     await persistCredentials(bundle, config);
   }
   return bundle.accessToken;
+}
+
+
+export type AuthorizedTikTokVideo = {
+  id: string;
+  title: string;
+  shareUrl: string;
+  coverImageUrl: string | null;
+  publishedAt: string;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+};
+function optionalVideoCount(value: unknown): number | null {
+  if (value == null) return null;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+/**
+ * Read the official account's own published videos using TikTok Display API.
+ * Not available to sandbox accounts or OAuth tokens lacking video.list.
+ * Never expose access tokens through responses or write them to logs.
+ */
+export async function fetchAuthorizedTikTokVideoList(): Promise<{
+  available: boolean;
+  videos: AuthorizedTikTokVideo[];
+  reason: string | null;
+}> {
+  const config = getTikTokConfig();
+  if (config.environment !== "production") {
+    return { available: false, videos: [], reason: "TikTok sandbox cannot populate production content leaderboards." };
+  }
+  const { data, error } = await supabaseAdmin.from("growth_social_connections")
+    .select("token_ciphertext,metadata").eq("platform", "tiktok").maybeSingle();
+  if (error || !data?.token_ciphertext) {
+    return { available: false, videos: [], reason: "TikTok must be authorized before importing public videos." };
+  }
+  const metadata = data.metadata as { environment?: unknown } | null;
+  if (metadata?.environment !== "production") {
+    return { available: false, videos: [], reason: "TikTok production OAuth authorization is required." };
+  }
+  let bundle = unseal(data.token_ciphertext, config.encryptionKey);
+  if (config.expectedOpenId !== bundle.openId) throw new Error("TikTok authorized identity changed.");
+  if (!bundle.scopes.includes("video.list")) {
+    return { available: false, videos: [], reason: "TikTok video.list permission is not granted; reconnect after app review." };
+  }
+  if (Date.parse(bundle.accessExpiresAt) < Date.now() + 5 * 60000) {
+    bundle = await refreshTikTokTokens(bundle, config);
+    if (!bundle.scopes.includes("video.list")) {
+      return { available: false, videos: [], reason: "TikTok video.list access was removed on token refresh." };
+    }
+    await persistCredentials(bundle, config);
+  }
+  const videos: AuthorizedTikTokVideo[] = [];
+  let cursor: number | undefined;
+  for (let page = 0; page < 2; page++) {
+    const url = new URL("https://open.tiktokapis.com/v2/video/list/");
+    url.searchParams.set("fields",
+      "id,title,video_description,create_time,cover_image_url,share_url,view_count,like_count,comment_count,share_count");
+    const response = await fetch(url.toString(), {
+      method: "POST", cache: "no-store",
+      headers: { Authorization: "Bearer " + bundle.accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ max_count: 20, ...(cursor ? { cursor } : {}) }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) throw new Error("TikTok video list returned HTTP " + response.status);
+    const payload = await response.json() as {
+      data?: { videos?: Record<string, unknown>[]; has_more?: boolean; cursor?: number };
+      error?: { code?: unknown };
+    };
+    if (payload.error?.code !== "ok" && payload.error?.code !== 0) {
+      throw new Error("TikTok video list API did not return a successful response.");
+    }
+    if (!Array.isArray(payload.data?.videos)) throw new Error("TikTok video list response was incomplete.");
+    for (const row of payload.data.videos) {
+      const id = typeof row.id === "string" ? row.id : "";
+      const timestamp = optionalVideoCount(row.create_time);
+      const urlText = typeof row.share_url === "string" ? row.share_url : "";
+      if (!/^\d+$/.test(id) || timestamp == null) continue;
+      let safeShareUrl = "";
+      try {
+        const u = new URL(urlText);
+        if (u.protocol === "https:" && (u.hostname === "tiktok.com" || u.hostname.endsWith(".tiktok.com"))) safeShareUrl = u.toString();
+      } catch { /* Provider URLs are optional; never accept untrusted redirect hosts. */ }
+      const cover = typeof row.cover_image_url === "string" ? row.cover_image_url : "";
+      videos.push({
+        id, shareUrl: safeShareUrl,
+        title: String(row.title || row.video_description || "TikTok video").slice(0, 200),
+        coverImageUrl: cover.startsWith("https://") ? cover : null,
+        publishedAt: new Date(timestamp * 1000).toISOString(),
+        views: optionalVideoCount(row.view_count),
+        likes: optionalVideoCount(row.like_count),
+        comments: optionalVideoCount(row.comment_count),
+        shares: optionalVideoCount(row.share_count),
+      });
+    }
+    if (!payload.data.has_more || typeof payload.data.cursor !== "number") break;
+    cursor = payload.data.cursor;
+  }
+  return { available: true, videos, reason: null };
 }
