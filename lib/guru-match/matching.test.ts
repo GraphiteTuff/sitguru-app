@@ -54,18 +54,26 @@ test("never guesses distance or pet type without documented evidence",()=>{
   assert.equal(matchGuruCandidates({...filters,pet:"cat"},[base],rates).length,0);
 });
 
-test("staff directory keeps all listed Gurus visible with separate promotion readiness",()=>{
+test("every publicly listed Guru has a safe marketing option without changing booking flags",()=>{
   const records=buildGuruDirectory([
     {...base,is_public:true,status:"active"},
     {...base,id:"00000000-0000-4000-8000-000000000012",slug:"other-guru",is_bookable:false},
+    {...base,id:"00000000-0000-4000-8000-000000000013",slug:null,is_bookable:false,services:[]},
+    {...base,id:"00000000-0000-4000-8000-000000000014",is_bookable:false,status:"suspended"},
   ],rates);
-  assert.equal(records.length,2);
-  assert.equal(records[0].canPromote,true);
-  assert.equal(records[1].canPromote,false);
-  assert.equal(records[1].reason,"Not currently bookable");
+  assert.equal(records.length,4);
+  assert.equal(records.filter(r=>r.canPromote).length,4);
+  assert.equal(records.filter(r=>r.canFeatureGuru).length,1);
+  assert.equal(records.filter(r=>r.promotionKind==="community").length,3);
+  assert.equal(records.find(r=>r.id.endsWith("0012"))?.canFeatureGuru,false);
+  assert.match(records[1].reason,/discovery card/i);
   const privateEntry=buildGuruDirectory([{...base,is_public:false}],rates)[0];
   assert.equal(privateEntry.canPromote,false);
-  assert.equal(privateEntry.reason,"Public profile is not listed");
+  assert.equal(privateEntry.canFeatureGuru,false);
+  assert.equal(privateEntry.reason,"Public listing or location unavailable");
+  // Booking matcher is intentionally still strict: marketing does not enable booking.
+  assert.equal(matchGuruCandidates(filters,[{...base,is_bookable:false}],rates).length,0);
+  assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,0);
 });
 test("a disabled service rate overrides stale legacy public labels",()=>{
   assert.equal(matchGuruCandidates(filters,[base],[{guru_id:base.id,service_key:"dog_walking",is_enabled:false}]).length,0);
