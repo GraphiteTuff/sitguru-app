@@ -29,6 +29,8 @@ test("returns only active public bookable service-area Gurus",()=>{
   assert.equal(matchGuruCandidates(filters,[{...base,is_bookable:false}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,is_public:false}],rates).length,0);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_public_visible:false}],rates).length,0);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_accepting_bookings:false}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,service_area_enabled:false}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,is_test_account:true}],rates).length,0);
 });
