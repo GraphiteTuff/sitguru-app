@@ -113,6 +113,9 @@ function eventDateSeries(events: Row[], filters: GrowthCenterFilters) {
   const result = [];
   for (let timestamp = Date.parse(filters.startIso); timestamp < Date.parse(filters.endIso); timestamp += 86400000) {
     const key = day(new Date(timestamp + 12 * 3600000).toISOString());
+    // UTC day stepping can cross one extra local date at daylight-saving
+    // transitions; never display activity beyond the requested end date.
+    if (key > day(new Date(Date.parse(filters.endIso) - 1000).toISOString())) break;
     if (!result.some((item) => item.date === key)) {
       result.push(grouped.get(key) || { date: key, pageViews: 0, linkClicks: 0, signupEvents: 0, bookingEvents: 0 });
     }
@@ -212,11 +215,16 @@ export async function loadSocialIntelligenceSnapshot(input: {
     if (catalog.some((item) => item.studioContentId === text(row.id))) continue;
     const publishedAt = text(row.published_at) || text(row.created_at);
     if (publishedAt < filters.startIso || publishedAt >= filters.endIso) continue;
+    const trackingKey = "sg_" + text(row.id);
+    const postEvents = matchedPostEvents(currentEvents, trackingKey).filter((event) =>
+      channelOf(event.source || event.medium) === channel,
+    );
     catalog.push({
       id: text(row.id), channel, title: text(row.title) || "SitGuru post",
       publishedUrl: url, thumbnailUrl: null, publishedAt, campaignSlug: "",
-      trackingKey: "", studioContentId: text(row.id),
-      metrics: emptyPostMetrics(), impact: emptyImpact(), daily: [],
+      trackingKey, studioContentId: text(row.id),
+      metrics: emptyPostMetrics(),
+      impact: eventImpact(postEvents, filters.startIso, filters.endIso), daily: [],
     });
   }
 
