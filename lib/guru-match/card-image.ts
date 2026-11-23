@@ -70,7 +70,7 @@ export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">',
     '<title>' + subject + '</title>',
-    '<desc>' + city + ', ' + state + ' - ' + service + '. ' + label + '.</desc>',
+    '<desc>' + (community ? "Explore SitGuru pet care in your community. " : "") + city + ', ' + state + ' - ' + service + '. ' + label + '.</desc>',
     '<defs>',
     '<linearGradient id="navy" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#102B43"/><stop offset="1" stop-color="#076346"/></linearGradient>',
     '<linearGradient id="photoBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#CAEDDB"/><stop offset="1" stop-color="#72BCA7"/></linearGradient>',
