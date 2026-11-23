@@ -48,6 +48,7 @@ export default function LiveResultsBoard({
   data,
   canSyncSocials = false,
   canConnectTikTok = false,
+  tiktokIsProduction = false,
   canConnectX = false,
   xIsStaging = false,
   tiktokNotice = "",
@@ -57,6 +58,7 @@ export default function LiveResultsBoard({
   data: LiveResultsData;
   canSyncSocials?: boolean;
   canConnectTikTok?: boolean;
+  tiktokIsProduction?: boolean;
   canConnectX?: boolean;
   xIsStaging?: boolean;
   tiktokNotice?: string;
@@ -236,7 +238,7 @@ export default function LiveResultsBoard({
                     href="/api/integrations/tiktok/start"
                     className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
                   >
-                    Connect TikTok (sandbox)
+                    {tiktokIsProduction ? "Connect TikTok (production)" : "Connect TikTok (sandbox)"}
                   </Link>
                 ) : null}
                 {canConnectX && manager && card.label === "X" && !card.accountLabel ? (
