@@ -105,7 +105,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const [{data:rows,error:campaignError}, candidates]=await Promise.all([
     q,loadAllGuruCandidates(),
   ]);
-  const directory=buildGuruDirectory(candidates.gurus,candidates.rates);
+  const directory=buildGuruDirectory(candidates.gurus.filter(g=>g.is_bookable===true),candidates.rates);
   const matches=filters?matchGuruCandidates(filters,candidates.gurus,candidates.rates):[];
   if(campaignError)throw new Error("Guru outreach reporting is not configured.");
   const campaigns=(rows||[]) as CampaignRow[];
@@ -146,8 +146,8 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "All registered Gurus are in the directory. Only currently bookable Gurus matching the chosen service, pet needs and recorded coverage can be promoted.":
-      "Browse the complete Guru directory below, then enter a city, state and service to find promotable local matches.",
+      "All bookable Gurus appear in the directory. Selected service, pet needs and recorded local coverage determine which can be shared.":
+      "Browse all bookable Gurus below, then enter a city, state and service to find matching local Gurus.",
   };
 }
 export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>){
