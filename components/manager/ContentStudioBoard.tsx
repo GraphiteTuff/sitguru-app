@@ -92,13 +92,9 @@ export function ContentStudioBoard({
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white hover:bg-[#1D4ED8]">
           + Create post
         </Link>
-        <Link href="/manager/campaigns-content?queue=review#review"
-          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-950 hover:bg-amber-100">
-          Review drafts {counts.review > 0 ? "(" + counts.review + ")" : ""}
-        </Link>
-        <Link href="/manager/campaigns-content?queue=publish#review"
+        <Link href="/manager/campaigns-content?tool=create#campaign-tools"
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-900 hover:bg-emerald-100">
-          Ready to publish {counts.publish > 0 ? "(" + counts.publish + ")" : ""}
+          New campaign
         </Link>
         <Link href="/manager/calendar" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-slate-50">Calendar</Link>
         <Link href="/manager/toolkit/brand" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-[#0F2744] hover:bg-slate-50">Brand Kit</Link>
