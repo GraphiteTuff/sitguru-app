@@ -5,11 +5,11 @@ import LiveResultsBoard from "@/components/portal/LiveResultsBoard";
 export const dynamic = "force-dynamic";
 
 const TIKTOK_NOTICES: Record<string, string> = {
-  connected: "TikTok sandbox connected. Test snapshots are isolated from production follower totals.",
+  connected: "TikTok account connected. Follower data is shown only when the production account has been verified.",
   cancelled: "TikTok authorization was cancelled. You can reconnect when ready.",
   invalid_state: "TikTok sign-in could not be verified. Start the connection again.",
   invalid_code: "TikTok did not return a valid authorization code.",
-  connection_failed: "TikTok connection failed. Check the sandbox app, granted scopes, and server configuration.",
+  connection_failed: "TikTok connection failed. Check TikTok app approval, granted scopes, callback URI, and account settings.",
 };
 
 const X_NOTICES: Record<string, string> = {
@@ -34,10 +34,14 @@ export default async function ManagerResultsPage({
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
   const [data, params] = await Promise.all([loadLiveResults(), searchParams]);
+  const tiktokMode = process.env.TIKTOK_OAUTH_MODE;
   const canConnectTikTok =
     access.actor.isSuperUser &&
     process.env.TIKTOK_SOCIAL_SYNC_ENABLED === "true" &&
-    process.env.TIKTOK_OAUTH_MODE === "sandbox";
+    (tiktokMode === "sandbox" ||
+      (tiktokMode === "production" &&
+        process.env.SITGURU_ISOLATED_STAGING !== "true" &&
+        Boolean(process.env.TIKTOK_EXPECTED_OPEN_ID?.trim())));
   const canConnectX =
     access.actor.isSuperUser &&
     process.env.X_SOCIAL_SYNC_ENABLED === "true" &&
@@ -53,6 +57,7 @@ export default async function ManagerResultsPage({
       data={data}
       canSyncSocials={access.actor.isSuperUser}
       canConnectTikTok={canConnectTikTok}
+      tiktokIsProduction={tiktokMode === "production"}
       canConnectX={canConnectX}
       xIsStaging={xIsStaging}
       xNotice={access.actor.isSuperUser ? X_NOTICES[params?.x || ""] || "" : ""}
