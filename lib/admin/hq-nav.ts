@@ -99,6 +99,9 @@ export const HQ_NAV_SECTIONS: HqNavSection[] = [
     items: [
       { label: "Manager Portal", href: "/manager", icon: "briefcase" },
       { label: "Growth Workplace", href: "/admin/growth", icon: "megaphone" },
+      { label: "Social Intelligence", href: "/admin/growth/social-intelligence", icon: "chart" },
+      { label: "Guru Match & Share", href: "/admin/growth/guru-match", icon: "paw" },
+      { label: "Content Studio Hub", href: "/admin/sales-marketing/content", icon: "megaphone" },
       { label: "Admin Toolkit", href: "/admin/toolkit", icon: "book" },
       { label: "Shared Brand Kit", href: "/admin/toolkit/brand", icon: "website" },
       { label: "Team Resources", href: "/admin/resources", icon: "book" },
