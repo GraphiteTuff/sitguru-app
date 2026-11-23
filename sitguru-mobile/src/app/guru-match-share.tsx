@@ -83,6 +83,7 @@ function Body(){
   const selectedGuru=dashboard?.matches.find(g=>g.id===selected);
   const card=dashboard?.campaigns.find(c=>c.code===active)||dashboard?.campaigns[0];
   const directory=dashboard?.directory||[];
+  const readyToShare=directory.filter(g=>g.canPromote).length;
   const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
     (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
@@ -190,20 +191,20 @@ function Body(){
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>Bookable Gurus</Text>
-        <Text style={styles.small}>{directory.length} bookable Gurus. Only local service matches can be shared.</Text>
+        <Text style={styles.heading}>All listed Gurus</Text>
+        <Text style={styles.small}>{directory.length} publicly listed Gurus · {readyToShare} ready to promote. Only bookable local service matches may be shared.</Text>
         <TextInput value={directoryQuery} onChangeText={setDirectoryQuery} style={styles.input}
-          accessibilityLabel="Search bookable Guru accounts" placeholder="Search name, city, state or service" />
+          accessibilityLabel="Search all publicly listed Gurus" placeholder="Search name, city, state or service" />
         <View style={styles.chips}>
-          {pill('All bookable',!onlyBookable,()=>setOnlyBookable(false))}
-          {pill('Bookable only',onlyBookable,()=>setOnlyBookable(true))}
+          {pill('All listed',!onlyBookable,()=>setOnlyBookable(false))}
+          {pill('Ready to promote',onlyBookable,()=>setOnlyBookable(true))}
         </View>
         <Text style={styles.small}>Showing {listed.length} accounts</Text>
         {listed.map(g=><View key={g.id} style={styles.guru}>
           <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{g.name} · {g.city||'Location missing'}, {g.state}</Text>
-            <Text style={styles.small}>{g.canPromote?'Bookable Guru':g.reason}</Text>
+            <Text style={styles.small}>{g.canPromote?'Ready for local matching':g.reason}</Text>
             <Text style={styles.small}>{g.serviceKeys.length?g.serviceKeys.map(k=>k.replace(/_/g,' ')).join(' · '):'No selected services'}</Text>
             {g.canPromote&&!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
           </View>

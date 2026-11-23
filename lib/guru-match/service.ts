@@ -105,7 +105,10 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const [{data:rows,error:campaignError}, candidates]=await Promise.all([
     q,loadAllGuruCandidates(),
   ]);
-  const directory=buildGuruDirectory(candidates.gurus.filter(g=>g.is_bookable===true),candidates.rates);
+  // Match the Admin Dashboard public-listing count, not its booking-readiness count.
+  // Bookability is a separate permission: pending, suspended and incomplete accounts
+  // remain visible to authorized staff but are never offered for public promotion.
+  const directory=buildGuruDirectory(candidates.gurus.filter(g=>g.is_public===true),candidates.rates);
   const matches=filters?matchGuruCandidates(filters,candidates.gurus,candidates.rates):[];
   if(campaignError)throw new Error("Guru outreach reporting is not configured.");
   const campaigns=(rows||[]) as CampaignRow[];
@@ -146,8 +149,8 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "All bookable Gurus appear in the directory. Selected service, pet needs and recorded local coverage determine which can be shared.":
-      "Browse all bookable Gurus below, then enter a city, state and service to find matching local Gurus.",
+      "All publicly listed Gurus appear in the directory. Only bookable profiles with verified local service and pet compatibility qualify for sharing.":
+      "Browse all publicly listed Gurus below, then enter a city, state and service to find genuinely bookable local matches.",
   };
 }
 export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>){

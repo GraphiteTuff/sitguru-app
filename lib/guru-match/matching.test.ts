@@ -27,8 +27,8 @@ test("requires valid state, city, distance and known service",()=>{
 test("requires the Guru to be bookable",()=>{
   assert.equal(matchGuruCandidates(filters,[base],rates).length,1);
   assert.equal(matchGuruCandidates(filters,[{...base,is_bookable:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,1);
-  assert.equal(matchGuruCandidates(filters,[{...base,is_public:false}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,0);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_public:false}],rates).length,0);
   assert.equal(matchGuruCandidates(filters,[{...base,is_public_visible:false}],rates).length,1);
   assert.equal(matchGuruCandidates(filters,[{...base,is_accepting_bookings:false}],rates).length,1);
   assert.equal(matchGuruCandidates(filters,[{...base,service_area_enabled:false}],rates).length,1);
@@ -54,14 +54,18 @@ test("never guesses distance or pet type without documented evidence",()=>{
   assert.equal(matchGuruCandidates({...filters,pet:"cat"},[base],rates).length,0);
 });
 
-test("staff directory includes every bookable Guru without needing a service match",()=>{
+test("staff directory keeps all listed Gurus visible with separate promotion readiness",()=>{
   const records=buildGuruDirectory([
-    {...base,is_public:false,status:"pending"},
+    {...base,is_public:true,status:"active"},
     {...base,id:"00000000-0000-4000-8000-000000000012",slug:"other-guru",is_bookable:false},
   ],rates);
   assert.equal(records.length,2);
   assert.equal(records[0].canPromote,true);
   assert.equal(records[1].canPromote,false);
+  assert.equal(records[1].reason,"Not currently bookable");
+  const privateEntry=buildGuruDirectory([{...base,is_public:false}],rates)[0];
+  assert.equal(privateEntry.canPromote,false);
+  assert.equal(privateEntry.reason,"Public profile is not listed");
 });
 test("a disabled service rate overrides stale legacy public labels",()=>{
   assert.equal(matchGuruCandidates(filters,[base],[{guru_id:base.id,service_key:"dog_walking",is_enabled:false}]).length,0);
