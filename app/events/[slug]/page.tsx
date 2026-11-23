@@ -27,6 +27,8 @@ import {
 import { fetchPublicEventBySlug } from "@/lib/community/queries";
 import { buildEventShareMeta } from "@/lib/community/share";
 import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
+import { getEventPromotionInfo } from "@/lib/community/event-taxonomy";
+import { buildCommunityEventSignupHref } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
@@ -86,8 +88,9 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
   const locationBlock = formatEventLocation(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const sourceLabel = googleDiscovery
-    ? "SitGuru Events"
+    ? "Featured by SitGuru"
     : "SitGuru Partner Event";
+  const eventCategory=getEventPromotionInfo(event);
 
   return (
     <main className="min-h-screen bg-[#f8fcfd]">
@@ -130,6 +133,7 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                     <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                       {event.title}
                     </h1>
+                    <p className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-800">{eventCategory.label}</p>
                     <p className="text-sm font-bold text-emerald-800">
                       {formatEventCountyState(event)}
                     </p>
@@ -281,9 +285,18 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                 source="community_event_detail"
                 campaign="event_detail_pet_parent_signup"
               />
+              <aside className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Pet community · Powered by SitGuru</p>
+                <h3 className="mt-2 text-lg font-black text-slate-950">Love caring for pets?</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Join SitGuru free as a Guru to connect with Pet Parents and grow your local pet care profile.</p>
+                <Link href={buildCommunityEventSignupHref({slug:event.slug,eventId:event.id,role:"guru",source:"event_detail",campaign:"event_detail_guru_signup"})}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#0F2744] px-4 py-2 text-sm font-black text-white">
+                  Join as a Guru
+                </Link>
+              </aside>
               <EventDetailShare
                 event={event}
-                partnerName={googleDiscovery ? "SitGuru Events" : partnerName}
+                partnerName={googleDiscovery ? "Featured on SitGuru" : partnerName}
               />
               <Link
                 href="/events"

@@ -9,6 +9,7 @@ import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events
 import { buildEventShareCaptionSocial } from "@/lib/community/share";
 import { getBrandedSocialGraphicUrl } from "@/lib/community/social-assets";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
+import {getEventPromotionInfo,eventPromotionExpiry,type EventPromotionCategoryId} from "@/lib/community/event-taxonomy";
 
 const SITE = "https://www.sitguru.com";
 export const EVENT_SHARE_CHANNELS = ["facebook","instagram","tiktok","x","other"] as const;
@@ -19,6 +20,8 @@ export type EventPromotionItem = {
   id:string;slug:string;title:string;startAt:string;endAt:string|null;
   venue:string;city:string;state:string;county:string;image:string|null;
   isFree:boolean;petFriendly:boolean;source:"discovered"|"partner";
+  category:EventPromotionCategoryId;categoryLabel:string;recommendedAudience:string;
+  recommendedGroup:string;promotionAngle:string;
 };
 export type EventShareCampaign = {
   id:string;code:string;event_id:string;event_slug:string;event_title:string;
@@ -50,23 +53,26 @@ export const validShareCode = (code:string) => codePattern.test(code);
 
 export function eventStillLive(event:CommunityEventWithPartner):boolean {
   if(event.status!=="published" || event.cancelled_at) return false;
-  const end = Date.parse(event.end_at || event.start_at);
-  return Number.isFinite(end) && end >= Date.now() - 3600000;
+  return eventPromotionExpiry(event) > Date.now();
 }
 export function promotionItem(event:CommunityEventWithPartner):EventPromotionItem {
+  const type=getEventPromotionInfo(event);
   return {
     id:event.id,slug:event.slug,title:event.title,startAt:event.start_at,endAt:event.end_at,
     venue:event.venue_name||"",city:event.city||"",state:event.state||"",
     county:event.featured_market_city||event.city||"",
     image:event.image_card_url||event.image_hero_url||event.image_original_url||null,
     isFree:event.is_free,petFriendly:event.pet_friendly,
+    category:type.id,categoryLabel:type.label,recommendedAudience:type.audience,
+    recommendedGroup:type.group,promotionAngle:type.angle,
     source:event.event_type==="google_discovery"?"discovered":"partner",
   };
 }
 export function filterEventPromotions(events:EventPromotionItem[],query:Record<string,unknown>):EventPromotionItem[]{
   const city=clean(query.city).toLowerCase(),state=clean(query.state).toLowerCase();
-  const search=clean(query.q).toLowerCase();
+  const search=clean(query.q).toLowerCase(),category=clean(query.category);
   return events.filter(e=>
+    (!category||category==="all"||e.category===category) &&
     (!state||e.state.toLowerCase()===state) &&
     (!city||[e.city,e.county,e.venue].some(field=>field.toLowerCase().includes(city))) &&
     (!search||[e.title,e.city,e.county,e.venue].some(field=>field.toLowerCase().includes(search)))
@@ -152,8 +158,15 @@ export async function createEventShare(actor:CommunityActor,input:Record<string,
   if(!live||!eventStillLive(live))throw new Error("This event is no longer published or upcoming.");
   const code=randomBytes(16).toString("base64url");
   const caption=buildEventShareCaptionSocial(live);
-  const reply=caption + "\n\nExplore the event and respond Yes or Maybe on SitGuru: " +
-    eventShareUrl(code,channel) + "\n\n#SitGuru #PetEvents";
+  const category=getEventPromotionInfo(live);
+  const reply=[
+    "🐾 Featured by SitGuru · "+category.label,
+    category.angle,
+    caption,
+    "Discover more local pet events and join the SitGuru community free as a Pet Parent or Guru.",
+    "Event details and RSVP: "+eventShareUrl(code,channel),
+    "Event organized by its listed host. #SitGuru #LocalPetEvents",
+  ].join("\n\n");
   const manager=actor.canModerate;
   const status:EventShareStatus=manager?"approved":"pending_review";
   const {data,error}=await supabaseAdmin.from("event_match_share_campaigns").insert({

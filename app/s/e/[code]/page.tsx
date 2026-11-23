@@ -6,6 +6,8 @@ import { CalendarDays,MapPin,ArrowRight,PawPrint,CheckCircle2 } from "lucide-rea
 import { findApprovedEventShare,logEventShareActivity,eventSocialImage } from "@/lib/event-match/service";
 import { getPublicEventUrl } from "@/lib/community/slug";
 import { formatEventDateRange } from "@/lib/community/format";
+import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
+import {getEventPromotionInfo} from "@/lib/community/event-taxonomy";
 
 export const dynamic = "force-dynamic";
 type Props={params:Promise<{code:string}>,searchParams:Promise<{via?:string}>};
@@ -45,9 +47,9 @@ export default async function EventShareLanding({params,searchParams}:Props){
   return <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 text-[#0F2744] sm:py-12">
     <article className="mx-auto max-w-xl overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-xl">
       <header className="bg-gradient-to-r from-[#0F2744] to-[#0D5C3A] p-6 text-white">
-        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest !text-emerald-100"><PawPrint size={18}/> SitGuru community events</p>
+        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest !text-emerald-100"><PawPrint size={18}/> Featured by SitGuru · {getEventPromotionInfo(e).label}</p>
         <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">{e.title}</h1>
-        <p className="mt-2 text-sm !text-emerald-50">Discover pet-friendly happenings nearby.</p>
+        <p className="mt-2 text-sm !text-emerald-50">Discover local pet events · Powered by SitGuru.</p>
       </header>
       <div className="space-y-5 p-5 sm:p-7">
         {e.image_card_url||e.image_hero_url||e.image_original_url?
@@ -60,7 +62,8 @@ export default async function EventShareLanding({params,searchParams}:Props){
           See event &amp; RSVP <ArrowRight size={18}/>
         </Link>
         <Link href={getPublicEventUrl(e.slug)} className="block text-center text-xs font-semibold text-[#0D5C3A]">View event directly on SitGuru</Link>
-        <p className="text-center text-xs text-slate-500">Events are hosted by their respective organizers. Confirm details with the event host.</p>
+        <CommunityJoinOptions slug={e.slug} eventId={e.id} variant="event" source="event_share_landing" campaign="event_match_share_join" />
+        <p className="text-center text-xs text-slate-500">Featured by SitGuru, not organized or sponsored by SitGuru unless explicitly stated. Confirm details with the event host.</p>
       </div>
     </article>
   </main>;
