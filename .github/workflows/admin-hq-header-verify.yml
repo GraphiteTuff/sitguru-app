@@ -6,6 +6,7 @@ on:
     paths:
       - "app/admin/layout.tsx"
       - "components/admin/AdminDeskSearch.tsx"
+      - "components/AdminAccountMenu.tsx"
       - "lib/portal/desk-ui.ts"
       - ".github/workflows/admin-hq-header-verify.yml"
 
