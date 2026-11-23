@@ -26,6 +26,9 @@ type Snapshot = {
   postEngagements: number | null;
   total: Impact;
   channels: Array<{ channel: string; status: string; followers: number | null; impact: Impact }>;
+  connections: Array<{ platform: string; status: string }>;
+  metaSync: Array<{ platform: string; status: string; importedPosts: number }>;
+  publishedChannelCounts: Record<string, number>;
   daily: Array<{ date: string; pageViews: number; linkClicks: number; signupEvents: number; bookingEvents: number }>;
   posts: Post[];
   notices: string[];
@@ -115,6 +118,9 @@ function Dashboard() {
   const opened = posts.find((post) => post.id === selected) || null;
   const daily = snapshot?.daily.slice(-14) || [];
   const maxBar = Math.max(1, ...daily.map((item) => item.pageViews));
+  const recentPosts = [...(snapshot?.posts || [])]
+    .sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''))
+    .slice(0, 6);
 
   return (
     <MobileScreen refreshing={refreshing} onRefresh={() => void load(true)}>
@@ -174,6 +180,39 @@ function Dashboard() {
               <Metric title="Signup events" value={snapshot.total.signupEvents} tone="signups"/>
               <Metric title="Booking events" value={snapshot.total.bookingEvents} note="Not verified paid bookings" tone="bookings"/>
               <Metric title="Paid revenue" value={null} note="Attribution not verified" tone="revenue"/>
+            </View>
+            <Text style={styles.section}>Recently published · All SitGuru socials</Text>
+            <View style={styles.card}>
+              <Text style={styles.muted}>Facebook, Instagram, TikTok, X and YouTube. Counts reflect your authorized published posts in this period, even when viewing one channel. Account followers do not imply post import access.</Text>
+              <View style={styles.channelGrid}>
+                {NETWORKS.filter((item) => item.value !== 'all').map((network) => {
+                  const count = snapshot.publishedChannelCounts?.[network.value] ?? 0;
+                  const meta = snapshot.metaSync?.find((item) => item.platform === network.value);
+                  const connector = snapshot.connections?.find((item) => item.platform === network.value);
+                  const status = meta
+                    ? meta.status === 'success' ? 'Meta imported' : meta.status === 'error' ? 'Import needs access' : 'Awaiting Meta sync'
+                    : count > 0 ? 'Posts cataloged' : connector?.status === 'connected' ? 'Account data only' : 'Post import unavailable';
+                  const active = platform === network.value;
+                  return (
+                    <Pressable key={network.value} accessibilityRole="button" accessibilityState={{ selected: active }}
+                      onPress={() => { setPlatform(active ? 'all' : network.value); setSelected(null); }}
+                      style={[styles.channelCard, active && styles.channelSelected]}>
+                      <Text style={styles.cardTitle}>{network.label}</Text>
+                      <Text style={styles.channelCount}>{count} {count === 1 ? 'post' : 'posts'} in period</Text>
+                      <Text style={styles.muted}>{status}</Text>
+                      <Text style={styles.channelAction}>{active ? 'Show all' : 'View posts'}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.muted}>The web portal's Sync Facebook & Instagram button refreshes Meta only. TikTok, X and YouTube posts appear from approved publishing records or authorized imports.</Text>
+              {recentPosts.map((post) => (
+                <View key={post.id} style={styles.recentRow}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{post.channel.toUpperCase()} · {post.title}</Text>
+                  <Text style={styles.muted}>{post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : 'Date unavailable'} · {display(post.metrics.views)} verified views</Text>
+                </View>
+              ))}
+              {!recentPosts.length ? <Text style={styles.body}>No published posts cataloged for these filters yet.</Text> : null}
             </View>
             <Text style={styles.section}>Site visits over time</Text>
             <View style={styles.card}>
@@ -276,6 +315,12 @@ const styles = StyleSheet.create({
     borderRadius: 18, padding: 15, gap: 9,
   },
   freshness: { color: SocialDeskColors.textSoft, fontSize: 12, fontWeight: '700', paddingHorizontal: 3 },
+  channelGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  channelCard: { flexGrow: 1, width: '46%', gap: 5, minHeight: 115, padding: 11, borderRadius: 14, borderWidth: 1, borderColor: '#D1EADD', backgroundColor: '#F0FDF4' },
+  channelSelected: { backgroundColor: '#DBEAFE', borderColor: '#2563EB' },
+  channelCount: { fontSize: 13, fontWeight: '800', color: SocialDeskColors.navy },
+  channelAction: { fontSize: 12, fontWeight: '900', color: '#2563EB' },
+  recentRow: { borderTopWidth: 1, borderTopColor: SocialDeskColors.border, paddingTop: 9, gap: 4 },
   cardTitle: { fontSize: 15, fontWeight: '900', color: SocialDeskColors.navy },
   body: { fontSize: 13, fontWeight: '600', color: '#334155', lineHeight: 20 },
   muted: { color: SocialDeskColors.muted, fontSize: 12, fontWeight: '600', lineHeight: 18 },
