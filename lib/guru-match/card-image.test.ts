@@ -21,6 +21,7 @@ test("Guru share image renders a 1080x1350 portrait downloadable PNG with a QR c
   assert.equal(meta.height, 1350);
   assert.ok(image.byteLength > 10000);
   assert.match(guruMatchCardSvg(input), /Scan to meet this Guru/);
+  assert.doesNotMatch(guruMatchCardSvg(input), /<text\b/); // All visible text uses bundled font, not missing SVG fonts.
 });
 
 test("Guru-controlled text cannot inject markup into card SVG", async () => {
