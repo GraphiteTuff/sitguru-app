@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
 
@@ -28,6 +28,12 @@ export default function WebappBottomNav({
 }) {
   const pathname = usePathname() || "";
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    document.body.setAttribute("data-sitguru-more-open", "1");
+    return () => document.body.removeAttribute("data-sitguru-more-open");
+  }, [moreOpen]);
   useBrowserChromeInset();
   const moreActive = more.some(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
