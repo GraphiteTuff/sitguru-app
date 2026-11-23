@@ -105,7 +105,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
   const [{data:rows,error:campaignError}, candidates]=await Promise.all([
     q,loadAllGuruCandidates(),
   ]);
-  // The Admin Dashboard public count is the full listed directory (72 at the current snapshot).
+  // Match the Admin Dashboard public-listing count, not its booking-readiness count.
   // Bookability is a separate permission: pending, suspended and incomplete accounts
   // remain visible to authorized staff but are never offered for public promotion.
   const directory=buildGuruDirectory(candidates.gurus.filter(g=>g.is_public===true),candidates.rates);
