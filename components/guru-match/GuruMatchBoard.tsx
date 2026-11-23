@@ -7,7 +7,7 @@ import {GURU_MATCH_SERVICES,type GuruMatch,type MatchFilters} from "@/lib/guru-m
 import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel} from "@/lib/guru-match/service";
 
 type Role="manager"|"admin"|"intern";
-const STATES=["PA","NJ","FL","NY","DE","MD","CT","VA","NC","SC","GA","TX","CA"];
+const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
 const SOURCES:[ShareChannel,string][]=[
   ["facebook","Facebook"],["instagram","Instagram"],["tiktok","TikTok"],
   ["x","X"],["other","Other"],
