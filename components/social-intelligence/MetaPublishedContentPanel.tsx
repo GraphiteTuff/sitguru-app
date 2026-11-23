@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Facebook, Instagram, RefreshCw, Video } from "lucide-react";
+import { ExternalLink, MessageSquareText, Camera, RefreshCw, Video } from "lucide-react";
 import type { MetaPublishedSync, SocialPost } from "@/lib/social-intelligence/types";
 
 function compact(value: number | null) {
@@ -51,7 +51,7 @@ export default function MetaPublishedContentPanel({
               ? "border-[#DBEAFE] bg-[#EFF6FF]" : "border-[#F5D0FE] bg-[#FDF4FF]"}`}>
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${fb ? "bg-[#2563EB] text-white" : "bg-[#9333EA] text-white"}`}>
-                  {fb ? <Facebook size={18} aria-hidden="true" /> : <Instagram size={18} aria-hidden="true" />}
+                  {fb ? <MessageSquareText size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}
                 </div>
                 <div>
                   <p className="text-sm font-black text-[#0F2744]">{label(platform)}</p>
@@ -82,8 +82,8 @@ export default function MetaPublishedContentPanel({
                       className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      {fb ? <Facebook className="text-[#2563EB]" size={38} aria-hidden="true" />
-                        : <Instagram className="text-[#9333EA]" size={38} aria-hidden="true" />}
+                      {fb ? <MessageSquareText className="text-[#2563EB]" size={38} aria-hidden="true" />
+                        : <Camera className="text-[#9333EA]" size={38} aria-hidden="true" />}
                     </div>
                   )}
                   <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-black shadow-sm ${fb
