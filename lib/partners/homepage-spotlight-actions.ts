@@ -18,6 +18,7 @@ export async function saveHomepagePartnerSpotlight(_previous: SpotlightSaveState
     title: text("title", 140),
     subtitle: text("subtitle", 140),
     description: text("description", 3500),
+    article_body: text("article_body", 10000),
     image_alt: text("image_alt", 220),
     primary_label: text("primary_label", 80),
     primary_href: safeSpotlightHref(text("primary_href", 1000)),
