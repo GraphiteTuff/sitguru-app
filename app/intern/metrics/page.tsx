@@ -31,6 +31,7 @@ export default async function InternMetricsPage({
         <span aria-current="page" className="inline-flex min-h-11 items-center rounded-xl bg-[#0F2744] px-4 text-sm font-black text-white">My Metrics</span>
         <Link href="/intern/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black text-white">My Social Intelligence</Link>
         <Link href="/intern/community-studio/guru-match" className="inline-flex min-h-11 items-center rounded-xl border border-[#D1EADD] bg-white px-4 text-sm font-black text-[#0D5C3A]">Guru Match &amp; Share</Link>
+        <Link href="/intern/community-studio/event-match" className="inline-flex min-h-11 items-center rounded-xl border border-[#D1EADD] bg-white px-4 text-sm font-black text-[#0D5C3A]">Event Match &amp; Share</Link>
         <Link href="/intern/content" className="inline-flex min-h-11 items-center rounded-xl border border-[#DBEAFE] bg-white px-4 text-sm font-black text-[#0F2744]">Create Content</Link>
       </nav>
       <GrowthCenterInsightsBoard
