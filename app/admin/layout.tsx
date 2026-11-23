@@ -1078,7 +1078,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <WorkspaceLiveSyncMount />
 
-      {isMessagesWorkspace ? null : <DeskChatDock mode="manager" />}
+      {isMessagesWorkspace ? null : <DeskChatDock mode="manager" aboveBottomNav aboveBottomNavUntil="lg" />}
 
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       {!isMessagesWorkspace && (

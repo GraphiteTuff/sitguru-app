@@ -76,9 +76,12 @@ export default function DeskChatDock({
   mode = "manager",
   /** Lift the FAB above WebappBottomNav so More stays tappable on phone. */
   aboveBottomNav = false,
+  aboveBottomNavUntil = "xl",
 }: {
   mode?: "manager" | "intern";
   aboveBottomNav?: boolean;
+  /** Admin bottom nav disappears at lg; Manager and Intern at xl. */
+  aboveBottomNavUntil?: "lg" | "xl";
 }) {
   useBrowserChromeInset();
   const audiences = mode === "intern" ? INTERN_AUDIENCES : MANAGER_AUDIENCES;
@@ -300,12 +303,13 @@ export default function DeskChatDock({
 
   return (
     <div
-      className="desk-chat-dock fixed inset-x-0 z-[90] flex flex-col items-end px-3 sm:px-4 xl:!bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:!pb-0"
+      className="desk-chat-dock pointer-events-none fixed inset-x-0 z-[90] flex flex-col items-end px-3 sm:px-4 xl:!bottom-6 xl:right-6 xl:left-auto xl:w-auto xl:px-0 xl:!pb-0"
       style={dockStyle}
       data-desk-chat-above-nav={aboveBottomNav ? "true" : undefined}
+      data-desk-chat-above-nav-until={aboveBottomNav ? aboveBottomNavUntil : undefined}
     >
       {open ? (
-        <section className="relative mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
+        <section className="pointer-events-auto relative mb-3 flex h-[min(36rem,calc(100dvh-8.5rem))] w-full max-w-[24rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.22)] sm:ml-auto supports-[height:100svh]:h-[min(36rem,calc(100svh-8.5rem))]">
           <button
             type="button"
             aria-label="Minimize chat"
@@ -501,7 +505,7 @@ export default function DeskChatDock({
         </section>
       ) : null}
       {alert ? (
-        <div className="mb-3 flex w-full max-w-[24rem] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_18px_50px_rgba(15,39,68,0.22)]" role="status">
+        <div className="pointer-events-auto mb-3 flex w-full max-w-[24rem] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_18px_50px_rgba(15,39,68,0.22)]" role="status">
           <button type="button" onClick={() => openThread(alert)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
             <Face name={alert.name} src={alert.avatarUrl} size="lg" />
             <span className="min-w-0">
@@ -518,7 +522,7 @@ export default function DeskChatDock({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg"
+        className="pointer-events-auto relative flex h-14 w-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg"
         aria-label={open ? "Close chat" : "Open chat"}
       >
         {open ? <X size={22} /> : <MessageCircle size={22} />}
