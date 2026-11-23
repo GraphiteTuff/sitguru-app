@@ -1,6 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { verifiedSitGuruFacebookPageToken } from "./facebook-page-access";
+
+test("Facebook Page token selector accepts only the pinned SitGuru Page", () => {
+  const token = verifiedSitGuruFacebookPageToken([
+    { id: "not-sitguru", name: "Other Business", access_token: "wrong-token" },
+    { id: "1115780798285628", name: "SitGuru", access_token: "official-token" },
+  ], "1115780798285628");
+  assert.equal(token, "official-token");
+});
+
+test("Facebook Page token selector rejects wrong Page names, IDs and absent credentials", () => {
+  assert.equal(verifiedSitGuruFacebookPageToken([
+    { id: "1115780798285628", name: "Different Page", access_token: "wrong" },
+  ], "1115780798285628"), null);
+  assert.equal(verifiedSitGuruFacebookPageToken([
+    { id: "77777777777777", name: "SitGuru", access_token: "wrong" },
+  ], "1115780798285628"), null);
+  assert.equal(verifiedSitGuruFacebookPageToken([
+    { id: "1115780798285628", name: "SitGuru", access_token: "   " },
+  ], "1115780798285628"), null);
+  assert.equal(verifiedSitGuruFacebookPageToken(null, "1115780798285628"), null);
+});
+
+
 import {
   fetchOfficialMetaSnapshot,
   persistOfficialMetaSnapshot,
