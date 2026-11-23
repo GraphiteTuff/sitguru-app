@@ -4,7 +4,7 @@ import Link from "next/link";
 import {ArrowUpRight,BarChart3,CheckCircle2,ClipboardCopy,Download,
   HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw,ChevronDown,ChevronUp,Share2} from "lucide-react";
 import {GURU_MATCH_SERVICES,type GuruMatch,type GuruDirectoryEntry,type MatchFilters} from "@/lib/guru-match/matching";
-import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel} from "@/lib/guru-match/service";
+import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel,GuruSocialGroup} from "@/lib/guru-match/service";
 
 type Role="manager"|"admin"|"intern";
 type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
@@ -71,6 +71,9 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [directoryState,setDirectoryState]=useState("all");
   const [directorySort,setDirectorySort]=useState<"state-asc"|"state-desc"|"name">("state-asc");
   const [quickChannel,setQuickChannel]=useState<ShareChannel>("facebook");
+  const [selectedGroupId,setSelectedGroupId]=useState("");
+  const [addGroupOpen,setAddGroupOpen]=useState(false);
+  const [groupForm,setGroupForm]=useState({name:"",city:"",state:"PA",channel:"facebook" as ShareChannel,groupUrl:""});
   const [directoryPage,setDirectoryPage]=useState(0);
   const [historyPage,setHistoryPage]=useState(0);
   const [expandedGuru,setExpandedGuru]=useState<string>("");
@@ -107,7 +110,10 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const cards=payload?.campaigns||[];
   const directory=payload?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
-  const availableStates=[...new Set(directory.map(g=>g.state).filter(Boolean))].sort();
+  const groups=payload?.groups||[];
+  const selectedGroup=groups.find(g=>g.id===selectedGroupId);
+  const availableStates=[...new Set([...directory.map(g=>g.state),...groups.map(g=>g.state)].filter(Boolean))].sort();
+  const availableGroups=groups.filter(g=>directoryState==="all"||g.state===directoryState);
   const directoryItems=directory.filter(g=>{
     const q=directoryQuery.toLowerCase().trim();
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
@@ -212,10 +218,11 @@ export default function GuruMatchBoard({role}:{role:Role}){
    * link is ready. For platforms without web composers, it reveals the PNG and reply. */
   const quickShare=async(g:GuruDirectoryEntry)=>{
     if(!g.canPromote||busy)return;
+    const group=selectedGroup;
     const service=g.serviceKeys[0];
     if(!service){setError("This Guru needs an enabled service to share.");return;}
-    const nextChannel=quickChannel;
-    const socialComposer=nextChannel==="facebook"||nextChannel==="x";
+    const nextChannel=group?.channel||quickChannel;
+    const socialComposer=Boolean(group)||nextChannel==="facebook"||nextChannel==="x";
     const popup=socialComposer?window.open("about:blank","_blank"):null;
     if(popup)popup.opener=null;
     setExpandedGuru(g.id);
@@ -225,12 +232,23 @@ export default function GuruMatchBoard({role}:{role:Role}){
     setBusy(true);setError("");setNotice("");
     try{
       const result=await api<{share:PreparedShare}>("POST","/api/guru-match",{
-        action:"prepare",guruId:g.id,channel:nextChannel,service,
+        action:"prepare",guruId:g.id,channel:nextChannel,service,groupId:group?.id,
       });
       const share=result.share;
       if(share.status!=="approved")throw new Error("This Guru needs approval before sharing.");
       setPreparedMini({guruId:g.id,service,channel:nextChannel,share});
-      if(nextChannel==="facebook"||nextChannel==="x"){
+      if(group){
+        let copied=false;
+        try{
+          await navigator.clipboard.writeText(share.replyText);
+          await api("POST","/api/guru-match",{action:"copy",id:share.id});
+          copied=true;
+        }catch{/* Some browsers revoke clipboard permission after async preparation. */}
+        if(popup)popup.location.href=group.group_url;
+        setNotice(copied
+          ?"Opened "+group.name+". The local message is copied; paste it and attach the card image if the group permits posts."
+          :"Opened "+group.name+". Use Copy reply in the expanded card, then paste it into the group's post composer.");
+      } else if(nextChannel==="facebook"||nextChannel==="x"){
         const target=nextChannel==="facebook"
           ?"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(share.shareUrl)
           :"https://twitter.com/intent/tweet?text="+encodeURIComponent(share.replyText);
@@ -246,6 +264,27 @@ export default function GuruMatchBoard({role}:{role:Role}){
       if(popup&&!popup.closed)popup.close();
       setError(e instanceof Error?e.message:"Unable to prepare a tracked Guru card.");
     }finally{setBusy(false);}
+  };
+
+  const saveLocalGroup=async()=>{
+    if(!groupForm.name.trim()||!groupForm.city.trim()||!groupForm.groupUrl.trim()){
+      setError("Group name, city, state and link are required.");return;
+    }
+    setBusy(true);setError("");
+    try{
+      const result=await api<{id:string}>("POST","/api/guru-match",{
+        action:"add_group",...groupForm,
+      });
+      setAddGroupOpen(false);
+      setSelectedGroupId(result.id);
+      setDirectoryState(groupForm.state.toUpperCase());
+      setQuickChannel(groupForm.channel);
+      setDirectoryPage(0);
+      setGroupForm({name:"",city:"",state:"PA",channel:"facebook",groupUrl:""});
+      setNotice("Local social group saved for Manager and Intern sharing.");
+      await load(searched);
+    }catch(e){setError(e instanceof Error?e.message:"Could not save the local group.");}
+    finally{setBusy(false);}
   };
 
   const currentStatus=active?.status;
