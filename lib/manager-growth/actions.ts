@@ -17,7 +17,7 @@ import {
   weekStartKey,
 } from "@/lib/manager-growth/model";
 import { loadPublicSurvey } from "@/lib/manager-growth/data";
-import { OUTREACH_INTERESTS, isOutreachStage, normalizeOutreachState, outreachIsClosed, validOutreachInterests } from "@/lib/manager-growth/outreach-crm";
+import { isOutreachStage, normalizeOutreachState, outreachIsClosed, validOutreachInterests } from "@/lib/manager-growth/outreach-crm";
 import { sendSitGuruEmail } from "@/lib/email/resend";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -294,6 +294,9 @@ export async function updateOutreach(formData: FormData) {
   }
   const requestedStatus = field(formData, "status");
   const status = isOutreachStage(requestedStatus) ? requestedStatus : String(current.status);
+  if (["Approved activity", "Partner enrolled", "Guru enrolled", "Spotlight published"].includes(status) && !actor.supervisor && status !== current.status) {
+    back("/manager/outreach", "Leadership or verified publishing records are required for this outcome.");
+  }
   const nextAction = field(formData, "nextAction").slice(0, 1000);
   const note = field(formData, "note").slice(0, 3000);
   const followUp = field(formData, "followUpOn") || null;
