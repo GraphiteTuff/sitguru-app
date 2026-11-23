@@ -158,9 +158,10 @@ export async function loadSocialIntelligenceSnapshot(input: {
   const permittedPublications = input.internId
     ? publications.filter((row) => allowedStudioIds.has(text(row.studio_content_id)))
     : publications;
-  const allowedTrackingKeys = new Set(
-    permittedPublications.map((row) => text(row.tracking_key)).filter(Boolean),
-  );
+  const allowedTrackingKeys = new Set([
+    ...permittedPublications.map((row) => text(row.tracking_key)).filter(Boolean),
+    ...(input.internId ? legacyPosts.map((row) => "sg_" + text(row.id)) : []),
+  ]);
   const scopedEvents = allEvents.filter((row) => {
     if (!selectedEvent(row, filters)) return false;
     if (!input.internId) return true;
@@ -250,6 +251,8 @@ export async function loadSocialIntelligenceSnapshot(input: {
     .map((group) => ({ slug: group.slug, label: group.label, channel: group.channel, impact: eventImpact(group.events, filters.startIso, filters.endIso) }))
     .sort((a, b) => (b.impact.pageViews + b.impact.linkClicks) - (a.impact.pageViews + a.impact.linkClicks));
 
+  // Compare a provider's known cumulative views only for posts in this catalog.
+  // Absence of a provider snapshot means unavailable, never zero.
   const metricPosts = catalog.filter((post) => post.metrics.views != null);
   const postViews = metricPosts.length ? metricPosts.reduce((sum, row) => sum + (row.metrics.views || 0), 0) : null;
   const engagedPosts = catalog.filter((post) => [post.metrics.likes,post.metrics.comments,post.metrics.shares,post.metrics.saves].some((n) => n != null));
