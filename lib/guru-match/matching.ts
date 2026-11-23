@@ -27,7 +27,8 @@ export type ServiceRow = { guru_id: string; service_key: string; is_enabled: boo
 export type GuruDirectoryEntry = {
   id: string; name: string; slug: string; city: string; state: string;
   photoUrl: string | null; serviceKeys: ServiceKey[]; serviceRadiusMiles: number;
-  canPromote: boolean; reason: string;
+  /** Staff can share either a verified Guru card or safe SitGuru discovery card. */
+  canPromote: boolean; canFeatureGuru: boolean; promotionKind: "guru"|"community"; reason: string;
 };
 
 export const KNOWN_CITY_COORDINATES: Record<string, [number, number]> = {
@@ -104,14 +105,19 @@ export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[])
     const name=names.length>1?`${names[0]} ${names[names.length-1][0]}.`:names[0]||`Incomplete Guru profile (${guru.id.slice(0,8)})`;
     const photo=clean(guru.profile_photo_url || guru.avatar_url || guru.photo_url || guru.image_url);
     const serviceOptions=GURU_MATCH_SERVICES.map(s=>s.key).filter(k=>keys.has(k));
+    const canFeatureGuru=!notReady && serviceOptions.length>0;
+    const canPromote=guru.is_public===true && guru.is_archived!==true &&
+      Boolean(clean(guru.service_city||guru.city)) && /^[A-Z]{2}$/.test(clean(guru.service_state||guru.state).toUpperCase());
     return {
       id:guru.id,name,slug:clean(guru.slug),
       city:clean(guru.service_city || guru.city),state:clean(guru.service_state || guru.state).toUpperCase(),
       photoUrl:photo.startsWith("https://")?photo:null,
       serviceKeys:serviceOptions,
       serviceRadiusMiles:num(guru.service_radius_miles)??0,
-      canPromote:!notReady,
-      reason:notReady || "Bookable Guru",
+      canPromote,canFeatureGuru,promotionKind:canFeatureGuru?"guru" as const:"community" as const,
+      reason:!canPromote?"Public listing or location unavailable":
+        canFeatureGuru?"Guru profile ready":
+        "SitGuru discovery card · no booking claim",
     };
   }).sort((a,b)=>Number(b.canPromote)-Number(a.canPromote)||a.name.localeCompare(b.name));
 }
