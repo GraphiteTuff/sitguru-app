@@ -7,6 +7,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchOfficialMetaSnapshot } from "@/lib/meta/social-analytics";
+import { verifiedSitGuruFacebookPageToken } from "@/lib/meta/facebook-page-access";
 import { fetchAuthorizedTikTokVideoList } from "@/lib/tiktok/social-analytics";
 import type { SocialChannel } from "./types";
 
@@ -146,13 +147,8 @@ async function officialFacebookPageToken(systemToken: string, verifiedPageId: st
   url.searchParams.set("limit", "100");
   try {
     const response = await graphGet(url, systemToken);
-    if (Array.isArray(response.data)) {
-      const official = (response.data as Row[]).find((page) =>
-        string(page.id) === verifiedPageId && string(page.name) === "SitGuru",
-      );
-      const pageToken = string(official?.access_token);
-      if (pageToken) return pageToken;
-    }
+    const pageToken = verifiedSitGuruFacebookPageToken(response.data, verifiedPageId);
+    if (pageToken) return pageToken;
   } catch {
     // Page listing can be unavailable when pages_show_list has not been
     // approved. We still verify the exact Page identity in the next call.
