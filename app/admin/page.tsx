@@ -222,6 +222,8 @@ export default async function AdminOperationsDashboard() {
     ]),
     loadMarketDensity(),
     contractorAttentionCounts(),
+    // Do not label the public-listing count as bookable supply.
+    safeCount("gurus", [{ column: "is_bookable", operator: "eq", value: true }]),
   ]);
 
   const emptyCount: CountResult = { value: null, available: false };
@@ -232,7 +234,8 @@ export default async function AdminOperationsDashboard() {
 
   const petParents = valueAt(0, emptyCount);
   const gurus = valueAt(1, emptyCount);
-  const bookableGurus = valueAt(2, emptyCount);
+  const publicGurus = valueAt(2, emptyCount);
+  const bookableGurus = valueAt(19, emptyCount);
   const pendingGurus = valueAt(3, emptyCount);
   const activeAmbassadors = valueAt(4, emptyCount);
   const unreadMessages = valueAt(5, emptyCount);
@@ -334,7 +337,7 @@ export default async function AdminOperationsDashboard() {
     {
       label: "Gurus",
       value: formatCount(gurus, "Needs setup"),
-      helper: `${formatCount(bookableGurus, "—")} bookable · ${formatCount(pendingGurus, "—")} pending`,
+      helper: `${formatCount(publicGurus, "—")} listed · ${formatCount(bookableGurus, "—")} bookable · ${formatCount(pendingGurus, "—")} pending`,
       href: "/admin/gurus",
       tone: "sky",
     },
