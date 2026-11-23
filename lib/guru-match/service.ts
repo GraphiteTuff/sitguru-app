@@ -71,7 +71,7 @@ async function permittedCreatorIds(actor:CommunityActor){
   return [actor.user.id,...(data||[]).map(x=>clean(x.user_id)).filter(isUuid)];
 }
 
-const GURU_SELECT="id,slug,display_name,full_name,name,city,state,service_city,service_state,service_latitude,service_longitude,service_radius_miles,service_area_enabled,services,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_archived,is_test_account,is_demo,status";
+const GURU_SELECT="id,slug,display_name,full_name,name,city,state,service_city,service_state,service_latitude,service_longitude,service_radius_miles,service_area_enabled,services,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_public_visible,is_accepting_bookings,accepting_bookings,is_archived,is_test_account,is_demo,status";
 
 export async function findEligibleGuruMatches(filters:MatchFilters):Promise<GuruMatch[]>{
   const {data,error}=await supabaseAdmin.from("gurus").select(GURU_SELECT)
