@@ -16,7 +16,7 @@ import {
 import DeskPageHero from "@/components/manager/DeskPageHero";
 import LiveResultsClock from "@/components/portal/LiveResultsClock";
 import LiveSocialAutoRefresh from "@/components/portal/LiveSocialAutoRefresh";
-import MetaSocialSyncControl from "@/components/portal/MetaSocialSyncControl";
+import SocialSyncControl from "@/components/portal/SocialSyncControl";
 import { refreshXFollowers } from "@/lib/x/refresh-action";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 import type { LiveResultsData } from "@/lib/admin/growth/live-results";
@@ -46,7 +46,7 @@ function formatCount(value: number) {
 export default function LiveResultsBoard({
   audience,
   data,
-  canSyncMeta = false,
+  canSyncSocials = false,
   canConnectTikTok = false,
   canConnectX = false,
   xIsStaging = false,
@@ -55,7 +55,7 @@ export default function LiveResultsBoard({
 }: {
   audience: "manager" | "intern";
   data: LiveResultsData;
-  canSyncMeta?: boolean;
+  canSyncSocials?: boolean;
   canConnectTikTok?: boolean;
   canConnectX?: boolean;
   xIsStaging?: boolean;
@@ -184,8 +184,13 @@ export default function LiveResultsBoard({
           })}
         </div>
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="text-sm font-black text-[#0F2744]">Social</h3>
-          {canSyncMeta && manager ? <MetaSocialSyncControl /> : null}
+          <div>
+            <h3 className="text-base font-black text-[#0F2744]">Social</h3>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Official follower snapshots · auto-refreshes on this page every minute
+            </p>
+          </div>
+          {canSyncSocials && manager ? <SocialSyncControl /> : null}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {data.social.map((card) => {
@@ -234,7 +239,7 @@ export default function LiveResultsBoard({
                     Connect TikTok (sandbox)
                   </Link>
                 ) : null}
-                {canConnectX && manager && card.label === "X" ? (
+                {canConnectX && manager && card.label === "X" && !card.accountLabel ? (
                   <Link
                     href="/api/integrations/x/start"
                     className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 hover:bg-sky-100"
@@ -242,16 +247,16 @@ export default function LiveResultsBoard({
                     Connect X{xIsStaging ? " (staging)" : ""}
                   </Link>
                 ) : null}
-                {canConnectX && manager && card.label === "X" && card.verifiedStatus !== "not_configured" ? (
-                  <form action={refreshXFollowers} className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-                    <label className="flex items-start gap-2 text-[11px] font-semibold text-slate-700">
+                {canConnectX && manager && card.label === "X" && Boolean(card.accountLabel) ? (
+                  <form action={refreshXFollowers} className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                    <label className="flex items-start gap-2 text-[11px] font-medium leading-relaxed text-slate-600">
                       <input name="confirm" type="checkbox" value="yes" required className="mt-0.5" />
-                      I approve one X follower lookup, which may use paid X API credits.
+                      Approve one X follower lookup (may use API credits)
                     </label>
-                    <button type="submit" className="min-h-9 rounded-lg bg-[#2563EB] px-3 text-xs font-bold text-white">
+                    <button type="submit" className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-900 hover:bg-blue-100">
                       Refresh X followers
                     </button>
-                    <p className="text-[10px] text-slate-500">Manual only; no automatic X API polling. Refreshes are rate-limited.</p>
+                    <p className="text-[10px] text-slate-500">X refresh is optional and rate-limited; no paid automatic polling.</p>
                   </form>
                 ) : null}
                 {verified && Number.isFinite(updatedAt) && (
@@ -275,6 +280,11 @@ export default function LiveResultsBoard({
             );
           })}
         </div>
+        <p className="text-xs font-medium text-slate-500">
+          Facebook &amp; Instagram refresh in the background about every 15 minutes.
+          TikTok uses authorized snapshots when available; X remains opt-in to control API charges.
+          YouTube stays unavailable until officially connected.
+        </p>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(220px,0.7fr)]">
