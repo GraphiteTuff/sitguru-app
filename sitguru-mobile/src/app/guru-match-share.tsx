@@ -33,6 +33,17 @@ const states=['PA','NJ','FL','NY','DE','MD','CA'];
 const channels:Channel[]=['facebook','instagram','tiktok','x','other'];
 const initial:Metrics={linkOpens:0,qrOpens:0,profileClicks:0,inquiryClicks:0,sharesReported:0,copyIntents:0};
 type Params={city:string;state:string;service:Service;pet:Pet;radius:number;channel:Channel};
+function GuruAvatar({name,photoUrl}:{name:string;photoUrl:string|null}){
+  const [failed,setFailed]=useState(false);
+  useEffect(()=>setFailed(false),[photoUrl]);
+  const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('')||'SG';
+  return photoUrl&&!failed?
+    <Image source={{uri:photoUrl}} style={styles.avatar} onError={()=>setFailed(true)}
+      accessibilityLabel={name+' profile photo'}/>:
+    <View style={[styles.avatar,styles.avatarBlank]} accessibilityLabel={name+' initials avatar'}>
+      <Text style={styles.paw}>{initials}</Text>
+    </View>;
+}
 function Body(){
   const {width}=useWindowDimensions();
   const [form,setForm]=useState<Params>({city:'Quakertown',state:'PA',service:'dog_walking',pet:'dog',radius:10,channel:'facebook'});
@@ -170,7 +181,7 @@ function Body(){
         {searched&&!dashboard?.matches.length&&<Text style={styles.notice}>No eligible matches. Do not promote an unrelated Guru; offer a general SitGuru search instead.</Text>}
         {searched&&dashboard?.matches.map(g=><TouchTarget key={g.id} accessibilityRole="button" onPress={()=>setSelected(g.id)}
           style={[styles.guru,selected===g.id&&styles.guruSelected]}>
-          {g.photoUrl?<Image source={{uri:g.photoUrl}} style={styles.avatar}/>:<View style={[styles.avatar,styles.avatarBlank]}><Text style={styles.paw}>🐾</Text></View>}
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{g.name} · {g.city}, {g.state}</Text>
             <Text style={styles.small}>{g.serviceLabel} · {g.reason}</Text>
@@ -189,7 +200,7 @@ function Body(){
         </View>
         <Text style={styles.small}>Showing {listed.length} accounts</Text>
         {listed.map(g=><View key={g.id} style={styles.guru}>
-          {g.photoUrl?<Image source={{uri:g.photoUrl}} style={styles.avatar}/>:<View style={[styles.avatar,styles.avatarBlank]}><Text style={styles.paw}>SG</Text></View>}
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{g.name} · {g.city||'Location missing'}, {g.state}</Text>
             <Text style={styles.small}>{g.canPromote?'Bookable Guru':g.reason}</Text>
