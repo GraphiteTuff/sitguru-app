@@ -110,7 +110,7 @@ function eventDateSeries(events: Row[], filters: GrowthCenterFilters) {
     if (type === "booking") item.bookingEvents++;
     grouped.set(key, item);
   }
-  const result = [];
+  const result: Array<{ date: string; pageViews: number; linkClicks: number; signupEvents: number; bookingEvents: number }> = [];
   for (let timestamp = Date.parse(filters.startIso); timestamp < Date.parse(filters.endIso); timestamp += 86400000) {
     const key = day(new Date(timestamp + 12 * 3600000).toISOString());
     // UTC day stepping can cross one extra local date at daylight-saving
@@ -260,11 +260,11 @@ export async function loadSocialIntelligenceSnapshot(input: {
     ? engagedPosts.reduce((sum, post) => sum + (post.metrics.likes || 0) + (post.metrics.comments || 0) + (post.metrics.shares || 0) + (post.metrics.saves || 0), 0)
     : null;
   const latestAt = catalog.map((post) => post.metrics.capturedAt).filter((at): at is string => Boolean(at)).sort().at(-1) || null;
-  const matchedPostEvents = catalog.reduce((sum, post) => sum + post.impact.pageViews + post.impact.linkClicks + post.impact.signupEvents + post.impact.bookingEvents, 0);
+  const matchedPostEventCount = catalog.reduce((sum, post) => sum + post.impact.pageViews + post.impact.linkClicks + post.impact.signupEvents + post.impact.bookingEvents, 0);
   const truncated = allEvents.length === EVENT_LIMIT;
   if (truncated) notices.push("The selected range contains more activity than the event-read limit; first-party totals may be incomplete.");
   if (!catalog.length) notices.push("No published posts are linked to this date range yet. Publish or import verified post IDs to unlock Reel analytics.");
-  if (!matchedPostEvents) notices.push("Post-by-post conversions require a unique utm_content tracking key on each published link.");
+  if (!matchedPostEventCount) notices.push("Post-by-post conversions require a unique utm_content tracking key on each published link.");
   notices.push("Social views are lifetime provider snapshots, not unique people or views during the selected date range.");
   notices.push("Tracked signup and booking events are not equivalent to verified new customers or paid revenue.");
   notices.push("Revenue attribution is withheld until a verified booking-to-post payment link is recorded.");
@@ -273,7 +273,7 @@ export async function loadSocialIntelligenceSnapshot(input: {
     capturedAt: new Date().toISOString(), rangeLabel: formatRangeLabel(filters), preset: filters.preset,
     platform: filters.platform, audience: filters.audience, campaign: filters.campaignId || "",
     total, prior, postViews, postEngagements, postMetricsAt: latestAt,
-    sourceCoverage: { eventsLoaded: allEvents.length, truncated, matchedPostEvents, bookingAttributionComplete: false },
+    sourceCoverage: { eventsLoaded: allEvents.length, truncated, matchedPostEvents: matchedPostEventCount, bookingAttributionComplete: false },
     daily: eventDateSeries(currentEvents, filters), channels, campaigns, posts: catalog,
     connections, notices: Array.from(new Set(notices)),
   };
