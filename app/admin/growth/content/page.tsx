@@ -57,7 +57,10 @@ export default async function AdminContentOverviewPage({
       </header>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
-      <Link href="/admin/growth/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">Open Social Intelligence dashboard →</Link>
+      <nav className="flex flex-wrap gap-2" aria-label="Related content workspaces">
+        <Link href="/admin/sales-marketing/content" className="inline-flex min-h-11 items-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#DBEAFE]">Admin Content Hub →</Link>
+        <Link href="/admin/growth/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">Social Intelligence →</Link>
+      </nav>
       <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {[
           ["Drafts", counts.drafts],
