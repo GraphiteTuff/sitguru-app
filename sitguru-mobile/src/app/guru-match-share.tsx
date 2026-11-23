@@ -22,7 +22,7 @@ type Card={
   city:string;state:string;service_key:string;channel:Channel;
   reply_text:string;shareUrl:string;cardUrl:string;metrics:Metrics;
 };
-type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
+type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;canFeatureGuru:boolean;promotionKind:"guru"|"community";reason:string};
 type SocialGroup={id:string;name:string;city:string;state:string;channel:Channel;group_url:string;created_at:string};
 type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];groups:SocialGroup[];campaigns:Card[];totals:Metrics;matchesNotice:string};
 type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
@@ -107,7 +107,7 @@ function Body(){
   const statesInDirectory=[...new Set([...directory.map(g=>g.state),...groups.map(g=>g.state)].filter(Boolean))].sort();
   const filteredGroups=groups.filter(g=>!groupSearch.trim()||
     (g.name+' '+g.city+' '+g.state).toLowerCase().includes(groupSearch.toLowerCase().trim()));
-  const listed=directory.filter(g=>(directoryState==='all'||g.state===directoryState)&&(!onlyBookable||g.canPromote)&&
+  const listed=directory.filter(g=>(directoryState==='all'||g.state===directoryState)&&(!onlyBookable||g.canFeatureGuru)&&
     (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())))
     .sort((a,b)=>directorySort==='name'?a.name.localeCompare(b.name):
       a.state.localeCompare(b.state)||a.city.localeCompare(b.city)||a.name.localeCompare(b.name));
@@ -128,9 +128,9 @@ function Body(){
   const toggleMini=(g:DirectoryGuru)=>{
     if(expandedGuru===g.id){setExpandedGuru('');setReadyMini(null);return;}
     setExpandedGuru(g.id);setMiniChannel(selectedGroup?.channel||'facebook');
-    const service=g.serviceKeys[0]||'';
+    const service=g.serviceKeys[0]||'custom_care';
     setMiniService(service);setReadyMini(null);
-    if(g.canPromote&&service)void prepareMini(g,selectedGroup?.channel||'facebook',service);
+    if(g.canPromote)void prepareMini(g,selectedGroup?.channel||'facebook',service);
   };
   const logMiniShared=async()=>{
     if(!readyMini)return;
@@ -150,8 +150,7 @@ function Body(){
   };
   const quickShare=async(g:DirectoryGuru)=>{
     if(!g.canPromote||busy)return;
-    const service=g.serviceKeys[0];
-    if(!service){setError("This Guru needs an enabled service to share.");return;}
+    const service=g.serviceKeys[0]||'custom_care';
     const channel=selectedGroup?.channel||form.channel;
     setExpandedGuru(g.id);setMiniService(service);setMiniChannel(channel);
     setReadyMini(null);setBusy(true);setError("");
@@ -316,7 +315,7 @@ function Body(){
           style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
         <View style={styles.chips}>
           {pill('All listed',!onlyBookable,()=>{setOnlyBookable(false);setDirectoryPage(0);})}
-          {pill('Ready to promote',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
+          {pill('Guru profile cards',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
         </View>
         <Text style={styles.small}>Showing {visibleDirectory.length} of {listed.length} Gurus</Text>
         {visibleDirectory.map(g=>{
@@ -331,23 +330,25 @@ function Body(){
                 <Text style={styles.cardTitle}>{g.name}</Text>
                 <Text style={styles.small}>{g.city||'Location missing'}, {g.state}</Text>
                 <Text style={g.canPromote?styles.good:styles.warning}>
-                  {g.canPromote?'Approved · Ready to share':g.reason}
+                  {g.canFeatureGuru?'Guru profile card ready':g.canPromote?'SitGuru discovery card ready':g.reason}
                 </Text>
               </View>
               <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
             </TouchTarget>
-            {g.canPromote&&g.serviceKeys.length>0&&
+            {g.canPromote&&
               <View style={styles.quickShareRow}>
                 {btn(selectedGroup?'Share to local group':'Share Guru',()=>{void quickShare(g);},busy,true)}
               </View>}
             {expanded&&<View style={styles.miniExpanded}>
-              {g.canPromote && g.serviceKeys.length ? <>
-                <Text style={styles.label}>Choose Guru service</Text>
-                <View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
-                  {pill(s.replace(/_/g,' '),miniService===s,()=>{
-                    setMiniService(s);void prepareMini(g,miniChannel,s);
-                  })}
-                </View>)}</View>
+              {g.canPromote ? <>
+                <Text style={styles.label}>{g.canFeatureGuru?"Choose Guru service":"SitGuru discovery card"}</Text>
+                {g.serviceKeys.length>0
+                  ?<View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
+                    {pill(s.replace(/_/g,' '),miniService===s,()=>{
+                      setMiniService(s);void prepareMini(g,miniChannel,s);
+                    })}
+                  </View>)}</View>
+                  :<Text style={styles.small}>General SitGuru pet-care discovery · no booking claim</Text>}
                 <Text style={styles.label}>Choose social channel</Text>
                 {selectedGroup
                   ? <Text style={styles.small}>{selectedGroup.channel.toUpperCase()} · {selectedGroup.name}</Text>
@@ -359,7 +360,7 @@ function Body(){
                 {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
                 {mini&&<>
                   <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
-                    accessibilityLabel={g.name+' promotional card and QR code'}/>
+                    accessibilityLabel={g.canFeatureGuru?g.name+' promotional card and QR code':'SitGuru discovery card and QR code'}/>
                   <View style={styles.inlineRow}>
                     {btn('Share to social app',()=>{void shareMini();})}
                     {btn('Open PNG',()=>{void Linking.openURL(mini.cardUrl);})}
@@ -371,9 +372,9 @@ function Body(){
                 </>}
                 {!mini&&!busy&&btn('Retry preparing card',()=>{void prepareMini(g,miniChannel,miniService);})}
               </>:<Text style={styles.warning}>
-                {g.canPromote?'A Guru service must be enabled before sharing.':g.reason}
+                {g.reason}
               </Text>}
-              {!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
+              {g.canFeatureGuru&&!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
             </View>}
           </View>;
         })}
