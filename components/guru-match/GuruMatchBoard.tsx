@@ -50,6 +50,8 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [selectedId,setSelectedId]=useState<string>("");
   const [currentCode,setCurrentCode]=useState("");
   const [searched,setSearched]=useState(false);
+  const [directoryQuery,setDirectoryQuery]=useState("");
+  const [directoryStatus,setDirectoryStatus]=useState<"all"|"ready"|"setup">("all");
   const load=useCallback(async(search:boolean)=>{
     setLoading(true);setError("");
     try{
@@ -78,6 +80,12 @@ export default function GuruMatchBoard({role}:{role:Role}){
   };
   const selected=payload?.matches.find(g=>g.id===selectedId);
   const cards=payload?.campaigns||[];
+  const directory=payload?.directory||[];
+  const directoryItems=directory.filter(g=>{
+    const q=directoryQuery.toLowerCase().trim();
+    return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
+      (!q||`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(" ")}`.toLowerCase().includes(q));
+  });
   const active=cards.find(c=>c.code===currentCode)||cards[0];
   const postTotals=payload?.totals||blank;
   const canApprove=role!=="intern";
@@ -221,6 +229,41 @@ export default function GuruMatchBoard({role}:{role:Role}){
           <PawPrint size={16}/> {busy?"Saving...":"Generate tracked Guru card"}
         </button>
       </div>}
+    </section>
+    <section aria-label="Registered Guru directory" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-[#0F2744]">All registered Gurus</h2>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Browse every registered account. Only ready Gurus with a verified local service match can be shared publicly.</p>
+        </div>
+        <p className="text-sm font-bold text-[#0F2744]">{directory.length} registered · {directory.filter(g=>g.canPromote).length} ready to match</p>
+      </div>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <input aria-label="Search all registered Gurus" placeholder="Search Guru, city, state or service"
+          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/>
+        <select aria-label="Filter Guru directory status" className={control+" sm:max-w-60"} value={directoryStatus}
+          onChange={e=>setDirectoryStatus(e.target.value as "all"|"ready"|"setup")}>
+          <option value="all">All Guru accounts</option>
+          <option value="ready">Ready to match</option>
+          <option value="setup">Needs review or setup</option>
+        </select>
+      </div>
+      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} registered accounts.</p>
+      <div className="mt-3 grid max-h-[560px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+        {directoryItems.map(g=><article key={g.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 p-3">
+          {g.photoUrl?<img src={g.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover"/>:
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#0D5C3A]"><PawPrint size={22}/></span>}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-black text-[#0F2744]">{g.name}</p>
+            <p className="text-xs text-slate-600">{g.city||"Location missing"}{g.state?", "+g.state:""}</p>
+            <p className={`mt-1 text-xs font-bold ${g.canPromote?"text-emerald-700":"text-amber-700"}`}>
+              {g.canPromote?"Ready for local matching":g.reason}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(s=>s.key===k)?.label||k).join(" · "):"No selected services"}</p>
+            {g.slug&&g.canPromote&&<a href={`/guru/${g.slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-bold text-blue-700 underline">View public profile</a>}
+          </div>
+        </article>)}
+      </div>
     </section>
     <section aria-label="Saved outreach cards" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
