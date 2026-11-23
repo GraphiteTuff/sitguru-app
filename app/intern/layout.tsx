@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import GrowthWorkstreamSwitcher from "@/components/portal/GrowthWorkstreamSwitcher";
 import InternPortalShell from "@/components/internship/InternPortalShell";
 import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
 import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
@@ -19,6 +20,7 @@ export default async function InternLayout({
         <WorkspaceLiveSyncMount />
         <Suspense fallback={<div className="min-h-dvh bg-[#F3F6F4]" />}>
           <InternPortalShell assigned onboarded>
+            <GrowthWorkstreamSwitcher role="intern" />
             {children}
           </InternPortalShell>
         </Suspense>
@@ -43,6 +45,7 @@ export default async function InternLayout({
           schoolLogoUrl={school?.logoUrl || ""}
           unreadMessages={unreadMessages}
         >
+          <GrowthWorkstreamSwitcher role="intern" />
           {children}
         </InternPortalShell>
       </Suspense>

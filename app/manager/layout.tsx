@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import GrowthWorkstreamSwitcher from "@/components/portal/GrowthWorkstreamSwitcher";
 import ManagerPortalChrome from "@/components/manager/ManagerPortalChrome";
 import SuperUserPortalBar from "@/components/manager/SuperUserPortalBar";
 import WorkspaceLiveSyncMount from "@/components/realtime/WorkspaceLiveSyncMount";
@@ -26,6 +27,7 @@ export default async function ManagerPortalLayout({
             <SuperUserPortalBar managers={portals.managers} interns={portals.interns} />
           </Suspense>
         ) : null}
+        <GrowthWorkstreamSwitcher role="manager" />
         {children}
       </ManagerPortalChrome>
     </>
