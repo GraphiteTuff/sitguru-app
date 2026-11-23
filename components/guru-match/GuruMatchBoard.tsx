@@ -245,9 +245,11 @@ export default function GuruMatchBoard({role}:{role:Role}){
           copied=true;
         }catch{/* Some browsers revoke clipboard permission after async preparation. */}
         if(popup)popup.location.href=group.group_url;
-        setNotice(copied
-          ?"Opened "+group.name+". The local message is copied; paste it and attach the card image if the group permits posts."
-          :"Opened "+group.name+". Use Copy reply in the expanded card, then paste it into the group's post composer.");
+        setNotice(popup
+          ? copied
+            ? "Opened "+group.name+". The local reply is copied; paste it into a permitted post or comment."
+            : "Opened "+group.name+". Use Copy reply on this card to paste into the group's post."
+          : "Your group-specific tracked link is ready. Tap Open group, then Copy reply, to complete the post.");
       } else if(nextChannel==="facebook"||nextChannel==="x"){
         const target=nextChannel==="facebook"
           ?"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(share.shareUrl)
@@ -409,7 +411,8 @@ export default function GuruMatchBoard({role}:{role:Role}){
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs font-black text-[#0F2744]">Share via</span>
         <select aria-label="Default social sharing channel" value={quickChannel}
-          className={control+" !w-auto min-w-36"} onChange={e=>setQuickChannel(e.target.value as ShareChannel)}>
+          className={control+" !w-auto min-w-36"} disabled={Boolean(selectedGroup)}
+          onChange={e=>setQuickChannel(e.target.value as ShareChannel)}>
           {SOURCES.map(([key,label])=><option key={key} value={key}>{label}</option>)}
         </select>
         <span className="text-xs font-semibold text-slate-600">Choose a channel once, then Share. Saved groups automatically use their platform.</span>
@@ -456,6 +459,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
                   </label>
                   <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Social channel
                     <select className={control+" mt-1"} value={miniChannel}
+                      disabled={Boolean(selectedGroup)}
                       onChange={e=>changeMiniChannel(g,e.target.value as ShareChannel)}>
                       {SOURCES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
                     </select>
@@ -478,6 +482,8 @@ export default function GuruMatchBoard({role}:{role:Role}){
                   <div className="min-w-0 space-y-3">
                     <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved Guru card</p>
                     <div className="flex flex-wrap gap-2">
+                      {selectedGroup&&<a className={primary} href={selectedGroup.group_url}
+                        target="_blank" rel="noopener noreferrer">Open local group</a>}
                       <a className={secondary}
                         href={"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(ready.shareUrl)}
                         target="_blank" rel="noopener noreferrer">Facebook</a>
