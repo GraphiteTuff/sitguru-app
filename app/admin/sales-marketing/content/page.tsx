@@ -292,8 +292,15 @@ export default async function SalesMarketingContentPage() {
               <MetricTile title="CEO escalations" value={summary.escalated} detail="Need leadership decision" icon={ShieldCheck} tone="violet" />
               <MetricTile title="Scheduled" value={summary.scheduled} detail="Approved with planned date" icon={CalendarDays} tone="teal" />
               <MetricTile title="Published links" value={summary.published} detail="Recorded in Content Studio" icon={CheckCircle2} tone="green" />
-              <MetricTile title="Meta imports" value={(facebook?.importedPosts || 0) + (instagram?.importedPosts || 0)}
-                detail="Provider posts, not new Studio drafts" icon={Video} tone="slate" />
+              {social ? (
+                <MetricTile title="Meta imports" value={(facebook?.importedPosts || 0) + (instagram?.importedPosts || 0)}
+                  detail="Provider posts, not new Studio drafts" icon={Video} tone="slate" />
+              ) : (
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-[#0F2744]">Meta performance</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">Open authorized Manager Insights for your post metrics.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
@@ -316,6 +323,9 @@ export default async function SalesMarketingContentPage() {
             {actor.isSuperUser ? (
               <DestinationCard href="/admin/growth/social-intelligence?preset=last_90" title="Social Intelligence"
                 description="Verified Facebook and Instagram content, rankings, link clicks, and attributed events." icon={BarChart3} featured />
+            ) : canSeeStudio ? (
+              <DestinationCard href="/manager/metrics?view=social-intelligence&preset=last_90" title="Manager Social Intelligence"
+                description="Open your authorized team social performance, recent posts and growth results." icon={BarChart3} featured />
             ) : null}
             <DestinationCard href="/admin/growth/reads" title="Reads & Media"
               description="SitGuru community stories, media and approved editorial resources." icon={ImageIcon} />
