@@ -24,6 +24,9 @@ type Card={
 };
 type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
 type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
+type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
+type ReadyMini={guruId:string;service:string;channel:Channel;share:PreparedShare};
+const PAGE_SIZE=10;
 const services:[Service,string][]=[
   ['dog_walking','Dog Walking'],['pet_sitting','Pet Sitting'],['drop_in_visits','Drop-In Visits'],
   ['house_sitting','House Sitting'],['doggy_day_care','Doggy Day Care'],['boarding','Boarding'],
@@ -53,6 +56,13 @@ function Body(){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState('');
   const [onlyBookable,setOnlyBookable]=useState(false);
+  const [directoryPage,setDirectoryPage]=useState(0);
+  const [historyPage,setHistoryPage]=useState(0);
+  const [historyOpen,setHistoryOpen]=useState(false);
+  const [expandedGuru,setExpandedGuru]=useState('');
+  const [miniService,setMiniService]=useState('');
+  const [miniChannel,setMiniChannel]=useState<Channel>('facebook');
+  const [readyMini,setReadyMini]=useState<ReadyMini|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -81,11 +91,48 @@ function Body(){
     setLoading(false);
   })();},[]);
   const selectedGuru=dashboard?.matches.find(g=>g.id===selected);
-  const card=dashboard?.campaigns.find(c=>c.code===active)||dashboard?.campaigns[0];
+  const card=dashboard?.campaigns.find(c=>c.code===active);
   const directory=dashboard?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
   const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
     (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
+  const listPageCount=Math.max(1,Math.ceil(listed.length/PAGE_SIZE));
+  const visibleDirectory=listed.slice(directoryPage*PAGE_SIZE,(directoryPage+1)*PAGE_SIZE);
+  const historyCount=Math.max(1,Math.ceil((dashboard?.campaigns.length||0)/PAGE_SIZE));
+  const recentCampaigns=(dashboard?.campaigns||[]).slice(historyPage*PAGE_SIZE,(historyPage+1)*PAGE_SIZE);
+  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string)=>{
+    if(!g.canPromote||!service)return;
+    setBusy(true);setError('');setReadyMini(null);
+    const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
+      method:'POST',body:{action:'prepare',guruId:g.id,channel,service},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.share){setError(result.error||'Unable to prepare this Guru card.');return;}
+    setReadyMini({guruId:g.id,channel,service,share:result.data.share});
+  };
+  const toggleMini=(g:DirectoryGuru)=>{
+    if(expandedGuru===g.id){setExpandedGuru('');setReadyMini(null);return;}
+    setExpandedGuru(g.id);setMiniChannel('facebook');
+    const service=g.serviceKeys[0]||'';
+    setMiniService(service);setReadyMini(null);
+    if(g.canPromote&&service)void prepareMini(g,'facebook',service);
+  };
+  const logMiniShared=async()=>{
+    if(!readyMini)return;
+    setBusy(true);setError('');
+    const result=await sitguruApiFetch<{ok:boolean}>('/api/guru-match',{
+      method:'POST',body:{action:'shared',id:readyMini.share.id},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error){setError(result.error);return;}
+    setNotice('This manual social share was recorded.');
+    await reload(searched);
+  };
+  const shareMini=async()=>{
+    if(!readyMini)return;
+    try{await Share.share({title:'Meet a SitGuru Guru',message:readyMini.share.replyText,url:readyMini.share.shareUrl});}
+    catch{setNotice('Share canceled. Your Guru card is still available.');}
+  };
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
     setForm(old=>({...old,[field]:value}));setSelected('');setSearched(false);
   };
