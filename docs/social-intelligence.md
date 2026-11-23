@@ -15,6 +15,7 @@
 
 ## What is measured
 
+- All five official social channels (Facebook, Instagram, TikTok, X, YouTube) appear in a unified published-content section with role-scoped post counts for the selected period, regardless of the active platform filter; clicking a channel filters posts. Meta post syncing is explicitly labeled as Facebook/Instagram only. A follower connection must not be represented as a verified post import.
 - Rankings: most watched, clicked, shared, saved, engaged, followed, site visits, signup events and booking events. Switch Top 10/25/All, date range, audience, platform and campaign.
 - Provider media metrics: cumulative post views/reach/likes/comments/shares/saves/follows, when permitted and verified. Missing values are null, **not zero**. Provider samples are historical snapshots; views are not unique people.
 - SitGuru first-party: timestamped social-attributed page views, tracking-link clicks, signup events and booking events from `growth_campaign_events`. Events do **not** prove verified new customers, successful paid bookings or causation.
