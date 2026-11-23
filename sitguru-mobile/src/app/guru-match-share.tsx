@@ -294,9 +294,65 @@ function Body(){
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>Guru Card Library</Text>
-        <Text style={styles.small}>{directory.length} listed profiles · {readyToShare} approved for promotion.</Text>
-        <Text style={styles.small}>Tap one mini card to expand its ready-to-share image and QR. Only one expands at a time.</Text>
+        <Text style={styles.heading}>Find & Share a Guru</Text>
+        <Text style={styles.small}>{directory.length} listed · {readyToShare} ready. Search by city/state and tap Share next to any approved Guru.</Text>
+        <Text style={styles.label}>Local social groups</Text>
+        <TextInput value={groupSearch} onChangeText={setGroupSearch} style={styles.input}
+          accessibilityLabel="Search saved social groups by name or city"
+          placeholder="Search social group or city"/>
+        <View style={styles.chips}>
+          {pill('No group',!selectedGroupId,()=>{
+            setSelectedGroupId('');setReadyMini(null);setExpandedGuru('');
+          })}
+          {filteredGroups.slice(0,10).map(group=><View key={group.id}>
+            {pill(group.city+', '+group.state+' · '+group.name,selectedGroupId===group.id,()=>{
+              setSelectedGroupId(group.id);setDirectoryState(group.state);
+              setForm(old=>({...old,channel:group.channel}));setDirectoryPage(0);
+              setReadyMini(null);setExpandedGuru('');
+            })}
+          </View>)}
+        </View>
+        {selectedGroup&&<View style={styles.groupNotice}>
+          <Text style={styles.small}>{selectedGroup.name} · {selectedGroup.city}, {selectedGroup.state}</Text>
+          {btn('Open selected group',()=>{void Linking.openURL(selectedGroup.group_url);})}
+        </View>}
+        {!groups.length&&<Text style={styles.small}>There are no saved groups yet. A Manager or Admin can add group links for staff to reuse.</Text>}
+        {role!=='intern'&&btn(groupFormOpen?'Close Add Group':'Add a local group',()=>setGroupFormOpen(v=>!v))}
+        {groupFormOpen&&role!=='intern'&&<View style={styles.miniExpanded}>
+          <Text style={styles.label}>Group name</Text>
+          <TextInput value={groupForm.name} onChangeText={v=>setGroupForm(o=>({...o,name:v}))}
+            style={styles.input} placeholder="Community group name"/>
+          <Text style={styles.label}>City</Text>
+          <TextInput value={groupForm.city} onChangeText={v=>setGroupForm(o=>({...o,city:v}))}
+            style={styles.input} placeholder="City"/>
+          <Text style={styles.label}>State</Text>
+          <View style={styles.chips}>{states.map(v=><View key={v}>
+            {pill(v,groupForm.state===v,()=>setGroupForm(o=>({...o,state:v})))}
+          </View>)}</View>
+          <Text style={styles.label}>Community platform</Text>
+          <View style={styles.chips}>{(['facebook','x','other'] as Channel[]).map(v=><View key={v}>
+            {pill(v.toUpperCase(),groupForm.channel===v,()=>setGroupForm(o=>({...o,channel:v})))}
+          </View>)}</View>
+          <Text style={styles.label}>Direct group URL</Text>
+          <TextInput value={groupForm.groupUrl} onChangeText={v=>setGroupForm(o=>({...o,groupUrl:v}))}
+            style={styles.input} placeholder="https://www.facebook.com/groups/..."
+            autoCapitalize="none" autoCorrect={false} keyboardType="url"/>
+          {btn('Save group for staff',()=>{void saveLocalGroup();},busy,true)}
+        </View>}
+        <Text style={styles.label}>Filter by state</Text>
+        <View style={styles.chips}>
+          {pill('All states',directoryState==='all',()=>{
+            setDirectoryState('all');setDirectoryPage(0);setSelectedGroupId('');setExpandedGuru('');
+          })}
+          {statesInDirectory.map(v=><View key={v}>{pill(v,directoryState===v,()=>{
+            setDirectoryState(v);setDirectoryPage(0);setExpandedGuru('');
+            if(selectedGroup?.state!==v)setSelectedGroupId('');
+          })}</View>)}
+        </View>
+        <View style={styles.chips}>
+          {pill('Sort state A–Z',directorySort==='state',()=>{setDirectorySort('state');setDirectoryPage(0);})}
+          {pill('Sort by name',directorySort==='name',()=>{setDirectorySort('name');setDirectoryPage(0);})}
+        </View>
         <TextInput value={directoryQuery} onChangeText={value=>{setDirectoryQuery(value);setDirectoryPage(0);}}
           style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
         <View style={styles.chips}>
@@ -307,7 +363,7 @@ function Body(){
         {visibleDirectory.map(g=>{
           const expanded=expandedGuru===g.id;
           const mini=readyMini?.guruId===g.id && readyMini.service===miniService &&
-            readyMini.channel===miniChannel ? readyMini.share : null;
+            readyMini.channel===miniChannel && readyMini.groupId===selectedGroupId ? readyMini.share : null;
           return <View key={g.id} style={styles.guruMini}>
             <TouchTarget accessibilityRole="button" accessibilityState={{expanded}}
               onPress={()=>toggleMini(g)} style={styles.guruMiniHeader}>
@@ -321,6 +377,10 @@ function Body(){
               </View>
               <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
             </TouchTarget>
+            {g.canPromote&&g.serviceKeys.length>0&&
+              <View style={styles.quickShareRow}>
+                {btn(selectedGroup?'Share to local group':'Share Guru',()=>{void quickShare(g);},busy,true)}
+              </View>}
             {expanded&&<View style={styles.miniExpanded}>
               {g.canPromote && g.serviceKeys.length ? <>
                 <Text style={styles.label}>Choose Guru service</Text>
@@ -443,6 +503,8 @@ const styles=StyleSheet.create({
   good:{fontSize:12,fontWeight:'800',color:'#166534'},
   warning:{fontSize:12,fontWeight:'800',color:'#92400E'},
   historyToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:'#E2E8F0',borderRadius:16,padding:13,backgroundColor:'#FFFFFF'},
+  quickShareRow:{paddingHorizontal:12,paddingBottom:10,flexDirection:'row'},
+  groupNotice:{gap:6,padding:10,borderRadius:12,backgroundColor:'#EFF6FF'},
   avatar:{height:58,width:58,borderRadius:12},avatarBlank:{backgroundColor:'#DCFCE7',alignItems:'center',justifyContent:'center'},
   paw:{fontSize:24},cardTitle:{fontSize:15,fontWeight:'900',color:'#0F2744'},
   small:{fontSize:12,fontWeight:'600',lineHeight:19,color:'#64748B'},
