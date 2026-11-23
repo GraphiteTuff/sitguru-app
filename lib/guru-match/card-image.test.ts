@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
 import QRCode from "qrcode";
-import { SHARE_QR_SIZE, guruMatchCardSvg, renderGuruMatchCardPng } from "./card-image";
+import { SHARE_QR_SIZE, guruCardInitials, guruMatchCardSvg, renderGuruMatchCardPng } from "./card-image";
 
 test("Guru share image renders a 1080x1350 portrait downloadable PNG with a QR code", async () => {
   const logo = await sharp({ create: { width: 120, height: 50, channels: 4, background: "#FFFFFF" } }).png().toBuffer();
@@ -70,4 +70,31 @@ test("SitGuru community cards do not advertise a suspended or unbookable individ
   assert.ok(!svg.includes("Scan to meet this Guru"));
   const output=await sharp(Buffer.from(svg)).png().toBuffer();
   assert.equal(output.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+});
+
+test("personal Guru posters never substitute generic marketing people for a missing Guru photo", async () => {
+  assert.equal(guruCardInitials("Yatziri r."), "YR");
+  const redStockPhoto = await sharp({create:{
+    width:180,height:180,channels:4,background:"#FF0000"
+  }}).png().toBuffer();
+  const greenGuruPhoto = await sharp({create:{
+    width:180,height:180,channels:4,background:"#00FF00"
+  }}).png().toBuffer();
+  const qr = await QRCode.toBuffer("https://www.sitguru.com/s/g/ABCDEFGHIJKLMNOPQRSTUV?via=qr",{
+    type:"png",width:460,margin:2,errorCorrectionLevel:"H"
+  });
+  const base = {
+    guruName:"Yatziri r.",city:"Rockaway",state:"NJ",serviceLabel:"Explore Guru services",
+    promotionType:"guru" as const,logoPng:greenGuruPhoto,qrPng:qr,dogPng:redStockPhoto,
+  };
+  const missingPhotoPoster = await renderGuruMatchCardPng({...base,photoPng:null});
+  // x=100/y=350 is within the photo panel, away from overlay text. It must
+  // remain SitGuru's mint background, not the bright-red unrelated stock photo.
+  const missingPixel = await sharp(missingPhotoPoster)
+    .extract({left:100,top:350,width:1,height:1}).removeAlpha().raw().toBuffer();
+  assert.ok(missingPixel[1] > missingPixel[0], "missing image uses a branded tile");
+  const genuinePhotoPoster = await renderGuruMatchCardPng({...base,photoPng:greenGuruPhoto});
+  const actualPixel = await sharp(genuinePhotoPoster)
+    .extract({left:100,top:350,width:1,height:1}).removeAlpha().raw().toBuffer();
+  assert.ok(actualPixel[1] > 200 && actualPixel[0] < 75, "actual Guru photo wins over stock");
 });
