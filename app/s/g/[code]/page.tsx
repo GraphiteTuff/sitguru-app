@@ -24,7 +24,7 @@ export default async function SharedGuruLanding({
   const prefetch=Boolean(requestHeaders.get("next-router-prefetch")||requestHeaders.get("purpose")==="prefetch");
   if(!crawler&&!prefetch)await logPublicShareEvent(share.id,via==="qr"?"qr_open":"link_open",via);
   const community=share.promotionType==="community";
-  const label=GURU_MATCH_SERVICES.find(s=>s.key===share.service_key)?.label||"Pet care";
+  const label=share.service_key==="custom_care"?"Pet care":GURU_MATCH_SERVICES.find(s=>s.key===share.service_key)?.label||"Pet care";
   return (
     <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 text-[#0F2744] sm:py-12">
       <div className="mx-auto w-full max-w-xl overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,39,68,0.12)]">
