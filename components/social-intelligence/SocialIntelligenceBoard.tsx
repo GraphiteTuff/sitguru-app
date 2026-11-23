@@ -229,7 +229,7 @@ export default function SocialIntelligenceBoard({
 
   return (
     <main className="min-w-0 space-y-5 rounded-[1.75rem] bg-[#F4F7FB] px-3 py-4 pb-10 sm:px-5 lg:px-6">
-      <div role="banner" aria-label="SitGuru Social Intelligence" className="relative isolate min-h-44 overflow-hidden rounded-[1.5rem] p-5 shadow-[0_16px_36px_rgba(15,39,68,0.22)] sm:p-6" style={{ background: "linear-gradient(112deg, #0F2744 0%, #164B61 47%, #0D5C3A 100%)", color: "#FFFFFF" }}>
+      <div role="banner" aria-label="SitGuru Social Intelligence" className="sitguru-social-intelligence-hero on-dark-surface relative isolate min-h-44 overflow-hidden rounded-[1.5rem] p-5 shadow-[0_16px_36px_rgba(15,39,68,0.22)] sm:p-6" style={{ background: "linear-gradient(112deg, #0F2744 0%, #164B61 47%, #0D5C3A 100%)", color: "#FFFFFF" }}>
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em]" style={{ color: "#BBF7D0" }}>

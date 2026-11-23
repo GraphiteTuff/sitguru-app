@@ -1035,6 +1035,16 @@ body[data-desk-chat-open] [data-rogue-admin-dock] {
   color: #ffffff !important;
 }
 
+/* Social Intelligence has its own branded hero inside Admin HQ.
+   Do not let the global admin heading rule darken its title. */
+.admin-theme .sitguru-social-intelligence-hero h1,
+.admin-theme .sitguru-social-intelligence-hero h2 {
+  color: #ffffff !important;
+}
+.admin-theme .sitguru-social-intelligence-hero > div > div > p {
+  color: #e5f7f0;
+}
+
 .admin-theme p {
   color: inherit;
 }
