@@ -23,9 +23,10 @@ type Card={
   reply_text:string;shareUrl:string;cardUrl:string;metrics:Metrics;
 };
 type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
-type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
+type SocialGroup={id:string;name:string;city:string;state:string;channel:Channel;group_url:string;created_at:string};
+type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];groups:SocialGroup[];campaigns:Card[];totals:Metrics;matchesNotice:string};
 type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
-type ReadyMini={guruId:string;service:string;channel:Channel;share:PreparedShare};
+type ReadyMini={guruId:string;service:string;channel:Channel;groupId:string;share:PreparedShare};
 const PAGE_SIZE=10;
 const services:[Service,string][]=[
   ['dog_walking','Dog Walking'],['pet_sitting','Pet Sitting'],['drop_in_visits','Drop-In Visits'],
@@ -56,6 +57,13 @@ function Body(){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState('');
   const [onlyBookable,setOnlyBookable]=useState(false);
+  const [directoryState,setDirectoryState]=useState('all');
+  const [directorySort,setDirectorySort]=useState<'state'|'name'>('state');
+  const [groupSearch,setGroupSearch]=useState('');
+  const [selectedGroupId,setSelectedGroupId]=useState('');
+  const [groupFormOpen,setGroupFormOpen]=useState(false);
+  const [groupForm,setGroupForm]=useState({name:'',city:'',state:'PA',channel:'facebook' as Channel,groupUrl:''});
+  const [showAdvanced,setShowAdvanced]=useState(false);
   const [directoryPage,setDirectoryPage]=useState(0);
   const [historyPage,setHistoryPage]=useState(0);
   const [historyOpen,setHistoryOpen]=useState(false);
@@ -94,28 +102,35 @@ function Body(){
   const card=dashboard?.campaigns.find(c=>c.code===active);
   const directory=dashboard?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
-  const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
-    (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
+  const groups=dashboard?.groups||[];
+  const selectedGroup=groups.find(group=>group.id===selectedGroupId);
+  const statesInDirectory=[...new Set([...directory.map(g=>g.state),...groups.map(g=>g.state)].filter(Boolean))].sort();
+  const filteredGroups=groups.filter(g=>!groupSearch.trim()||
+    (g.name+' '+g.city+' '+g.state).toLowerCase().includes(groupSearch.toLowerCase().trim()));
+  const listed=directory.filter(g=>(directoryState==='all'||g.state===directoryState)&&(!onlyBookable||g.canPromote)&&
+    (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())))
+    .sort((a,b)=>directorySort==='name'?a.name.localeCompare(b.name):
+      a.state.localeCompare(b.state)||a.city.localeCompare(b.city)||a.name.localeCompare(b.name));
   const listPageCount=Math.max(1,Math.ceil(listed.length/PAGE_SIZE));
   const visibleDirectory=listed.slice(directoryPage*PAGE_SIZE,(directoryPage+1)*PAGE_SIZE);
   const historyCount=Math.max(1,Math.ceil((dashboard?.campaigns.length||0)/PAGE_SIZE));
   const recentCampaigns=(dashboard?.campaigns||[]).slice(historyPage*PAGE_SIZE,(historyPage+1)*PAGE_SIZE);
-  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string)=>{
+  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string,groupId=selectedGroupId)=>{
     if(!g.canPromote||!service)return;
     setBusy(true);setError('');setReadyMini(null);
     const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
-      method:'POST',body:{action:'prepare',guruId:g.id,channel,service},cache:'no-store',
+      method:'POST',body:{action:'prepare',guruId:g.id,channel,service,groupId:groupId||undefined},cache:'no-store',
     });
     setBusy(false);
     if(result.error||!result.data?.share){setError(result.error||'Unable to prepare this Guru card.');return;}
-    setReadyMini({guruId:g.id,channel,service,share:result.data.share});
+    setReadyMini({guruId:g.id,channel,service,groupId,share:result.data.share});
   };
   const toggleMini=(g:DirectoryGuru)=>{
     if(expandedGuru===g.id){setExpandedGuru('');setReadyMini(null);return;}
-    setExpandedGuru(g.id);setMiniChannel('facebook');
+    setExpandedGuru(g.id);setMiniChannel(selectedGroup?.channel||'facebook');
     const service=g.serviceKeys[0]||'';
     setMiniService(service);setReadyMini(null);
-    if(g.canPromote&&service)void prepareMini(g,'facebook',service);
+    if(g.canPromote&&service)void prepareMini(g,selectedGroup?.channel||'facebook',service);
   };
   const logMiniShared=async()=>{
     if(!readyMini)return;
@@ -132,6 +147,47 @@ function Body(){
     if(!readyMini)return;
     try{await Share.share({title:'Meet a SitGuru Guru',message:readyMini.share.replyText,url:readyMini.share.shareUrl});}
     catch{setNotice('Share canceled. Your Guru card is still available.');}
+  };
+  const quickShare=async(g:DirectoryGuru)=>{
+    if(!g.canPromote||busy)return;
+    const service=g.serviceKeys[0];
+    if(!service){setError("This Guru needs an enabled service to share.");return;}
+    const channel=selectedGroup?.channel||form.channel;
+    setExpandedGuru(g.id);setMiniService(service);setMiniChannel(channel);
+    setReadyMini(null);setBusy(true);setError("");
+    const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
+      method:'POST',body:{action:'prepare',guruId:g.id,service,channel,groupId:selectedGroupId||undefined},
+      cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.share){setError(result.error||"The share card is unavailable.");return;}
+    const share=result.data.share;
+    setReadyMini({guruId:g.id,service,channel,groupId:selectedGroupId,share});
+    if(selectedGroup){
+      setNotice("Use the share sheet to copy the prepared message. The group will open afterward so staff can post it.");
+      try{
+        await Share.share({title:'SitGuru local Guru',message:share.replyText,url:share.shareUrl});
+        await Linking.openURL(selectedGroup.group_url);
+      }catch{setNotice("The local group and ready-to-copy message are available in the expanded card.");}
+    }else{
+      try{await Share.share({title:'Meet a SitGuru Guru',message:share.replyText,url:share.shareUrl});}
+      catch{setNotice("The approved card is ready for sharing.");}
+    }
+  };
+  const saveLocalGroup=async()=>{
+    if(!groupForm.name.trim()||!groupForm.city.trim()||!groupForm.groupUrl.trim()){
+      setError("Group name, city and URL are required.");return;
+    }
+    setBusy(true);setError("");
+    const result=await sitguruApiFetch<{ok:boolean;id:string}>('/api/guru-match',{
+      method:'POST',body:{action:'add_group',...groupForm},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.id){setError(result.error||"Could not save the local group.");return;}
+    setSelectedGroupId(result.data.id);setDirectoryState(groupForm.state);
+    setGroupFormOpen(false);setGroupForm({name:'',city:'',state:'PA',channel:'facebook',groupUrl:''});
+    setDirectoryPage(0);setNotice("Local social group saved for all authorized staff.");
+    await reload(searched);
   };
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
     setForm(old=>({...old,[field]:value}));setSelected('');setSearched(false);
