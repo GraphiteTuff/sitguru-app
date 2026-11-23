@@ -161,6 +161,30 @@ export async function loadSocialIntelligenceSnapshot(input: {
   const permittedPublications = input.internId
     ? publications.filter((row) => allowedStudioIds.has(text(row.studio_content_id)))
     : publications;
+  // Every official channel stays visible in the published-content section,
+  // even when a single platform filter is active. Keep counts inside the
+  // user's permissions and selected date/campaign range, not the global catalog.
+  const publishedChannelCounts: Record<SocialChannel, number> = {
+    facebook: 0, instagram: 0, tiktok: 0, x: 0, youtube: 0,
+  };
+  const countedStudioIds = new Set<string>();
+  for (const publication of permittedPublications) {
+    const channel = channelOf(publication.platform);
+    const publishedAt = text(publication.published_at);
+    if (!channel || !publishedAt || publishedAt < filters.startIso || publishedAt >= filters.endIso) continue;
+    if (filters.campaignId && text(publication.campaign_slug) !== filters.campaignId) continue;
+    publishedChannelCounts[channel] += 1;
+    const studioId = text(publication.studio_content_id);
+    if (studioId) countedStudioIds.add(studioId);
+  }
+  for (const post of legacyPosts) {
+    const channel = channelOf(post.platform);
+    const publishedAt = text(post.published_at) || text(post.created_at);
+    const studioId = text(post.id);
+    if (!channel || !text(post.published_url).startsWith("https://") ||
+      publishedAt < filters.startIso || publishedAt >= filters.endIso || countedStudioIds.has(studioId)) continue;
+    publishedChannelCounts[channel] += 1;
+  }
   const allowedTrackingKeys = new Set([
     ...permittedPublications.map((row) => text(row.tracking_key)).filter(Boolean),
     ...(input.internId ? legacyPosts.map((row) => "sg_" + text(row.id)) : []),
@@ -278,7 +302,7 @@ export async function loadSocialIntelligenceSnapshot(input: {
     total, prior, postViews, postEngagements, postMetricsAt: latestAt,
     sourceCoverage: { eventsLoaded: allEvents.length, truncated, matchedPostEvents: matchedPostEventCount, bookingAttributionComplete: false },
     daily: eventDateSeries(currentEvents, filters), channels, campaigns, posts: catalog,
-    connections,
+    publishedChannelCounts, connections,
     metaSync: (["facebook", "instagram"] as const).map((platform) => {
       const row = metaSyncRows.find((item) => text(item.platform) === platform);
       const status = text(row?.status);
