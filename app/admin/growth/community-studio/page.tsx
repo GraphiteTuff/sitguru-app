@@ -17,7 +17,7 @@ export default async function AdminCommunityStudioPage() {
       <Link href="/admin/growth/guru-match" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[#0F2744]">Guru Match &amp; Share</Link>
       <Link href="/admin/growth/event-match" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[#0F2744]">Event Match &amp; Share</Link>
     </nav>
-    <CommunityShareDesk items={publishedStories} role="manager" />
+    <CommunityShareDesk items={publishedStories} role="admin" />
     <CommunityStudioBoard workspace={workspace} />
   </main>;
 }
