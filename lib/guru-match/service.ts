@@ -366,7 +366,7 @@ export async function findApprovedShare(code:string){
     // The branded card directs visitors to general SitGuru care discovery instead.
     return {...data,promotionType,guru:{
       slug:"",name:"SitGuru Pet Care",city:clean(data.city),state:clean(data.state),
-      photoUrl:null,experienceYears:null,firstName:"",intro:null,
+      photoUrl:null,photoUrls:[] as string[],experienceYears:null,firstName:"",intro:null,
     }};
   }
   if(g.is_bookable!==true||clean(g.status).toLowerCase()!=="active")return null;
@@ -391,6 +391,10 @@ export async function findApprovedShare(code:string){
     name:publicName.replace(/^\S+/,firstName),firstName,intro:guruPublicIntro(g.bio,firstName),
     city:clean(g.city),state:clean(g.state),
     photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url),
+    photoUrls:[...new Set(
+      [g.profile_photo_url,g.avatar_url,g.photo_url,g.image_url]
+        .map(photoUrl).filter((url):url is string=>Boolean(url))
+    )],
     experienceYears:(()=>{
       const years=Number(g.experience_years??g.years_experience);
       return Number.isFinite(years)&&years>0&&years<70?Math.floor(years):null;
