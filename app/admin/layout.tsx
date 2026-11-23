@@ -1081,9 +1081,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       {isMessagesWorkspace ? null : <DeskChatDock mode="manager" />}
 
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
-      <SafeAssistantBubble>
-        <RogueFloatingAssistant />
-      </SafeAssistantBubble>
+      {!isMessagesWorkspace && (
+        <SafeAssistantBubble>
+          <RogueFloatingAssistant />
+        </SafeAssistantBubble>
+      )}
     </>
   );
 }
