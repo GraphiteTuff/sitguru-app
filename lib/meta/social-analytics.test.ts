@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { verifiedSitGuruFacebookPageToken } from "./facebook-page-access";
 
+import {
+  fetchOfficialMetaSnapshot,
+  persistOfficialMetaSnapshot,
+  OFFICIAL_META_ENTITY_ID,
+  type OfficialMetaSnapshot,
+} from "./social-analytics";
+
 test("Facebook Page token selector accepts only the pinned SitGuru Page", () => {
   const token = verifiedSitGuruFacebookPageToken([
     { id: "not-sitguru", name: "Other Business", access_token: "wrong-token" },
@@ -23,14 +30,6 @@ test("Facebook Page token selector rejects wrong Page names, IDs and absent cred
   ], "1115780798285628"), null);
   assert.equal(verifiedSitGuruFacebookPageToken(null, "1115780798285628"), null);
 });
-
-
-import {
-  fetchOfficialMetaSnapshot,
-  persistOfficialMetaSnapshot,
-  OFFICIAL_META_ENTITY_ID,
-  type OfficialMetaSnapshot,
-} from "./social-analytics";
 
 test("Facebook fetch uses Bearer header, checks ID and accepts verified followers", async () => {
   let requestUrl = "";
