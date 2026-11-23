@@ -113,7 +113,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const groups=payload?.groups||[];
   const selectedGroup=groups.find(g=>g.id===selectedGroupId);
   const availableStates=[...new Set([...directory.map(g=>g.state),...groups.map(g=>g.state)].filter(Boolean))].sort();
-  const availableGroups=groups.filter(g=>directoryState==="all"||g.state===directoryState);
+  const availableGroups=groups;
   const directoryItems=directory.filter(g=>{
     const q=directoryQuery.toLowerCase().trim();
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
@@ -289,16 +289,18 @@ export default function GuruMatchBoard({role}:{role:Role}){
 
   const currentStatus=active?.status;
   return <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 px-3 py-5 text-[#0F2744] sm:px-5 lg:px-7">
-    <header className="on-dark-surface overflow-hidden rounded-[1.6rem] p-5 shadow-[0_12px_30px_rgba(15,39,68,.14)] sm:p-7"
+    <header className="on-dark-surface overflow-hidden rounded-[1.25rem] p-4 shadow-[0_12px_30px_rgba(15,39,68,.14)] sm:p-5"
       style={{background:"linear-gradient(112deg,#0F2744 0%,#164B61 48%,#0D5C3A 100%)",color:"#fff"}}>
       <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] !text-emerald-100">
         <PawPrint size={17}/> SitGuru · Community Studio
       </p>
-      <h1 className="mt-3 text-3xl font-black tracking-tight !text-white sm:text-4xl">Guru Match &amp; Share</h1>
-      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-emerald-50">
+      <h1 className="mt-1 text-2xl font-black tracking-tight !text-white sm:text-3xl">Guru Match &amp; Share</h1>
+      <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 !text-emerald-50 sm:text-sm">
         Promote eligible local Gurus with branded QR cards and track every recorded link opening, scan and profile click.
       </p>
-      <nav className="mt-5 flex flex-wrap gap-2 text-xs font-black" aria-label="Community Studio workspaces">
+      <details className="mt-2 text-xs font-black !text-emerald-100">
+        <summary className="cursor-pointer py-1">Other tools</summary>
+      <nav className="mt-2 flex flex-wrap gap-2 text-xs font-black" aria-label="Community Studio workspaces">
         <Link href={role==="admin"?"/admin/sales-marketing/content":`/${role}/community-studio`}
           className="rounded-xl border border-white/25 bg-white/15 px-3 py-2 !text-white">Community Studio</Link>
         <Link href={role==="admin"?"/admin/growth/social-intelligence":role==="manager"?"/manager/metrics?view=social-intelligence":"/intern/social-intelligence"}
@@ -306,94 +308,10 @@ export default function GuruMatchBoard({role}:{role:Role}){
         {role!=="intern"&&<Link href={role==="admin"?"/admin/growth/content":"/manager/campaigns-content"}
           className="rounded-xl border border-white/25 bg-white/15 px-3 py-2 !text-white">Content approvals</Link>}
       </nav>
+      </details>
     </header>
-    <section aria-label="Outreach activity in past 90 days" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-      <Kpi label="Link opens" count={postTotals.linkOpens} subtitle="Page visits, not unique people" tone="border-[#E0E7FF] bg-[#F0F4FF]" icon={Users}/>
-      <Kpi label="QR scans" count={postTotals.qrOpens} subtitle="QR landing opens" tone="border-[#DDD6FE] bg-[#F5F3FF]" icon={QrCode}/>
-      <Kpi label="Profile clicks" count={postTotals.profileClicks} subtitle="Click-through to a Guru" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
-      <Kpi label="Inquiries started" count={postTotals.inquiryClicks} subtitle="Booking-intent link clicks" tone="border-[#FDE68A] bg-[#FFFBEB]" icon={HeartHandshake}/>
-      <Kpi label="Share reports" count={postTotals.sharesReported} subtitle="Staff-confirmed manual share" tone="border-[#BBF7D0] bg-[#F0FDF4]" icon={CheckCircle2}/>
-      <Kpi label="Copy intents" count={postTotals.copyIntents} subtitle="Approved reply copies" tone="border-[#FED7AA] bg-[#FFF7ED]" icon={ClipboardCopy}/>
-    </section>
     {error&&<div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{error}</div>}
     {notice&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{notice}</div>}
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Local Guru search">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-[#0F2744]">Find eligible Gurus</h2>
-        <button type="button" onClick={()=>void load(searched)} className={secondary} disabled={loading}>
-          <RefreshCw size={16}/> Refresh
-        </button>
-      </div>
-      <p className="mt-1 text-xs font-semibold text-slate-600">City and state plus the Guru&apos;s actual service coverage and offered service are required. Unsupported locations will not produce unverified matches.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <label className="text-xs font-black text-[#0F2744]">City
-          <input className={control+" mt-1"} value={filters.city}
-            maxLength={80} onChange={e=>updateFilter("city",e.target.value)}/>
-        </label>
-        <label className="text-xs font-black text-[#0F2744]">State
-          <select className={control+" mt-1"} value={filters.state}
-            onChange={e=>updateFilter("state",e.target.value)}>
-            {STATES.map(state=><option key={state} value={state}>{state}</option>)}
-          </select>
-        </label>
-        <label className="text-xs font-black text-[#0F2744]">Service needed
-          <select className={control+" mt-1"} value={filters.service}
-            onChange={e=>updateFilter("service",e.target.value as MatchFilters["service"])}>
-            {GURU_MATCH_SERVICES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
-        </label>
-        <label className="text-xs font-black text-[#0F2744]">Pet type
-          <select className={control+" mt-1"} value={filters.pet}
-            onChange={e=>updateFilter("pet",e.target.value as MatchFilters["pet"])}>
-            <option value="any">Any / verify with Guru</option>
-            <option value="dog">Dogs (verified dog service)</option>
-            <option value="cat">Cats (verified cat care)</option>
-          </select>
-        </label>
-        <label className="text-xs font-black text-[#0F2744]">Maximum distance
-          <select className={control+" mt-1"} value={filters.radius}
-            onChange={e=>updateFilter("radius",Number(e.target.value))}>
-            {[5,10,15,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}
-          </select>
-        </label>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="min-w-44 flex-1 text-xs font-black">Social channel
-          <select className={control+" mt-1"} value={channel}
-            onChange={e=>setChannel(e.target.value as ShareChannel)}>
-            {SOURCES.map(([id,label])=><option value={id} key={id}>{label}</option>)}
-          </select>
-        </label>
-        <button type="button" className={primary} onClick={()=>void load(true)} disabled={loading||!filters.city.trim()}>
-          <Search size={16}/> {loading?"Searching...":"Find local matches"}
-        </button>
-      </div>
-      {searched&&payload&&<p className="mt-4 text-sm font-semibold text-slate-600">
-        {payload.matches.length} eligible match{payload.matches.length===1?"":"es"}. {payload.matchesNotice}
-      </p>}
-      {searched&&payload?.matches.length===0&&<div className="mt-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
-        No verified matches for these conditions. Offer a general SitGuru search link instead; do not advertise an unmatched Guru.
-      </div>}
-      {searched&&!!payload?.matches.length&&<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {payload.matches.map((g:GuruMatch)=><button key={g.id} type="button" onClick={()=>setSelectedId(g.id)}
-          className={`flex min-w-0 items-start gap-3 rounded-2xl border p-3 text-left transition hover:bg-[#EFF6FF] ${selectedId===g.id?"border-[#2563EB] bg-[#EFF6FF]":"border-slate-200 bg-white"}`}>
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-black text-[#0F2744]">{g.name}</span>
-            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500"><MapPin size={12}/>{g.city}, {g.state}</span>
-            <span className="mt-1 block text-xs font-bold text-[#0D5C3A]">{g.serviceLabel}</span>
-            <span className="mt-1 block text-xs text-slate-500">{g.distanceMiles!==null?`${g.distanceMiles} mi · `:""}{g.reason}</span>
-            {g.experienceYears!==null&&<span className="mt-1 block text-xs text-slate-600">{g.experienceYears} years experience</span>}
-          </span>
-        </button>)}
-      </div>}
-      {selected&&<div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] p-4">
-        <p className="text-sm font-bold text-[#0D5C3A]">Selected: {selected.name} · {selected.city}, {selected.state} · {selected.serviceLabel}</p>
-        <button type="button" onClick={()=>void generate()} disabled={busy} className={primary}>
-          <PawPrint size={16}/> {busy?"Saving...":"Generate tracked Guru card"}
-        </button>
-      </div>}
-    </section>
     <section aria-label="Registered Guru directory" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -406,7 +324,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
         <input aria-label="Search Gurus" placeholder="Search name, city, or service"
           className={control} value={directoryQuery} onChange={e=>{setDirectoryQuery(e.target.value);setDirectoryPage(0);}}/>
         <select aria-label="Filter Gurus by state" className={control} value={directoryState}
-          onChange={e=>{setDirectoryState(e.target.value);setDirectoryPage(0);setExpandedGuru("");}}>
+          onChange={e=>{setDirectoryState(e.target.value);setDirectoryPage(0);setExpandedGuru("");setSelectedGroupId(old=>groups.find(g=>g.id===old)?.state===e.target.value?old:"");}}>
           <option value="all">All states</option>
           {availableStates.map(state=><option key={state} value={state}>{state}</option>)}
         </select>
@@ -606,6 +524,99 @@ export default function GuruMatchBoard({role}:{role:Role}){
         </div>
       </div>
     </section>
+    <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      aria-label="Advanced local matching and outreach analytics">
+      <summary className="flex cursor-pointer items-center justify-between gap-3 text-base font-black text-[#0F2744]">
+        Advanced local matching &amp; analytics <ChevronDown size={18}/>
+      </summary>
+      <div className="mt-4 space-y-4">
+    <section aria-label="Outreach activity in past 90 days" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <Kpi label="Link opens" count={postTotals.linkOpens} subtitle="Page visits, not unique people" tone="border-[#E0E7FF] bg-[#F0F4FF]" icon={Users}/>
+      <Kpi label="QR scans" count={postTotals.qrOpens} subtitle="QR landing opens" tone="border-[#DDD6FE] bg-[#F5F3FF]" icon={QrCode}/>
+      <Kpi label="Profile clicks" count={postTotals.profileClicks} subtitle="Click-through to a Guru" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
+      <Kpi label="Inquiries started" count={postTotals.inquiryClicks} subtitle="Booking-intent link clicks" tone="border-[#FDE68A] bg-[#FFFBEB]" icon={HeartHandshake}/>
+      <Kpi label="Share reports" count={postTotals.sharesReported} subtitle="Staff-confirmed manual share" tone="border-[#BBF7D0] bg-[#F0FDF4]" icon={CheckCircle2}/>
+      <Kpi label="Copy intents" count={postTotals.copyIntents} subtitle="Approved reply copies" tone="border-[#FED7AA] bg-[#FFF7ED]" icon={ClipboardCopy}/>
+    </section>
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Local Guru search">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-black text-[#0F2744]">Find eligible Gurus</h2>
+        <button type="button" onClick={()=>void load(searched)} className={secondary} disabled={loading}>
+          <RefreshCw size={16}/> Refresh
+        </button>
+      </div>
+      <p className="mt-1 text-xs font-semibold text-slate-600">City and state plus the Guru&apos;s actual service coverage and offered service are required. Unsupported locations will not produce unverified matches.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <label className="text-xs font-black text-[#0F2744]">City
+          <input className={control+" mt-1"} value={filters.city}
+            maxLength={80} onChange={e=>updateFilter("city",e.target.value)}/>
+        </label>
+        <label className="text-xs font-black text-[#0F2744]">State
+          <select className={control+" mt-1"} value={filters.state}
+            onChange={e=>updateFilter("state",e.target.value)}>
+            {STATES.map(state=><option key={state} value={state}>{state}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-black text-[#0F2744]">Service needed
+          <select className={control+" mt-1"} value={filters.service}
+            onChange={e=>updateFilter("service",e.target.value as MatchFilters["service"])}>
+            {GURU_MATCH_SERVICES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-black text-[#0F2744]">Pet type
+          <select className={control+" mt-1"} value={filters.pet}
+            onChange={e=>updateFilter("pet",e.target.value as MatchFilters["pet"])}>
+            <option value="any">Any / verify with Guru</option>
+            <option value="dog">Dogs (verified dog service)</option>
+            <option value="cat">Cats (verified cat care)</option>
+          </select>
+        </label>
+        <label className="text-xs font-black text-[#0F2744]">Maximum distance
+          <select className={control+" mt-1"} value={filters.radius}
+            onChange={e=>updateFilter("radius",Number(e.target.value))}>
+            {[5,10,15,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="min-w-44 flex-1 text-xs font-black">Social channel
+          <select className={control+" mt-1"} value={channel}
+            onChange={e=>setChannel(e.target.value as ShareChannel)}>
+            {SOURCES.map(([id,label])=><option value={id} key={id}>{label}</option>)}
+          </select>
+        </label>
+        <button type="button" className={primary} onClick={()=>void load(true)} disabled={loading||!filters.city.trim()}>
+          <Search size={16}/> {loading?"Searching...":"Find local matches"}
+        </button>
+      </div>
+      {searched&&payload&&<p className="mt-4 text-sm font-semibold text-slate-600">
+        {payload.matches.length} eligible match{payload.matches.length===1?"":"es"}. {payload.matchesNotice}
+      </p>}
+      {searched&&payload?.matches.length===0&&<div className="mt-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+        No verified matches for these conditions. Offer a general SitGuru search link instead; do not advertise an unmatched Guru.
+      </div>}
+      {searched&&!!payload?.matches.length&&<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {payload.matches.map((g:GuruMatch)=><button key={g.id} type="button" onClick={()=>setSelectedId(g.id)}
+          className={`flex min-w-0 items-start gap-3 rounded-2xl border p-3 text-left transition hover:bg-[#EFF6FF] ${selectedId===g.id?"border-[#2563EB] bg-[#EFF6FF]":"border-slate-200 bg-white"}`}>
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-black text-[#0F2744]">{g.name}</span>
+            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500"><MapPin size={12}/>{g.city}, {g.state}</span>
+            <span className="mt-1 block text-xs font-bold text-[#0D5C3A]">{g.serviceLabel}</span>
+            <span className="mt-1 block text-xs text-slate-500">{g.distanceMiles!==null?`${g.distanceMiles} mi · `:""}{g.reason}</span>
+            {g.experienceYears!==null&&<span className="mt-1 block text-xs text-slate-600">{g.experienceYears} years experience</span>}
+          </span>
+        </button>)}
+      </div>}
+      {selected&&<div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] p-4">
+        <p className="text-sm font-bold text-[#0D5C3A]">Selected: {selected.name} · {selected.city}, {selected.state} · {selected.serviceLabel}</p>
+        <button type="button" onClick={()=>void generate()} disabled={busy} className={primary}>
+          <PawPrint size={16}/> {busy?"Saving...":"Generate tracked Guru card"}
+        </button>
+      </div>}
+    </section>
+      </div>
+    </details>
     <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
       aria-label="Previous Guru outreach and approval history">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-base font-black text-[#0F2744]">
