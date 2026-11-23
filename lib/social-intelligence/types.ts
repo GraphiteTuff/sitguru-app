@@ -74,6 +74,9 @@ export type SocialIntelligenceSnapshot = {
   channels: Array<{ channel: SocialChannel; impact: ImpactCounts; followers: number | null; status: SocialConnectorStatus["status"]; lastSyncedAt: string | null }>;
   campaigns: Array<{ slug: string; label: string; channel: string; impact: ImpactCounts }>;
   posts: SocialPost[];
+  /** Published official imports or Content Studio links within the selected period,
+   * scoped to the current viewer; independent of the selected platform filter. */
+  publishedChannelCounts: Record<SocialChannel, number>;
   connections: SocialConnectorStatus[];
   metaSync: MetaPublishedSync[];
   notices: string[];
