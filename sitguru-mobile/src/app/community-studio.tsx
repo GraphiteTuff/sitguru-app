@@ -20,7 +20,7 @@ type Mode = 'public' | 'member' | 'manager';
 type Mutation = { ok: boolean; error: string; message: string };
 
 export default function CommunityStudioScreen() {
-  const { session, loading } = useAuth();
+  const { session, loading, roles } = useAuth();
   const { colors } = useTheme();
   const [mode, setMode] = useState<Mode>('public');
   const [workspace, setWorkspace] = useState<CommunityWorkspace | null>(null);
