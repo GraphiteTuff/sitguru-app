@@ -5,7 +5,6 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, us
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
-import HomepageAppsComingSoon from "@/components/marketing/HomepageAppsComingSoon";
 import DrBaldwinPartnerSpotlight from "@/components/partners/DrBaldwinPartnerSpotlight";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
@@ -2637,8 +2636,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <HomepageAppsComingSoon onTrack={trackHomepageClick} />
 
       <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
