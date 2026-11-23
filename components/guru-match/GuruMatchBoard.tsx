@@ -17,6 +17,18 @@ const control="min-h-11 w-full rounded-xl border border-[#DCE5EE] bg-[#F8FAFC] p
 const secondary="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#0F2744] hover:bg-[#DBEAFE]";
 const primary="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8] disabled:opacity-55";
 function metric(value:number){return value.toLocaleString("en-US");}
+function GuruAvatar({name,photoUrl,size="lg"}:{name:string;photoUrl:string|null;size?:"lg"|"sm"}){
+  const [failed,setFailed]=useState(false);
+  useEffect(()=>setFailed(false),[photoUrl]);
+  const dimension=size==="lg"?"h-16 w-16":"h-14 w-14";
+  const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0].toUpperCase()).join("")||"SG";
+  return <span className={`flex ${dimension} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-emerald-50 text-sm font-black text-[#0D5C3A]`}
+    aria-label={photoUrl&&!failed?`${name} profile photo`:`${name} initials avatar`}>
+    {photoUrl&&!failed?<img src={photoUrl} alt="" onError={()=>setFailed(true)}
+      className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer"/>:
+      <span aria-hidden="true">{initials}</span>}
+  </span>;
+}
 async function api<T>(method:"GET"|"POST"|"PATCH",path:string,body?:unknown):Promise<T>{
   const response=await fetch(path,{method,credentials:"same-origin",cache:"no-store",
     headers:body?{"Content-Type":"application/json"}:undefined,
@@ -212,8 +224,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
       {searched&&!!payload?.matches.length&&<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {payload.matches.map((g:GuruMatch)=><button key={g.id} type="button" onClick={()=>setSelectedId(g.id)}
           className={`flex min-w-0 items-start gap-3 rounded-2xl border p-3 text-left transition hover:bg-[#EFF6FF] ${selectedId===g.id?"border-[#2563EB] bg-[#EFF6FF]":"border-slate-200 bg-white"}`}>
-          {g.photoUrl?<img src={g.photoUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover"/>
-            :<span className="flex h-16 w-16 items-center justify-center rounded-xl bg-emerald-50 text-[#0D5C3A]"><PawPrint size={28}/></span>}
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-black text-[#0F2744]">{g.name}</span>
             <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500"><MapPin size={12}/>{g.city}, {g.state}</span>
@@ -251,8 +262,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
       <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} bookable Gurus.</p>
       <div className="mt-3 grid max-h-[560px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
         {directoryItems.map(g=><article key={g.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 p-3">
-          {g.photoUrl?<img src={g.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover"/>:
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#0D5C3A]"><PawPrint size={22}/></span>}
+          <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
           <div className="min-w-0 flex-1">
             <p className="truncate font-black text-[#0F2744]">{g.name}</p>
             <p className="text-xs text-slate-600">{g.city||"Location missing"}{g.state?", "+g.state:""}</p>
