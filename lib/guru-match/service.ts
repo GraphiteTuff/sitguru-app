@@ -329,15 +329,26 @@ export async function updateGuruShare(actor:CommunityActor,input:Record<string,u
 export async function findApprovedShare(code:string){
   if(!isCode(code))return null;
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns")
-    .select("id,code,guru_id,status,city,state,radius_miles,service_key,pet_type,channel").eq("code",code).eq("status","approved").maybeSingle();
+    .select("id,code,guru_id,promotion_type,status,city,state,radius_miles,service_key,pet_type,channel")
+    .eq("code",code).eq("status","approved").maybeSingle();
   if(error||!data)return null;
   const {data:g,error:gError}=await supabaseAdmin.from("gurus")
-    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,status")
+    .select("id,slug,display_name,full_name,name,city,state,service_city,service_state,services,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_archived,status")
     .eq("id",data.guru_id).maybeSingle();
-  if(gError||!g||g.is_bookable!==true)return null;
-  const slug=safeGuruSlug(g.slug);if(!slug)return null;
-  // An approved card must stop working if the Guru later disables a service
-  // or leaves the original service radius. Never silently promote stale coverage.
+  if(gError||!g||g.is_public!==true||g.is_archived===true)return null;
+  const promotionType=data.promotion_type==="community"?"community" as const:"guru" as const;
+  if(promotionType==="community"){
+    // Do not expose a pending, suspended, unbookable or incomplete Guru as available.
+    // The branded card directs visitors to general SitGuru care discovery instead.
+    return {...data,promotionType,guru:{
+      slug:"",name:"SitGuru Pet Care",city:clean(data.city),state:clean(data.state),
+      photoUrl:null,
+    }};
+  }
+  if(g.is_bookable!==true||clean(g.status).toLowerCase()!=="active")return null;
+  const slug=safeGuruSlug(g.slug);
+  if(!slug)return null;
+  // A personal Guru card must stop working when booking or documented services change.
   const filters=normalizeMatchFilters({
     city:data.city,state:data.state,service:data.service_key,pet:data.pet_type,
     radius:data.radius_miles,
@@ -345,8 +356,10 @@ export async function findApprovedShare(code:string){
   if(!filters)return null;
   const eligible=await findEligibleGuruMatches(filters);
   if(!eligible.some(item=>item.id===data.guru_id))return null;
-  return {...data,guru:{slug,name:initialsName(g.display_name||g.full_name||g.name),
-    city:clean(g.city),state:clean(g.state),photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
+  return {...data,promotionType,guru:{slug,
+    name:initialsName(g.display_name||g.full_name||g.name),
+    city:clean(g.city),state:clean(g.state),
+    photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url)}};
 }
 export async function logPublicShareEvent(shareId:string,eventType:"link_open"|"qr_open"|"profile_click"|"inquiry_click",source:ShareChannel|"qr"){
   const {error}=await supabaseAdmin.from("guru_match_share_events").insert({
