@@ -53,11 +53,11 @@ export default async function SharedGuruLanding({
             <p className="flex items-center gap-2 text-sm font-bold"><ShieldCheck size={18}/> See services, experience and availability on SitGuru.</p>
             <p className="mt-1 text-xs text-slate-600">A match is an invitation to explore. Confirm availability and your pet’s needs directly with the Guru.</p>
           </div>
-          <Link href={`/go/guru-match/${share.code}?intent=profile`}
+          <Link prefetch={false} href={`/go/guru-match/${share.code}?intent=profile`}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 font-black !text-white hover:bg-[#1D4ED8]">
             View Guru profile <ArrowRight size={18}/>
           </Link>
-          <Link href={`/go/guru-match/${share.code}?intent=inquiry`}
+          <Link prefetch={false} href={`/go/guru-match/${share.code}?intent=inquiry`}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-3 font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">
             <HeartHandshake size={18}/> Explore booking this Guru
           </Link>
