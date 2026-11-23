@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, Check, ClipboardCopy, ExternalLink, Filter, Share2 } from "lucide-react";
+import { ArrowUpRight, Check, ClipboardCopy, ExternalLink, Share2 } from "lucide-react";
 import type { CommunityItem } from "@/lib/community-studio/types";
 
-type Role = "manager" | "intern";
+type Role = "manager" | "intern" | "admin";
 type Channel = "facebook" | "instagram" | "tiktok" | "x" | "youtube";
 const channels: { id: Channel; label: string }[] = [
   { id: "facebook", label: "Facebook" },
@@ -62,6 +62,9 @@ export default function CommunityShareDesk({ items, role }: { items: CommunityIt
     (category === "all" || item.kind === category) &&
     (item.title + " " + item.story + " " + item.location).toLowerCase().includes(search.toLowerCase())
   );
+  const contentHref = role === "intern" ? "/intern/content" : role === "admin" ? "/admin/growth/content" : "/manager/campaigns-content";
+  const guruHref = role === "intern" ? "/intern/community-studio/guru-match" : role === "admin" ? "/admin/growth/guru-match" : "/manager/community-studio/guru-match";
+  const eventHref = role === "intern" ? "/intern/community-studio/event-match" : role === "admin" ? "/admin/growth/event-match" : "/manager/community-studio/event-match";
   const compactButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-[#0F2744] hover:bg-slate-50";
   async function copy(value: string, label: string) {
     try {
@@ -101,9 +104,9 @@ export default function CommunityShareDesk({ items, role }: { items: CommunityIt
       <span className="rounded-xl bg-white px-4 py-3 text-sm font-black shadow-sm">{ready.length} ready</span>
     </div>
     <div className="flex flex-wrap gap-2">
-      <Link href={role === "manager" ? "/manager/campaigns-content" : "/intern/content"} className={compactButton}>Content Studio <ArrowUpRight size={15}/></Link>
-      <Link href={role === "manager" ? "/manager/community-studio/guru-match" : "/intern/community-studio/guru-match"} className={compactButton}>Guru Match &amp; Share <ArrowUpRight size={15}/></Link>
-      <Link href={role === "manager" ? "/manager/community-studio/event-match" : "/intern/community-studio/event-match"} className={compactButton}>Event Match &amp; Share <ArrowUpRight size={15}/></Link>
+      <Link href={contentHref} className={compactButton}>Content Studio <ArrowUpRight size={15}/></Link>
+      <Link href={guruHref} className={compactButton}>Guru Match &amp; Share <ArrowUpRight size={15}/></Link>
+      <Link href={eventHref} className={compactButton}>Event Match &amp; Share <ArrowUpRight size={15}/></Link>
       <Link href="/pack" target="_blank" rel="noreferrer" className={compactButton}>Public SitGuru Pack <ExternalLink size={15}/></Link>
     </div>
     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -143,7 +146,7 @@ export default function CommunityShareDesk({ items, role }: { items: CommunityIt
               </label>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={compactButton} onClick={() => copy(caption, "Caption")}><ClipboardCopy size={15}/>Copy caption</button>
-                <button type="button" className={compactButton} onClick={() => copy(url, "Tracked link")}><Check size={15}/>Copy tracked link</button>
+                <button type="button" className={compactButton} onClick={() => copy(url, "Attribution link")}><Check size={15}/>Copy campaign link</button>
                 <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#2563EB] px-4 text-xs font-black !text-white" onClick={() => share(item)}><Share2 size={15}/>Open {channels.find((entry) => entry.id === channel)?.label} share</button>
               </div>
               <p className="text-xs leading-5 text-slate-500">The link includes campaign attribution parameters. Platform publishing requires confirmation inside the social account; copying or opening a share window does not prove that a post was published. Use Guru Match or Event Match for their dedicated tracked campaign counters.</p>
