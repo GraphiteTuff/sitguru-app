@@ -91,7 +91,18 @@ async function graphList(
   const result: Row[] = [];
   let after = "";
   for (let page = 0; page < 2; page++) {
-    const response = await graphGet(graphUrl(host, path, fields, after), token);
+    let response: Row;
+    try {
+      response = await graphGet(graphUrl(host, path, fields, after), token);
+    } catch {
+      // Recover from unsupported optional fields without treating follower
+      // permission alone as proof of access to published media.
+      const fallback = host === "graph.facebook.com" && path.endsWith("/posts")
+        ? "id,message,permalink_url,created_time"
+        : "id,permalink,media_type,timestamp";
+      if (fields === fallback) throw new Error("Meta media listing is not authorized.");
+      response = await graphGet(graphUrl(host, path, fallback, after), token);
+    }
     if (!Array.isArray(response.data)) throw new Error("Meta media list response did not contain media.");
     result.push(...(response.data as Row[]));
     const paging = response.paging && typeof response.paging === "object"
@@ -117,7 +128,7 @@ async function getInstagramOwner() {
         token: system,
         host: "graph.facebook.com" as const,
         path: identity.accountId + "/media",
-        fields: "id,caption,permalink,media_type,media_product_type,timestamp,thumbnail_url,like_count,comments_count",
+        fields: "id,caption,permalink,media_type,media_product_type,timestamp,thumbnail_url,media_url,like_count,comments_count",
       };
     } catch {
       // An expired FB token may be replaced by a separately authorized
@@ -132,7 +143,7 @@ async function getInstagramOwner() {
       token: instagram,
       host: "graph.instagram.com" as const,
       path: "me/media",
-      fields: "id,permalink,media_type,timestamp,thumbnail_url,like_count,comments_count",
+      fields: "id,caption,permalink,media_type,timestamp,thumbnail_url,media_url,like_count,comments_count",
     };
   }
   throw new Error("Pinned SitGuru Instagram account could not be verified.");
@@ -140,15 +151,8 @@ async function getInstagramOwner() {
 async function optionalInstagramViews(id: string, token: string, host: "graph.facebook.com" | "graph.instagram.com") {
   if (!/^\d+$/.test(id)) return null;
   try {
-    if (host === "graph.facebook.com") {
-      const detail = await graphGet(graphUrl(host, id, "total_views_count,saved_count,shares_count", undefined), token);
-      return {
-        views: number(detail.total_views_count),
-        saves: number(detail.saved_count),
-        shares: number(detail.shares_count),
-      };
-    }
-    const url = new URL("https://graph.instagram.com/v27.0/" + id + "/insights");
+    // Views are media insights, not a guaranteed field on the media object.
+    const url = new URL("https://" + host + "/v27.0/" + id + "/insights");
     url.searchParams.set("metric", "views");
     const payload = await graphGet(url, token);
     const item = Array.isArray(payload.data) ? payload.data[0] as Row | undefined : undefined;
@@ -176,13 +180,13 @@ async function importInstagram(): Promise<ImportedPost[]> {
     if (!/^\d+$/.test(id) || !publishedAt || !permalinkKey(publishedUrl)) continue;
     // Supplement list fields only for the latest video posts to limit API load.
     const video = string(row.media_type) === "VIDEO" || string(row.media_product_type) === "REELS";
-    const extra = video && results.length < 12
+    const extra = video && results.length < 3
       ? await optionalInstagramViews(id, owner.token, owner.host) : null;
     const caption = string(row.caption);
     results.push({
       id, platform: "instagram", publishedUrl,
       title: caption ? caption.slice(0, 200) : "Instagram " + (video ? "Reel" : "post"),
-      publishedAt, thumbnail: string(row.thumbnail_url) || null,
+      publishedAt, thumbnail: string(row.thumbnail_url) || string(row.media_url) || null,
       views: extra?.views ?? null, reach: null,
       likes: number(row.like_count), comments: number(row.comments_count),
       shares: extra?.shares ?? null, saves: extra?.saves ?? null, follows: null,

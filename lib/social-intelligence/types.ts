@@ -44,6 +44,14 @@ export type SocialPost = {
   impact: ImpactCounts;
   daily: Array<{ date: string; views: number | null }>;
 };
+export type MetaPublishedSync = {
+  platform: "facebook" | "instagram";
+  status: "never" | "attempted" | "success" | "error";
+  importedPosts: number;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+};
+
 export type SocialIntelligenceSnapshot = {
   capturedAt: string;
   rangeLabel: string;
@@ -67,5 +75,6 @@ export type SocialIntelligenceSnapshot = {
   campaigns: Array<{ slug: string; label: string; channel: string; impact: ImpactCounts }>;
   posts: SocialPost[];
   connections: SocialConnectorStatus[];
+  metaSync: MetaPublishedSync[];
   notices: string[];
 };
