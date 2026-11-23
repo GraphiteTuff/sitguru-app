@@ -358,20 +358,39 @@ export default function GuruMatchBoard({role}:{role:Role}){
     <section aria-label="Registered Guru directory" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-[#0F2744]">All listed Gurus</h2>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Browse every publicly listed Guru, including profiles still being set up. Only bookable Gurus with matching local services may be promoted.</p>
+          <h2 className="text-xl font-black text-[#0F2744]">Find &amp; share a Guru</h2>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Search or sort by state, then use the Share button beside an eligible Guru. Expand a card only if you want the QR or image.</p>
         </div>
         <p className="text-sm font-bold text-[#0F2744]">{directory.length} listed · {readyToShare} ready to share</p>
       </div>
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input aria-label="Search listed Gurus" placeholder="Search Guru, city, state or service"
-          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>{setDirectoryQuery(e.target.value);setDirectoryPage(0);}}/>
-        <select aria-label="Filter Guru directory status" className={control+" sm:max-w-60"} value={directoryStatus}
-          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"ready"|"setup");setDirectoryPage(0);}}>
-          <option value="all">All listed Gurus</option>
-          <option value="ready">Ready to promote</option>
-          <option value="setup">Not currently promotable</option>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <input aria-label="Search Gurus" placeholder="Search name, city, or service"
+          className={control} value={directoryQuery} onChange={e=>{setDirectoryQuery(e.target.value);setDirectoryPage(0);}}/>
+        <select aria-label="Filter Gurus by state" className={control} value={directoryState}
+          onChange={e=>{setDirectoryState(e.target.value);setDirectoryPage(0);setExpandedGuru("");}}>
+          <option value="all">All states</option>
+          {availableStates.map(state=><option key={state} value={state}>{state}</option>)}
         </select>
+        <select aria-label="Sort Gurus" className={control} value={directorySort}
+          onChange={e=>{setDirectorySort(e.target.value as "state-asc"|"state-desc"|"name");setDirectoryPage(0);}}>
+          <option value="state-asc">State A–Z</option>
+          <option value="state-desc">State Z–A</option>
+          <option value="name">Name A–Z</option>
+        </select>
+        <select aria-label="Filter Guru readiness" className={control} value={directoryStatus}
+          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"ready"|"setup");setDirectoryPage(0);}}>
+          <option value="all">All listed</option>
+          <option value="ready">Ready to share</option>
+          <option value="setup">Needs setup</option>
+        </select>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-black text-[#0F2744]">Share via</span>
+        <select aria-label="Default social sharing channel" value={quickChannel}
+          className={control+" !w-auto min-w-36"} onChange={e=>setQuickChannel(e.target.value as ShareChannel)}>
+          {SOURCES.map(([key,label])=><option key={key} value={key}>{label}</option>)}
+        </select>
+        <span className="text-xs font-semibold text-slate-600">Choose once, then tap Share beside any eligible Guru.</span>
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
       <div className="mt-3 space-y-2" data-mini-guru-card-library>
@@ -380,9 +399,10 @@ export default function GuruMatchBoard({role}:{role:Role}){
           const ready=preparedMini?.guruId===g.id && preparedMini?.service===miniService &&
             preparedMini?.channel===miniChannel ? preparedMini.share : null;
           return <article key={g.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <button type="button" aria-expanded={expanded} aria-controls={"guru-card-"+g.id}
+            <div className="flex w-full items-center gap-1 pr-3 sm:pr-4">
+              <button type="button" aria-expanded={expanded} aria-controls={"guru-card-"+g.id}
               onClick={()=>toggleGuru(g)}
-              className="flex min-h-20 w-full min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-[#F8FAFC] sm:px-4">
+              className="flex min-h-16 flex-1 min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-[#F8FAFC] sm:px-4">
               <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-black text-[#0F2744]">{g.name}</span>
@@ -396,7 +416,13 @@ export default function GuruMatchBoard({role}:{role:Role}){
               <span className="shrink-0 rounded-lg bg-[#EFF6FF] p-2 text-blue-700" aria-hidden>
                 {expanded?<ChevronUp size={19}/>:<ChevronDown size={19}/>}
               </span>
-            </button>
+              </button>
+              {g.canPromote&&g.serviceKeys.length>0&&
+                <button type="button" className={primary+" !min-h-10 shrink-0 !px-3 sm:!px-4"}
+                  disabled={busy} onClick={()=>void quickShare(g)}>
+                  <Share2 size={15}/> Share
+                </button>}
+            </div>
             {expanded&&<div id={"guru-card-"+g.id} className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
               {g.canPromote && g.serviceKeys.length>0 ? <>
                 <div className="flex flex-wrap items-end gap-2">
