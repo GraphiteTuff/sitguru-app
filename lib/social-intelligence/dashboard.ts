@@ -136,7 +136,7 @@ export async function loadSocialIntelligenceSnapshot(input: {
     .limit(300);
   if (input.internId) contentQuery.eq("intern_id", input.internId);
 
-  const [allEvents, publications, samples, legacyPosts, connections] = await Promise.all([
+  const [allEvents, publications, samples, legacyPosts, connections, metaSyncRows] = await Promise.all([
     rows(supabaseAdmin.from("growth_campaign_events")
       .select("id,campaign_id,campaign_name,campaign_slug,event_type,source,medium,created_at,metadata,booking_id")
       .gte("created_at", filters.priorStartIso).lt("created_at", filters.endIso)
@@ -149,6 +149,9 @@ export async function loadSocialIntelligenceSnapshot(input: {
       .order("captured_at", { ascending: false }).limit(5000), "Provider post insights", notices),
     rows(contentQuery, "Content Studio published posts", notices),
     loadSocialConnectorStatus(),
+    rows(supabaseAdmin.from("growth_social_meta_sync_status")
+      .select("platform,status,imported_posts,last_attempt_at,last_success_at")
+      .limit(2), "Official Meta post import status", notices),
   ]);
 
   // Interns may only see attribution events and provider posts tied to their own
@@ -275,6 +278,17 @@ export async function loadSocialIntelligenceSnapshot(input: {
     total, prior, postViews, postEngagements, postMetricsAt: latestAt,
     sourceCoverage: { eventsLoaded: allEvents.length, truncated, matchedPostEvents: matchedPostEventCount, bookingAttributionComplete: false },
     daily: eventDateSeries(currentEvents, filters), channels, campaigns, posts: catalog,
-    connections, notices: Array.from(new Set(notices)),
+    connections,
+    metaSync: (["facebook", "instagram"] as const).map((platform) => {
+      const row = metaSyncRows.find((item) => text(item.platform) === platform);
+      const status = text(row?.status);
+      return {
+        platform, status: (status === "success" || status === "error" || status === "attempted") ? status : "never",
+        importedPosts: count(row?.imported_posts) || 0,
+        lastAttemptAt: text(row?.last_attempt_at) || null,
+        lastSuccessAt: text(row?.last_success_at) || null,
+      };
+    }),
+    notices: Array.from(new Set(notices)),
   };
 }
