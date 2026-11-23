@@ -15,7 +15,8 @@ export default async function SharedGuruLanding({
   const share=await findApprovedShare(code);
   if(!share)notFound();
   const search=await searchParams;
-  const via=channels.has(search.via||"")?search.via!:"other";
+  const via=(channels.has(search.via||"")?search.via:"other") as
+    "facebook"|"instagram"|"tiktok"|"x"|"other"|"qr";
   // Social preview crawlers and speculative prefetches are not human clicks.
   const requestHeaders=await headers();
   const agent=requestHeaders.get("user-agent")||"";
