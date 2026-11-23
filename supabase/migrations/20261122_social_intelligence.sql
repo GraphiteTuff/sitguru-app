@@ -4,7 +4,7 @@ create table if not exists public.growth_social_publications (
   id uuid primary key default gen_random_uuid(),
   platform text not null check (platform in ('facebook','instagram','tiktok','x','youtube')),
   provider_post_id text not null,
-  studio_content_id uuid null references public.internship_content(id) on delete set null,
+  studio_content_id uuid null,
   permalink text not null default '',
   title text not null default '',
   thumbnail_url text,
@@ -16,6 +16,24 @@ create table if not exists public.growth_social_publications (
   updated_at timestamptz not null default now(),
   unique(platform,provider_post_id)
 );
+-- Staging may not contain the internship tables. Keep the migration reusable
+-- and enforce a foreign key whenever Content Studio is installed.
+do $
+begin
+  if to_regclass('public.internship_content') is not null then
+    if not exists (
+      select 1 from pg_constraint
+      where conrelid = 'public.growth_social_publications'::regclass
+        and conname = 'growth_social_publications_studio_content_id_fkey'
+    ) then
+      alter table public.growth_social_publications
+        add constraint growth_social_publications_studio_content_id_fkey
+        foreign key (studio_content_id)
+        references public.internship_content(id) on delete set null;
+    end if;
+  end if;
+end
+$;
 create index if not exists growth_social_publications_pub_idx
   on public.growth_social_publications (published_at desc);
 create index if not exists growth_social_publications_campaign_idx
