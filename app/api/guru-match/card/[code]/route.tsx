@@ -35,8 +35,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
   const share = await findApprovedShare(code);
   if (!share) return new Response("Not found", { status: 404 });
   try {
-    const [font, logo, photo, qr] = await Promise.all([
-      readFile(path.join(process.cwd(), "app/fonts/plus-jakarta-sans-latin.woff2")),
+    const [logo, photo, qr] = await Promise.all([
       readFile(path.join(process.cwd(), "public/images/sitguru-logo-final.png"))
         .then(data => sharp(data).resize({ width: 220 }).png().toBuffer())
         .then(data => `data:image/png;base64,${data.toString("base64")}`),
@@ -44,7 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
       QRCode.toDataURL(guruMatchQrUrl(code), { width: 360, margin: 2, errorCorrectionLevel: "H" }),
     ]);
     const service = GURU_MATCH_SERVICES.find(item => item.key === share.service_key)?.label || "Pet Care";
-    const family = "SitGuru";
+    const family = "sans-serif";
     return new ImageResponse(
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "#F4F7FB", fontFamily: family }}>
         <div style={{ height: 210, display: "flex", flexDirection: "column", background: "linear-gradient(110deg,#0F2744,#0D5C3A)", padding: "27px 58px" }}>
@@ -78,7 +77,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
       </div>,
       {
         width: 1200, height: 630,
-        fonts: [{ name: family, data: font, weight: 800, style: "normal" }],
         headers: {
           "Cache-Control": "private, no-store",
           "Content-Disposition": 'inline; filename="sitguru-guru-share.png"',
