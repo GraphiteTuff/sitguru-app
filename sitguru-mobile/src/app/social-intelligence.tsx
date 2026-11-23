@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import RoleGate from '@/components/RoleGate';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import { useAuth } from '@/hooks/useAuth';
 import { sitguruApiFetch } from '@/lib/data/api';
-import { SitGuruColors } from '@/constants/colors';
+import { SocialDeskColors, SocialDeskKpiTones } from '@/constants/social-intelligence-desk';
 
 type MetricName = 'views' | 'clicks' | 'shares' | 'signups' | 'bookings';
 type Impact = { pageViews: number; linkClicks: number; signupEvents: number; bookingEvents: number };
@@ -60,11 +61,19 @@ function rankValue(post: Post, metric: MetricName): number | null {
   if (metric === 'signups') return post.impact.signupEvents;
   return post.impact.bookingEvents;
 }
-function Metric({ title, value, note }: { title: string; value: number | null; note?: string }) {
+function Metric({
+  title, value, note, tone,
+}: {
+  title: string;
+  value: number | null;
+  note?: string;
+  tone: keyof typeof SocialDeskKpiTones;
+}) {
+  const colors = SocialDeskKpiTones[tone];
   return (
-    <View style={styles.metric}>
+    <View style={[styles.metric, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={styles.metricLabel}>{title}</Text>
-      <Text style={styles.metricNumber}>{display(value)}</Text>
+      <Text style={[styles.metricNumber, { color: colors.value }]}>{display(value)}</Text>
       {note ? <Text style={styles.muted}>{note}</Text> : null}
     </View>
   );
@@ -109,8 +118,22 @@ function Dashboard() {
   return (
     <MobileScreen refreshing={refreshing} onRefresh={() => void load(true)}>
       <View style={styles.container}>
-        <Text style={styles.title}>Social Intelligence</Text>
-        <Text style={styles.subtitle}>SitGuru Content Studio · Measure what grows our community.</Text>
+        <LinearGradient
+          colors={[SocialDeskColors.navy, '#104951', SocialDeskColors.evergreen]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.hero}
+        >
+          <Text style={styles.heroKicker}>🐾 SitGuru · Growth Center Insights</Text>
+          <Text style={styles.heroTitle}>Social Intelligence</Text>
+          <Text style={styles.heroDescription}>Content performance, community growth and measurable SitGuru activity.</Text>
+          <View style={styles.heroSteps}>
+            {['Create', 'Publish', 'Measure', 'Grow SitGuru'].map((step) => (
+              <Text key={step} style={styles.heroStep}>{step}</Text>
+            ))}
+          </View>
+        </LinearGradient>
+        <View style={styles.filterPanel}>
         <Text style={styles.section}>Reporting period</Text>
         <View style={styles.filterRow}>
           {PERIODS.map((period) => (
@@ -129,18 +152,19 @@ function Dashboard() {
             </Pressable>
           ))}
         </View>
-        {loading ? <View style={styles.center}><ActivityIndicator color={SitGuruColors.primary}/><Text style={styles.muted}>Loading verified metrics…</Text></View> : null}
+        </View>
+        {loading ? <View style={styles.center}><ActivityIndicator color={SocialDeskColors.primary}/><Text style={styles.muted}>Loading verified metrics…</Text></View> : null}
         {error ? <View style={styles.card}><Text style={styles.error}>{error}</Text><Pressable onPress={() => void load()} style={styles.chip}><Text style={styles.chipText}>Retry</Text></Pressable></View> : null}
         {snapshot ? (
           <>
-            <Text style={styles.muted}>{snapshot.rangeLabel}</Text>
+            <Text style={styles.freshness}>{snapshot.rangeLabel}</Text>
             <View style={styles.metrics}>
-              <Metric title="Provider views" value={snapshot.postViews} note="Available snapshots"/>
-              <Metric title="Site visits" value={snapshot.total.pageViews}/>
-              <Metric title="Link clicks" value={snapshot.total.linkClicks}/>
-              <Metric title="Signup events" value={snapshot.total.signupEvents}/>
-              <Metric title="Booking events" value={snapshot.total.bookingEvents} note="Not verified paid bookings"/>
-              <Metric title="Paid revenue" value={null} note="Attribution not verified"/>
+              <Metric title="Provider views" value={snapshot.postViews} note="Available snapshots" tone="views"/>
+              <Metric title="Site visits" value={snapshot.total.pageViews} tone="visits"/>
+              <Metric title="Link clicks" value={snapshot.total.linkClicks} tone="clicks"/>
+              <Metric title="Signup events" value={snapshot.total.signupEvents} tone="signups"/>
+              <Metric title="Booking events" value={snapshot.total.bookingEvents} note="Not verified paid bookings" tone="bookings"/>
+              <Metric title="Paid revenue" value={null} note="Attribution not verified" tone="revenue"/>
             </View>
             <Text style={styles.section}>Site visits over time</Text>
             <View style={styles.card}>
@@ -153,7 +177,7 @@ function Dashboard() {
               </View>
               <Text style={styles.muted}>First-party social-attributed site activity, not social views.</Text>
             </View>
-            <Text style={styles.section}>Content leaderboards</Text>
+            <Text style={styles.section}>🏆 Content leaderboards</Text>
             <View style={styles.filterRow}>
               {RANKS.map((rank) => (
                 <Pressable key={rank.value} accessibilityRole="button" accessibilityState={{ selected: metric === rank.value }}
@@ -183,7 +207,10 @@ function Dashboard() {
               </View>
             )) : <View style={styles.card}><Text style={styles.body}>No published social posts are linked to these filters yet.</Text></View>}
             <Text style={styles.section}>Data coverage</Text>
-            {(snapshot.notices || []).slice(0, 5).map((note) => <Text style={styles.muted} key={note}>{note}</Text>)}
+            <View style={styles.card}>
+              {(snapshot.notices || []).slice(0, 5).map((note) => <Text style={styles.muted} key={note}>{note}</Text>)}
+              {!snapshot.notices?.length ? <Text style={styles.muted}>All connected sources are reporting normally.</Text> : null}
+            </View>
           </>
         ) : null}
       </View>
@@ -196,27 +223,62 @@ export default function SocialIntelligenceScreen() {
   return <RoleGate requiredRole={requiredRole} title="Social Intelligence"><Dashboard/></RoleGate>;
 }
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 40, gap: 12 },
-  title: { fontSize: 27, fontWeight: '900', color: '#0F2744' },
-  subtitle: { fontSize: 13, fontWeight: '600', color: '#475569' },
-  section: { marginTop: 8, fontSize: 17, fontWeight: '900', color: '#0F2744' },
+  container: {
+    paddingHorizontal: 4, paddingTop: 8, paddingBottom: 40, gap: 12,
+    backgroundColor: SocialDeskColors.page, borderRadius: 24,
+  },
+  hero: {
+    borderRadius: 24, padding: 20, paddingVertical: 24, gap: 8, overflow: 'hidden',
+  },
+  heroKicker: { fontSize: 11, fontWeight: '900', color: '#D1FAE5', letterSpacing: 1.1 },
+  heroTitle: { fontSize: 28, fontWeight: '900', color: SocialDeskColors.white },
+  heroDescription: { fontSize: 13, fontWeight: '600', color: '#ECFDF5', lineHeight: 20 },
+  heroSteps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  heroStep: {
+    backgroundColor: 'rgba(255,255,255,0.14)', color: SocialDeskColors.white,
+    borderRadius: 22, paddingVertical: 6, paddingHorizontal: 9, fontWeight: '800', fontSize: 10,
+  },
+  filterPanel: {
+    borderWidth: 1, borderColor: SocialDeskColors.border,
+    backgroundColor: SocialDeskColors.white, borderRadius: 19,
+    padding: 14, gap: 10,
+  },
+  section: { marginTop: 8, fontSize: 18, fontWeight: '900', color: SocialDeskColors.navy },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, minHeight: 42, backgroundColor: '#FFFFFF', justifyContent: 'center' },
-  chipActive: { backgroundColor: '#0D5C3A', borderColor: '#0D5C3A' },
-  chipText: { fontSize: 12, fontWeight: '800', color: '#334155' },
-  chipTextActive: { color: '#FFFFFF' },
+  chip: {
+    borderWidth: 1, borderColor: SocialDeskColors.border, borderRadius: 24,
+    paddingVertical: 10, paddingHorizontal: 14, minHeight: 44,
+    backgroundColor: SocialDeskColors.control, justifyContent: 'center',
+  },
+  chipActive: { backgroundColor: SocialDeskColors.primary, borderColor: SocialDeskColors.primary },
+  chipText: { fontSize: 12, fontWeight: '900', color: SocialDeskColors.navy },
+  chipTextActive: { color: SocialDeskColors.white },
   center: { padding: 30, alignItems: 'center', gap: 12 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metric: { width: '47%', borderRadius: 15, padding: 12, backgroundColor: '#EFF6F2', gap: 6, borderWidth: 1, borderColor: '#D1EADD' },
-  metricLabel: { fontSize: 11, fontWeight: '800', color: '#475569' },
-  metricNumber: { fontSize: 25, fontWeight: '900', color: '#0F2744' },
-  card: { borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, gap: 8 },
-  cardTitle: { fontSize: 15, fontWeight: '900', color: '#0F2744' },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
+  metric: {
+    width: '48%', borderRadius: 17, padding: 14, gap: 7, minHeight: 110,
+    borderWidth: 1,
+  },
+  metricLabel: { fontSize: 11, fontWeight: '900', color: SocialDeskColors.navy },
+  metricNumber: { fontSize: 26, fontWeight: '900' },
+  card: {
+    borderWidth: 1, borderColor: SocialDeskColors.border,
+    backgroundColor: SocialDeskColors.white,
+    borderRadius: 18, padding: 15, gap: 9,
+  },
+  freshness: { color: SocialDeskColors.textSoft, fontSize: 12, fontWeight: '700', paddingHorizontal: 3 },
+  cardTitle: { fontSize: 15, fontWeight: '900', color: SocialDeskColors.navy },
   body: { fontSize: 13, fontWeight: '600', color: '#334155', lineHeight: 20 },
-  muted: { color: '#64748B', fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  muted: { color: SocialDeskColors.muted, fontSize: 12, fontWeight: '600', lineHeight: 18 },
   bars: { height: 108, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 3 },
   barSlot: { flex: 1, justifyContent: 'flex-end', height: 100 },
-  bar: { width: '100%', backgroundColor: '#0D5C3A', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  details: { borderTopWidth: 1, borderTopColor: '#E2E8F0', marginTop: 9, paddingTop: 12, gap: 9 },
-  error: { color: '#BE123C', fontWeight: '700', fontSize: 13 },
+  bar: {
+    width: '100%', backgroundColor: SocialDeskColors.primary,
+    borderTopLeftRadius: 5, borderTopRightRadius: 5,
+  },
+  details: {
+    borderTopWidth: 1, borderTopColor: SocialDeskColors.softBlue,
+    marginTop: 9, paddingTop: 12, gap: 9,
+  },
+  error: { color: SocialDeskColors.red, fontWeight: '700', fontSize: 13 },
 });

@@ -7,7 +7,7 @@ import {
   type StudioContentRow,
 } from "@/lib/internship/content-studio-actions";
 import { studioRowLabel, studioSummary } from "@/lib/internship/content-studio";
-import { DESK_UI } from "@/lib/portal/desk-ui";
+import { DESK_STAT, DESK_UI } from "@/lib/portal/desk-ui";
 import { checkTikTokDraftDeliveryStatus, sendApprovedTikTokVideoDraft } from "@/lib/tiktok/content-posting-actions";
 
 const PLATFORM_LINKS: Record<string, string> = {
@@ -44,36 +44,40 @@ export function ContentStudioBoard({
 }) {
   const draftUploadPilotEnabled = process.env.TIKTOK_DRAFT_UPLOAD_ENABLED === "true";
   const cards = [
-    ["Drafts", summary.drafts],
-    ["Pending my approval", summary.pending],
-    ["Changes requested", summary.changes],
-    ["Approved", summary.approved],
-    ["Scheduled", summary.scheduled],
-    ["Published", summary.published],
+    ["Drafts", summary.drafts, "sky"],
+    ["Pending my approval", summary.pending, "amber"],
+    ["Changes requested", summary.changes, "peach"],
+    ["Approved", summary.approved, "green"],
+    ["Scheduled", summary.scheduled, "violet"],
+    ["Published", summary.published, "teal"],
   ] as const;
 
   return (
     <div className="space-y-4">
-      <header className="rounded-[1.5rem] bg-[#0D5C3A] p-5 public-dark-section" data-brand-green>
-        <p className="text-xs font-black uppercase tracking-[0.16em] !text-white">Content Studio</p>
-        <h2 className="mt-1 text-2xl font-black !text-white">Create, review, approve, and share SitGuru content.</h2>
+      <header className="rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] public-dark-section" data-brand-green>
+        <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-100">SitGuru · Manager's Desk</p>
+        <h2 className="mt-1 text-2xl font-black !text-white">Content Studio</h2>
+        <p className="mt-2 max-w-3xl text-sm font-semibold !text-emerald-50">Create, review, approve and measure what grows our community.</p>
       </header>
       {notice ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{notice}</p> : null}
       {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{error}</p> : null}
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <Link href="/manager/create" className="rounded-2xl bg-[#2563EB] px-4 py-3 text-sm font-black !text-white">Create content</Link>
-        <Link href="/manager/reads" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">Reads &amp; Media</Link>
-        <Link href="/manager/toolkit/brand" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Brand Kit</Link>
-        <a href="#review" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Review queue</a>
-        <Link href="/manager/calendar" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900">Content calendar</Link>
+        <Link href="/manager/create" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2563EB] px-4 py-3 text-sm font-black !text-white shadow-sm hover:bg-[#1D4ED8] focus-visible:ring-2 focus-visible:ring-[#2563EB]/30">Create content</Link>
+        <Link href="/manager/reads" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-3 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">Reads &amp; Media</Link>
+        <Link href="/manager/toolkit/brand" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Brand Kit</Link>
+        <a href="#review" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Review queue</a>
+        <Link href="/manager/calendar" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EEF2F6]">Content calendar</Link>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map(([label, count]) => (
-          <article key={label} className={`${DESK_UI.card} p-4`}>
-            <p className="text-2xl font-black text-slate-950">{count}</p>
-            <p className="text-sm font-semibold text-slate-600">{label}</p>
-          </article>
-        ))}
+        {cards.map(([label, count, tone]) => {
+          const accent = DESK_STAT[tone];
+          return (
+            <article key={label} className={`rounded-2xl border p-4 shadow-[0_8px_24px_rgba(15,39,68,0.05)] ${accent.wrap}`}>
+              <p className={`text-2xl font-black tabular-nums ${accent.value}`}>{count}</p>
+              <p className="text-sm font-bold text-[#0F2744]">{label}</p>
+            </article>
+          );
+        })}
       </div>
       {isSuperUser && draftUploadPilotEnabled ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">

@@ -27,7 +27,7 @@ export default async function InternInsightsPage({
 
   return (
     <div className="space-y-4">
-      <Link href="/intern/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-950">View my Content Studio performance and leaderboards →</Link>
+      <Link href="/intern/social-intelligence" className="inline-flex min-h-11 items-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#0F2744] shadow-sm hover:bg-[#DBEAFE]">View my Content Studio performance and leaderboards →</Link>
       <GrowthCenterInsightsBoard
         snapshot={snapshot}
         userId={access.actor.id}

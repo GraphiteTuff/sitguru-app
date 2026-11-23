@@ -16,9 +16,9 @@ export default async function InternSocialIntelligencePage({
   const intern = await currentAssignedIntern();
   if (!intern) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-xl font-black text-slate-950">My Content Performance</h1>
-        <p className="mt-2 text-sm text-slate-700">Insights become available after you sign in with your assigned internship account and complete onboarding.</p>
+      <main className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-[#F4F7FB] px-4 py-8 shadow-sm">
+        <h1 className="text-xl font-black text-[#0F2744]">My Content Performance</h1>
+        <p className="mt-2 text-sm text-slate-600">Insights become available after you sign in with your assigned internship account and complete onboarding.</p>
       </main>
     );
   }
