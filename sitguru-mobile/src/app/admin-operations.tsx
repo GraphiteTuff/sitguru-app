@@ -121,6 +121,13 @@ export default function AdminOperationsScreen() {
             <SitGuruLogo size="small" variant="symbol" />
           </View>
 
+          <Card title="Growth &amp; Community Studio">
+            <ActionRow actions={[
+              {label:"Guru Match & Share",href:"/guru-match-share"},
+              {label:"Content Studio",href:"/content-studio"},
+              {label:"Social Intelligence",href:"/social-intelligence"},
+            ]}/>
+          </Card>
           <View style={styles.hero}>
             <Text style={styles.heroEyebrow}>Super Admin HQ</Text>
             <Text style={styles.title}>Authorized admin work</Text>

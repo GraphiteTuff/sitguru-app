@@ -30,7 +30,10 @@ export default async function CampaignsContentPage({
           <p className="text-sm font-black text-[#0F2744]">Your content, measured</p>
           <p className="text-xs font-semibold text-slate-600">After publishing, compare watched, clicked, shared and SitGuru growth results.</p>
         </div>
-        <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">View Content Analytics</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/manager/community-studio/guru-match" className="inline-flex min-h-11 items-center rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 text-sm font-black text-[#0D5C3A] hover:bg-[#DCFCE7]">Guru Match &amp; Share</Link>
+          <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-11 items-center rounded-xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]">View Content Analytics</Link>
+        </div>
       </div>
       <ContentStudioBoard
         items={studio.items}

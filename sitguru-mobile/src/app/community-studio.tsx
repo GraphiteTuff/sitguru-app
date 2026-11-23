@@ -20,7 +20,7 @@ type Mode = 'public' | 'member' | 'manager';
 type Mutation = { ok: boolean; error: string; message: string };
 
 export default function CommunityStudioScreen() {
-  const { session, loading } = useAuth();
+  const { session, loading, roles } = useAuth();
   const { colors } = useTheme();
   const [mode, setMode] = useState<Mode>('public');
   const [workspace, setWorkspace] = useState<CommunityWorkspace | null>(null);
@@ -145,6 +145,15 @@ export default function CommunityStudioScreen() {
     <TouchTarget accessibilityRole="button" onPress={() => router.back()} style={styles.back}><Text style={[styles.label, { color: colors.primary }]}>← Back</Text></TouchTarget>
     <View style={[styles.hero, { backgroundColor: '#0D5C3A' }]}><Text style={styles.kicker}>COMMUNITY STUDIO</Text><Text style={styles.title}>The SitGuru Pack</Text><Text style={styles.heroBody}>Every pet has a story. Celebrate yours with the people who care.</Text></View>
     {developmentError ? <Text accessibilityRole="alert" style={[styles.message, { color: colors.danger, backgroundColor: colors.card }]}>{developmentError}</Text> : <>
+      {roles.some(role => role === 'admin' || role === 'manager' || role === 'intern') ? (
+        <View style={cardStyle}>
+          <Text style={[styles.heading,{color:colors.text}]}>Staff outreach tools</Text>
+          <Text style={bodyStyle}>Use the same tracked Guru promotions and Content Studio results as desktop.</Text>
+          {button('Guru Match & Share · QR tracking',()=>router.push('/guru-match-share'))}
+          {button('Content Studio · Live reviews',()=>router.push('/content-studio'))}
+          {button('Social Intelligence · Latest results',()=>router.push('/social-intelligence'))}
+        </View>
+      ) : null}
       {button('Submit photo or video',()=>{if(!session)router.push('/login');else {setMode('member');compose();}})}
       {session && <View style={styles.tabs}>{([{ id: 'public', label: 'The Pack' }, { id: 'member', label: 'My stories' }, { id: 'manager', label: 'Review' }] as const).filter(tab=>tab.id!=='manager'||workspace?.canModerate||mode==='manager').map((tab) => <TouchTarget key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: mode === tab.id }} onPress={() => { setMode(tab.id); setWorkspace(null); setComposing(false); setReviewing(null); setError(''); }} style={[styles.tab, { backgroundColor: mode === tab.id ? colors.primarySoft : colors.card, borderColor: colors.border }]}><Text style={[styles.label, { color: mode === tab.id ? colors.primary : colors.text }]}>{tab.label}</Text></TouchTarget>)}</View>}
       {session && button('Pet Parent permission requests',()=>router.push('/community-permissions'))}

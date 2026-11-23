@@ -327,6 +327,13 @@ export default async function SalesMarketingContentPage() {
               <DestinationCard href="/manager/metrics?view=social-intelligence&preset=last_90" title="Manager Social Intelligence"
                 description="Open your authorized team social performance, recent posts and growth results." icon={BarChart3} featured />
             ) : null}
+            {actor.isSuperUser ? (
+              <DestinationCard href="/admin/growth/guru-match" title="Guru Match & Share"
+                description="See Guru outreach, unique QR scans, profile clicks and manually reported shares." icon={PawPrint} featured />
+            ) : canSeeStudio ? (
+              <DestinationCard href="/manager/community-studio/guru-match" title="Guru Match & Share"
+                description="Match local Gurus and prepare approved social reply cards." icon={PawPrint} featured />
+            ) : null}
             <DestinationCard href="/admin/growth/reads" title="Reads & Media"
               description="SitGuru community stories, media and approved editorial resources." icon={ImageIcon} />
           </div>

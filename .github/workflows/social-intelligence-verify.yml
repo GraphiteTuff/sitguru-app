@@ -5,6 +5,16 @@ on:
     branches: [sitguru-main]
     paths:
       - "lib/social-intelligence/**"
+      - "lib/guru-match/**"
+      - "components/guru-match/**"
+      - "app/api/guru-match/**"
+      - "app/api/content-studio/snapshot/**"
+      - "app/s/g/**"
+      - "app/go/guru-match/**"
+      - "app/manager/community-studio/guru-match/**"
+      - "app/intern/community-studio/guru-match/**"
+      - "app/admin/growth/guru-match/**"
+      - "supabase/migrations/20261123_guru_match_share_tracking.sql"
       - "components/social-intelligence/**"
       - "app/api/social-intelligence/**"
       - "app/api/cron/social-intelligence-sync/**"
@@ -39,6 +49,10 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Check web TypeScript
         run: npm run typecheck
+      - name: Test strict Guru matching
+        run: npx tsx --test lib/guru-match/matching.test.ts
+      - name: Build web in isolated mode
+        run: npm run build:isolated
 
   mobile:
     name: Typecheck Expo Social Intelligence

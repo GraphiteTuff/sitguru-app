@@ -1,3 +1,4 @@
+import Link from "next/link";
 import CommunityStudioBoard from "@/components/community-studio/CommunityStudioBoard";
 import CommunityWorkLinks from "@/components/community-studio/CommunityWorkLinks";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -9,5 +10,14 @@ export default async function InternCommunityStudioPage() {
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   const workspace = await loadCommunityWorkspace("intern");
-  return <div className="space-y-5"><CommunityStudioBoard workspace={workspace} mode="intern" /><CommunityWorkLinks mode="intern" /></div>;
+  return <div className="space-y-5">
+    <Link href="/intern/community-studio/guru-match"
+      className="flex min-h-20 flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D1EADD] bg-gradient-to-r from-[#EFF6FF] via-[#F0FDF4] to-white p-5 shadow-sm hover:border-[#0D5C3A]">
+      <span><span className="block text-lg font-black text-[#0F2744]">🐾 Guru Match &amp; Share</span>
+      <span className="mt-1 block text-sm font-semibold text-slate-600">Match local Gurus by city, state and service. Generate QR cards and track clicks.</span></span>
+      <span className="rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-black text-white">Open tool →</span>
+    </Link>
+    <CommunityStudioBoard workspace={workspace} mode="intern" />
+    <CommunityWorkLinks mode="intern" />
+  </div>;
 }
