@@ -35,6 +35,15 @@ function tidy(value: string, limit = 70): string {
     .trim().slice(0,limit);
 }
 
+/** Branded neutral placeholder, never a stock person posing as a real Guru. */
+export function guruCardInitials(name: string): string {
+  const words = tidy(name, 42).split(/\s+/).filter(Boolean);
+  if (!words.length) return "SG";
+  if (words.length === 1) return Array.from(words[0]).slice(0, 2).join("").toLocaleUpperCase("en-US");
+  return ((Array.from(words[0])[0] || "") + (Array.from(words[words.length - 1])[0] || ""))
+    .toLocaleUpperCase("en-US");
+}
+
 let loadedFont: Promise<string> | undefined;
 /**
  * Serverless Linux can have no usable fonts installed. Never use SVG <text>
@@ -142,12 +151,14 @@ async function cropImage(input: Buffer, width: number, height: number, radius = 
   return img;
 }
 
-/** The Guru's own photo is the hero, as in the reference mockup.
- * When it is unavailable, the approved SitGuru pet-care hero image is used,
- * never a fabricated Guru portrait. */
+/** An individual Guru poster must feature that actual Guru's photo.
+ * When it is missing, use a branded initials tile instead of stock imagery
+ * that could wrongly represent a different person. Community discovery cards
+ * may still use the approved generic SitGuru pet-care photography. */
 async function petPhotoPanel(input: GuruMatchCardAssets): Promise<Buffer|null> {
-  const source = (input.promotionType !== "community" && input.photoPng)
-    || input.dogPng || input.catPng;
+  const source = input.promotionType === "community"
+    ? input.dogPng || input.catPng
+    : input.photoPng;
   if (!source) return null;
   return cropImage(source, 574, 648, 34);
 }
@@ -191,8 +202,20 @@ export async function renderGuruMatchCardPng(input: GuruMatchCardAssets): Promis
   overlays.push({input:logo,left:60,top:37});
   const portrait=await petPhotoPanel(input);
   if(portrait) overlays.push({input:portrait,left:54,top:259});
-  else textItems.push({value:"SITGURU PET CARE",left:100,top:533,size:43,
-    color:"#0D5C3A",bold:true,maxWidth:480,maxHeight:65});
+  else {
+    // A missing or inaccessible Guru photo must never display an unrelated
+    // person. Keep the poster recognizable with the Guru's actual initials.
+    textItems.push({
+      value:community?"SITGURU PET CARE":guruCardInitials(input.guruName),
+      left:community?92:198,top:480,size:community?50:170,
+      color:"#0D5C3A",bold:true,maxWidth:480,maxHeight:210,
+    });
+    textItems.push({
+      value:community?"Find trusted local pet care":"View this Guru's profile",
+      left:community?90:102,top:723,size:31,
+      color:"#195846",bold:true,maxWidth:475,maxHeight:65,
+    });
+  }
   // QR image is not AI art. These are exact QRCode bytes for this saved campaign.
   overlays.push({input:await sharp(input.qrPng)
     .resize(SHARE_QR_SIZE,SHARE_QR_SIZE,{fit:"contain",kernel:"nearest",background:"#FFFFFF"})
