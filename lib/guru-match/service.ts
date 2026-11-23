@@ -170,8 +170,23 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
     approvedGuruTemplate && input.promotionType==="community"?"community":"guru";
   const matches=promotionType==="guru"?await findEligibleGuruMatches(filters):[];
   const guru=matches.find(g=>g.id===guruId);
-  if(promotionType==="guru"&&!guru)
-    throw new Error("This Guru does not currently meet the selected location, service and pet requirements.");
+  let unspecifiedGuruName="";
+  if(promotionType==="guru"&&!guru){
+    if(!approvedGuruTemplate||filters.service!=="custom_care")
+      throw new Error("This Guru does not currently meet the selected location, service and pet requirements.");
+    const {data:profile,error:profileError}=await supabaseAdmin.from("gurus")
+      .select("display_name,full_name,name,slug,service_city,service_state,city,state,is_public,is_bookable,is_archived,status")
+      .eq("id",guruId).maybeSingle();
+    if(profileError||!profile||profile.is_bookable!==true||profile.is_public!==true||
+      profile.is_archived===true||clean(profile.status).toLowerCase()!=="active"||
+      !safeGuruSlug(profile.slug))
+      throw new Error("The Guru's profile is not ready for public sharing.");
+    const localCity=clean(profile.service_city||profile.city);
+    const localState=clean(profile.service_state||profile.state).toUpperCase();
+    if(localCity.toLowerCase()!==filters.city.toLowerCase()||localState!==filters.state)
+      throw new Error("Choose the Guru's actual city before sharing a general profile card.");
+    unspecifiedGuruName=initialsName(profile.display_name||profile.full_name||profile.name);
+  }
   if(promotionType==="community"){
     const {data:listed,error:listError}=await supabaseAdmin.from("gurus")
       .select("id,is_public,is_archived").eq("id",guruId).maybeSingle();
@@ -181,7 +196,9 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const code=randomBytes(16).toString("base64url");
   const reply=promotionType==="guru"&&guru
     ? `Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`
-    : `Hi! Looking for pet care near ${filters.city}, ${filters.state}? Explore SitGuru to find pet care providers, compare services and check availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
+    : promotionType==="guru"&&unspecifiedGuruName
+      ? `Hi! Meet ${unspecifiedGuruName} on SitGuru near ${filters.city}, ${filters.state}. View their profile to check offered services and current availability: ${guruMatchPublicUrl(code,channel)} 🐾`
+      : `Hi! Looking for pet care near ${filters.city}, ${filters.state}? Explore SitGuru to find pet care providers, compare services and check availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
   const manager=actor.canModerate;
   // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.
   const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
@@ -224,9 +241,10 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
   const slug=safeGuruSlug(guru.slug);
   const named=Boolean(clean(guru.display_name||guru.full_name||guru.name));
   const canFeatureGuru=guru.is_bookable===true &&
-    clean(guru.status).toLowerCase()==="active" && Boolean(slug) && named && available.size>0;
+    clean(guru.status).toLowerCase()==="active" && Boolean(slug) && named;
   const promotionType: "guru"|"community"=canFeatureGuru?"guru":"community";
-  if(canFeatureGuru&&!available.has(service))
+  const unspecifiedPersonal=canFeatureGuru && available.size===0 && service==="custom_care";
+  if(canFeatureGuru&&!available.has(service)&&!unspecifiedPersonal)
     throw new Error("The selected Guru service is not enabled.");
   const city=clean(group?.city||guru.service_city||guru.city);
   const state=clean(group?.state||guru.service_state||guru.state).toUpperCase();
@@ -235,8 +253,13 @@ export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<stri
     ?Math.max(1,Math.min(50,Math.floor(radiusValue))):10;
   const filters=normalizeMatchFilters({city,state,service,pet:"any",radius});
   if(!filters)throw new Error("This listing needs a valid city and state before sharing.");
-  if(canFeatureGuru&&!matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
+  if(canFeatureGuru&&!unspecifiedPersonal&&
+    !matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
     throw new Error("This Guru does not serve the selected local area or service. Choose a local group.");
+  if(unspecifiedPersonal&&(
+    city.toLowerCase()!==clean(guru.service_city||guru.city).toLowerCase()||
+    state!==clean(guru.service_state||guru.state).toUpperCase()))
+    throw new Error("This Guru needs service information before sharing outside their listed city.");
   let existingQuery=supabaseAdmin.from("guru_match_share_campaigns")
     .select("id,code,reply_text").eq("guru_id",guruId)
     .eq("created_by_user_id",actor.user.id).eq("channel",channel)
