@@ -62,7 +62,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
     const name = community?"SitGuru Pet Care":cardText(share.guru.name,34);
     const city = cardText(share.city, 42);
     const state = cardText(share.state, 2);
-    const service = community?"Explore local pet care":cardText(GURU_MATCH_SERVICES.find(s => s.key === share.service_key)?.label || "Pet care", 34);
+    const service = community?"Explore local pet care":share.service_key==="custom_care"?"Explore Guru services":cardText(GURU_MATCH_SERVICES.find(s => s.key === share.service_key)?.label || "Pet care", 34);
     const initials = name.split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase() || "SG";
     return new ImageResponse(
       <div style={{ display:"flex",flexDirection:"column",width:"100%",height:"100%",fontFamily:"GuruSans",
