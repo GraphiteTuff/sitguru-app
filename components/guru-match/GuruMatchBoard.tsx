@@ -424,7 +424,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
         </select>
         <span className="text-xs font-semibold text-slate-600">Choose a channel once, then Share. Saved groups automatically use their platform.</span>
       </div>
-      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
+      <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} listed profiles. All {readyToShare} have share cards; booking eligibility is unchanged.</p>
       <div className="mt-3 space-y-2" data-mini-guru-card-library>
         {shownDirectory.map(g=>{
           const expanded=expandedGuru===g.id;
@@ -523,9 +523,9 @@ export default function GuruMatchBoard({role}:{role:Role}){
                     onClick={()=>void prepareMini(g,miniChannel,miniService)}>Retry</button>
                 </p>}
               </> : <p className="text-sm font-semibold text-amber-800">
-                {g.canPromote?"This Guru must enable a service before a card can be shared.":g.reason}
+                {g.reason}
               </p>}
-              {!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
+              {g.canFeatureGuru&&!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
                 className="inline-flex text-xs font-black text-blue-700 underline">View Guru profile</Link>}
             </div>}
           </article>;
@@ -550,7 +550,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
     <section aria-label="Outreach activity in past 90 days" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       <Kpi label="Link opens" count={postTotals.linkOpens} subtitle="Page visits, not unique people" tone="border-[#E0E7FF] bg-[#F0F4FF]" icon={Users}/>
       <Kpi label="QR scans" count={postTotals.qrOpens} subtitle="QR landing opens" tone="border-[#DDD6FE] bg-[#F5F3FF]" icon={QrCode}/>
-      <Kpi label="Profile clicks" count={postTotals.profileClicks} subtitle="Click-through to a Guru" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
+      <Kpi label="Care page clicks" count={postTotals.profileClicks} subtitle="Guru profile or care search" tone="border-[#BAE6FD] bg-[#F0F9FF]" icon={BarChart3}/>
       <Kpi label="Inquiries started" count={postTotals.inquiryClicks} subtitle="Booking-intent link clicks" tone="border-[#FDE68A] bg-[#FFFBEB]" icon={HeartHandshake}/>
       <Kpi label="Share reports" count={postTotals.sharesReported} subtitle="Staff-confirmed manual share" tone="border-[#BBF7D0] bg-[#F0FDF4]" icon={CheckCircle2}/>
       <Kpi label="Copy intents" count={postTotals.copyIntents} subtitle="Approved reply copies" tone="border-[#FED7AA] bg-[#FFF7ED]" icon={ClipboardCopy}/>
