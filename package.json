@@ -20,7 +20,8 @@
     "diagnose-payments": "tsx scripts/diagnose-payments.ts",
     "seed-social-baseline": "tsx scripts/seed-social-baseline.ts",
     "test:tiktok-social": "tsx --test lib/tiktok/social-analytics.test.ts lib/tiktok/content-posting.test.ts lib/tiktok/content-posting-status.test.ts",
-    "test:x-social": "tsx --test lib/x/social-analytics.test.ts"
+    "test:x-social": "tsx --test lib/x/social-analytics.test.ts",
+    "test:social-sync": "tsx --test lib/social/unified-sync-policy.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
