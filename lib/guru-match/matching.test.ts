@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {distanceMiles,matchGuruCandidates,normalizeMatchFilters,type GuruCandidate,type ServiceRow} from "./matching";
+import {buildGuruDirectory,distanceMiles,matchGuruCandidates,normalizeMatchFilters,type GuruCandidate,type ServiceRow} from "./matching";
 
 const base:GuruCandidate={
   id:"00000000-0000-4000-8000-000000000011",
@@ -24,15 +24,15 @@ test("requires valid state, city, distance and known service",()=>{
   assert.equal(normalizeMatchFilters({...filters,radius:500}),null);
   assert.equal(normalizeMatchFilters({...filters,radius:10})?.city,"Quakertown");
 });
-test("returns only active public bookable service-area Gurus",()=>{
+test("requires the Guru to be bookable",()=>{
   assert.equal(matchGuruCandidates(filters,[base],rates).length,1);
   assert.equal(matchGuruCandidates(filters,[{...base,is_bookable:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,is_public:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,is_public_visible:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,is_accepting_bookings:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,service_area_enabled:false}],rates).length,0);
-  assert.equal(matchGuruCandidates(filters,[{...base,is_test_account:true}],rates).length,0);
+  assert.equal(matchGuruCandidates(filters,[{...base,status:"suspended"}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_public:false}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_public_visible:false}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_accepting_bookings:false}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,service_area_enabled:false}],rates).length,1);
+  assert.equal(matchGuruCandidates(filters,[{...base,is_test_account:true}],rates).length,1);
 });
 test("requires correct state, location radius and service",()=>{
   assert.equal(matchGuruCandidates(filters,[{...base,service_state:"NJ"}],rates).length,0);
@@ -52,4 +52,17 @@ test("never guesses distance or pet type without documented evidence",()=>{
     {guru_id:base.id,service_key:"pet_sitting",is_enabled:true},
   ]).length,1);
   assert.equal(matchGuruCandidates({...filters,pet:"cat"},[base],rates).length,0);
+});
+
+test("staff directory includes every bookable Guru without needing a service match",()=>{
+  const records=buildGuruDirectory([
+    {...base,is_public:false,status:"pending"},
+    {...base,id:"00000000-0000-4000-8000-000000000012",slug:"other-guru",is_bookable:false},
+  ],rates);
+  assert.equal(records.length,2);
+  assert.equal(records[0].canPromote,true);
+  assert.equal(records[1].canPromote,false);
+});
+test("a disabled service rate overrides stale legacy public labels",()=>{
+  assert.equal(matchGuruCandidates(filters,[base],[{guru_id:base.id,service_key:"dog_walking",is_enabled:false}]).length,0);
 });
