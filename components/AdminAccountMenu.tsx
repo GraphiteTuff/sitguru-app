@@ -193,7 +193,11 @@ const FOUNDER_ROLES: DashboardSwitchRole[] = [
   "admin",
 ];
 
-export default function AdminAccountMenu() {
+export default function AdminAccountMenu({
+  variant = "default",
+}: {
+  variant?: "default" | "desk";
+} = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -384,33 +388,41 @@ export default function AdminAccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full bg-[#2563EB] pl-1.5 pr-1.5 text-white shadow-sm transition hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:pr-2.5 xl:max-w-[13rem] xl:pr-3"
+        className={variant === "desk"
+          ? "flex shrink-0 items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/25"
+          : "flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full bg-[#2563EB] pl-1.5 pr-1.5 text-white shadow-sm transition hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:pr-2.5 xl:max-w-[13rem] xl:pr-3"}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open admin account menu"
       >
-        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white">
+        <span className={variant === "desk"
+          ? "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-slate-200"
+          : "relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white"}>
           <Image
             src="/images/sitguru-admin-avatar.jpg"
             alt="SitGuru Admin Avatar"
             fill
-            sizes="32px"
+            sizes={variant === "desk" ? "48px" : "32px"}
             priority
             className="object-cover"
           />
         </span>
 
-        <span className="hidden min-w-0 flex-1 text-left sm:block">
-          <span className="block truncate text-xs font-black leading-tight text-white">
+        <span className="hidden min-w-0 max-w-[9.5rem] flex-1 text-left sm:block">
+          <span className={variant === "desk"
+            ? "block truncate text-sm font-bold leading-tight text-[#0F2744]"
+            : "block truncate text-xs font-black leading-tight text-white"}>
             {account.displayName}
           </span>
 
-          <span className="hidden truncate text-[10px] font-semibold leading-tight text-white/80 xl:block">
+          <span className={variant === "desk"
+            ? "mt-0.5 block truncate text-[11px] font-medium leading-[1.15] text-slate-500"
+            : "hidden truncate text-[10px] font-semibold leading-tight text-white/80 xl:block"}>
             {topButtonRoleLabel}
           </span>
         </span>
 
-        <span className="hidden shrink-0 text-white/90 sm:block">
+        <span className={variant === "desk" ? "hidden shrink-0 text-[#0F2744] sm:block" : "hidden shrink-0 text-white/90 sm:block"}>
           {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </span>
       </button>
