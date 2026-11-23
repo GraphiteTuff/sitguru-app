@@ -377,8 +377,13 @@ export async function findApprovedShare(code:string){
     radius:data.radius_miles,
   });
   if(!filters)return null;
-  const eligible=await findEligibleGuruMatches(filters);
-  if(!eligible.some(item=>item.id===data.guru_id))return null;
+  const genericPersonalCard=data.service_key==="custom_care" &&
+    clean(data.city).toLowerCase()===clean(g.service_city||g.city).toLowerCase() &&
+    clean(data.state).toUpperCase()===clean(g.service_state||g.state).toUpperCase();
+  if(!genericPersonalCard){
+    const eligible=await findEligibleGuruMatches(filters);
+    if(!eligible.some(item=>item.id===data.guru_id))return null;
+  }
   return {...data,promotionType,guru:{slug,
     name:initialsName(g.display_name||g.full_name||g.name),
     city:clean(g.city),state:clean(g.state),
