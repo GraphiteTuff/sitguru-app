@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment } from "react";
 import {
   BarChart3,
@@ -77,7 +77,9 @@ const ICONS = {
   Help: CircleHelp,
 } as const;
 
-function navActive(pathname: string, item: (typeof MANAGER_PORTAL_SIDEBAR)[number]) {
+function navActive(pathname: string, item: (typeof MANAGER_PORTAL_SIDEBAR)[number], socialMode: boolean) {
+  if (item.href.includes("?view=social-intelligence")) return pathname === "/manager/metrics" && socialMode;
+  if (item.href === "/manager/metrics" && socialMode) return false;
   if (item.match === "exact") return pathname === item.href || pathname === `${item.href}/`;
   if (item.match === "growth-home") return isManagerGrowthHomePath(pathname);
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -91,6 +93,8 @@ export default function ManagerPortalShell({
   unreadMessages?: number;
 }) {
   const pathname = usePathname() || GROWTH_MANAGER_BASE;
+  const searchParams = useSearchParams();
+  const socialMode = searchParams.get("view") === "social-intelligence";
 
   return (
     <div className={`min-h-dvh w-full max-w-full overflow-x-clip ${DESK_UI.pageBg} text-[#0F2744]`}>
@@ -112,7 +116,7 @@ export default function ManagerPortalShell({
           <nav aria-label="My Manager Portal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
             {MANAGER_PORTAL_SIDEBAR.map((item, index) => {
               const Icon = ICONS[item.label as keyof typeof ICONS] || LayoutDashboard;
-              const active = navActive(pathname, item);
+              const active = navActive(pathname, item, socialMode);
               const previous = index > 0 ? MANAGER_PORTAL_SIDEBAR[index - 1] : null;
               const showGroup = item.group !== previous?.group;
               return (
