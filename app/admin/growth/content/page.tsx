@@ -50,11 +50,17 @@ export default async function AdminContentOverviewPage({
 
   return (
     <main className="mx-auto max-w-4xl space-y-4 px-4 py-8">
-      <header className="rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] public-dark-section" data-brand-green>
+      {/* Use a section rather than a header: .admin-theme header globally forces a white background. */}
+      <section
+        aria-labelledby="admin-content-overview-title"
+        className="on-dark-surface rounded-[1.5rem] bg-gradient-to-r from-[#0F2744] via-[#104951] to-[#0D5C3A] p-5 shadow-[0_12px_32px_rgba(15,39,68,0.14)] public-dark-section sm:p-6"
+        data-brand-green
+        style={{ background: "linear-gradient(112deg, #0F2744 0%, #104951 52%, #0D5C3A 100%)" }}
+      >
         <p className="text-xs font-black uppercase tracking-widest !text-emerald-100">SitGuru · Admin HQ</p>
-        <h1 className="mt-1 text-3xl font-black !text-white">Content overview</h1>
-        <p className="mt-2 text-sm font-semibold !text-emerald-50">Review intern submissions and handle escalations. Routine approvals remain with the assigned manager.</p>
-      </header>
+        <h1 id="admin-content-overview-title" className="mt-2 text-2xl font-black leading-tight !text-white sm:text-3xl">Content overview</h1>
+        <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 !text-emerald-50">Review intern submissions and handle escalations. Routine approvals remain with the assigned manager.</p>
+      </section>
       {first(params.ok) ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">{first(params.ok)}</p> : null}
       {first(params.error) ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">{first(params.error)}</p> : null}
       <nav className="flex flex-wrap gap-2" aria-label="Related content workspaces">
