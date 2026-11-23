@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { guruFirstName, guruPublicIntro } from "./public-intro";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { communityRequestActor, readCommunityJson } from "@/lib/community-studio/api-access";
 import type { CommunityActor } from "@/lib/community-studio/service";
@@ -72,7 +73,7 @@ async function permittedCreatorIds(actor:CommunityActor){
   return [actor.user.id,...(data||[]).map(x=>clean(x.user_id)).filter(isUuid)];
 }
 
-const GURU_SELECT="id,slug,display_name,full_name,name,city,state,service_city,service_state,service_latitude,service_longitude,service_radius_miles,service_area_enabled,services,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_public_visible,is_accepting_bookings,accepting_bookings,is_archived,is_test_account,is_demo,status";
+const GURU_SELECT="id,slug,display_name,full_name,name,city,state,service_city,service_state,service_latitude,service_longitude,service_radius_miles,service_area_enabled,services,bio,experience_years,years_experience,profile_photo_url,avatar_url,photo_url,image_url,is_active,is_public,is_bookable,is_public_visible,is_accepting_bookings,accepting_bookings,is_archived,is_test_account,is_demo,status";
 
 async function loadAllGuruCandidates():Promise<{gurus:GuruCandidate[]; rates:ServiceRow[]}>{
   const gurus:GuruCandidate[]=[];
@@ -365,7 +366,7 @@ export async function findApprovedShare(code:string){
     // The branded card directs visitors to general SitGuru care discovery instead.
     return {...data,promotionType,guru:{
       slug:"",name:"SitGuru Pet Care",city:clean(data.city),state:clean(data.state),
-      photoUrl:null,experienceYears:null,
+      photoUrl:null,experienceYears:null,firstName:"",intro:null,
     }};
   }
   if(g.is_bookable!==true||clean(g.status).toLowerCase()!=="active")return null;
@@ -384,8 +385,10 @@ export async function findApprovedShare(code:string){
     const eligible=await findEligibleGuruMatches(filters);
     if(!eligible.some(item=>item.id===data.guru_id))return null;
   }
+  const publicName=initialsName(g.display_name||g.full_name||g.name);
+  const firstName=guruFirstName(publicName);
   return {...data,promotionType,guru:{slug,
-    name:initialsName(g.display_name||g.full_name||g.name),
+    name:publicName.replace(/^\S+/,firstName),firstName,intro:guruPublicIntro(g.bio,firstName),
     city:clean(g.city),state:clean(g.state),
     photoUrl:photoUrl(g.profile_photo_url||g.avatar_url||g.photo_url||g.image_url),
     experienceYears:(()=>{
