@@ -123,6 +123,15 @@ export async function loadEventShareDashboard(actor:CommunityActor,filters:Recor
   if(campaignResult.error)throw new Error("Event outreach reporting is not configured. Apply the database migration.");
   const campaigns=(campaignResult.data||[]) as EventShareCampaign[];
   const eventMap=new Map(eventList.map(event=>[event.slug,event]));
+  const expired=campaigns.filter(c=>c.status==="approved"&&!eventMap.has(c.event_slug)).map(c=>c.id);
+  // Preserve historical metrics but close old share campaigns automatically as the directory refreshes.
+  if(expired.length){
+    const {error:archiveError}=await supabaseAdmin.from("event_match_share_campaigns")
+      .update({status:"archived",updated_at:new Date().toISOString()})
+      .in("id",expired).eq("status","approved");
+    if(archiveError)console.warn("Event campaign archive reconciliation failed",archiveError.code);
+    else campaigns.forEach(c=>{if(expired.includes(c.id))c.status="archived";});
+  }
   const metricsByCampaign=new Map<string,EventShareMetrics>();
   const totals=emptyMetrics();
   if(campaigns.length){
