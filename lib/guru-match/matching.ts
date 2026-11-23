@@ -105,7 +105,9 @@ export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[])
     const name=names.length>1?`${names[0]} ${names[names.length-1][0]}.`:names[0]||`Incomplete Guru profile (${guru.id.slice(0,8)})`;
     const photo=clean(guru.profile_photo_url || guru.avatar_url || guru.photo_url || guru.image_url);
     const serviceOptions=GURU_MATCH_SERVICES.map(s=>s.key).filter(k=>keys.has(k));
-    const canFeatureGuru=!notReady && serviceOptions.length>0;
+    // A bookable public Guru can be shared without claiming any particular
+    // service when no service selections are configured yet.
+    const canFeatureGuru=!notReady;
     const canPromote=guru.is_public===true && guru.is_archived!==true &&
       Boolean(clean(guru.service_city||guru.city)) && /^[A-Z]{2}$/.test(clean(guru.service_state||guru.state).toUpperCase());
     return {
