@@ -210,6 +210,10 @@ function DestinationCard({
 export default async function SalesMarketingContentPage() {
   const actor = await getAdminIdentity();
   if (!actor?.canAccessAdmin) redirect("/admin/login");
+  // A general Admin HQ login does not grant access to Sales & Marketing content.
+  if (!actor.isSuperUser && !actor.modules.growth_marketing && !actor.modules.social_media) {
+    redirect("/admin");
+  }
 
   // Admin content is an oversight surface, never a third approval pipeline.
   // Manager/intern content remains governed by the existing assignment rules.
