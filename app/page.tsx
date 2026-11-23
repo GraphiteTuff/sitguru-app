@@ -6,6 +6,7 @@ import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGr
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
 import HomepageAppsComingSoon from "@/components/marketing/HomepageAppsComingSoon";
+import DrBaldwinPartnerSpotlight from "@/components/partners/DrBaldwinPartnerSpotlight";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -3060,6 +3061,7 @@ export default function HomePage() {
       </section>
 
       <CompactPartnerSection onTrack={trackHomepageClick} />
+      <DrBaldwinPartnerSpotlight onTrack={trackHomepageClick} />
       <HomepageEventsSectionClient />
       <HomepagePlacesTeaser />
     </main>
