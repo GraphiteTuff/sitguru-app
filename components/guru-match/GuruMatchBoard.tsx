@@ -68,6 +68,9 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState("");
   const [directoryStatus,setDirectoryStatus]=useState<"all"|"ready"|"setup">("all");
+  const [directoryState,setDirectoryState]=useState("all");
+  const [directorySort,setDirectorySort]=useState<"state-asc"|"state-desc"|"name">("state-asc");
+  const [quickChannel,setQuickChannel]=useState<ShareChannel>("facebook");
   const [directoryPage,setDirectoryPage]=useState(0);
   const [historyPage,setHistoryPage]=useState(0);
   const [expandedGuru,setExpandedGuru]=useState<string>("");
@@ -104,11 +107,15 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const cards=payload?.campaigns||[];
   const directory=payload?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
+  const availableStates=[...new Set(directory.map(g=>g.state).filter(Boolean))].sort();
   const directoryItems=directory.filter(g=>{
     const q=directoryQuery.toLowerCase().trim();
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
+      (directoryState==="all"||g.state===directoryState) &&
       (!q||`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(" ")}`.toLowerCase().includes(q));
-  });
+  }).sort((a,b)=>directorySort==="name"?a.name.localeCompare(b.name):
+    directorySort==="state-desc"?(b.state.localeCompare(a.state)||a.name.localeCompare(b.name)):
+    (a.state.localeCompare(b.state)||a.name.localeCompare(b.name)));
   const active=cards.find(c=>c.code===currentCode);
   const pageCount=Math.max(1,Math.ceil(directoryItems.length/MINI_PAGE_SIZE));
   const shownDirectory=directoryItems.slice(directoryPage*MINI_PAGE_SIZE,(directoryPage+1)*MINI_PAGE_SIZE);
@@ -199,6 +206,46 @@ export default function GuruMatchBoard({role}:{role:Role}){
   };
   const changeMiniService=(g:GuruDirectoryEntry,nextService:string)=>{
     setMiniService(nextService);void prepareMini(g,miniChannel,nextService);
+  };
+
+  /** Direct-action share: the initial tap opens a social composer once the tracked
+   * link is ready. For platforms without web composers, it reveals the PNG and reply. */
+  const quickShare=async(g:GuruDirectoryEntry)=>{
+    if(!g.canPromote||busy)return;
+    const service=g.serviceKeys[0];
+    if(!service){setError("This Guru needs an enabled service to share.");return;}
+    const nextChannel=quickChannel;
+    const socialComposer=nextChannel==="facebook"||nextChannel==="x";
+    const popup=socialComposer?window.open("about:blank","_blank"):null;
+    if(popup)popup.opener=null;
+    setExpandedGuru(g.id);
+    setMiniChannel(nextChannel);
+    setMiniService(service);
+    setPreparedMini(null);
+    setBusy(true);setError("");setNotice("");
+    try{
+      const result=await api<{share:PreparedShare}>("POST","/api/guru-match",{
+        action:"prepare",guruId:g.id,channel:nextChannel,service,
+      });
+      const share=result.share;
+      if(share.status!=="approved")throw new Error("This Guru needs approval before sharing.");
+      setPreparedMini({guruId:g.id,service,channel:nextChannel,share});
+      if(nextChannel==="facebook"||nextChannel==="x"){
+        const target=nextChannel==="facebook"
+          ?"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(share.shareUrl)
+          :"https://twitter.com/intent/tweet?text="+encodeURIComponent(share.replyText);
+        if(popup)popup.location.href=target;
+        else setNotice("Your tracked card is ready. Tap the social button on the expanded row to open the composer.");
+      } else if(nextChannel==="other"&&navigator.share){
+        try{await navigator.share({title:"Meet a SitGuru Guru",text:share.replyText,url:share.shareUrl});}
+        catch{setNotice("Your tracked link and image are ready in the expanded card.");}
+      } else {
+        setNotice("Your tracked card is ready. Download the image to post in the selected social app.");
+      }
+    }catch(e){
+      if(popup&&!popup.closed)popup.close();
+      setError(e instanceof Error?e.message:"Unable to prepare a tracked Guru card.");
+    }finally{setBusy(false);}
   };
 
   const currentStatus=active?.status;
