@@ -155,7 +155,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
     }),
     totals, period:"90d",
     matchesNotice:filters?
-      "All 72 listed profiles can be promoted through the staff library. Individual Guru cards require valid booking and local service eligibility; incomplete profiles use SitGuru discovery cards.":
+      "All publicly listed profiles can be promoted through the staff library. Individual Guru cards require valid booking and local service eligibility; incomplete profiles use SitGuru discovery cards.":
       "Browse the 72 publicly listed profiles. Guru cards link to verified bookable profiles; the remaining records use tracked SitGuru discovery cards without booking claims.",
   };
 }
