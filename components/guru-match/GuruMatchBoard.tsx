@@ -365,6 +365,12 @@ export default function GuruMatchBoard({role}:{role:Role}){
           {canApprove&&<button type="button" onClick={()=>setAddGroupOpen(open=>!open)}
             className={secondary}>{addGroupOpen?"Cancel":"Add a group"}</button>}
         </div>
+        <a href={"https://www.facebook.com/search/groups/?q="+encodeURIComponent(
+          (directoryState==="all"?"local":directoryState)+" pet owners community"
+        )} target="_blank" rel="noopener noreferrer"
+          className="mt-2 inline-flex text-xs font-bold text-blue-700 underline">
+          Find local Facebook groups to add
+        </a>
         {selectedGroup?<p className="mt-2 text-xs font-semibold text-[#0F2744]">
           Sharing to <strong>{selectedGroup.name}</strong> in {selectedGroup.city}, {selectedGroup.state}.
           Tap Share on an eligible Guru to open the group and prepare its tracked reply.
@@ -636,7 +642,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
           <div className="flex flex-wrap items-center gap-2 p-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-[#0F2744]">{c.guru.name} · {c.city}, {c.state}</p>
-              <p className="text-xs text-slate-500">{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profiles · {c.metrics.sharesReported} reported shares</p>
+              <p className="text-xs text-slate-500">{groups.find(g=>g.id===c.group_id)?.name?groups.find(g=>g.id===c.group_id)?.name+" · ":""}{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profiles · {c.metrics.sharesReported} reported shares</p>
             </div>
             <span className={c.status==="approved"?"rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800":"rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800"}>
               {c.status.replaceAll("_"," ")}
