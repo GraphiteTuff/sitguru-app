@@ -90,19 +90,8 @@ export function serviceKeys(g: GuruCandidate, rows: ServiceRow[]) {
   return set;
 }
 function guruNotReady(guru:GuruCandidate) {
-  if (guru.is_archived === true || guru.is_test_account === true || guru.is_demo === true)
-    return "Excluded account";
-  if (guru.is_active !== true || clean(guru.status).toLowerCase() !== "active")
-    return "Awaiting active approval";
-  if (guru.is_public !== true || guru.is_public_visible === false)
-    return "Profile not public";
-  if (guru.is_bookable !== true || guru.is_accepting_bookings === false ||
-      guru.accepting_bookings === false) return "Not accepting bookings";
-  if (guru.service_area_enabled !== true) return "Service area not enabled";
-  if (!/^[a-z0-9][a-z0-9-]{0,120}$/i.test(clean(guru.slug))) return "Profile link missing";
-  if (!clean(guru.service_state || guru.state) || !clean(guru.service_city || guru.city))
-    return "Service location missing";
-  if ((num(guru.service_radius_miles) ?? 0) <= 0) return "Service radius missing";
+  if (guru.is_bookable !== true) return "Not currently bookable";
+  if (!/^[a-z0-9][a-z0-9-]{0,120}$/i.test(clean(guru.slug))) return "Public profile link missing";
   return "";
 }
 export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[]):GuruDirectoryEntry[] {
@@ -119,8 +108,8 @@ export function buildGuruDirectory(gurus:GuruCandidate[], services:ServiceRow[])
       photoUrl:photo.startsWith("https://")?photo:null,
       serviceKeys:serviceOptions,
       serviceRadiusMiles:num(guru.service_radius_miles)??0,
-      canPromote:!notReady && serviceOptions.length>0,
-      reason:notReady || (serviceOptions.length===0?"Service selection needed":"Ready for local matching"),
+      canPromote:!notReady,
+      reason:notReady || "Bookable Guru",
     };
   }).sort((a,b)=>Number(b.canPromote)-Number(a.canPromote)||a.name.localeCompare(b.name));
 }
