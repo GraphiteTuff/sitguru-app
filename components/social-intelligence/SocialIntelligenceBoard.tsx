@@ -75,7 +75,7 @@ function StatCard({
     </article>
   );
 }
-function PostDetail({ post, onBack }: { post: SocialPost; onBack: () => void }) {
+function PostDetail({ post, onBack, contentHref, overviewHref }: { post: SocialPost; onBack: () => void; contentHref: string; overviewHref: string }) {
   const actions = [
     ["Views", fmt(post.metrics.views)], ["Reach", fmt(post.metrics.reach)],
     ["Likes", fmt(post.metrics.likes)], ["Comments", fmt(post.metrics.comments)],
@@ -120,14 +120,22 @@ function PostDetail({ post, onBack }: { post: SocialPost; onBack: () => void }) 
       </div>
       <p className="text-sm text-slate-600">Individual post attribution requires a unique tracking key. When no matching tagged traffic exists, zeros mean no matched events—not proof that this post had no impact. Paid revenue remains unavailable until bookings and payments can be verified against the same attribution.</p>
       <div className="flex flex-wrap gap-2 text-sm">
-        <Link href="/manager/campaigns-content" className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800">Content Studio</Link>
-        <Link href="/manager/insights" className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800">Growth Center Insights</Link>
+        <Link href={contentHref} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800">Content Studio</Link>
+        <Link href={overviewHref} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800">Growth Center Insights</Link>
       </div>
     </section>
   );
 }
 
-export default function SocialIntelligenceBoard({ snapshot }: { snapshot: SocialIntelligenceSnapshot }) {
+export default function SocialIntelligenceBoard({
+  snapshot,
+  role = "manager",
+}: {
+  snapshot: SocialIntelligenceSnapshot;
+  role?: "manager" | "intern" | "admin";
+}) {
+  const overviewHref = role === "admin" ? "/admin/growth" : role === "intern" ? "/intern/insights" : "/manager/metrics";
+  const contentHref = role === "admin" ? "/admin/growth/content" : role === "intern" ? "/intern/content" : "/manager/campaigns-content";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -192,8 +200,8 @@ export default function SocialIntelligenceBoard({ snapshot }: { snapshot: Social
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
         <div className="flex flex-wrap gap-2">
-          <Link href="/manager/metrics" className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">Growth Center overview</Link>
-          <Link href="/manager/campaigns-content" className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">Content Studio</Link>
+          <Link href={overviewHref} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">Growth Center overview</Link>
+          <Link href={contentHref} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">Content Studio</Link>
         </div>
         <div className="flex flex-wrap gap-2">
           <a href={makeExportUrl()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"><FileDown size={16} /> Export CSV</a>
@@ -219,7 +227,7 @@ export default function SocialIntelligenceBoard({ snapshot }: { snapshot: Social
       </div>
       <p className="text-xs font-semibold text-slate-500">{snapshot.rangeLabel} · Latest SitGuru snapshot: {new Date(snapshot.capturedAt).toLocaleString()} · Social metrics are provider snapshots; site metrics are first-party activity.</p>
 
-      {selected ? <PostDetail post={selected} onBack={() => setFilter("post","")}/> : (
+      {selected ? <PostDetail post={selected} contentHref={contentHref} overviewHref={overviewHref} onBack={() => setFilter("post","")}/> : (
         <>
           <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             <StatCard label="Post views" value={fmt(snapshot.postViews)} detail={snapshot.postMetricsAt ? "Last synced " + new Date(snapshot.postMetricsAt).toLocaleDateString() : "Provider insights not synced"} icon={Video}/>
