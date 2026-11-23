@@ -47,6 +47,7 @@ import {
   Globe,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
+import GrowthWorkstreamSwitcher from "@/components/portal/GrowthWorkstreamSwitcher";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import AdminDeskSearch from "@/components/admin/AdminDeskSearch";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
@@ -1063,6 +1064,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   : "w-full max-w-none"
               }
             >
+              <GrowthWorkstreamSwitcher role="admin" />
               {children}
             </div>
 
