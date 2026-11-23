@@ -68,7 +68,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
     const [logoPng, photoPng, qrPng, dogPng, catPng] = await Promise.all([
       safeBrandLogo(),
       safePhoto(share.guru.photoUrl),
-      QRCode.toBuffer(guruMatchQrUrl(code), { type: "png", width: 460, margin: 2, errorCorrectionLevel: "H" }),
+      QRCode.toBuffer(guruMatchQrUrl(code), { type: "png", width: 620, margin: 4, errorCorrectionLevel: "H" }),
       readFile(path.join(process.cwd(), "public/images/hero/sitguru-dog-walking-hero.jpg")).catch(() => null),
       readFile(path.join(process.cwd(), "public/images/petperks/petperks-pet-parent-cat.jpg")).catch(() => null),
     ]);
