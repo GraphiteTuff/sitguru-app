@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import RoleGate from '@/components/RoleGate';
@@ -134,10 +135,10 @@ function Dashboard() {
           </View>
         </LinearGradient>
         <View style={styles.filterRow}>
-          <Pressable accessibilityRole="button" onPress={() => { const r=require('expo-router');r.router.push('/guru-match-share'); }} style={styles.chip}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/guru-match-share')} style={styles.chip}>
             <Text style={styles.chipText}>Guru Match &amp; Share tracking →</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => { const r=require('expo-router');r.router.push('/content-studio'); }} style={styles.chip}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/content-studio')} style={styles.chip}>
             <Text style={styles.chipText}>Content Studio →</Text>
           </Pressable>
         </View>
