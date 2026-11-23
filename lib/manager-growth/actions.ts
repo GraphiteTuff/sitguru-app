@@ -17,6 +17,8 @@ import {
   weekStartKey,
 } from "@/lib/manager-growth/model";
 import { loadPublicSurvey } from "@/lib/manager-growth/data";
+import { isOutreachStage, normalizeOutreachState, outreachIsClosed, validOutreachInterests } from "@/lib/manager-growth/outreach-crm";
+import { sendSitGuruEmail } from "@/lib/email/resend";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function field(formData: FormData, key: string) {
@@ -166,40 +168,157 @@ export async function saveContent(formData: FormData) {
     : "Content draft saved.");
 }
 
+function htmlEscape(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
+async function outreachAssignee(requested: string, fallbackId: string) {
+  const { data } = await supabaseAdmin
+    .from("staff_engagements")
+    .select("user_id,display_name,email")
+    .eq("status", "active")
+    .limit(50);
+  const people = data || [];
+  const selected = people.find((person) => String(person.user_id) === requested)
+    || people.find((person) => String(person.email || "").trim().toLowerCase() === "ava@sitguru.com");
+  return {
+    userId: selected ? String(selected.user_id) : fallbackId,
+    name: String(selected?.display_name || "Assigned manager"),
+    email: String(selected?.email || ""),
+  };
+}
+
+async function notifyOutreachAssignment(leadId: string, leadName: string, contact: string, source: string, assignee: { userId: string; email: string; name: string }) {
+  const href = `/manager/outreach?lead=${encodeURIComponent(leadId)}`;
+  const title = `New SitGuru outreach lead: ${leadName}`;
+  const body = `New ${source.toLowerCase()} lead assigned to you. ${contact || "Open the record for details."}`;
+  const { error } = await supabaseAdmin.from("notifications").insert({
+    user_id: assignee.userId,
+    type: "growth_outreach_assigned",
+    title,
+    body,
+    link: href,
+    href,
+    is_read: false,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) console.error("[growth-outreach] notification failed", error.message);
+  if (assignee.email) {
+    try {
+      await sendSitGuruEmail({
+        to: assignee.email,
+        subject: title,
+        html: `<p>Hello ${htmlEscape(assignee.name)},</p><p>A new community relationship has been assigned to you.</p><p><strong>${htmlEscape(leadName)}</strong></p><p>${htmlEscape(body)}</p><p><a href="https://www.sitguru.com${href}">Open SitGuru Outreach</a></p><p>Please record your contact attempt and next follow-up directly in the record.</p>`,
+        text: `Hello ${assignee.name},\n\n${leadName}\n${body}\n\nhttps://www.sitguru.com${href}\n\nPlease update the record after outreach.`,
+      });
+    } catch (error) {
+      console.error("[growth-outreach] assignee email failed", error);
+    }
+  }
+}
+
 export async function saveOutreach(formData: FormData) {
   const actor = await manager();
   if (!actor) back("/manager/outreach", "You cannot save this relationship.");
-  const partner = field(formData, "partnerName");
+  const partner = field(formData, "partnerName").slice(0, 180);
   if (partner.length < 2) back("/manager/outreach", "Add the partner or prospect name.");
   const commitment = field(formData, "commitment") || "Conversation";
   let approved = field(formData, "leadershipApproved") === "yes" && actor.supervisor;
-  let status = field(formData, "status") || "Identified";
+  let status = field(formData, "status") || "Assigned";
+  if (!isOutreachStage(status)) status = "Assigned";
   if (formalCommitmentNeedsApproval(commitment) && !partnershipCanProceed({ commitment, leadershipApproved: approved })) {
     approved = false;
     status = "Needs leadership approval";
   }
-  const { error } = await supabaseAdmin.from("manager_work_outreach").insert({
-    owner_user_id: actor.id,
+  const assignee = await outreachAssignee(field(formData, "assigneeId"), actor.id);
+  const interests = validOutreachInterests(formData.getAll("interests").map(String));
+  const source = field(formData, "leadSource") || "In-person encounter";
+  const payload = {
+    owner_user_id: assignee.userId,
+    created_by_user_id: actor.id,
+    assigned_to_user_id: assignee.userId,
     partner_name: partner,
-    contact_name: field(formData, "contactName"),
-    partner_kind: field(formData, "partnerKind") || "Community event",
-    opportunity: field(formData, "opportunity"),
-    sitguru_benefit: field(formData, "sitguruBenefit"),
-    partner_benefit: field(formData, "partnerBenefit"),
-    who_benefits: field(formData, "whoBenefits"),
-    proposed_activity: field(formData, "activity"),
+    contact_name: field(formData, "contactName").slice(0, 160),
+    partner_kind: field(formData, "partnerKind") || "Pet business",
+    opportunity: field(formData, "opportunity").slice(0, 3000),
+    sitguru_benefit: field(formData, "sitguruBenefit").slice(0, 1500),
+    partner_benefit: field(formData, "partnerBenefit").slice(0, 1500),
+    who_benefits: field(formData, "whoBenefits").slice(0, 300),
+    proposed_activity: field(formData, "activity").slice(0, 1500),
     commitment,
     leadership_approved: approved,
     status,
     follow_up_on: field(formData, "followUpOn") || null,
-    next_action: field(formData, "nextAction"),
-    lesson: field(formData, "lesson"),
+    next_action: field(formData, "nextAction").slice(0, 1000),
+    lesson: field(formData, "lesson").slice(0, 3000),
+    city: field(formData, "city").slice(0, 100),
+    state: normalizeOutreachState(field(formData, "state")),
+    street_address: field(formData, "streetAddress").slice(0, 200),
+    phone: field(formData, "phone").slice(0, 40),
+    email: field(formData, "email").slice(0, 160),
+    website: field(formData, "website").slice(0, 400),
+    social_url: field(formData, "socialUrl").slice(0, 400),
+    lead_source: source.slice(0, 80),
+    interests,
+    priority: ["High", "Normal", "Low"].includes(field(formData, "priority")) ? field(formData, "priority") : "Normal",
+  };
+  const { data: saved, error } = await supabaseAdmin.from("manager_work_outreach").insert(payload).select("id").single();
+  if (error || !saved) back("/manager/outreach", "The relationship could not be saved. Please check the outreach database migration.");
+  const note = `Lead captured from ${source}. Assigned to ${assignee.name}.`;
+  const { error: activityError } = await supabaseAdmin.from("manager_work_outreach_activity").insert({
+    outreach_id: saved.id,
+    actor_user_id: actor.id,
+    activity_type: "created",
+    new_status: status,
+    note,
   });
-  if (error) back("/manager/outreach", "The relationship could not be saved.");
+  if (activityError) console.error("[growth-outreach] creation history failed", activityError.message);
+  if (assignee.userId !== actor.id) {
+    await notifyOutreachAssignment(String(saved.id), partner, field(formData, "nextAction"), source, assignee);
+  }
   refresh("/manager/outreach");
-  back("/manager/outreach", formalCommitmentNeedsApproval(commitment) && !approved
-    ? "Saved. A contract, sponsorship, or other formal commitment waits for leadership approval."
-    : "Relationship saved.");
+  back("/manager/outreach", `Relationship assigned to ${assignee.name}. Follow-up is now tracked.`);
+}
+
+export async function updateOutreach(formData: FormData) {
+  const actor = await manager();
+  if (!actor) back("/manager/outreach", "You cannot update this relationship.");
+  const id = field(formData, "id");
+  if (!/^[a-f0-9-]{36}$/i.test(id)) back("/manager/outreach", "Invalid outreach record.");
+  const { data: current, error: readError } = await supabaseAdmin.from("manager_work_outreach")
+    .select("id,status,assigned_to_user_id,created_by_user_id,next_action,follow_up_on")
+    .eq("id", id).maybeSingle();
+  if (readError || !current) back("/manager/outreach", "Relationship not found.");
+  if (![current.assigned_to_user_id, current.created_by_user_id].includes(actor.id) && !actor.supervisor) {
+    back("/manager/outreach", "Only the assigned manager, creator, or leadership may update this record.");
+  }
+  const requestedStatus = field(formData, "status");
+  const status = isOutreachStage(requestedStatus) ? requestedStatus : String(current.status);
+  if (["Approved activity", "Partner enrolled", "Guru enrolled", "Spotlight published"].includes(status) && !actor.supervisor && status !== current.status) {
+    back("/manager/outreach", "Leadership or verified publishing records are required for this outcome.");
+  }
+  const nextAction = field(formData, "nextAction").slice(0, 1000);
+  const note = field(formData, "note").slice(0, 3000);
+  const followUp = field(formData, "followUpOn") || null;
+  if (!note && status === current.status && nextAction === current.next_action && followUp === current.follow_up_on) {
+    back("/manager/outreach", "Add an update before saving.");
+  }
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin.from("manager_work_outreach").update({
+    status, next_action: nextAction, follow_up_on: outreachIsClosed(status) ? null : followUp,
+    updated_at: now,
+    ...(status === "Contacted" || status === "Conversation" ? { last_contacted_at: now } : {}),
+    ...(outreachIsClosed(status) ? { closed_at: now } : { closed_at: null }),
+  }).eq("id", id);
+  if (error) back("/manager/outreach", "Could not update relationship.");
+  const { error: historyError } = await supabaseAdmin.from("manager_work_outreach_activity").insert({
+    outreach_id: id, actor_user_id: actor.id, activity_type: "update",
+    previous_status: String(current.status || ""), new_status: status,
+    note: note || `Status: ${status}. Next: ${nextAction || "None"}`,
+  });
+  if (historyError) console.error("[growth-outreach] activity save failed", historyError.message);
+  refresh("/manager/outreach");
+  back("/manager/outreach", "Outreach progress recorded.");
 }
 
 export async function approveOutreach(formData: FormData) {

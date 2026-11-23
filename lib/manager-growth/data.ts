@@ -86,15 +86,44 @@ export async function loadCampaignDesk(ownerId: string) {
 }
 
 export async function loadOutreach(ownerId: string) {
-  const list = await rows(
-    "manager_work_outreach",
-    "id,partner_name,contact_name,partner_kind,opportunity,sitguru_benefit,partner_benefit,who_benefits,proposed_activity,commitment,leadership_approved,status,follow_up_on,next_action,lesson",
-    { column: "owner_user_id", value: ownerId },
-  );
-  const today = weekStartKey();
+  const [{ data, error }, { data: staff }] = await Promise.all([
+    supabaseAdmin.from("manager_work_outreach")
+      .select("id,owner_user_id,created_by_user_id,assigned_to_user_id,partner_name,contact_name,partner_kind,opportunity,sitguru_benefit,partner_benefit,who_benefits,proposed_activity,commitment,leadership_approved,status,follow_up_on,next_action,lesson,lead_source,city,state,street_address,phone,email,website,social_url,interests,priority,outcome_type,last_contacted_at,created_at,updated_at")
+      .order("updated_at", { ascending: false }).limit(300),
+    supabaseAdmin.from("staff_engagements").select("user_id,display_name,email").eq("status", "active").order("display_name"),
+  ]);
+  if (error) console.error("[growth-outreach] failed to load", error.message);
+  const list = (data || []) as Row[];
+  const people = (staff || []).filter((person) => Boolean(person.user_id)).map((person) => ({
+    id: String(person.user_id),
+    name: String(person.display_name || person.email || "Staff member"),
+    email: String(person.email || ""),
+  }));
+  const ids = list.map((record) => String(record.id));
+  let activity: Row[] = [];
+  if (ids.length) {
+    const { data: events, error: eventError } = await supabaseAdmin
+      .from("manager_work_outreach_activity")
+      .select("id,outreach_id,actor_user_id,activity_type,previous_status,new_status,note,created_at")
+      .in("outreach_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(600);
+    if (eventError) console.error("[growth-outreach] history unavailable", eventError.message);
+    activity = (events || []) as Row[];
+  }
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const weekEnd = addDays(today, 7);
   return {
     list,
-    followUps: list.filter((row) => text(row.follow_up_on) && text(row.follow_up_on) <= addDays(today, 7) && row.status !== "Closed"),
+    activity,
+    staff: people,
+    ownerId,
+    followUps: list.filter((record) =>
+      text(record.follow_up_on) && text(record.follow_up_on) <= weekEnd &&
+      !["Closed", "Not interested"].includes(text(record.status))),
+    overdue: list.filter((record) =>
+      text(record.follow_up_on) && text(record.follow_up_on) < today &&
+      !["Closed", "Not interested"].includes(text(record.status))).length,
   };
 }
 
