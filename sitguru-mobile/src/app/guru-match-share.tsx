@@ -283,10 +283,11 @@ function Body(){
           <Text style={styles.label}>City</Text>
           <TextInput value={groupForm.city} onChangeText={v=>setGroupForm(o=>({...o,city:v}))}
             style={styles.input} placeholder="City"/>
-          <Text style={styles.label}>State</Text>
-          <View style={styles.chips}>{states.map(v=><View key={v}>
-            {pill(v,groupForm.state===v,()=>setGroupForm(o=>({...o,state:v})))}
-          </View>)}</View>
+          <Text style={styles.label}>State (two-letter code)</Text>
+          <TextInput value={groupForm.state} style={styles.input}
+            accessibilityLabel="Social group state code" maxLength={2}
+            autoCapitalize="characters" autoCorrect={false} placeholder="PA"
+            onChangeText={v=>setGroupForm(o=>({...o,state:v.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2)}))}/>
           <Text style={styles.label}>Community platform</Text>
           <View style={styles.chips}>{(['facebook','x','other'] as Channel[]).map(v=><View key={v}>
             {pill(v.toUpperCase(),groupForm.channel===v,()=>setGroupForm(o=>({...o,channel:v})))}
@@ -348,11 +349,13 @@ function Body(){
                   })}
                 </View>)}</View>
                 <Text style={styles.label}>Choose social channel</Text>
-                <View style={styles.chips}>{channels.map(c=><View key={c}>
-                  {pill(c.toUpperCase(),miniChannel===c,()=>{
-                    setMiniChannel(c);void prepareMini(g,c,miniService);
-                  })}
-                </View>)}</View>
+                {selectedGroup
+                  ? <Text style={styles.small}>{selectedGroup.channel.toUpperCase()} · {selectedGroup.name}</Text>
+                  : <View style={styles.chips}>{channels.map(c=><View key={c}>
+                    {pill(c.toUpperCase(),miniChannel===c,()=>{
+                      setMiniChannel(c);void prepareMini(g,c,miniService);
+                    })}
+                  </View>)}</View>}
                 {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
                 {mini&&<>
                   <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
