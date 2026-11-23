@@ -423,13 +423,78 @@ export default function GuruMatchBoard({role}:{role:Role}){
           <option value="setup">Needs setup</option>
         </select>
       </div>
+      <div className="mt-3 rounded-xl border border-blue-100 bg-[#F4F8FF] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-black text-[#0F2744]">
+            Share directly to a local social group
+            <select value={selectedGroupId} aria-label="Choose a local social group" className={control}
+              onChange={e=>{
+                const group=groups.find(v=>v.id===e.target.value);
+                setSelectedGroupId(e.target.value);setExpandedGuru("");setPreparedMini(null);
+                if(group){setDirectoryState(group.state);setDirectoryPage(0);setQuickChannel(group.channel);}
+              }}>
+              <option value="">No group selected — share by channel</option>
+              {availableGroups.map(group=>
+                <option key={group.id} value={group.id}>
+                  {group.city}, {group.state} · {group.name} ({group.channel})
+                </option>)}
+            </select>
+          </label>
+          {selectedGroup&&<a href={selectedGroup.group_url} target="_blank" rel="noopener noreferrer"
+            className={secondary}>Open group</a>}
+          {canApprove&&<button type="button" onClick={()=>setAddGroupOpen(open=>!open)}
+            className={secondary}>{addGroupOpen?"Cancel":"Add a group"}</button>}
+        </div>
+        {selectedGroup?<p className="mt-2 text-xs font-semibold text-[#0F2744]">
+          Sharing to <strong>{selectedGroup.name}</strong> in {selectedGroup.city}, {selectedGroup.state}.
+          Tap Share on an eligible Guru to open the group and prepare its tracked reply.
+        </p>:<p className="mt-2 text-xs text-slate-600">
+          Select a saved city/state group to share directly. Only Manager-approved group links are listed.
+          {!groups.length&&" No groups have been saved yet; a Manager or Admin can add the first one."}
+        </p>}
+        {addGroupOpen&&canApprove&&<div className="mt-3 grid gap-2 rounded-lg border border-blue-100 bg-white p-3 sm:grid-cols-2">
+          <label className="text-xs font-bold">Group name
+            <input className={control+" mt-1"} value={groupForm.name} maxLength={110}
+              placeholder="e.g., Quakertown Local Pet Owners"
+              onChange={e=>setGroupForm(old=>({...old,name:e.target.value}))}/>
+          </label>
+          <label className="text-xs font-bold">City
+            <input className={control+" mt-1"} value={groupForm.city} maxLength={90}
+              placeholder="City" onChange={e=>setGroupForm(old=>({...old,city:e.target.value}))}/>
+          </label>
+          <label className="text-xs font-bold">State
+            <select className={control+" mt-1"} value={groupForm.state}
+              onChange={e=>setGroupForm(old=>({...old,state:e.target.value}))}>
+              {STATES.map(state=><option key={state} value={state}>{state}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-bold">Platform
+            <select className={control+" mt-1"} value={groupForm.channel}
+              onChange={e=>setGroupForm(old=>({...old,channel:e.target.value as ShareChannel}))}>
+              <option value="facebook">Facebook group</option>
+              <option value="x">X Community</option>
+              <option value="other">Other social community</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold sm:col-span-2">Direct group URL
+            <input className={control+" mt-1"} type="url" value={groupForm.groupUrl}
+              placeholder="https://www.facebook.com/groups/..."
+              onChange={e=>setGroupForm(old=>({...old,groupUrl:e.target.value}))}/>
+          </label>
+          <div className="sm:col-span-2">
+            <button type="button" className={primary} disabled={busy} onClick={()=>void saveLocalGroup()}>
+              Save this group for staff
+            </button>
+          </div>
+        </div>}
+      </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs font-black text-[#0F2744]">Share via</span>
         <select aria-label="Default social sharing channel" value={quickChannel}
           className={control+" !w-auto min-w-36"} onChange={e=>setQuickChannel(e.target.value as ShareChannel)}>
           {SOURCES.map(([key,label])=><option key={key} value={key}>{label}</option>)}
         </select>
-        <span className="text-xs font-semibold text-slate-600">Choose once, then tap Share beside any eligible Guru.</span>
+        <span className="text-xs font-semibold text-slate-600">Choose a channel once, then Share. Saved groups automatically use their platform.</span>
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
       <div className="mt-3 space-y-2" data-mini-guru-card-library>
@@ -438,7 +503,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
           const ready=preparedMini?.guruId===g.id && preparedMini?.service===miniService &&
             preparedMini?.channel===miniChannel ? preparedMini.share : null;
           return <article key={g.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex w-full items-center gap-1 pr-3 sm:pr-4">
+            <div className="flex w-full items-center gap-1 pr-2 sm:pr-4">
               <button type="button" aria-expanded={expanded} aria-controls={"guru-card-"+g.id}
               onClick={()=>toggleGuru(g)}
               className="flex min-h-16 flex-1 min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-[#F8FAFC] sm:px-4">
@@ -459,7 +524,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
               {g.canPromote&&g.serviceKeys.length>0&&
                 <button type="button" className={primary+" !min-h-10 shrink-0 !px-3 sm:!px-4"}
                   disabled={busy} onClick={()=>void quickShare(g)}>
-                  <Share2 size={15}/> Share
+                  <Share2 size={15}/> {selectedGroup?"Open group & copy":"Share"}
                 </button>}
             </div>
             {expanded&&<div id={"guru-card-"+g.id} className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
