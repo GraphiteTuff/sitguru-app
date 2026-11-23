@@ -465,7 +465,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
                         {g.serviceKeys.map(key=><option key={key} value={key}>{GURU_MATCH_SERVICES.find(v=>v.key===key)?.label||key}</option>)}
                       </select>:
                       <div className="mt-1 rounded-lg bg-[#EFF6FF] p-2 text-xs text-blue-700">
-                        SitGuru discovery · no booking claim
+                        {g.canFeatureGuru?"General Guru profile · no specific service claim":"SitGuru discovery · no booking claim"}
                       </div>}
                   </label>
                   <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Social channel
