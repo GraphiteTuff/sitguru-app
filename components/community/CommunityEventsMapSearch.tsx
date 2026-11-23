@@ -351,11 +351,13 @@ export default function CommunityEventsMapSearch({
   initialView = "events",
   initialLane = "",
   initialCategory = "",
+  initialEventCategory = "",
 }: {
   events: CommunityEventWithPartner[];
   initialView?: "events" | "places";
   initialLane?: PlaceLane | "";
   initialCategory?: PlaceCategoryId | "";
+  initialEventCategory?: string;
 }) {
   const router=useRouter();
   const [clock,setClock]=useState(0);
@@ -378,8 +380,8 @@ export default function CommunityEventsMapSearch({
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [placesErrorCode, setPlacesErrorCode] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>({...EMPTY_FILTERS,category:initialEventCategory});
+  const [draft, setDraft] = useState<Filters>({...EMPTY_FILTERS,category:initialEventCategory});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [locationReady, setLocationReady] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -665,6 +667,12 @@ export default function CommunityEventsMapSearch({
       setDraft(normalized);
     }
     setFilters(normalized);
+    if(view==="events" && typeof window!=="undefined"){
+      const url=new URL(window.location.href);
+      if(normalized.category)url.searchParams.set("category",normalized.category);
+      else url.searchParams.delete("category");
+      window.history.replaceState({},"",url.pathname+url.search);
+    }
     if (normalized.county || normalized.city || normalized.state) {
       saveCommunityLocationPreference({
         county: normalized.county,
@@ -783,10 +791,10 @@ export default function CommunityEventsMapSearch({
         {view==="events"?<div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
           <p className="mb-3 text-xs font-black uppercase tracking-wider text-emerald-900">Explore events by type · Powered by SitGuru</p>
           <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Browse pet event categories">
-            <button type="button" aria-pressed={!filters.category} onClick={()=>applySearch({...filters,category:""})}
+            <button type="button" aria-pressed={!filters.category} onClick={()=>{setDraft(v=>({...v,category:""}));applySearch({...filters,category:""});}}
               className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-black ${!filters.category?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-200 bg-white text-emerald-900"}`}>All Events</button>
             {EVENT_PROMOTION_CATEGORIES.filter(item=>item.id==="other"||events.some(e=>getEventPromotionCategoryId(e)===item.id && (!clock||eventPromotionExpiry(e)>clock))).map(item=>
-              <button type="button" key={item.id} aria-pressed={filters.category===item.id} onClick={()=>applySearch({...filters,category:item.id})}
+              <button type="button" key={item.id} aria-pressed={filters.category===item.id} onClick={()=>{setDraft(v=>({...v,category:item.id}));applySearch({...filters,category:item.id});}}
                 className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-black ${filters.category===item.id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-200 bg-white text-emerald-900"}`}>{item.label}</button>)}
           </div>
           <p className="mt-1 text-xs font-semibold text-slate-600">Events are listed by their organizers and discovered by SitGuru; filters refresh as new events are added.</p>

@@ -11,6 +11,7 @@ import {
   fetchFeaturedCommunityPageEvents,
   fetchPublicEvents,
 } from "@/lib/community/queries";
+import { EVENT_PROMOTION_CATEGORIES } from "@/lib/community/event-taxonomy";
 import {
   getPlaceCategory,
   parsePlaceLane,
@@ -73,6 +74,7 @@ export default async function CommunityPage({ searchParams }: PageProps) {
   const initialCategory = (
     getPlaceCategory(categoryParam) ? categoryParam : ""
   ) as PlaceCategoryId | "";
+  const initialEventCategory = EVENT_PROMOTION_CATEGORIES.some(c=>c.id===categoryParam)?categoryParam:"";
   const [featuredEvents, partnerEvents, discovered] = await Promise.all([
     fetchFeaturedCommunityPageEvents({ limit: 3 }),
     fetchPublicEvents({ limit: 200 }),
@@ -130,6 +132,7 @@ export default async function CommunityPage({ searchParams }: PageProps) {
         initialView={view}
         initialLane={initialLane}
         initialCategory={initialCategory}
+        initialEventCategory={initialEventCategory}
       />
 
       <CommunityFeaturedSection events={featuredEvents} />

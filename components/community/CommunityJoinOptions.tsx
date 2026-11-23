@@ -5,6 +5,7 @@ import { Home, Sparkles, Star, Users } from "lucide-react";
 import {
   buildCommunityEventLoginHref,
   buildCommunityEventSignupHref,
+  buildCommunityJoinHref,
   COMMUNITY_SIGNUP_ROLES,
   savePendingEventRsvp,
   type CommunitySignupRole,
@@ -59,7 +60,7 @@ export default function CommunityJoinOptions({
                 source,
                 campaign: campaign || `community_${role.id}`,
               })
-            : `/signup?role=${role.id}&intent=${role.signupIntent}&source=${source}`;
+            : buildCommunityJoinHref({role:role.id,source,campaign:campaign||"community_events_join",next:"/events"});
 
           return (
             <Link
@@ -109,7 +110,7 @@ export default function CommunityJoinOptions({
                       ? "community_event_ambassador"
                       : "community_event_im_going"),
               })
-            : `/signup?role=${role.id}&intent=${role.signupIntent}&next=${encodeURIComponent("/events")}&source=${source}`;
+            : buildCommunityJoinHref({role:role.id,source,campaign:campaign||"community_events_join",next:"/events"});
 
           return (
             <Link
