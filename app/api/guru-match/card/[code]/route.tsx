@@ -15,7 +15,8 @@ async function safePhoto(raw: string | null): Promise<string | null> {
     const url = new URL(raw);
     const permitted = url.protocol === "https:" && (
       (url.hostname === "mmtjhxnzuglbyumbsjhs.supabase.co" &&
-        url.pathname.startsWith("/storage/v1/object/public/guru-photos/")) ||
+        ["guru-photos","guru-profile-photos","guru-avatars","profile-photos","avatars"].some(bucket =>
+          url.pathname.startsWith(`/storage/v1/object/public/${bucket}/`))) ||
       url.hostname === "lh3.googleusercontent.com" ||
       url.hostname === "auth.sitguru.com"
     );
