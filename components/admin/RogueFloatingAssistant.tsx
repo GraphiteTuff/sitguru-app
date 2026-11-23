@@ -380,7 +380,7 @@ export default function RogueFloatingAssistant() {
 
   const ui = (
     <div
-      className="pointer-events-none fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] right-3 z-[80] flex flex-row items-center justify-end gap-2 overflow-visible sm:bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:right-5 md:bottom-6 md:right-[6.5rem] md:gap-3"
+      className="pointer-events-none fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] right-24 z-[80] flex flex-row items-center justify-end gap-2 overflow-visible sm:right-[6.5rem] lg:bottom-6 lg:right-[6.5rem] lg:gap-3"
       data-rogue-admin-dock
       style={
         {
