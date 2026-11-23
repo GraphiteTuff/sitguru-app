@@ -521,6 +521,6 @@ const styles=StyleSheet.create({
   small:{fontSize:12,fontWeight:'600',lineHeight:19,color:'#64748B'},
   error:{backgroundColor:'#FEF2F2',color:'#991B1B',borderRadius:12,padding:12,fontSize:13,fontWeight:'800'},
   notice:{backgroundColor:'#F0FDF4',color:'#166534',borderRadius:12,padding:12,fontSize:13,fontWeight:'700'},
-  shareImage:{width:'100%',height:210,backgroundColor:'#F8FAFC',borderRadius:14},
+  shareImage:{width:'100%',aspectRatio:4/5,backgroundColor:'#F8FAFC',borderRadius:14},
   reply:{padding:14,backgroundColor:'#F8FAFC',borderRadius:14,fontSize:13,lineHeight:21,color:'#0F2744'},
 });
