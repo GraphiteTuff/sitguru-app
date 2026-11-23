@@ -11,7 +11,7 @@ const denied = { ok: false, message: "", error: "Only Super Admin and the assign
 
 export async function saveHomepagePartnerSpotlight(_previous: SpotlightSaveState, form: FormData): Promise<SpotlightSaveState> {
   const actor = await getAdminIdentity();
-  if (!actor || !(actor.isSuperUser || actor.role === "social_community_manager")) return denied;
+  if (!actor || !(actor.isSuperUser || actor.email.toLowerCase() === "ava@sitguru.com")) return denied;
   const text = (key: string, limit: number) => String(form.get(key) || "").trim().slice(0, limit);
   const payload = {
     eyebrow: text("eyebrow", 70),
