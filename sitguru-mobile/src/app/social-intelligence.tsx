@@ -133,6 +133,14 @@ function Dashboard() {
             ))}
           </View>
         </LinearGradient>
+        <View style={styles.filterRow}>
+          <Pressable accessibilityRole="button" onPress={() => { const r=require('expo-router');r.router.push('/guru-match-share'); }} style={styles.chip}>
+            <Text style={styles.chipText}>Guru Match &amp; Share tracking →</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => { const r=require('expo-router');r.router.push('/content-studio'); }} style={styles.chip}>
+            <Text style={styles.chipText}>Content Studio →</Text>
+          </Pressable>
+        </View>
         <View style={styles.filterPanel}>
         <Text style={styles.section}>Reporting period</Text>
         <View style={styles.filterRow}>
