@@ -5,6 +5,8 @@ import path from "node:path";
 
 export const SHARE_POSTER_WIDTH = 1080;
 export const SHARE_POSTER_HEIGHT = 1350;
+/** Large enough to remain readable in the exported social-poster PNG. */
+export const SHARE_QR_SIZE = 284;
 
 export type GuruMatchCardAssets = {
   guruName: string;
@@ -83,9 +85,9 @@ export function guruMatchCardSvg(input: GuruMatchCardAssets): string {
     '<rect x="66" y="354" width="948" height="258" rx="28" fill="#C9D8DA" opacity=".35"/>',
     '<rect x="62" y="348" width="948" height="258" rx="28" fill="#FFFFFF" stroke="#D9E6E7" stroke-width="2"/>',
     '<circle cx="190" cy="478" r="100" fill="#DEF6E9"/>',
-    '<rect x="63" y="651" width="954" height="440" rx="30" fill="url(#photoBg)"/>',
-    '<rect x="62" y="1111" width="956" height="211" rx="27" fill="#EAF7EE" stroke="#CFE7D8" stroke-width="2"/>',
-    '<rect x="781" y="1121" width="212" height="191" rx="22" fill="#FFFFFF"/>',
+    '<rect x="63" y="630" width="954" height="365" rx="30" fill="url(#photoBg)"/>',
+    '<rect x="62" y="1010" width="956" height="312" rx="27" fill="#EAF7EE" stroke="#CFE7D8" stroke-width="2"/>',
+    '<rect x="693" y="1019" width="315" height="301" rx="26" fill="#FFFFFF" stroke="#79C721" stroke-width="7"/>',
     '<rect x="58" y="1338" width="964" height="3" rx="1.5" fill="#0B6546" opacity=".25"/>',
     '</svg>',
   ].join("");
@@ -127,32 +129,34 @@ async function cropImage(input: Buffer, width: number, height: number, radius = 
   return img;
 }
 
+/** Lead with the actual Guru photograph when available. Add approved pet imagery
+ * as a secondary panel, without claiming a photo belongs to the specific Guru. */
 async function petPhotoPanel(input: GuruMatchCardAssets): Promise<Buffer|null> {
-  if (!input.dogPng && !input.catPng) return null;
-  const layers: {input: Buffer;left:number;top:number}[] = [];
-  if (input.dogPng) layers.push({
-    input:await cropImage(input.dogPng,600,440), left:0,top:0,
-  });
-  if (input.catPng) layers.push({
-    input:await cropImage(input.catPng,348,440),left:607,top:0,
-  });
-  // Show one pet image across the entire area when only one is available.
-  if (layers.length===1) {
-    layers[0].input=await cropImage(input.dogPng||input.catPng!,954,440);
-    layers[0].left=0;
+  const width=954, height=365;
+  const lead=(input.promotionType!=="community" && input.photoPng)
+    || input.dogPng || input.catPng;
+  const supporting=lead===input.dogPng?input.catPng:
+    lead===input.catPng?input.dogPng:input.dogPng||input.catPng;
+  if (!lead) return null;
+  const layers:{input:Buffer;left:number;top:number}[]=[];
+  if(supporting){
+    layers.push({input:await cropImage(lead,594,height),left:0,top:0});
+    layers.push({input:await cropImage(supporting,354,height),left:600,top:0});
+  }else{
+    layers.push({input:await cropImage(lead,width,height),left:0,top:0});
   }
-  const photo = await sharp({
-    create:{width:954,height:440,channels:4,background:"#C2E8D6"},
+  const photo=await sharp({
+    create:{width,height,channels:4,background:"#C2E8D6"},
   }).composite(layers).png().toBuffer();
-  const overlay = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="954" height="440">' +
+  const overlay=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="954" height="365">' +
     '<defs><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0" stop-color="#102B43" stop-opacity="0"/>' +
-    '<stop offset=".55" stop-color="#102B43" stop-opacity=".02"/>' +
-    '<stop offset="1" stop-color="#102B43" stop-opacity=".88"/></linearGradient></defs>' +
-    '<rect width="954" height="440" fill="url(#shade)"/></svg>');
+    '<stop offset=".55" stop-color="#102B43" stop-opacity=".08"/>' +
+    '<stop offset="1" stop-color="#102B43" stop-opacity=".87"/></linearGradient></defs>' +
+    '<rect width="954" height="365" fill="url(#shade)"/></svg>');
   const shaded=await sharp(photo).composite([{input:overlay,left:0,top:0}]).png().toBuffer();
   return sharp(shaded).composite([{
-    input:roundedMask(954,440,30),blend:"dest-in",
+    input:roundedMask(width,height,30),blend:"dest-in",
   }]).png().toBuffer();
 }
 
@@ -174,13 +178,15 @@ export async function renderGuruMatchCardPng(input: GuruMatchCardAssets): Promis
     {value:location,left:329,top:466,size:33,color:"#42576B",bold:true,maxWidth:640,maxHeight:50},
     {value:community?"Find sitters, walkers and more":service,left:329,top:523,size:27,
       color:"#116A4B",bold:true,maxWidth:638,maxHeight:42},
-    {value:"Real people. Happier pets.",left:102,top:1001,size:47,color:"#FFFFFF",
+    {value:"Real people. Happier pets.",left:102,top:910,size:47,color:"#FFFFFF",
       bold:true,maxWidth:855,maxHeight:58},
-    {value:community?"Discover pet care nearby":"Connect with your Guru",left:94,top:1158,size:45,
-      color:"#102B43",bold:true,maxWidth:640,maxHeight:60},
-    {value:community?"Explore local providers and availability.":"Check services, availability and fit.",
-      left:96,top:1219,size:24,color:"#326B58",maxWidth:646,maxHeight:40},
-    {value:"sitguru.com",left:95,top:1270,size:30,color:"#086446",bold:true,maxWidth:535,maxHeight:45},
+    {value:community?"Discover local care":"Connect with your Guru",left:94,top:1066,size:43,
+      color:"#102B43",bold:true,maxWidth:575,maxHeight:64},
+    {value:community?"Scan to explore pet care":"Scan to view their profile",left:96,top:1144,size:29,
+      color:"#326B58",maxWidth:550,maxHeight:43},
+    {value:community?"Find providers near you.":"and see booking options.",left:96,top:1193,size:29,
+      color:"#326B58",maxWidth:550,maxHeight:43},
+    {value:"sitguru.com",left:95,top:1261,size:31,color:"#086446",bold:true,maxWidth:540,maxHeight:46},
   ];
   if (!community && input.experienceYears && input.experienceYears>0) {
     textItems.push({value:input.experienceYears+" years of experience",left:330,top:568,size:21,
@@ -198,11 +204,11 @@ export async function renderGuruMatchCardPng(input: GuruMatchCardAssets): Promis
       color:"#0D674B",bold:true,maxWidth:94,maxHeight:82});
   }
   const photo=await petPhotoPanel(input);
-  if (photo) overlays.push({input:photo,left:63,top:651});
+  if (photo) overlays.push({input:photo,left:63,top:630});
   // Put the QR on a white tile so it remains scannable when saved or resized.
-  overlays.push({input:await sharp(input.qrPng).resize(178,178,{
-    fit:"contain",background:"#FFFFFF",
-  }).png().toBuffer(),left:798,top:1129});
+  overlays.push({input:await sharp(input.qrPng).resize(SHARE_QR_SIZE,SHARE_QR_SIZE,{
+    fit:"contain",background:"#FFFFFF",kernel:"nearest",
+  }).png().toBuffer(),left:708,top:1026});
   // Text is composed last, above all photograph content and shadows.
   const textLayers=await Promise.all(textItems.map(item=>renderedText(item,fontfile)));
   overlays.push(...textLayers);
