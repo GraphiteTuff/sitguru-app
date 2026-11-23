@@ -24,6 +24,9 @@ type Card={
 };
 type DirectoryGuru={id:string;name:string;slug:string;city:string;state:string;photoUrl:string|null;serviceKeys:string[];canPromote:boolean;reason:string};
 type Payload={ok:boolean;matches:Guru[];directory:DirectoryGuru[];campaigns:Card[];totals:Metrics;matchesNotice:string};
+type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
+type ReadyMini={guruId:string;service:string;channel:Channel;share:PreparedShare};
+const PAGE_SIZE=10;
 const services:[Service,string][]=[
   ['dog_walking','Dog Walking'],['pet_sitting','Pet Sitting'],['drop_in_visits','Drop-In Visits'],
   ['house_sitting','House Sitting'],['doggy_day_care','Doggy Day Care'],['boarding','Boarding'],
@@ -53,6 +56,13 @@ function Body(){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState('');
   const [onlyBookable,setOnlyBookable]=useState(false);
+  const [directoryPage,setDirectoryPage]=useState(0);
+  const [historyPage,setHistoryPage]=useState(0);
+  const [historyOpen,setHistoryOpen]=useState(false);
+  const [expandedGuru,setExpandedGuru]=useState('');
+  const [miniService,setMiniService]=useState('');
+  const [miniChannel,setMiniChannel]=useState<Channel>('facebook');
+  const [readyMini,setReadyMini]=useState<ReadyMini|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -81,11 +91,48 @@ function Body(){
     setLoading(false);
   })();},[]);
   const selectedGuru=dashboard?.matches.find(g=>g.id===selected);
-  const card=dashboard?.campaigns.find(c=>c.code===active)||dashboard?.campaigns[0];
+  const card=dashboard?.campaigns.find(c=>c.code===active);
   const directory=dashboard?.directory||[];
   const readyToShare=directory.filter(g=>g.canPromote).length;
   const listed=directory.filter(g=>(!onlyBookable||g.canPromote)&&
     (!directoryQuery.trim()||(`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(' ')}`).toLowerCase().includes(directoryQuery.toLowerCase().trim())));
+  const listPageCount=Math.max(1,Math.ceil(listed.length/PAGE_SIZE));
+  const visibleDirectory=listed.slice(directoryPage*PAGE_SIZE,(directoryPage+1)*PAGE_SIZE);
+  const historyCount=Math.max(1,Math.ceil((dashboard?.campaigns.length||0)/PAGE_SIZE));
+  const recentCampaigns=(dashboard?.campaigns||[]).slice(historyPage*PAGE_SIZE,(historyPage+1)*PAGE_SIZE);
+  const prepareMini=async(g:DirectoryGuru,channel:Channel,service:string)=>{
+    if(!g.canPromote||!service)return;
+    setBusy(true);setError('');setReadyMini(null);
+    const result=await sitguruApiFetch<{ok:boolean;share:PreparedShare}>('/api/guru-match',{
+      method:'POST',body:{action:'prepare',guruId:g.id,channel,service},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error||!result.data?.share){setError(result.error||'Unable to prepare this Guru card.');return;}
+    setReadyMini({guruId:g.id,channel,service,share:result.data.share});
+  };
+  const toggleMini=(g:DirectoryGuru)=>{
+    if(expandedGuru===g.id){setExpandedGuru('');setReadyMini(null);return;}
+    setExpandedGuru(g.id);setMiniChannel('facebook');
+    const service=g.serviceKeys[0]||'';
+    setMiniService(service);setReadyMini(null);
+    if(g.canPromote&&service)void prepareMini(g,'facebook',service);
+  };
+  const logMiniShared=async()=>{
+    if(!readyMini)return;
+    setBusy(true);setError('');
+    const result=await sitguruApiFetch<{ok:boolean}>('/api/guru-match',{
+      method:'POST',body:{action:'shared',id:readyMini.share.id},cache:'no-store',
+    });
+    setBusy(false);
+    if(result.error){setError(result.error);return;}
+    setNotice('This manual social share was recorded.');
+    await reload(searched);
+  };
+  const shareMini=async()=>{
+    if(!readyMini)return;
+    try{await Share.share({title:'Meet a SitGuru Guru',message:readyMini.share.replyText,url:readyMini.share.shareUrl});}
+    catch{setNotice('Share canceled. Your Guru card is still available.');}
+  };
   const setField=<K extends keyof Params>(field:K,value:Params[K])=>{
     setForm(old=>({...old,[field]:value}));setSelected('');setSearched(false);
   };
@@ -191,49 +238,114 @@ function Body(){
         {selectedGuru&&btn('Generate unique tracking link + QR card',()=>{void create();},busy,true)}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>All listed Gurus</Text>
-        <Text style={styles.small}>{directory.length} publicly listed Gurus · {readyToShare} ready to promote. Only bookable local service matches may be shared.</Text>
-        <TextInput value={directoryQuery} onChangeText={setDirectoryQuery} style={styles.input}
-          accessibilityLabel="Search all publicly listed Gurus" placeholder="Search name, city, state or service" />
+        <Text style={styles.heading}>Guru Card Library</Text>
+        <Text style={styles.small}>{directory.length} listed profiles · {readyToShare} approved for promotion.</Text>
+        <Text style={styles.small}>Tap one mini card to expand its ready-to-share image and QR. Only one expands at a time.</Text>
+        <TextInput value={directoryQuery} onChangeText={value=>{setDirectoryQuery(value);setDirectoryPage(0);}}
+          style={styles.input} accessibilityLabel="Search all Guru cards" placeholder="Search name, city or service" />
         <View style={styles.chips}>
-          {pill('All listed',!onlyBookable,()=>setOnlyBookable(false))}
-          {pill('Ready to promote',onlyBookable,()=>setOnlyBookable(true))}
+          {pill('All listed',!onlyBookable,()=>{setOnlyBookable(false);setDirectoryPage(0);})}
+          {pill('Ready to promote',onlyBookable,()=>{setOnlyBookable(true);setDirectoryPage(0);})}
         </View>
-        <Text style={styles.small}>Showing {listed.length} accounts</Text>
-        {listed.map(g=><View key={g.id} style={styles.guru}>
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
-          <View style={{flex:1}}>
-            <Text style={styles.cardTitle}>{g.name} · {g.city||'Location missing'}, {g.state}</Text>
-            <Text style={styles.small}>{g.canPromote?'Ready for local matching':g.reason}</Text>
-            <Text style={styles.small}>{g.serviceKeys.length?g.serviceKeys.map(k=>k.replace(/_/g,' ')).join(' · '):'No selected services'}</Text>
-            {g.canPromote&&!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
-          </View>
-        </View>)}
+        <Text style={styles.small}>Showing {visibleDirectory.length} of {listed.length} Gurus</Text>
+        {visibleDirectory.map(g=>{
+          const expanded=expandedGuru===g.id;
+          const mini=readyMini?.guruId===g.id && readyMini.service===miniService &&
+            readyMini.channel===miniChannel ? readyMini.share : null;
+          return <View key={g.id} style={styles.guruMini}>
+            <TouchTarget accessibilityRole="button" accessibilityState={{expanded}}
+              onPress={()=>toggleMini(g)} style={styles.guruMiniHeader}>
+              <GuruAvatar name={g.name} photoUrl={g.photoUrl}/>
+              <View style={{flex:1,gap:3}}>
+                <Text style={styles.cardTitle}>{g.name}</Text>
+                <Text style={styles.small}>{g.city||'Location missing'}, {g.state}</Text>
+                <Text style={g.canPromote?styles.good:styles.warning}>
+                  {g.canPromote?'Approved · Ready to share':g.reason}
+                </Text>
+              </View>
+              <Text style={styles.expandIcon}>{expanded?'−':'+'}</Text>
+            </TouchTarget>
+            {expanded&&<View style={styles.miniExpanded}>
+              {g.canPromote && g.serviceKeys.length ? <>
+                <Text style={styles.label}>Choose Guru service</Text>
+                <View style={styles.chips}>{g.serviceKeys.map(s=><View key={s}>
+                  {pill(s.replace(/_/g,' '),miniService===s,()=>{
+                    setMiniService(s);void prepareMini(g,miniChannel,s);
+                  })}
+                </View>)}</View>
+                <Text style={styles.label}>Choose social channel</Text>
+                <View style={styles.chips}>{channels.map(c=><View key={c}>
+                  {pill(c.toUpperCase(),miniChannel===c,()=>{
+                    setMiniChannel(c);void prepareMini(g,c,miniService);
+                  })}
+                </View>)}</View>
+                {busy&&!mini&&<ActivityIndicator color={SocialDeskColors.primary}/>}
+                {mini&&<>
+                  <Image source={{uri:mini.cardUrl}} resizeMode="contain" style={styles.shareImage}
+                    accessibilityLabel={g.name+' promotional card and QR code'}/>
+                  <View style={styles.inlineRow}>
+                    {btn('Share to social app',()=>{void shareMini();})}
+                    {btn('Open PNG',()=>{void Linking.openURL(mini.cardUrl);})}
+                  </View>
+                  <Text selectable style={styles.reply}>{mini.replyText}</Text>
+                  <Text selectable style={styles.small}>{mini.shareUrl}</Text>
+                  <Text style={styles.small}>For Instagram and TikTok, post the image using the native app and add the tracked link to a permitted caption or reply. Posting is not automatic.</Text>
+                  {btn('Mark post as shared',()=>{void logMiniShared();},busy,true)}
+                </>}
+                {!mini&&!busy&&btn('Retry preparing card',()=>{void prepareMini(g,miniChannel,miniService);})}
+              </>:<Text style={styles.warning}>
+                {g.canPromote?'A Guru service must be enabled before sharing.':g.reason}
+              </Text>}
+              {!!g.slug&&btn('View Guru profile',()=>{void Linking.openURL('https://www.sitguru.com/guru/'+g.slug);})}
+            </View>}
+          </View>;
+        })}
+        <View style={styles.inlineRow}>
+          {btn('Previous',()=>{setDirectoryPage(v=>Math.max(0,v-1));setExpandedGuru('');},directoryPage===0)}
+          {btn('Next',()=>{setDirectoryPage(v=>v+1);setExpandedGuru('');},directoryPage+1>=listPageCount)}
+        </View>
+        <Text style={styles.small}>Page {directoryPage+1} of {listPageCount}</Text>
       </View>
-      <Text style={styles.heading}>Tracked promotions</Text>
-      {!dashboard?.campaigns.length&&<View style={styles.card}><Text style={styles.small}>No promotions yet. Choose a matching Guru above.</Text></View>}
-      {dashboard?.campaigns.map(c=><View key={c.id} style={styles.card}>
-        <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
-        <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')}</Text>
-        <Text style={styles.small}>{c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profile clicks · {c.metrics.inquiryClicks} inquiry clicks</Text>
-        {btn('View promotion',()=>setActive(c.code))}
-        {c.status==='pending_review'&&role!=='intern'&&<View style={styles.inlineRow}>
-          {btn('Approve',()=>{void action(c,'approve');},busy,true)}
-          {btn('Reject',()=>{void action(c,'reject');},busy)}
-        </View>}
-        {c.status==='approved'&&<View style={styles.inlineRow}>
-          {btn('Share reply',()=>{void shareReply(c);})}
-          {btn('Mark shared',()=>{void action(c,'shared');},busy,true)}
-        </View>}
-        {card?.id===c.id&&<>
-          {c.status==='approved'?<>
-            <Image source={{uri:c.cardUrl}} resizeMode="contain" style={styles.shareImage}/>
-            {btn('Open downloadable card',()=>{void Linking.openURL(c.cardUrl);})}
-            {btn('Preview tracked link',()=>{void Linking.openURL(c.shareUrl);})}
-          </>:<Text style={styles.notice}>Public QR and sharing unlock only after manager approval.</Text>}
-          <Text style={styles.reply}>{c.status==='approved'?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,'[link unlocks after approval]')}</Text>
-        </>}
-      </View>)}
+      <TouchTarget accessibilityRole="button"
+        onPress={()=>{setHistoryOpen(x=>!x);setActive('');}}
+        style={styles.historyToggle}>
+        <Text style={styles.heading}>Past outreach & approvals ({dashboard?.campaigns.length||0})</Text>
+        <Text style={styles.expandIcon}>{historyOpen?'−':'+'}</Text>
+      </TouchTarget>
+      {historyOpen&&<View style={styles.card}>
+        <Text style={styles.small}>Compact history with {PAGE_SIZE} items per page. Campaign metrics remain tracked.</Text>
+        {recentCampaigns.map(c=><View key={c.id} style={styles.guruMini}>
+          <TouchTarget accessibilityRole="button" accessibilityState={{expanded:card?.id===c.id}}
+            onPress={()=>setActive(active===c.code?'':c.code)} style={styles.guruMiniHeader}>
+            <View style={{flex:1}}>
+              <Text style={styles.cardTitle}>{c.guru.name} · {c.city}, {c.state}</Text>
+              <Text style={styles.small}>{c.channel.toUpperCase()} · {c.status.replace(/_/g,' ')} · {c.metrics.linkOpens+c.metrics.qrOpens} opens</Text>
+            </View>
+            <Text style={styles.expandIcon}>{card?.id===c.id?'−':'+'}</Text>
+          </TouchTarget>
+          {c.status==='pending_review'&&role!=='intern'&&<View style={styles.inlineRow}>
+            {btn('Approve',()=>{void action(c,'approve');},busy,true)}
+            {btn('Reject',()=>{void action(c,'reject');},busy)}
+          </View>}
+          {card?.id===c.id&&<View style={styles.miniExpanded}>
+            {c.status==='approved'?<>
+              <Image source={{uri:c.cardUrl}} resizeMode="contain" style={styles.shareImage}/>
+              <View style={styles.inlineRow}>
+                {btn('Share',()=>{void shareReply(c);})}
+                {btn('Mark shared',()=>{void action(c,'shared');},busy,true)}
+              </View>
+              {btn('Open PNG',()=>{void Linking.openURL(c.cardUrl);})}
+              {btn('Open tracked link',()=>{void Linking.openURL(c.shareUrl);})}
+            </>:<Text style={styles.warning}>Content requires Manager approval to publish.</Text>}
+            <Text selectable style={styles.reply}>{c.status==='approved'?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,'[link available after approval]')}</Text>
+          </View>}
+        </View>)}
+        <View style={styles.inlineRow}>
+          {btn('Previous',()=>{setHistoryPage(v=>Math.max(0,v-1));setActive('');},historyPage===0)}
+          {btn('Next',()=>{setHistoryPage(v=>v+1);setActive('');},historyPage+1>=historyCount)}
+        </View>
+        <Text style={styles.small}>Page {historyPage+1} of {historyCount}</Text>
+      </View>}
       {loading&&<ActivityIndicator color={SocialDeskColors.primary}/>}
       <Text style={styles.small}>Counts are recorded actions, not unique people. Inquiry clicks do not mean confirmed requests, bookings or revenue. Availability must be confirmed with the Guru.</Text>
     </View>
@@ -268,6 +380,13 @@ const styles=StyleSheet.create({
   metricValue:{fontWeight:'900',fontSize:25,color:'#0F2744',marginTop:4},
   guru:{padding:10,borderRadius:15,borderWidth:1,borderColor:'#E2E8F0',flexDirection:'row',gap:9,alignItems:'center'},
   guruSelected:{borderColor:'#2563EB',backgroundColor:'#EFF6FF'},
+  guruMini:{borderWidth:1,borderColor:'#E2E8F0',borderRadius:16,backgroundColor:'#FFFFFF',overflow:'hidden'},
+  guruMiniHeader:{flexDirection:'row',alignItems:'center',gap:12,padding:12,minHeight:80},
+  miniExpanded:{borderTopWidth:1,borderTopColor:'#E2E8F0',backgroundColor:'#F8FAFC',padding:12,gap:10},
+  expandIcon:{fontSize:26,fontWeight:'700',color:'#2563EB',paddingHorizontal:6},
+  good:{fontSize:12,fontWeight:'800',color:'#166534'},
+  warning:{fontSize:12,fontWeight:'800',color:'#92400E'},
+  historyToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:'#E2E8F0',borderRadius:16,padding:13,backgroundColor:'#FFFFFF'},
   avatar:{height:58,width:58,borderRadius:12},avatarBlank:{backgroundColor:'#DCFCE7',alignItems:'center',justifyContent:'center'},
   paw:{fontSize:24},cardTitle:{fontSize:15,fontWeight:'900',color:'#0F2744'},
   small:{fontSize:12,fontWeight:'600',lineHeight:19,color:'#64748B'},

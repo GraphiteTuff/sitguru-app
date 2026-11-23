@@ -2,11 +2,15 @@
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {ArrowUpRight,BarChart3,CheckCircle2,ClipboardCopy,Download,
-  HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw} from "lucide-react";
-import {GURU_MATCH_SERVICES,type GuruMatch,type MatchFilters} from "@/lib/guru-match/matching";
+  HeartHandshake,MapPin,PawPrint,QrCode,Search,ShieldCheck,Users,RefreshCw,ChevronDown,ChevronUp,Share2} from "lucide-react";
+import {GURU_MATCH_SERVICES,type GuruMatch,type GuruDirectoryEntry,type MatchFilters} from "@/lib/guru-match/matching";
 import type {CampaignView,CampaignMetrics,GuruMatchDashboard,ShareChannel} from "@/lib/guru-match/service";
 
 type Role="manager"|"admin"|"intern";
+type PreparedShare={id:string;code:string;status:string;replyText:string;shareUrl:string;cardUrl:string;qrUrl:string};
+type PreparedMiniCard={guruId:string;service:string;channel:ShareChannel;share:PreparedShare};
+const MINI_PAGE_SIZE=12;
+const HISTORY_PAGE_SIZE=8;
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
 const SOURCES:[ShareChannel,string][]=[
   ["facebook","Facebook"],["instagram","Instagram"],["tiktok","TikTok"],
@@ -64,6 +68,12 @@ export default function GuruMatchBoard({role}:{role:Role}){
   const [searched,setSearched]=useState(false);
   const [directoryQuery,setDirectoryQuery]=useState("");
   const [directoryStatus,setDirectoryStatus]=useState<"all"|"ready"|"setup">("all");
+  const [directoryPage,setDirectoryPage]=useState(0);
+  const [historyPage,setHistoryPage]=useState(0);
+  const [expandedGuru,setExpandedGuru]=useState<string>("");
+  const [preparedMini,setPreparedMini]=useState<PreparedMiniCard|null>(null);
+  const [miniChannel,setMiniChannel]=useState<ShareChannel>("facebook");
+  const [miniService,setMiniService]=useState<string>("");
   const load=useCallback(async(search:boolean)=>{
     setLoading(true);setError("");
     try{
@@ -99,7 +109,11 @@ export default function GuruMatchBoard({role}:{role:Role}){
     return (directoryStatus==="all"||(directoryStatus==="ready"?g.canPromote:!g.canPromote)) &&
       (!q||`${g.name} ${g.city} ${g.state} ${g.serviceKeys.join(" ")}`.toLowerCase().includes(q));
   });
-  const active=cards.find(c=>c.code===currentCode)||cards[0];
+  const active=cards.find(c=>c.code===currentCode);
+  const pageCount=Math.max(1,Math.ceil(directoryItems.length/MINI_PAGE_SIZE));
+  const shownDirectory=directoryItems.slice(directoryPage*MINI_PAGE_SIZE,(directoryPage+1)*MINI_PAGE_SIZE);
+  const historyCount=Math.max(1,Math.ceil(cards.length/HISTORY_PAGE_SIZE));
+  const shownHistory=cards.slice(historyPage*HISTORY_PAGE_SIZE,(historyPage+1)*HISTORY_PAGE_SIZE);
   const postTotals=payload?.totals||blank;
   const canApprove=role!=="intern";
   const generate=async()=>{
@@ -135,6 +149,58 @@ export default function GuruMatchBoard({role}:{role:Role}){
     }catch(e){setError(e instanceof Error?e.message:"Could not complete this action.");}
     finally{setBusy(false);}
   };
+  // Card templates become available from approved Guru records without manual creation.
+  // Materialize a tracked campaign only when staff opens a card, and reuse it thereafter.
+  const prepareMini=async(g:GuruDirectoryEntry,nextChannel:ShareChannel,nextService:string)=>{
+    if(!g.canPromote || !nextService)return;
+    setBusy(true);setError("");setPreparedMini(null);
+    try{
+      const result=await api<{share:PreparedShare}>("POST","/api/guru-match",{
+        action:"prepare",guruId:g.id,channel:nextChannel,service:nextService,
+      });
+      if(result.share.status!=="approved")throw new Error("This Guru card is awaiting approval.");
+      setPreparedMini({guruId:g.id,service:nextService,channel:nextChannel,share:result.share});
+    }catch(e){setError(e instanceof Error?e.message:"Unable to prepare the Guru card.");}
+    finally{setBusy(false);}
+  };
+  const toggleGuru=(g:GuruDirectoryEntry)=>{
+    if(expandedGuru===g.id){setExpandedGuru("");setPreparedMini(null);return;}
+    setExpandedGuru(g.id);setMiniChannel("facebook");
+    const service=g.serviceKeys[0]||"";
+    setMiniService(service);setPreparedMini(null);
+    if(g.canPromote && service)void prepareMini(g,"facebook",service);
+  };
+  const copyMini=async()=>{
+    if(!preparedMini)return;
+    try{
+      await navigator.clipboard.writeText(preparedMini.share.replyText);
+      await api("POST","/api/guru-match",{action:"copy",id:preparedMini.share.id});
+      setNotice("Tracked reply copied. Publish only where relevant social replies are allowed.");
+    }catch(e){setError(e instanceof Error?e.message:"Could not copy share reply.");}
+  };
+  const markMiniShared=async()=>{
+    if(!preparedMini)return;
+    try{
+      await api("POST","/api/guru-match",{action:"shared",id:preparedMini.share.id});
+      setNotice("Manual social share recorded for this Guru and channel.");
+      await load(searched);
+    }catch(e){setError(e instanceof Error?e.message:"Unable to log the share.");}
+  };
+  const nativeMiniShare=async()=>{
+    if(!preparedMini)return;
+    const share=preparedMini.share;
+    try{
+      if(navigator.share)await navigator.share({title:"Meet a SitGuru Guru",text:share.replyText,url:share.shareUrl});
+      else await copyMini();
+    }catch{/* Sharing can be canceled by staff. */}
+  };
+  const changeMiniChannel=(g:GuruDirectoryEntry,nextChannel:ShareChannel)=>{
+    setMiniChannel(nextChannel);void prepareMini(g,nextChannel,miniService);
+  };
+  const changeMiniService=(g:GuruDirectoryEntry,nextService:string)=>{
+    setMiniService(nextService);void prepareMini(g,miniChannel,nextService);
+  };
+
   const currentStatus=active?.status;
   return <main className="mx-auto w-full max-w-7xl min-w-0 space-y-5 px-3 py-5 text-[#0F2744] sm:px-5 lg:px-7">
     <header className="on-dark-surface overflow-hidden rounded-[1.6rem] p-5 shadow-[0_12px_30px_rgba(15,39,68,.14)] sm:p-7"
@@ -252,98 +318,176 @@ export default function GuruMatchBoard({role}:{role:Role}){
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input aria-label="Search listed Gurus" placeholder="Search Guru, city, state or service"
-          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/>
+          className={control+" sm:max-w-lg"} value={directoryQuery} onChange={e=>{setDirectoryQuery(e.target.value);setDirectoryPage(0);}}/>
         <select aria-label="Filter Guru directory status" className={control+" sm:max-w-60"} value={directoryStatus}
-          onChange={e=>setDirectoryStatus(e.target.value as "all"|"ready"|"setup")}>
+          onChange={e=>{setDirectoryStatus(e.target.value as "all"|"ready"|"setup");setDirectoryPage(0);}}>
           <option value="all">All listed Gurus</option>
           <option value="ready">Ready to promote</option>
           <option value="setup">Not currently promotable</option>
         </select>
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-600">Showing {directoryItems.length} of {directory.length} publicly listed Gurus. {readyToShare} currently ready to promote.</p>
-      <div className="mt-3 grid max-h-[560px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
-        {directoryItems.map(g=><article key={g.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 p-3">
-          <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-black text-[#0F2744]">{g.name}</p>
-            <p className="text-xs text-slate-600">{g.city||"Location missing"}{g.state?", "+g.state:""}</p>
-            <p className={`mt-1 text-xs font-bold ${g.canPromote?"text-emerald-700":"text-amber-700"}`}>
-              {g.canPromote?"Ready for local matching":g.reason}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(s=>s.key===k)?.label||k).join(" · "):"No selected services"}</p>
-            {g.slug&&g.canPromote&&<a href={`/guru/${g.slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-bold text-blue-700 underline">View public profile</a>}
+      <div className="mt-3 space-y-2" data-mini-guru-card-library>
+        {shownDirectory.map(g=>{
+          const expanded=expandedGuru===g.id;
+          const ready=preparedMini?.guruId===g.id && preparedMini?.service===miniService &&
+            preparedMini?.channel===miniChannel ? preparedMini.share : null;
+          return <article key={g.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <button type="button" aria-expanded={expanded} aria-controls={"guru-card-"+g.id}
+              onClick={()=>toggleGuru(g)}
+              className="flex min-h-20 w-full min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-[#F8FAFC] sm:px-4">
+              <GuruAvatar name={g.name} photoUrl={g.photoUrl} size="sm"/>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-black text-[#0F2744]">{g.name}</span>
+                <span className="block truncate text-xs font-semibold text-slate-500">
+                  {g.city||"Location missing"}{g.state?", "+g.state:""} · {g.serviceKeys.length?g.serviceKeys.map(k=>GURU_MATCH_SERVICES.find(v=>v.key===k)?.label||k).slice(0,3).join(" · "):"Services not configured"}
+                </span>
+                <span className={g.canPromote?"mt-1 block text-xs font-bold text-emerald-700":"mt-1 block text-xs font-bold text-amber-700"}>
+                  {g.canPromote?"Approved Guru · Card ready":g.reason}
+                </span>
+              </span>
+              <span className="shrink-0 rounded-lg bg-[#EFF6FF] p-2 text-blue-700" aria-hidden>
+                {expanded?<ChevronUp size={19}/>:<ChevronDown size={19}/>}
+              </span>
+            </button>
+            {expanded&&<div id={"guru-card-"+g.id} className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
+              {g.canPromote && g.serviceKeys.length>0 ? <>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Guru service
+                    <select className={control+" mt-1"} value={miniService}
+                      onChange={e=>changeMiniService(g,e.target.value)}>
+                      {g.serviceKeys.map(key=><option key={key} value={key}>{GURU_MATCH_SERVICES.find(v=>v.key===key)?.label||key}</option>)}
+                    </select>
+                  </label>
+                  <label className="min-w-36 flex-1 text-xs font-black text-[#0F2744]">Social channel
+                    <select className={control+" mt-1"} value={miniChannel}
+                      onChange={e=>changeMiniChannel(g,e.target.value as ShareChannel)}>
+                      {SOURCES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
+                {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
+                    <img src={ready.cardUrl} alt={"Branded SitGuru card for "+g.name+" with profile details and QR code"}
+                      className="block w-full max-w-[560px] rounded-xl border border-slate-200" loading="lazy"/>
+                    <div className="flex flex-wrap gap-2">
+                      <a className={secondary} href={ready.cardUrl} download={"sitguru-"+g.slug+"-card.png"}>
+                        <Download size={16}/> Download image
+                      </a>
+                      <a className={secondary} href={ready.shareUrl} target="_blank" rel="noopener noreferrer">
+                        <ArrowUpRight size={16}/> Test tracked link
+                      </a>
+                    </div>
+                  </div>
+                  <div className="min-w-0 space-y-3">
+                    <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Share this approved Guru card</p>
+                    <div className="flex flex-wrap gap-2">
+                      <a className={secondary}
+                        href={"https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(ready.shareUrl)}
+                        target="_blank" rel="noopener noreferrer">Facebook</a>
+                      <a className={secondary}
+                        href={"https://twitter.com/intent/tweet?text="+encodeURIComponent(ready.replyText)}
+                        target="_blank" rel="noopener noreferrer">X</a>
+                      <button type="button" className={secondary} onClick={()=>void nativeMiniShare()}><Share2 size={16}/> Share</button>
+                      <button type="button" className={secondary} onClick={()=>void copyMini()}><ClipboardCopy size={16}/> Copy reply</button>
+                    </div>
+                    <p className="text-xs leading-5 text-slate-500">
+                      For Instagram and TikTok, download the PNG and use their native posting tools.
+                      Copy the tracked link into the caption or permitted reply. Posting is not automatic.
+                    </p>
+                    <div className="break-all rounded-lg bg-[#EFF6FF] p-3 text-xs font-semibold text-[#1D4ED8]">{ready.shareUrl}</div>
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-[#0F2744]">
+                      {ready.replyText}
+                    </div>
+                    <button type="button" className={primary} onClick={()=>void markMiniShared()} disabled={busy}>
+                      Mark social post as shared
+                    </button>
+                  </div>
+                </div>}
+                {!ready&&!busy&&<p className="text-xs text-slate-600">
+                  The approved Guru card becomes available automatically when opened. Use Refresh if it does not load.
+                  <button type="button" className="ml-2 font-black text-blue-700 underline"
+                    onClick={()=>void prepareMini(g,miniChannel,miniService)}>Retry</button>
+                </p>}
+              </> : <p className="text-sm font-semibold text-amber-800">
+                {g.canPromote?"This Guru must enable a service before a card can be shared.":g.reason}
+              </p>}
+              {!!g.slug&&<Link href={"/guru/"+g.slug} target="_blank"
+                className="inline-flex text-xs font-black text-blue-700 underline">View Guru profile</Link>}
+            </div>}
+          </article>;
+        })}
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+        <span>Page {Math.min(directoryPage+1,pageCount)} of {pageCount} · {directoryItems.length} profiles</span>
+        <div className="flex gap-2">
+          <button type="button" className={secondary} disabled={directoryPage===0}
+            onClick={()=>{setDirectoryPage(n=>Math.max(0,n-1));setExpandedGuru("");}}>Previous</button>
+          <button type="button" className={secondary} disabled={directoryPage+1>=pageCount}
+            onClick={()=>{setDirectoryPage(n=>n+1);setExpandedGuru("");}}>Next</button>
+        </div>
+      </div>
+    </section>
+    <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      aria-label="Previous Guru outreach and approval history">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-base font-black text-[#0F2744]">
+        <span>Past outreach &amp; approvals <span className="text-xs font-semibold text-slate-500">({cards.length} recent)</span></span>
+        <ChevronDown size={20} className="text-slate-500"/>
+      </summary>
+      <p className="mt-2 text-xs text-slate-500">Historical campaigns are kept for reporting, not displayed as full-size cards. Show at most {HISTORY_PAGE_SIZE} at once.</p>
+      <div className="mt-3 space-y-2">
+        {!cards.length&&<p className="p-3 text-sm text-slate-600">No previous promotions yet.</p>}
+        {shownHistory.map(c=><article key={c.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-[#0F2744]">{c.guru.name} · {c.city}, {c.state}</p>
+              <p className="text-xs text-slate-500">{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.metrics.linkOpens+c.metrics.qrOpens} opens · {c.metrics.profileClicks} profiles · {c.metrics.sharesReported} reported shares</p>
+            </div>
+            <span className={c.status==="approved"?"rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800":"rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800"}>
+              {c.status.replaceAll("_"," ")}
+            </span>
+            {c.status==="pending_review"&&canApprove&&<>
+              <button type="button" disabled={busy} className={primary} onClick={()=>void act(c,"approve")}>Approve</button>
+              <button type="button" disabled={busy} className={secondary} onClick={()=>void act(c,"reject")}>Reject</button>
+            </>}
+            <button type="button" className={secondary}
+              onClick={()=>setCurrentCode(currentCode===c.code?"":c.code)}>
+              {active?.id===c.id?"Collapse":"Details"}
+            </button>
           </div>
+          {active?.id===c.id&&<div className="space-y-3 border-t border-slate-100 bg-[#FAFCFF] p-3 sm:p-4">
+            {currentStatus==="approved"?<>
+              <img src={c.cardUrl} alt={"Tracked Guru share card for "+c.guru.name}
+                className="block w-full max-w-[600px] rounded-xl border border-slate-200" loading="lazy"/>
+              <div className="flex flex-wrap gap-2">
+                <a href={c.cardUrl} download="sitguru-guru-share.png" className={secondary}><Download size={15}/> Download PNG</a>
+                <a href={c.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Tracked link</a>
+                <button type="button" className={secondary} disabled={busy} onClick={()=>void act(c,"copy")}>
+                  <ClipboardCopy size={15}/> Copy reply
+                </button>
+                <button type="button" className={primary} disabled={busy} onClick={()=>void act(c,"shared")}>Mark shared</button>
+              </div>
+              <p className="break-all rounded-lg bg-[#EFF6FF] p-2 text-xs text-blue-700">{c.shareUrl}</p>
+            </>:<p className="text-sm text-amber-900">
+              {c.status==="pending_review"?"This custom outreach card requires Manager approval before sharing.":"This card is not currently approved for sharing."}
+            </p>}
+            <p className="whitespace-pre-wrap text-sm text-[#0F2744]">
+              {currentStatus==="approved"?c.reply_text:c.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,"[tracking link available after approval]")}
+            </p>
+          </div>}
         </article>)}
       </div>
-    </section>
-    <section aria-label="Saved outreach cards" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-black">Review, share and measure</h2>
-        <span className="text-xs font-semibold text-slate-500">Last 100 cards · activity in last 90 days</span>
-      </div>
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="space-y-3">
-          {!cards.length&&<div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            No Guru promotions yet. Search for a local Guru and generate the first tracked card.
-          </div>}
-          {cards.map(c=><article key={c.id} className={`min-w-0 rounded-2xl border bg-white p-4 shadow-sm ${active?.id===c.id?"border-[#2563EB]":"border-slate-200"}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-base font-black text-[#0F2744]">{c.guru.name} · {c.city}, {c.state}</p>
-                <p className="mt-1 text-xs font-semibold capitalize text-slate-500">{c.channel} · {c.service_key.replaceAll("_"," ")} · {c.pet_type==="any"?"Pet type to confirm":c.pet_type}</p>
-              </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-black ${c.status==="approved"?"bg-[#DCFCE7] text-[#166534]":c.status==="pending_review"?"bg-[#FFF3CD] text-[#92400E]":"bg-[#E2E8F0] text-slate-700"}`}>{c.status.replaceAll("_"," ")}</span>
-            </div>
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-              {([["Opens",c.metrics.linkOpens+c.metrics.qrOpens],["Profiles",c.metrics.profileClicks],["Inquiries",c.metrics.inquiryClicks],["Shares",c.metrics.sharesReported]] as [string,number][]).map(([k,v])=>
-                <div key={k} className="min-w-0 rounded-lg bg-[#F8FAFC] p-2"><p className="text-lg font-black tabular-nums">{metric(v)}</p><p className="text-[11px] text-slate-600">{k}</p></div>)}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className={secondary} onClick={()=>setCurrentCode(c.code)}>View card</button>
-              {c.status==="pending_review"&&canApprove&&<>
-                <button type="button" disabled={busy} className={primary} onClick={()=>void act(c,"approve")}>Approve</button>
-                <button type="button" disabled={busy} className={secondary} onClick={()=>void act(c,"reject")}>Reject</button>
-              </>}
-              {c.status==="approved"&&<>
-                <button type="button" className={secondary} disabled={busy}
-                  onClick={()=>void act(c,"copy")}><ClipboardCopy size={14}/> Copy reply</button>
-                <button type="button" className={secondary} disabled={busy}
-                  onClick={()=>void act(c,"shared")}>Mark shared</button>
-              </>}
-            </div>
-          </article>)}
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Page {historyPage+1} of {historyCount}</span>
+        <div className="flex gap-2">
+          <button type="button" className={secondary} disabled={historyPage===0}
+            onClick={()=>{setHistoryPage(n=>Math.max(0,n-1));setCurrentCode("");}}>Previous</button>
+          <button type="button" className={secondary} disabled={historyPage+1>=historyCount}
+            onClick={()=>{setHistoryPage(n=>n+1);setCurrentCode("");}}>Next</button>
         </div>
-        {active&&<aside className="min-w-0 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-[#0F2744] to-[#0D5C3A] p-5">
-            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest !text-emerald-100"><PawPrint size={15}/> Guru share card</p>
-            <h3 className="mt-1 text-xl font-black !text-white">{active.guru.name}</h3>
-            <p className="mt-2 text-sm font-semibold !text-emerald-50">{active.city}, {active.state} · {active.channel}</p>
-          </div>
-          <div className="space-y-4 p-4 sm:p-5">
-            {currentStatus==="approved"?<>
-              <img src={active.cardUrl} alt={`SitGuru promotional card for ${active.guru.name}, including a scannable QR code`}
-                className="w-full rounded-xl border border-slate-200" loading="lazy"/>
-              <div className="flex flex-wrap gap-2">
-                <a href={active.cardUrl} download="sitguru-guru-share.png" className={secondary}><Download size={15}/> Download PNG</a>
-                <a href={active.shareUrl} target="_blank" rel="noopener noreferrer" className={secondary}><ArrowUpRight size={15}/> Preview tracked link</a>
-              </div>
-              <div className="break-all rounded-xl bg-[#EFF6FF] p-3 text-xs font-semibold text-[#1D4ED8]">{active.shareUrl}</div>
-              <div className="rounded-xl border border-[#D1EADD] bg-[#F0FDF4] p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-[#0D5C3A]">Suggested reply · approved</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#0F2744]">{active.reply_text}</p>
-                <button type="button" disabled={busy} className={primary+" mt-3"}
-                  onClick={()=>void act(active,"copy")}><ClipboardCopy size={15}/> Copy for a relevant social reply</button>
-              </div>
-            </>:<div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="flex items-center gap-2 text-sm font-black text-amber-900"><ShieldCheck size={18}/> Awaiting approval</p>
-              <p className="mt-2 text-xs text-amber-900">The QR image and public share link stay disabled until a Manager approves this card. Interns cannot self-approve.</p>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{active.reply_text.replace(/https:\/\/www\.sitguru\.com\/s\/g\/\S+/g,"[tracking link available after approval]")}</p>
-            </div>}
-            <p className="text-xs leading-5 text-slate-500">Counts are recorded actions, not unique visitors. QR opens are recorded when the destination loads. Inquiries are clicks on a booking-intent link, not confirmed requests or paid bookings. Social posting is manual; SitGuru does not publish in groups without permission.</p>
-          </div>
-        </aside>}
       </div>
-    </section>
+    </details>
     <p className="pb-5 text-xs font-medium text-slate-500">SitGuru Community Studio · Manager and Admin analytics read the same live event records. Guru availability must be verified on the Guru profile.</p>
   </main>;
 }

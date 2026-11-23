@@ -5,7 +5,7 @@ import type { CommunityActor } from "@/lib/community-studio/service";
 import { getInternOnboarding } from "@/lib/internship/queries";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
-  matchGuruCandidates,buildGuruDirectory,normalizeMatchFilters,type GuruDirectoryEntry,type GuruMatch,type MatchFilters,type GuruCandidate,type ServiceRow,
+  matchGuruCandidates,buildGuruDirectory,normalizeMatchFilters,serviceKeys,isServiceKey,GURU_MATCH_SERVICES,type GuruDirectoryEntry,type GuruMatch,type MatchFilters,type GuruCandidate,type ServiceRow,
 } from "./matching";
 
 const SITE="https://www.sitguru.com";
@@ -153,7 +153,7 @@ export async function loadCampaignDashboard(actor:CommunityActor,filters:MatchFi
       "Browse all publicly listed Gurus below, then enter a city, state and service to find genuinely bookable local matches.",
   };
 }
-export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>){
+export async function makeGuruShare(actor:CommunityActor,input:Record<string,unknown>,approvedGuruTemplate=false){
   const filters=normalizeMatchFilters(input);
   const guruId=clean(input.guruId);
   const channel=channelOf(input.channel);
@@ -164,19 +164,61 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const code=randomBytes(16).toString("base64url");
   const reply=`Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
   const manager=actor.canModerate;
-  const status:CampaignStatus=manager?"approved":"pending_review";
+  // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.\n  const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns").insert({
     code,guru_id:guru.id,created_by_user_id:actor.user.id,
     intern_id:!manager&&actor.intern?actor.intern.id:null,
     city:filters.city,state:filters.state,radius_miles:filters.radius,
     service_key:filters.service,pet_type:filters.pet,channel,reply_text:reply,
     status,approved_by_user_id:manager?actor.user.id:null,
-    approved_at:manager?new Date().toISOString():null,
+    approved_at:status==="approved"?new Date().toISOString():null,
   }).select("id,code,status,reply_text").single();
   if(error||!data)throw new Error("The Guru promotion could not be saved.");
   return {id:data.id,code:data.code,status:data.status,replyText:data.reply_text,
     shareUrl:guruMatchPublicUrl(code,channel),cardUrl:guruMatchCardImage(code),qrUrl:guruMatchQrImage(code)};
 }
+/** Auto-available branded Guru card, lazily materialized only when staff opens it.
+ * Reuses the same staff/Guru/channel/service campaign instead of creating endless cards.
+ * Approval here is for a fixed, administrator-bookable Guru template; custom intern
+ * content still follows the existing manager review workflow. */
+export async function prepareGuruMiniCard(actor:CommunityActor,input:Record<string,unknown>){
+  const guruId=clean(input.guruId);
+  if(!isUuid(guruId)) throw new Error("Choose a valid Guru.");
+  const channel=channelOf(input.channel);
+  const candidates=await loadAllGuruCandidates();
+  const guru=candidates.gurus.find(g=>g.id===guruId);
+  if(!guru || guru.is_bookable!==true || guru.is_public!==true ||
+    clean(guru.status).toLowerCase()!=="active")
+    throw new Error("This Guru is not currently approved for public sharing.");
+  const available=serviceKeys(guru,candidates.rates);
+  const requested=clean(input.service);
+  const service=requested || GURU_MATCH_SERVICES.find(item=>available.has(item.key))?.key || "";
+  if(!isServiceKey(service) || !available.has(service))
+    throw new Error("This Guru needs an enabled service before a share card can be used.");
+  const city=clean(guru.service_city||guru.city);
+  const state=clean(guru.service_state||guru.state).toUpperCase();
+  const radiusValue=Number(guru.service_radius_miles);
+  const radius=Number.isFinite(radiusValue)?Math.min(50,Math.floor(radiusValue)):0;
+  const filters=normalizeMatchFilters({city,state,service,pet:"any",radius});
+  if(!filters || !matchGuruCandidates(filters,[guru],candidates.rates).some(item=>item.id===guruId))
+    throw new Error("Complete this Guru's service location and coverage before sharing.");
+  const {data:existing,error:queryError}=await supabaseAdmin.from("guru_match_share_campaigns")
+    .select("id,code,reply_text").eq("guru_id",guruId)
+    .eq("created_by_user_id",actor.user.id).eq("channel",channel)
+    .eq("service_key",service).eq("city",city).eq("state",state)
+    .eq("pet_type","any").eq("status","approved")
+    .order("created_at",{ascending:false}).limit(1).maybeSingle();
+  if(queryError) throw new Error("Unable to retrieve the approved Guru card.");
+  if(existing) return {
+    id:existing.id,code:existing.code,status:"approved" as const,
+    replyText:existing.reply_text,shareUrl:guruMatchPublicUrl(existing.code,channel),
+    cardUrl:guruMatchCardImage(existing.code),qrUrl:guruMatchQrImage(existing.code),
+  };
+  return makeGuruShare(actor,{
+    guruId,city,state,service,pet:"any",radius,channel,
+  },true);
+}
+
 export async function updateGuruShare(actor:CommunityActor,input:Record<string,unknown>){
   const id=clean(input.id),action=clean(input.action);
   if(!isUuid(id))throw new Error("Select an outreach card.");
