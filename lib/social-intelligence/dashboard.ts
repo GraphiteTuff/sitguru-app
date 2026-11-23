@@ -148,7 +148,23 @@ export async function loadSocialIntelligenceSnapshot(input: {
     loadSocialConnectorStatus(),
   ]);
 
-  const scopedEvents = allEvents.filter((row) => selectedEvent(row, filters));
+  // Interns may only see attribution events and provider posts tied to their own
+  // published, approved Content Studio items. Aggregate campaign totals and
+  // unrelated post metrics must never leak through the service-role client.
+  const allowedStudioIds = new Set(legacyPosts.map((row) => text(row.id)));
+  const permittedPublications = input.internId
+    ? publications.filter((row) => allowedStudioIds.has(text(row.studio_content_id)))
+    : publications;
+  const allowedTrackingKeys = new Set(
+    permittedPublications.map((row) => text(row.tracking_key)).filter(Boolean),
+  );
+  const scopedEvents = allEvents.filter((row) => {
+    if (!selectedEvent(row, filters)) return false;
+    if (!input.internId) return true;
+    const metadata = row.metadata && typeof row.metadata === "object"
+      ? row.metadata as Row : {};
+    return allowedTrackingKeys.has(text(metadata.utm_content));
+  });
   const currentEvents = scopedEvents.filter((row) => inRange(row, filters.startIso, filters.endIso));
   const total = eventImpact(scopedEvents, filters.startIso, filters.endIso);
   const prior = eventImpact(scopedEvents, filters.priorStartIso, filters.priorEndIso);
@@ -165,7 +181,7 @@ export async function loadSocialIntelligenceSnapshot(input: {
   }
 
   const catalog: SocialPost[] = [];
-  for (const row of publications) {
+  for (const row of permittedPublications) {
     const channel = channelOf(row.platform);
     if (!channel) continue;
     if (filters.platform !== "all" && filters.platform !== channel) continue;
