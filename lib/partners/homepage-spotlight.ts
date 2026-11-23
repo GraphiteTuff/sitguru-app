@@ -9,6 +9,7 @@ export type HomepagePartnerSpotlight = {
   title: string;
   subtitle: string;
   description: string;
+  article_body: string;
   image_url: string;
   image_alt: string;
   image_path: string;
@@ -23,7 +24,7 @@ export type HomepagePartnerSpotlight = {
 export async function getHomepagePartnerSpotlight(includeDraft = false) {
   try {
     let query = supabaseAdmin.from("homepage_partner_spotlights")
-      .select("slug,eyebrow,title,subtitle,description,image_url,image_alt,image_path,primary_label,primary_href,secondary_label,secondary_href,is_published,updated_at")
+      .select("slug,eyebrow,title,subtitle,description,article_body,image_url,image_alt,image_path,primary_label,primary_href,secondary_label,secondary_href,is_published,updated_at")
       .eq("slug", DR_BALDWIN_SLUG);
     if (!includeDraft) query = query.eq("is_published", true);
     const { data, error } = await query.maybeSingle();
