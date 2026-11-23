@@ -146,7 +146,10 @@ function Body(){
         <TextInput value={form.city} onChangeText={v=>setField('city',v)}
           accessibilityLabel="Pet Parent city" style={styles.input} autoCapitalize="words" maxLength={80}
           placeholder="Enter city"/>
-        <Text style={styles.label}>State</Text>
+        <Text style={styles.label}>State (two-letter code)</Text>
+        <TextInput value={form.state} onChangeText={v=>setField('state',v.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2))}
+          accessibilityLabel="Pet Parent state code" autoCapitalize="characters" autoCorrect={false}
+          style={styles.input} maxLength={2} placeholder="PA"/>
         <View style={styles.chips}>{states.map(s=><View key={s}>{pill(s,s===form.state,()=>setField('state',s))}</View>)}</View>
         <Text style={styles.label}>Required service</Text>
         <View style={styles.chips}>{services.map(([id,title])=><View key={id}>{pill(title,id===form.service,()=>setField('service',id))}</View>)}</View>
