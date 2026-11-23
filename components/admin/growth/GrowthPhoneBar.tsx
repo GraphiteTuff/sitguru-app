@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -52,6 +52,12 @@ export default function GrowthPhoneBar({
   hideFrom?: "lg" | "xl";
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    document.body.setAttribute("data-sitguru-more-open", "1");
+    return () => document.body.removeAttribute("data-sitguru-more-open");
+  }, [moreOpen]);
   const staffHome = basePath === "/admin/growth" || basePath === "/manager";
   const desk = basePath === "/manager";
   const rootClass = hideFrom === "xl" ? "xl:hidden" : "lg:hidden";
