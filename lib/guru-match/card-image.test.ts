@@ -34,3 +34,21 @@ test("Guru-controlled text cannot inject markup into card SVG", async () => {
   assert.match(svg, /R&amp;D &lt;City&gt;/);
   assert.match(svg, /Sitting &quot;Deluxe&quot;/);
 });
+
+test("Guru card also renders a real PNG when a profile photo is present", async () => {
+  const photo = await sharp({create:{
+    width:120,height:120,channels:4,background:"#0D5C3A"
+  }}).png().toBuffer();
+  const qr = await QRCode.toBuffer("https://www.sitguru.com/s/g/ABCDEFGHIJKLMNOPQRSTUV?via=qr",{
+    type:"png",width:300,margin:2
+  });
+  const bytes=await renderGuruMatchCardPng({
+    guruName:"Kara",city:"Huntsville",state:"AL",serviceLabel:"Dog Walking",
+    logoPng:photo,qrPng:qr,photoPng:photo
+  });
+  assert.equal(bytes.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+  const meta=await sharp(bytes).metadata();
+  assert.equal(meta.width,1200);
+  assert.equal(meta.height,630);
+  assert.ok(bytes.length>10000);
+});
