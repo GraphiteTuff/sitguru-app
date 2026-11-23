@@ -172,7 +172,8 @@ export async function makeGuruShare(actor:CommunityActor,input:Record<string,unk
   const code=randomBytes(16).toString("base64url");
   const reply=`Hi! If you're looking for ${guru.serviceLabel.toLowerCase()} in ${filters.city}, ${filters.state}, SitGuru can help you find local pet care. Meet ${guru.name} and check their services and availability: ${guruMatchPublicUrl(code,channel)} 🐾`;
   const manager=actor.canModerate;
-  // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.\n  const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
+  // Pre-approved Guru directory templates are approved by backend eligibility, not by an intern.
+  const status:CampaignStatus=(manager||approvedGuruTemplate)?"approved":"pending_review";
   const {data,error}=await supabaseAdmin.from("guru_match_share_campaigns").insert({
     code,guru_id:guru.id,created_by_user_id:actor.user.id,
     intern_id:!manager&&actor.intern?actor.intern.id:null,group_id:groupId||null,
