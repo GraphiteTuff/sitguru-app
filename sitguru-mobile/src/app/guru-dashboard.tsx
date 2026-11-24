@@ -2,6 +2,7 @@ import { router, type Href } from 'expo-router';
 import {
   Bell,
   CalendarDays,
+  ChevronDown,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -959,9 +960,7 @@ export default function GuruDashboardScreen() {
                           styles.dashboardTitle
                         }
                       >
-                        {firstName === 'there'
-                          ? `Good ${dayPart()}`
-                          : `Good ${dayPart()}, ${firstName}`}
+                        {firstName === 'there' ? 'Welcome Back, Guru!' : `Welcome Back, ${firstName}!`}
                       </Text>
 
                       <Text
@@ -969,11 +968,13 @@ export default function GuruDashboardScreen() {
                           styles.welcomeText
                         }
                       >
-                        Connect with Pet Parents. Grow your care business.
+                        Your pet care business at a glance.
                       </Text>
 
 
-                      <SitGuruRoleStatus role="guru" />
+                      <View style={styles.roleStatusPill}>
+                        <SitGuruRoleStatus role="guru" />
+                      </View>
 
                       {city || state ? (
                         <View
@@ -983,7 +984,7 @@ export default function GuruDashboardScreen() {
                         >
                           <MapPin
                             color={
-                              palette.primary
+                              '#EAF7EF'
                             }
                             size={12}
                             strokeWidth={
@@ -1036,9 +1037,9 @@ export default function GuruDashboardScreen() {
                       >
                         <Bell
                           color={
-                            palette.title
+                            '#FFFFFF'
                           }
-                          size={18}
+                          size={20}
                           strokeWidth={
                             2.3
                           }
@@ -1144,8 +1145,9 @@ export default function GuruDashboardScreen() {
                           palette={
                             palette
                           }
-                          size={42}
+                          size={46}
                         />
+                      <ChevronDown color="#FFFFFF" size={17} strokeWidth={2.8} />
                       </BubblePressable>
                     </View>
                   </View>
@@ -2205,7 +2207,7 @@ function RequestCard({
             request.petPhotoUrl
           }
           palette={palette}
-          size={52}
+          size={80}
         />
 
         <View
@@ -3956,25 +3958,29 @@ function createStyles(
       paddingTop: 10,
     },
     header: {
-      alignItems: 'center',
-      flexDirection: 'row',
-      justifyContent:
-        'space-between',
+      alignItems: 'stretch',
+      backgroundColor: '#06462F',
+      borderRadius: 24,
+      flexDirection: 'column-reverse',
+      gap: 10,
+      minHeight: 148,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
     },
     headerCopy: {
-      flex: 1,
-      gap: 2,
-      paddingRight: 8,
+      flexGrow: 0,
+      flexShrink: 1,
+      gap: 4,
     },
     dashboardTitle: {
-      color: palette.title,
+      color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
       fontSize: 21,
       letterSpacing: -0.45,
     },
     welcomeText: {
-      color: palette.muted,
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
       fontSize: 11,
@@ -3989,7 +3995,7 @@ function createStyles(
       marginTop: 2,
     },
     locationText: {
-      color: palette.muted,
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
       fontSize: 9,
@@ -3998,13 +4004,12 @@ function createStyles(
       alignItems: 'center',
       flexDirection: 'row',
       gap: 6,
+      justifyContent: 'flex-end',
     },
     headerIconButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.border,
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderColor: 'rgba(255,255,255,0.28)',
       borderRadius: 999,
       borderWidth: 1,
       height: 38,
@@ -4063,7 +4068,22 @@ function createStyles(
         : '#FFF4D8',
     },
     profileButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 999,
+      flexDirection: 'row',
+      gap: 3,
+      minHeight: 54,
+      paddingHorizontal: 5,
+      paddingRight: 10,
+    },
+    roleStatusPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 999,
+      marginTop: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
     },
     loadNotice: {
       backgroundColor:
@@ -4083,15 +4103,12 @@ function createStyles(
     },
     primaryActionCard: {
       alignItems: 'center',
-      backgroundColor:
-        isDark
-          ? '#087A4C'
-          : '#087F50',
-      borderRadius: 21,
+      backgroundColor: '#006B45',
+      borderRadius: 23,
       flexDirection: 'row',
-      gap: 10,
-      minHeight: 92,
-      padding: 14,
+      gap: 12,
+      minHeight: 116,
+      padding: 16,
       shadowColor:
         palette.shadow,
       shadowOffset: {
@@ -4108,25 +4125,23 @@ function createStyles(
       gap: 2,
     },
     primaryActionEyebrow: {
-      color:
-        'rgba(255,255,255,0.78)',
+      color: '#F7E7B0',
       fontFamily: AppFonts.bold,
-      fontSize: 8,
+      fontSize: 11,
       letterSpacing: 0.8,
     },
     primaryActionTitle: {
       color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 18,
+      fontSize: 21,
     },
     primaryActionText: {
-      color:
-        'rgba(255,255,255,0.84)',
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
-      fontSize: 10,
-      lineHeight: 14,
+      fontSize: 13,
+      lineHeight: 19,
     },
     primaryActionIcon: {
       alignItems: 'center',
@@ -4339,34 +4354,32 @@ function createStyles(
     },
     quickActions: {
       flexDirection: 'row',
-      gap: 8,
+      flexWrap: 'wrap',
+      gap: 10,
     },
     quickAction: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.border,
-      borderRadius: 17,
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 19,
       borderWidth: 1,
-      flex: 1,
-      gap: 6,
-      justifyContent:
-        'center',
-      minHeight: 74,
-      paddingHorizontal: 5,
-      paddingVertical: 9,
+      flexBasis: '46%',
+      flexGrow: 1,
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 104,
+      minWidth: 120,
+      paddingHorizontal: 12,
+      paddingVertical: 13,
     },
     quickActionIcon: {
       alignItems: 'center',
-      backgroundColor:
-        palette.primarySoft,
-      borderRadius: 999,
-      height: 37,
-      justifyContent:
-        'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 14,
+      height: 43,
+      justifyContent: 'center',
       position: 'relative',
-      width: 37,
+      width: 43,
     },
     quickActionBadge: {
       alignItems: 'center',
@@ -4393,8 +4406,8 @@ function createStyles(
     },
     quickActionLabel: {
       color: palette.title,
-      fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
       textAlign: 'center',
     },
     requestCard: {
@@ -4426,13 +4439,13 @@ function createStyles(
       color: palette.title,
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 13,
+      fontSize: 16,
     },
     requestMeta: {
       color: palette.muted,
       fontFamily:
         AppFonts.medium,
-      fontSize: 9,
+      fontSize: 12,
     },
     requestButtonRow: {
       flexDirection: 'row',
@@ -4444,40 +4457,35 @@ function createStyles(
     },
     filledButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.primary,
-      borderRadius: 999,
+      backgroundColor: palette.primary,
+      borderRadius: 18,
       flex: 1,
-      justifyContent:
-        'center',
-      minHeight: 38,
+      justifyContent: 'center',
+      minHeight: 56,
       paddingHorizontal: 10,
     },
     filledButtonText: {
       color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     outlineButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.primary,
-      borderRadius: 999,
-      borderWidth: 1,
+      backgroundColor: palette.surface,
+      borderColor: palette.primary,
+      borderRadius: 18,
+      borderWidth: 1.5,
       flex: 1,
-      justifyContent:
-        'center',
-      minHeight: 38,
+      justifyContent: 'center',
+      minHeight: 56,
       paddingHorizontal: 10,
     },
     outlineButtonText: {
       color: palette.primary,
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     statusGrid: {
       flexDirection: 'row',

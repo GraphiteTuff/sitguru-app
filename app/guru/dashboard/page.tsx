@@ -91,6 +91,9 @@ type BookingRow = {
   service_type?: string | null;
   booking_type?: string | null;
   pet_name?: string | null;
+  pet_photo_url?: string | null;
+  pet_image_url?: string | null;
+  pet_avatar_url?: string | null;
   customer_name?: string | null;
   pet_parent_name?: string | null;
   start_time?: string | null;
@@ -1250,6 +1253,7 @@ type GuruPawReportStats = {
   completed: number;
   notStarted: number;
   completionRate: number | null;
+  activeBookingId: string | null;
 };
 
 async function getGuruPawReportStats(bookings: BookingRow[]) {
@@ -1263,6 +1267,7 @@ async function getGuruPawReportStats(bookings: BookingRow[]) {
     completed: 0,
     notStarted: bookingIds.length,
     completionRate: null,
+    activeBookingId: null,
   };
 
   if (!bookingIds.length) return emptyStats;
@@ -1284,6 +1289,8 @@ async function getGuruPawReportStats(bookings: BookingRow[]) {
     }
   });
 
+  const activeBookingId =
+    Array.from(statusByBooking.entries()).find(([, status]) => status === "in_progress")?.[0] || null;
   const active = Array.from(statusByBooking.values()).filter(
     (status) => status === "in_progress",
   ).length;
@@ -1310,6 +1317,7 @@ async function getGuruPawReportStats(bookings: BookingRow[]) {
     completed,
     notStarted,
     completionRate,
+    activeBookingId,
   };
 }
 
@@ -2009,7 +2017,7 @@ export default async function GuruDashboardPage() {
     universityProgress.isComplete,
   );
   const completedBookings = bookings.filter(
-    (booking) => getBookingStatus(booking).toLowerCase() === "completed",
+    (booking) => ["completed", "complete"].includes(getBookingStatus(booking).toLowerCase()),
   );
   const upcomingBookings = bookings.filter((booking) => {
     const status = getBookingStatus(booking).toLowerCase();
@@ -2021,6 +2029,7 @@ export default async function GuruDashboardPage() {
     return {
       id,
       petName: getPetName(booking),
+      petPhotoUrl: String(booking.pet_photo_url || booking.pet_image_url || booking.pet_avatar_url || ""),
       service: getBookingService(booking),
       when: getBookingDate(booking),
       place: "",
@@ -2051,7 +2060,26 @@ export default async function GuruDashboardPage() {
           profilePercent={profileCompletion}
           services={normalizeServices(guruProfile.services)}
           publicHref={publicHref}
+          activePawReports={pawReportStats.active}
+          activePawReportHref={
+            pawReportStats.activeBookingId
+              ? "/guru/dashboard/bookings/" + encodeURIComponent(pawReportStats.activeBookingId) + "/visit-updates"
+              : null
+          }
+          payoutNeedsAttention={
+            paymentSetup.connectedCount === 0 &&
+            (paymentSetup.stripeStarted || paymentSetup.paypalStarted) &&
+            upcomingBookings.length > 0
+          }
         />
+        <details className="group rounded-[1.7rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+          <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 text-base font-black text-slate-950 [&::-webkit-details-marker]:hidden">
+            <span>Business setup, milestones &amp; metrics</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
+              {profileCompletion}% profile · {guruTier.shortLabel}
+            </span>
+          </summary>
+          <div className="mt-4 space-y-4 border-t border-emerald-100 pt-4">
         <GuruSetupChecklist
           profile={guruProfile}
           profileCompletion={profileCompletion}
@@ -2067,7 +2095,7 @@ export default async function GuruDashboardPage() {
             <p className="mt-1 text-sm font-semibold text-slate-600">{pawReportStats.active > 0 ? `${pawReportStats.active} active now` : "Open visit updates"}</p>
           </Link>
           <Link href="/guru/dashboard/earnings" className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Earnings</p>
+            <p className="text-xs font-bold text-slate-500">Payout setup</p>
             <p className="mt-1 text-2xl font-black text-slate-950">{paymentSetup.connectedCount > 0 ? "Ready" : "Setup"}</p>
             <p className="mt-1 text-sm font-semibold text-slate-600">{paymentSetup.statusLabel}</p>
           </Link>
@@ -2076,8 +2104,8 @@ export default async function GuruDashboardPage() {
             <p className="mt-1 text-2xl font-black text-slate-950">{enabledPricedServiceRates.length}</p>
             <p className="mt-1 text-sm font-semibold text-slate-600">{serviceRatesReady ? "Active rates" : "Add rates to get booked"}</p>
           </Link>
-          <Link href="/guru/dashboard/reviews" className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Reviews</p>
+          <Link href="/guru/dashboard/bookings" className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold text-slate-500">Completed care</p>
             <p className="mt-1 text-2xl font-black text-slate-950">{completedBookings.length}</p>
             <p className="mt-1 text-sm font-semibold text-slate-600">Completed visits</p>
           </Link>
@@ -2103,6 +2131,8 @@ export default async function GuruDashboardPage() {
             </div>
           </details>
         </section>
+          </div>
+        </details>
       </div>
     </main>
   );
