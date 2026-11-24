@@ -22,6 +22,8 @@ import {
   Star,
   RotateCcw,
   UserRound,
+  X,
+  ZoomIn,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
@@ -146,6 +148,83 @@ function Face({ src, name, className, largePlaceholder = false }: { src: string;
         <PawPrint className={largePlaceholder ? "h-11 w-11 text-[#0D5C3A]" : "h-5 w-5 text-[#0D5C3A]"} aria-hidden="true" />
       )}
     </span>
+  );
+}
+
+/**
+ * Accessible, responsive Guru portrait. On narrow phones the full-width photo
+ * is easier to see; on wider screens it sits beside the Guru's name.
+ * Tapping the photo opens its original aspect ratio, not an enlarged crop.
+ */
+function GuruPortrait({ src, name }: { src: string; name: string }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const showPhoto = Boolean(src) && failedSrc !== src;
+  const frame =
+    "group relative flex h-[clamp(190px,55vw,240px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[1.4rem] border border-emerald-100 bg-emerald-50 min-[440px]:h-40 min-[440px]:w-40 sm:h-44 sm:w-44";
+
+  return (
+    <>
+      {showPhoto ? (
+        <button
+          type="button"
+          aria-label={"View larger photo of " + name}
+          onClick={() => dialogRef.current?.showModal()}
+          className={frame + " cursor-zoom-in focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            onError={() => setFailedSrc(src)}
+            className="h-full w-full object-cover object-center transition-transform duration-200 group-hover:scale-[1.03]"
+          />
+          <span aria-hidden="true" className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-emerald-900 shadow-md">
+            <ZoomIn className="h-5 w-5" />
+          </span>
+        </button>
+      ) : (
+        <div className={frame} role="img" aria-label={"Profile photo not available for " + name}>
+          <PawPrint aria-hidden="true" className="h-16 w-16 text-[#0D5C3A]" />
+        </div>
+      )}
+      <dialog
+        ref={dialogRef}
+        aria-label={"Full-size profile photo of " + name}
+        className="fixed inset-0 m-auto max-h-[94dvh] w-[min(94vw,800px)] max-w-none overflow-y-auto rounded-[1.6rem] border border-emerald-100 bg-white p-3 text-slate-950 shadow-[0_28px_100px_rgba(0,0,0,0.4)] backdrop:bg-slate-950/80 sm:p-5"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) event.currentTarget.close();
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 px-1 pb-3">
+          <p className="text-base font-black text-slate-950 sm:text-xl">{name}&apos;s photo</p>
+          <button
+            type="button"
+            onClick={() => dialogRef.current?.close()}
+            aria-label="Close enlarged Guru photo"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-900 hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+          >
+            <X aria-hidden="true" className="h-6 w-6" />
+          </button>
+        </div>
+        {showPhoto ? (
+          <div className="flex min-h-[240px] items-center justify-center overflow-hidden rounded-2xl bg-emerald-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={"Full profile photo of " + name}
+              onError={() => setFailedSrc(src)}
+              className="max-h-[73dvh] max-w-full object-contain"
+            />
+          </div>
+        ) : (
+          <p className="rounded-2xl bg-emerald-50 p-8 text-center text-sm font-semibold text-emerald-900">
+            This photo is currently unavailable.
+          </p>
+        )}
+      </dialog>
+    </>
   );
 }
 
@@ -487,8 +566,8 @@ export default function CustomerCareCommandCenter({
           <ul className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {gurus.map((guru) => (
               <li key={guru.id} className="flex min-w-0 flex-col rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,.06)] sm:p-5">
-                <div className="flex items-start gap-4">
-                  <Face src={guru.photo} name={guru.name} largePlaceholder className="h-[104px] w-[104px] rounded-[1.4rem] sm:h-28 sm:w-28" />
+                <div className="flex flex-col items-start gap-4 min-[440px]:flex-row">
+                  <GuruPortrait src={guru.photo} name={guru.name} />
                   <div className="min-w-0 flex-1">
                     <p className="text-lg font-black text-[#102339]">{guru.name}</p>
                     <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-600">{guru.services}</p>
