@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   CalendarDays,
   Check,
@@ -273,6 +273,7 @@ const BOOKING_STATUS_OPTIONS: Array<{
 
 export default function GuruPricingScreen() {
   const { user, profile } = useAuth();
+  const { step: requestedStep } = useLocalSearchParams<{ step?: string }>();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
@@ -300,7 +301,17 @@ export default function GuruPricingScreen() {
     ]),
   );
 
-  const [currentStep, setCurrentStep] = useState<PricingStep>(1);
+  const [currentStep, setCurrentStep] = useState<PricingStep>(() => {
+    const requested = Number(requestedStep);
+    return [1, 2, 3, 4, 5].includes(requested) ? (requested as PricingStep) : 1;
+  });
+
+  useEffect(() => {
+    const requested = Number(requestedStep);
+    if ([1, 2, 3, 4, 5].includes(requested)) {
+      setCurrentStep(requested as PricingStep);
+    }
+  }, [requestedStep]);
   const [selectedServiceId, setSelectedServiceId] =
     useState<ServiceId>('dog-walking');
   const [serviceRates, setServiceRates] =
