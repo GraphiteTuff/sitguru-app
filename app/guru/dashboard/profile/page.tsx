@@ -1283,6 +1283,9 @@ function GuruDashboardProfilePageContent() {
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
     const submitValue = String(submitter?.value || "");
+    const requestedStep = /^step-[123]$/.test(submitValue)
+      ? submitValue.slice(-1)
+      : "";
     const saveIntent =
       submitValue === "continue" && activeStep !== "3"
         ? "continue"
@@ -1616,6 +1619,19 @@ function GuruDashboardProfilePageContent() {
         setProfileExists(true);
       }
 
+      // Step tabs submit this same form before navigating, preventing unsaved edits
+      // from being discarded when Gurus move between the three sections.
+      if (requestedStep) {
+        setSuccessMessage("Profile changes saved successfully.");
+        setJustSaved(true);
+        stop();
+        if (requestedStep !== activeStep) {
+          router.push(`/guru/dashboard/profile?step=${requestedStep}`);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        return;
+      }
+
       const destination = nextGuruProfileDestination({
         saved: true,
         activeStep,
@@ -1684,13 +1700,9 @@ function GuruDashboardProfilePageContent() {
       serviceRates,
     });
 
-    return Math.max(
-      10,
-      Math.round(
-        (publicReadiness.checks.filter((item) => item.complete).length /
-          publicReadiness.checks.length) *
-          100,
-      ),
+    return Math.round(
+      (publicReadiness.checks.filter((item) => item.complete).length /
+        publicReadiness.checks.length) * 100,
     );
   }, [
     displayName,
@@ -1780,14 +1792,14 @@ function GuruDashboardProfilePageContent() {
     <main
       className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] !text-slate-950"
     >
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div data-brand-green="true" className="grid gap-8 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+      <div className="mx-auto max-w-[1500px] px-3 py-4 pb-24 sm:px-6 sm:py-6 lg:px-8">
+        <section className="overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[2.25rem]">
+          <div data-brand-green="true" className="grid gap-6 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-4 py-5 sm:gap-8 sm:px-8 sm:py-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
                   href={routes.dashboard}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-white/85 px-4 py-2 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
+                  className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-extrabold !text-[#06462F] shadow-sm ring-1 ring-white/70 transition hover:bg-emerald-50"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Guru Dashboard
@@ -1809,13 +1821,16 @@ function GuruDashboardProfilePageContent() {
                 ) : null}
               </div>
 
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.13em] text-emerald-800 shadow-sm ring-1 ring-white/70">
                 <ShieldCheck className="h-4 w-4" />
                 Guided Profile Builder
               </div>
 
+              <p className="mb-2 text-sm font-black !text-[#EAF7EF] sm:text-base">
+                Welcome back, {displayName.trim().split(/\s+/)[0] || "Guru"}!
+              </p>
               <h1
-                className="max-w-4xl text-3xl font-extrabold tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl lg:text-6xl"
+                className="max-w-4xl text-[clamp(1.9rem,5vw,3.2rem)] font-extrabold leading-tight tracking-[-0.035em] !text-white"
               >
                 {activeStep === "1"
                   ? "Step 1: Complete your Guru profile"
@@ -1825,19 +1840,18 @@ function GuruDashboardProfilePageContent() {
               </h1>
 
               <p
-                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-[#EAF7EF] md:text-lg"
+                className="mt-3 max-w-3xl text-sm font-semibold leading-6 !text-[#EAF7EF] sm:text-base sm:leading-7"
               >
-                Only this step is shown so you can focus. Save when finished,
-                then continue to the next step or return to the dashboard to see
-                this step turn green and know exactly what to do next.
+                Edit your photo, bio, location, and services one step at a time.
+                Save your progress whenever you like, then preview what Pet Parents see.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="inline-flex min-h-[56px] min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-6 py-4 text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:bg-[#A74400] disabled:opacity-60"
+                  className="inline-flex min-h-[58px] min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#A74400] px-3 py-3 text-center text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:bg-[#8C3900] disabled:opacity-60 sm:min-w-[160px] sm:px-6"
                 >
                   {uploadingPhoto ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1849,14 +1863,14 @@ function GuruDashboardProfilePageContent() {
 
                 <Link
                   href={publicProfileHref}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                  className="inline-flex min-h-[58px] min-w-0 items-center justify-center rounded-2xl bg-white px-3 py-3 text-center text-sm font-extrabold !text-emerald-950 shadow-sm ring-1 ring-white/80 transition hover:bg-emerald-50 sm:min-w-[160px] sm:px-6"
                 >
                   Preview profile
                 </Link>
 
                 <Link
                   href={routes.messages}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                  className="col-span-2 inline-flex min-h-[54px] min-w-0 items-center justify-center rounded-2xl border-2 border-white/70 bg-white/10 px-3 py-3 text-center text-sm font-extrabold !text-white transition hover:bg-white/20 sm:col-span-1 sm:min-w-[150px] sm:px-6"
                 >
                   Messages
                 </Link>
@@ -1865,21 +1879,27 @@ function GuruDashboardProfilePageContent() {
 
             <div className="flex flex-col items-center text-center">
               <div className="relative">
-                <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
-                <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
+                <div aria-hidden="true" className="pointer-events-none absolute -inset-4 rounded-full bg-white/30 blur-xl" />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  aria-label="Change your Guru profile photo"
+                  className="group relative flex h-48 w-48 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl transition hover:ring-4 hover:ring-lime-300 focus-visible:outline focus-visible:outline-4 focus-visible:outline-white sm:h-56 sm:w-56 md:h-60 md:w-60"
+                >
                   {profilePhotoUrl ? (
                     <Image
                       src={profilePhotoUrl}
                       alt={`${publicPreviewName} profile photo`}
                       fill
-                      sizes="224px"
+                      sizes="240px"
                       className="object-cover"
                       unoptimized
                     />
                   ) : (
                     publicPreviewName.charAt(0).toUpperCase()
                   )}
-                </div>
+                </button>
 
                 <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
                   🐾
@@ -1897,8 +1917,9 @@ function GuruDashboardProfilePageContent() {
                 </div>
               ) : null}
 
+              <p className="mt-4 text-sm font-extrabold !text-[#EAF7EF]">Tap your photo to change it</p>
               <h2
-                className="mt-6 text-3xl font-extrabold tracking-tight !text-white md:text-4xl"
+                className="mt-3 text-2xl font-extrabold tracking-tight !text-white sm:text-3xl md:text-4xl"
               >
                 {publicPreviewName}
               </h2>
@@ -1915,7 +1936,7 @@ function GuruDashboardProfilePageContent() {
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-6 md:px-8">
+          <div className="grid grid-cols-2 gap-2 bg-white px-3 py-4 sm:gap-3 sm:px-6 sm:py-6 md:grid-cols-3 xl:grid-cols-6 md:px-8">
             {[
               { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
               { label: "Services", value: services.length, icon: "🐾" },
@@ -1943,18 +1964,18 @@ function GuruDashboardProfilePageContent() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
+                className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200 sm:rounded-3xl sm:p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold !text-slate-500">
                       {item.label}
                     </p>
-                    <p className="mt-2 text-3xl font-extrabold !text-slate-950">
+                    <p className="mt-2 break-words text-xl font-extrabold !text-slate-950 sm:text-2xl">
                       {item.value}
                     </p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                  <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100 sm:flex">
                     {item.icon}
                   </div>
                 </div>
@@ -1962,6 +1983,37 @@ function GuruDashboardProfilePageContent() {
             ))}
           </div>
         </section>
+
+        <nav aria-label="Profile builder steps" className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { number: "1", label: "About me", helper: "Photo & bio" },
+            { number: "2", label: "Service area", helper: "Location" },
+            { number: "3", label: "My services", helper: "Rates & visibility" },
+          ].map((step) => {
+            const current = activeStep === step.number;
+            return (
+              <button key={step.number} form="guru-profile-editor" type="submit" name="saveAction"
+                value={`step-${step.number}`} disabled={saving || saveLocked}
+                aria-current={current ? "step" : undefined}
+                className={`flex min-h-[74px] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-400 disabled:opacity-60 sm:min-h-[86px] sm:flex-row sm:gap-3 sm:text-left ${
+                  current
+                    ? "border-emerald-700 bg-emerald-50 text-emerald-950 shadow-sm"
+                    : "border-emerald-100 bg-white text-slate-700 hover:border-emerald-400 hover:bg-emerald-50"
+                }`}>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black sm:h-11 sm:w-11 ${
+                  current ? "bg-emerald-800 text-white" : "bg-emerald-100 text-emerald-900"
+                }`}>{step.number}</span>
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-black leading-tight sm:text-base">{step.label}</span>
+                  <span className="mt-1 hidden text-xs font-semibold text-slate-600 sm:block">{step.helper}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+        <p className="mt-2 px-1 text-xs font-semibold leading-5 text-emerald-900">
+          Tap any step to save your current changes before switching.
+        </p>
 
         <input
           ref={photoInputRef}
@@ -2006,9 +2058,9 @@ function GuruDashboardProfilePageContent() {
           </div>
         )}
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <section className="mt-5 grid gap-4 xl:grid-cols-[1.08fr_0.92fr] xl:gap-6">
           <div className="space-y-6">
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-6">
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
@@ -2034,16 +2086,36 @@ function GuruDashboardProfilePageContent() {
               </div>
 
               <form
+                id="guru-profile-editor"
                 onSubmit={handleSubmit}
                 aria-busy={saving || saveLocked}
                 className="space-y-6"
               >
+                <div className="sticky top-[82px] z-30 -mx-1 flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-[0_8px_30px_rgba(15,23,42,0.12)] backdrop-blur sm:top-[94px] sm:flex-row sm:items-center sm:justify-between" role="region" aria-label="Profile save shortcuts">
+                  <div className="hidden min-w-0 sm:block">
+                    <p className="text-sm font-black text-emerald-950">Step {activeStep} of 3</p>
+                    <p className="text-xs font-semibold text-slate-600">Save anytime. Your work is kept between steps.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
+                    {hasNextStep ? (
+                      <button type="submit" name="saveAction" value="save" disabled={saving || saveLocked}
+                        className="inline-flex min-h-[52px] items-center justify-center rounded-xl border-2 border-emerald-200 bg-white px-3 py-2 text-sm font-black text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-60 sm:px-5">
+                        Save progress
+                      </button>
+                    ) : null}
+                    <button type="submit" name="saveAction" value={primarySaveValue} disabled={saving || saveLocked}
+                      className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[#0D5C3A] px-3 py-2 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-60 sm:px-5">
+                      {saving ? <PawIcon size={20} contrast="dark" className="animate-spin" /> : <Save className="h-5 w-5" aria-hidden="true" />}
+                      {saving ? "Saving..." : hasNextStep ? "Save & next" : "Save changes"}
+                    </button>
+                  </div>
+                </div>
                 {activeStep === "1" ? (
                   <section
                     id="profile"
-                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                    className="scroll-mt-36 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-3 sm:rounded-[1.75rem] sm:p-5"
                   >
-                    <div className="mb-5 rounded-[1.3rem] bg-[#07132f] px-5 py-4">
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
                         Step 1
                       </p>
@@ -2072,7 +2144,7 @@ function GuruDashboardProfilePageContent() {
                             setDisplayName(event.target.value)
                           }
                           placeholder="Your public display name"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2090,7 +2162,7 @@ function GuruDashboardProfilePageContent() {
                             setSlug(slugify(event.target.value))
                           }
                           placeholder="your-public-slug"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2106,7 +2178,7 @@ function GuruDashboardProfilePageContent() {
                           value={headline}
                           onChange={(event) => setHeadline(event.target.value)}
                           placeholder="Ex: Trusted Pet Care Guru"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2135,7 +2207,7 @@ function GuruDashboardProfilePageContent() {
                           aria-required="true"
                           aria-invalid={experienceFieldError ? true : undefined}
                           aria-describedby="years_experience_help years_experience_error"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           id="years_experience_help"
@@ -2171,7 +2243,7 @@ function GuruDashboardProfilePageContent() {
                           onChange={(event) => setBio(event.target.value)}
                           rows={6}
                           placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2275,7 +2347,7 @@ function GuruDashboardProfilePageContent() {
                             setProfilePhotoUrl(event.target.value)
                           }
                           placeholder="https://..."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
                     </div>
@@ -2313,7 +2385,7 @@ function GuruDashboardProfilePageContent() {
                           value={city}
                           onChange={(event) => setCity(event.target.value)}
                           placeholder="Quakertown"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2332,7 +2404,7 @@ function GuruDashboardProfilePageContent() {
                           }
                           placeholder="PA"
                           maxLength={2}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2352,7 +2424,7 @@ function GuruDashboardProfilePageContent() {
                           placeholder="18951"
                           inputMode="numeric"
                           maxLength={5}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
@@ -2381,7 +2453,7 @@ function GuruDashboardProfilePageContent() {
                           }
                           placeholder="25"
                           inputMode="decimal"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
@@ -2410,7 +2482,7 @@ function GuruDashboardProfilePageContent() {
                             setStreetAddress(event.target.value)
                           }
                           placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2442,9 +2514,9 @@ function GuruDashboardProfilePageContent() {
                 {activeStep === "3" ? (
                   <section
                     id="services"
-                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                    className="scroll-mt-36 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-3 sm:rounded-[1.75rem] sm:p-5"
                   >
-                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0ea5e9_100%)] px-5 py-4">
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
                         Step 3
                       </p>
@@ -2562,7 +2634,7 @@ function GuruDashboardProfilePageContent() {
                                     }
                                     inputMode="decimal"
                                     disabled={service.rate_unit === "custom"}
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
 
@@ -2607,7 +2679,7 @@ function GuruDashboardProfilePageContent() {
                                     }
                                     placeholder="Optional"
                                     inputMode="numeric"
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
 
@@ -2625,7 +2697,7 @@ function GuruDashboardProfilePageContent() {
                                       )
                                     }
                                     placeholder="Example: Includes feeding, water refresh, and quick photo update."
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
                               </div>
@@ -2648,7 +2720,7 @@ function GuruDashboardProfilePageContent() {
                         onChange={(event) => setHourlyRate(event.target.value)}
                         placeholder="Optional standard hourly rate"
                         inputMode="decimal"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       />
                       <p
                         className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
@@ -3016,44 +3088,41 @@ function GuruDashboardProfilePageContent() {
               </div>
             </section>
 
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Admin visibility
+            <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                KEEP GROWING
               </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                What Admin should also be able to see
+              <h2 className="mt-2 text-2xl font-black text-emerald-950">
+                Handy Guru shortcuts
               </h2>
-
-              <div className="mt-6 space-y-3">
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Make your profile easier to discover, book, and trust.
+              </p>
+              <nav aria-label="Guru profile quick actions" className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 {[
-                  "Updated Step 1 profile details and public title",
-                  "Updated Step 2 location, service ZIP, and travel radius",
-                  "Updated Step 3 service selections and service-specific rates",
-                  "Photo, bio, and profile completion data",
-                  "Customer-facing visibility only when setup requirements are met",
+                  { label: "Preview public profile", description: "See what Pet Parents see", href: publicProfileHref },
+                  { label: "Manage availability", description: "Set your schedule and time off", href: "/guru/dashboard/availability" },
+                  { label: "Promote my profile", description: "Share your Guru link", href: "/guru/dashboard/promote" },
+                  { label: "Review earnings", description: "Payout settings and history", href: "/guru/dashboard/earnings" },
                 ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-extrabold !text-slate-700"
-                  >
-                    {item}
-                  </div>
+                  <Link key={item.href} href={item.href}
+                    className="group flex min-h-[76px] items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-[#F8FFFB] px-4 py-3 text-emerald-950 transition hover:border-emerald-300 hover:bg-emerald-50">
+                    <span className="min-w-0">
+                      <span className="block text-base font-black">{item.label}</span>
+                      <span className="mt-1 block text-xs font-semibold text-slate-600">{item.description}</span>
+                    </span>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-emerald-700 transition group-hover:translate-x-0.5" aria-hidden="true" />
+                  </Link>
                 ))}
-              </div>
+              </nav>
             </section>
 
-            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Why this matters
-              </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                Better profile data strengthens the marketplace
-              </h2>
-              <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                The stronger your Guru profile is, the better it can perform for
-                customer trust, search visibility, and Admin operations. This
-                page is one of the core pieces powering the Guru side of
-                SitGuru.
+            <section className="rounded-[1.6rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">GURU TIP</p>
+              <h2 className="mt-2 text-xl font-black text-emerald-950">A complete profile helps Pet Parents choose you</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                Include a clear photo, friendly introduction, accurate service area, and the services you actually offer.
+                Public visibility and booking eligibility still depend on SitGuru readiness checks.
               </p>
             </section>
           </div>

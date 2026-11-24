@@ -101,7 +101,7 @@ export function GuruHeaderActions({
       <BubblePressable
         accessibilityRole="button"
         accessibilityLabel="Open Guru profile"
-        onPress={() => router.push('/guru-profile')}
+        onPress={() => router.push('/guru-setup')}
         scaleTo={0.88}
         style={styles.avatarButton}
       >
