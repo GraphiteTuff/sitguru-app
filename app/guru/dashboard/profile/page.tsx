@@ -1283,6 +1283,9 @@ function GuruDashboardProfilePageContent() {
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
     const submitValue = String(submitter?.value || "");
+    const requestedStep = /^step-[123]$/.test(submitValue)
+      ? submitValue.slice(-1)
+      : "";
     const saveIntent =
       submitValue === "continue" && activeStep !== "3"
         ? "continue"
@@ -1614,6 +1617,19 @@ function GuruDashboardProfilePageContent() {
         setServiceRates(savedServiceRates);
         setIsPublic(safeIsPublic);
         setProfileExists(true);
+      }
+
+      // Step tabs submit this same form before navigating, preventing unsaved edits
+      // from being discarded when Gurus move between the three sections.
+      if (requestedStep) {
+        setSuccessMessage("Profile changes saved successfully.");
+        setJustSaved(true);
+        stop();
+        if (requestedStep !== activeStep) {
+          router.push(`/guru/dashboard/profile?step=${requestedStep}`);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        return;
       }
 
       const destination = nextGuruProfileDestination({
@@ -1963,6 +1979,37 @@ function GuruDashboardProfilePageContent() {
           </div>
         </section>
 
+        <nav aria-label="Profile builder steps" className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { number: "1", label: "About me", helper: "Photo & bio" },
+            { number: "2", label: "Service area", helper: "Location" },
+            { number: "3", label: "My services", helper: "Rates & visibility" },
+          ].map((step) => {
+            const current = activeStep === step.number;
+            return (
+              <button key={step.number} form="guru-profile-editor" type="submit" name="saveAction"
+                value={`step-${step.number}`} disabled={saving || saveLocked}
+                aria-current={current ? "step" : undefined}
+                className={`flex min-h-[74px] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-400 disabled:opacity-60 sm:min-h-[86px] sm:flex-row sm:gap-3 sm:text-left ${
+                  current
+                    ? "border-emerald-700 bg-emerald-50 text-emerald-950 shadow-sm"
+                    : "border-emerald-100 bg-white text-slate-700 hover:border-emerald-400 hover:bg-emerald-50"
+                }`}>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black sm:h-11 sm:w-11 ${
+                  current ? "bg-emerald-800 text-white" : "bg-emerald-100 text-emerald-900"
+                }`}>{step.number}</span>
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-black leading-tight sm:text-base">{step.label}</span>
+                  <span className="mt-1 hidden text-xs font-semibold text-slate-600 sm:block">{step.helper}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+        <p className="mt-2 px-1 text-xs font-semibold leading-5 text-emerald-900">
+          Tap any step to save your current changes before switching.
+        </p>
+
         <input
           ref={photoInputRef}
           type="file"
@@ -2034,10 +2081,30 @@ function GuruDashboardProfilePageContent() {
               </div>
 
               <form
+                id="guru-profile-editor"
                 onSubmit={handleSubmit}
                 aria-busy={saving || saveLocked}
                 className="space-y-6"
               >
+                <div className="sticky top-[82px] z-30 -mx-1 flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-[0_8px_30px_rgba(15,23,42,0.12)] backdrop-blur sm:top-[94px] sm:flex-row sm:items-center sm:justify-between" role="region" aria-label="Profile save shortcuts">
+                  <div className="hidden min-w-0 sm:block">
+                    <p className="text-sm font-black text-emerald-950">Step {activeStep} of 3</p>
+                    <p className="text-xs font-semibold text-slate-600">Save anytime. Your work is kept between steps.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
+                    {hasNextStep ? (
+                      <button type="submit" name="saveAction" value="save" disabled={saving || saveLocked}
+                        className="inline-flex min-h-[52px] items-center justify-center rounded-xl border-2 border-emerald-200 bg-white px-3 py-2 text-sm font-black text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-60 sm:px-5">
+                        Save progress
+                      </button>
+                    ) : null}
+                    <button type="submit" name="saveAction" value={primarySaveValue} disabled={saving || saveLocked}
+                      className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[#0D5C3A] px-3 py-2 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-60 sm:px-5">
+                      {saving ? <PawIcon size={20} contrast="dark" className="animate-spin" /> : <Save className="h-5 w-5" aria-hidden="true" />}
+                      {saving ? "Saving..." : hasNextStep ? "Save & next" : "Save changes"}
+                    </button>
+                  </div>
+                </div>
                 {activeStep === "1" ? (
                   <section
                     id="profile"
