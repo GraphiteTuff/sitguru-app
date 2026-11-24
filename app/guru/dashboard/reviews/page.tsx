@@ -1,71 +1,44 @@
+import Link from "next/link";
+import { ArrowRight, MessageSquareHeart, Star, UserRound } from "lucide-react";
+import GuruPageHero from "@/components/guru/GuruPageHero";
+
 export default function GuruDashboardReviewsPage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm lg:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-            Guru Reviews
-          </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-            Reviews
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-            Review customer feedback, ratings, sentiment, and service quality trends from one place.
-          </p>
+    <main className="min-h-[70svh] bg-[#F7FFFB] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <GuruPageHero
+          eyebrow="PET PARENT FEEDBACK"
+          title="Your Reviews"
+          description="Build trust through great care and meaningful Pet Parent feedback. Review totals will appear here when the live reporting source is connected."
+          action={{ href: "/guru/dashboard/profile", label: "Edit My Guru Profile" }}
+        />
+        <section aria-label="Review summary" className="grid gap-3 sm:grid-cols-2">
+          <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-800"><Star className="h-6 w-6" aria-hidden="true" /></span>
+            <h2 className="mt-4 text-xl font-black text-slate-950">Average rating</h2>
+            <p className="mt-3 text-4xl font-black text-slate-950" aria-label="Average rating not available yet">—</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">We won’t show a guessed rating or a placeholder zero.</p>
+          </article>
+          <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-800"><MessageSquareHeart className="h-6 w-6" aria-hidden="true" /></span>
+            <h2 className="mt-4 text-xl font-black text-slate-950">Pet Parent feedback</h2>
+            <p className="mt-3 text-lg font-black text-emerald-900">Reporting connection pending</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Verified feedback will appear here when the review feed is available.</p>
+          </article>
         </section>
-
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Average Rating
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">0.0</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Your average review score will appear here.
-            </p>
+        <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-3">
+            <UserRound className="mt-1 h-6 w-6 shrink-0 text-emerald-800" aria-hidden="true" />
+            <div>
+              <h2 className="text-xl font-black text-slate-950">Make your profile stand out</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Complete your services and add clear, friendly photos so local Pet Parents can get to know you.</p>
+            </div>
           </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Total Reviews
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">0</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Review totals will appear here.
-            </p>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              5-Star Reviews
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">0</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Top-rated review counts will appear here.
-            </p>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Response Rate
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">--</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Review response activity will appear here.
-            </p>
-          </div>
-        </div>
-
-        <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm lg:p-8">
-          <h2 className="text-2xl font-black tracking-tight text-white">
-            Reviews workspace
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-            This page is now a valid Next.js module and will clear the current build error.
-            Once the build is fully clean, you can add review feeds, moderation tools, and rating analytics here.
-          </p>
+          <Link href="/guru/dashboard/promote" className="mt-5 inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-center text-base font-black !text-white transition hover:bg-emerald-800 sm:w-auto">
+            Promote My Guru Profile <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Link>
         </section>
       </div>
-    </div>
+    </main>
   );
 }
