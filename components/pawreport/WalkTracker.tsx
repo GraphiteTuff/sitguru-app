@@ -75,7 +75,6 @@ export default function WalkTracker({
           </div>
         </>
       ) : (
-      {/* SVG route map placeholder */}
       <div className="relative mt-4 h-36 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 sm:h-40">
         <svg
           viewBox="0 0 320 160"
