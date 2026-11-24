@@ -128,14 +128,22 @@ function firstToken(value: string, fallback: string) {
   return token || fallback;
 }
 
-function Face({ src, name, className }: { src: string; name: string; className: string }) {
+function Face({ src, name, className, largePlaceholder = false }: { src: string; name: string; className: string; largePlaceholder?: boolean }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const showPhoto = Boolean(src) && failedSrc !== src;
   return (
-    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden bg-emerald-50 ${className}`}>
-      {src ? (
+    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden bg-emerald-50 ${className}`} aria-hidden="true">
+      {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="absolute inset-0 h-full w-full bg-white object-cover object-center" />
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          onError={() => setFailedSrc(src)}
+          className="absolute inset-0 h-full w-full bg-white object-cover object-center"
+        />
       ) : (
-        <PawPrint className="h-5 w-5 text-[#0D5C3A]" aria-hidden />
+        <PawPrint className={largePlaceholder ? "h-11 w-11 text-[#0D5C3A]" : "h-5 w-5 text-[#0D5C3A]"} aria-hidden="true" />
       )}
     </span>
   );
@@ -478,9 +486,9 @@ export default function CustomerCareCommandCenter({
         ) : (
           <ul className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {gurus.map((guru) => (
-              <li key={guru.id} className="flex min-w-0 flex-col rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,.06)]">
-                <div className="flex items-start gap-3">
-                  <Face src={guru.photo} name={guru.name} className="h-20 w-20 rounded-[1.2rem] sm:h-24 sm:w-24" />
+              <li key={guru.id} className="flex min-w-0 flex-col rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,.06)] sm:p-5">
+                <div className="flex items-start gap-4">
+                  <Face src={guru.photo} name={guru.name} largePlaceholder className="h-[104px] w-[104px] rounded-[1.4rem] sm:h-28 sm:w-28" />
                   <div className="min-w-0 flex-1">
                     <p className="text-lg font-black text-[#102339]">{guru.name}</p>
                     <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-600">{guru.services}</p>
