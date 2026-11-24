@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Platform, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -21,6 +21,10 @@ type Mutation = { ok: boolean; error: string; message: string };
 
 export default function CommunityStudioScreen() {
   const { session, loading, roles } = useAuth();
+  const params = useLocalSearchParams<{ from?: string | string[]; petName?: string | string[] }>();
+  const from = Array.isArray(params.from) ? params.from[0] : params.from;
+  const fromPetMoments = from === 'pet-moment';
+  const selectedPetName = Array.isArray(params.petName) ? params.petName[0] : params.petName;
   const { colors } = useTheme();
   const [mode, setMode] = useState<Mode>('public');
   const [workspace, setWorkspace] = useState<CommunityWorkspace | null>(null);
@@ -80,6 +84,16 @@ export default function CommunityStudioScreen() {
     return () => { if (timer) clearInterval(timer); subscription.remove(); };
   }, [developmentError, load, mode]));
   useEffect(() => { setWorkspace(null); setReviewing(null); setComposing(false); }, [session?.user.id]);
+  // Pet Parents arrive here from the dashboard and should go straight to the existing
+  // private draft / moderated community story workflow, not a staff workspace.
+  useEffect(() => {
+    if (!fromPetMoments || !session) return;
+    setMode('member');
+    setKind('gallery');
+    setPetName(selectedPetName || '');
+    setComposing(true);
+    setStep(0);
+  }, [fromPetMoments, selectedPetName, session?.user.id]);
 
   const cardStyle = [styles.card, { backgroundColor: colors.card, borderColor: colors.border }];
   const inputStyle = [styles.input, { backgroundColor: colors.input, color: colors.inputText, borderColor: colors.border }];
@@ -143,7 +157,7 @@ export default function CommunityStudioScreen() {
   const visibleItems=mode==='public'?sections.gallery:workspace?.items;
   return <MobileScreen refreshing={fetching} onRefresh={() => { void load(); }} footer={session && !developmentError && (workspace?.ready !== false || mode === 'public') ? <StickyActionBar>{composing ? button(busy ? 'Saving…' : step<2?'Continue':'Submit for manager review', () => {if(step<2)setStep(step+1);else void save('submit');}, busy || (step===0 && kind!=='pack'&&!photo&&!editing?.imageUrl)||(step===1&&(!title.trim()||story.trim().length<20))||(step===2&&(!consent||(featuresClientPet&&!bookingId)))) : button('Share a community story', () => { setMode('member'); compose(); })}</StickyActionBar> : undefined}>
     <TouchTarget accessibilityRole="button" onPress={() => router.back()} style={styles.back}><Text style={[styles.label, { color: colors.primary }]}>← Back</Text></TouchTarget>
-    <View style={[styles.hero, { backgroundColor: '#0D5C3A' }]}><Text style={styles.kicker}>COMMUNITY STUDIO</Text><Text style={styles.title}>The SitGuru Pack</Text><Text style={styles.heroBody}>Every pet has a story. Celebrate yours with the people who care.</Text></View>
+    <View style={[styles.hero, { backgroundColor: '#0D5C3A' }]}><Text style={styles.kicker}>{fromPetMoments ? 'YOUR SITGURU COMMUNITY' : 'COMMUNITY STUDIO'}</Text><Text style={styles.title}>{fromPetMoments ? 'Pet Moments' : 'The SitGuru Pack'}</Text><Text style={styles.heroBody}>{fromPetMoments ? 'Share your pet’s photos, videos and favorite memories. Private until you choose to submit for review.' : 'Every pet has a story. Celebrate yours with the people who care.'}</Text></View>
     {developmentError ? <Text accessibilityRole="alert" style={[styles.message, { color: colors.danger, backgroundColor: colors.card }]}>{developmentError}</Text> : <>
       {roles.some(role => role === 'admin' || role === 'manager' || role === 'intern') ? (
         <View style={cardStyle}>
@@ -154,7 +168,7 @@ export default function CommunityStudioScreen() {
           {button('Social Intelligence · Latest results',()=>router.push('/social-intelligence'))}
         </View>
       ) : null}
-      {button('Submit photo or video',()=>{if(!session)router.push('/login');else {setMode('member');compose();}})}
+      {button('Add photos or video',()=>{if(!session)router.push('/login');else {setMode('member');compose();setKind('gallery');}})}
       {session && <View style={styles.tabs}>{([{ id: 'public', label: 'The Pack' }, { id: 'member', label: 'My stories' }, { id: 'manager', label: 'Review' }] as const).filter(tab=>tab.id!=='manager'||workspace?.canModerate||mode==='manager').map((tab) => <TouchTarget key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: mode === tab.id }} onPress={() => { setMode(tab.id); setWorkspace(null); setComposing(false); setReviewing(null); setError(''); }} style={[styles.tab, { backgroundColor: mode === tab.id ? colors.primarySoft : colors.card, borderColor: colors.border }]}><Text style={[styles.label, { color: mode === tab.id ? colors.primary : colors.text }]}>{tab.label}</Text></TouchTarget>)}</View>}
       {session && button('Pet Parent permission requests',()=>router.push('/community-permissions'))}
       {loading || (fetching && !workspace) ? <ActivityIndicator color={colors.primary} /> : null}
@@ -229,8 +243,8 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
   storyInput: { minHeight: 128 },
   photo: { width: '100%', aspectRatio: 1.25, borderRadius: 16, resizeMode: 'cover' },
-  button: { minHeight: 50, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12, width: '100%' },
-  buttonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  button: { minHeight: 58, borderRadius: 17, paddingHorizontal: 18, paddingVertical: 13, width: '100%' },
+  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', textAlign: 'center' },
   disabled: { opacity: 0.5 },
   message: { padding: 14, borderRadius: 14, fontSize: 14, lineHeight: 22 },
   consent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
