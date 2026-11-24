@@ -500,7 +500,7 @@ export default function GuruDashboardHeader({
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-5">
+        <nav className="hidden flex-1 items-center justify-center gap-4 xl:flex xl:gap-5">
           {navItems.map((item) => {
             const isActive =
               resolvedActiveTab === item.tab ||
@@ -533,7 +533,7 @@ export default function GuruDashboardHeader({
           })}
         </nav>
 
-        <div className="hidden items-center gap-3 lg:flex">
+        <div className="hidden items-center gap-3 xl:flex">
           <Link
             href="/guru/success-center"
             className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
@@ -669,7 +669,7 @@ export default function GuruDashboardHeader({
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex items-center gap-2 xl:hidden">
           <button
             type="button"
             onClick={() => setAccountMenuOpen((value) => !value)}
@@ -686,7 +686,7 @@ export default function GuruDashboardHeader({
 
             {accountMenuOpen ? (
         <div
-          className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden"
+          className="border-t border-slate-200 bg-white px-4 py-4 xl:hidden"
           style={{ color: "#0f172a" }}
         >
           <div className="mx-auto grid max-w-[1500px] gap-2">
