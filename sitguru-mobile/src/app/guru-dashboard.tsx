@@ -1501,9 +1501,7 @@ export default function GuruDashboardScreen() {
                       }
                       label="Calendar"
                       onPress={() =>
-                        router.push(
-                          '/guru-pricing',
-                        )
+                        router.push('/guru-pricing?step=2')
                       }
                       styles={styles}
                     />
@@ -1540,7 +1538,7 @@ export default function GuruDashboardScreen() {
                           color={
                             palette.primary
                           }
-                          size={20}
+                          size={22}
                           strokeWidth={2.3}
                         />
                       }
@@ -1550,6 +1548,24 @@ export default function GuruDashboardScreen() {
                           '/guru-live-walk',
                         )
                       }
+                      styles={styles}
+                    />
+
+                    <QuickAction
+                      icon={
+                        <CircleDollarSign color={palette.primary} size={22} strokeWidth={2.3} />
+                      }
+                      label="Earnings"
+                      onPress={() => router.push('/guru-earnings')}
+                      styles={styles}
+                    />
+
+                    <QuickAction
+                      icon={
+                        <Users color={palette.primary} size={22} strokeWidth={2.3} />
+                      }
+                      label="Grow"
+                      onPress={() => router.push('/guru-referrals')}
                       styles={styles}
                     />
                   </View>
@@ -2108,6 +2124,7 @@ function QuickAction({
   return (
     <BubblePressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={styles.quickAction}
     >
@@ -2135,11 +2152,7 @@ function QuickAction({
         ) : null}
       </View>
 
-      <Text
-        style={
-          styles.quickActionLabel
-        }
-      >
+      <Text numberOfLines={2} allowFontScaling style={styles.quickActionLabel}>
         {label}
       </Text>
     </BubblePressable>
@@ -4362,24 +4375,24 @@ function createStyles(
       backgroundColor: palette.surface,
       borderColor: palette.border,
       borderRadius: 19,
-      borderWidth: 1,
+      borderWidth: 1.25,
       flexBasis: '46%',
       flexGrow: 1,
       gap: 8,
       justifyContent: 'center',
-      minHeight: 104,
+      minHeight: 112,
       minWidth: 120,
       paddingHorizontal: 12,
-      paddingVertical: 13,
+      paddingVertical: 15,
     },
     quickActionIcon: {
       alignItems: 'center',
       backgroundColor: palette.primarySoft,
       borderRadius: 14,
-      height: 43,
+      height: 48,
       justifyContent: 'center',
       position: 'relative',
-      width: 43,
+      width: 48,
     },
     quickActionBadge: {
       alignItems: 'center',
@@ -4407,7 +4420,7 @@ function createStyles(
     quickActionLabel: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 14,
+      fontSize: 15,
       textAlign: 'center',
     },
     requestCard: {
