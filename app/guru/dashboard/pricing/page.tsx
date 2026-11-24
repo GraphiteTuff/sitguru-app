@@ -1,5 +1,6 @@
 "use client";
 
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -872,25 +873,7 @@ async function saveWeeklyAvailability(
 }
 
 function LoadingState() {
-  return (
-    <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 text-slate-950"
-      style={{
-        fontFamily:
-          '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 600,
-      }}
-    >
-      <div className="mx-auto flex max-w-6xl items-center justify-center">
-        <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
-          <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
-          <p className="mt-3 text-base font-bold text-slate-900">
-            Loading Guru pricing workspace...
-          </p>
-        </div>
-      </div>
-    </main>
-  );
+  return <SitGuruPortalLoading portal="Guru" message="Loading your Guru pricing workspace..." />;
 }
 
 export default function GuruDashboardPricingPage() {
