@@ -7,6 +7,8 @@ type WalkTrackerProps = {
   statusLabel?: string;
   /** Guru can log walk actions; Pet Parent is view-only. */
   interactive?: boolean;
+  /** Render an illustrated sample route, never a live location. */
+  demo?: boolean;
   onLogWalk?: () => void;
   className?: string;
 };
@@ -20,6 +22,7 @@ export default function WalkTracker({
   durationLabel = "18 min",
   statusLabel = "Walk in progress",
   interactive = false,
+  demo = false,
   onLogWalk,
   className = "",
 }: WalkTrackerProps) {
@@ -44,6 +47,34 @@ export default function WalkTracker({
         </span>
       </div>
 
+      {demo ? (
+        <>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-xs font-extrabold text-emerald-900">Sample walk progress</p>
+            <p className="text-xs font-extrabold text-emerald-700">60% complete</p>
+          </div>
+          <div role="progressbar" aria-label="Sample walk progress" aria-valuenow={60} aria-valuemin={0} aria-valuemax={100} className="mt-2 h-2.5 overflow-hidden rounded-full bg-emerald-100">
+            <div className="h-full w-[60%] rounded-full bg-gradient-to-r from-green-600 to-lime-500" />
+          </div>
+          <div role="img" aria-label="Illustrated demo route with start and end markers; not live GPS" className="relative mt-4 h-40 overflow-hidden rounded-2xl border border-emerald-100 bg-[#e9f6ec] sm:h-48">
+            <svg aria-hidden="true" viewBox="0 0 520 240" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+              <rect width="520" height="240" fill="#e9f6ed" />
+              <path d="M0 170 L165 123 280 172 390 138 520 170 V240 H0Z" fill="#d4ebce" />
+              <path d="M0 44 116 56 193 18 295 50 377 12 520 45" fill="none" stroke="#ffffff" strokeWidth="18" />
+              <path d="M20 238 125 158 205 152 287 99 340 0" fill="none" stroke="#ffffff" strokeWidth="15" />
+              <path d="M0 100 93 118 200 88 283 119 377 93 520 133" fill="none" stroke="#ffffff" strokeWidth="15" />
+              <path d="M168 0 164 80 216 141 231 240" fill="none" stroke="#ffffff" strokeWidth="12" />
+              <path d="M432 0 416 66 442 155 503 240" fill="none" stroke="#ffffff" strokeWidth="12" />
+              <path d="M382 0 C389 30 360 50 385 72 S444 105 432 139" fill="none" stroke="#b2dfee" strokeWidth="20" />
+              <path d="M60 185 C115 195 151 151 196 130 S258 106 290 122 S365 126 405 91 L460 63" fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M60 185 C115 195 151 151 196 130 S258 106 290 122 S365 126 405 91 L460 63" fill="none" stroke="#00a450" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="60" cy="185" r="16" fill="#fff"/><circle cx="60" cy="185" r="10" fill="#00834e"/><circle cx="60" cy="185" r="4" fill="#fff"/>
+              <circle cx="460" cy="63" r="23" fill="#fff"/><circle cx="460" cy="63" r="17" fill="#00834e"/><circle cx="460" cy="63" r="6" fill="#fff"/>
+            </svg>
+            <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-[10px] font-bold text-emerald-900 shadow-sm">Illustrative route · Not GPS</span>
+          </div>
+        </>
+      ) : (
       {/* SVG route map placeholder */}
       <div className="relative mt-4 h-36 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 sm:h-40">
         <svg
@@ -83,6 +114,7 @@ export default function WalkTracker({
         </svg>
       </div>
 
+      )}
       {interactive ? (
         <button
           type="button"
