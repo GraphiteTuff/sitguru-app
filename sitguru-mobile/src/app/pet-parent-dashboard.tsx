@@ -2771,7 +2771,7 @@ function createStyles(isDark: boolean) {
       shadowRadius: 15,
     },
     bookingEyebrow: {
-      color: '#D9F99D',
+      color: '#F7E7B0',
       fontFamily: AppFonts.bold,
       fontSize: 11,
       letterSpacing: 1.15,
@@ -2783,7 +2783,7 @@ function createStyles(isDark: boolean) {
       lineHeight: 29,
     },
     bookingSubtitle: {
-      color: '#E2FCE9',
+      color: '#EAF7EF',
       fontFamily: AppFonts.medium,
       fontSize: 14,
       lineHeight: 21,

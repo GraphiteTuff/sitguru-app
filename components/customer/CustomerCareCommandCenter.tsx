@@ -318,11 +318,11 @@ export default function CustomerCareCommandCenter({
           <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-lime-400/15 blur-2xl" aria-hidden="true" />
           <div className="relative flex min-w-0 items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-lime-200">Fast, personalized pet care</p>
-              <h2 className="mt-2 max-w-2xl text-[clamp(1.65rem,3.2vw,2.4rem)] font-black leading-tight tracking-tight text-white">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-[#F7E7B0]">Fast, personalized pet care</p>
+              <h2 data-brand-green="true" className="mt-2 max-w-2xl text-[clamp(1.65rem,3.2vw,2.4rem)] font-black leading-tight tracking-tight text-white">
                 Find the perfect Guru for your pet
               </h2>
-              <p className="mt-2 text-sm font-medium text-emerald-50 sm:text-base">Choose what you need and we&apos;ll find matching local Gurus.</p>
+              <p className="mt-2 text-sm font-medium text-[#EAF7EF] sm:text-base">Choose what you need and we&apos;ll find matching local Gurus.</p>
             </div>
             <PawPrint aria-hidden="true" className="hidden h-16 w-16 shrink-0 text-lime-300/70 sm:block" />
           </div>
@@ -385,7 +385,7 @@ export default function CustomerCareCommandCenter({
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <section className="overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm" aria-labelledby="what-matters-heading">
           <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-[#004c34] to-[#006c42] px-5 py-4 text-white">
-            <h2 id="what-matters-heading" className="flex items-center gap-2 text-xl font-black text-white">
+            <h2 id="what-matters-heading" data-brand-green="true" className="flex items-center gap-2 text-xl font-black text-white">
               <CalendarDays aria-hidden="true" className="h-6 w-6 text-lime-300" /> What matters now
             </h2>
             {visit ? <span className="rounded-full bg-lime-100 px-3 py-1 text-xs font-black text-emerald-900">{visit.isLive ? "Care is live" : "Next care appointment"}</span> : null}
