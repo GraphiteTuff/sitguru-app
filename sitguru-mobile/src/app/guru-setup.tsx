@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    Image,
     StyleSheet,
     Text,
     TextInput,
@@ -20,6 +22,9 @@ import {
     type GuruSetupDraft,
 } from '@/hooks/data/useRoleSetup';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useAuth } from '@/hooks/useAuth';
+import { uploadAndSaveProfileMedia } from '@/lib/data/profile-media';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
   beginSingleSubmission,
   endSingleSubmission,
@@ -141,6 +146,7 @@ export default function GuruSetupScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
   const isDark = useThemeMode() === 'dark';
+  const { user, profile } = useAuth();
   const { loading, saving, load, save } = useGuruSetup();
   const {
     feedback,
@@ -150,6 +156,13 @@ export default function GuruSetupScreen() {
   } = useSaveFeedback();
 
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const profileRecord = (profile ?? {}) as Record<string, unknown>;
+  const accountPhoto = ['avatar_url', 'profile_photo_url', 'photo_url']
+    .map((key) => profileRecord[key])
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0) || '';
+  const currentPhotoUrl = photoUrl || resolveSupabaseStorageUrl(accountPhoto);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -249,6 +262,46 @@ export default function GuruSetupScreen() {
       trustNotes,
       selectedOnboardingItems,
     };
+  }
+
+  async function chooseGuruPhoto() {
+    if (!user?.id || uploadingPhoto) {
+      if (!user?.id) showError('Sign in required', 'Sign in to update your Guru photo.');
+      return;
+    }
+
+    try {
+      const selection = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+      if (selection.canceled || !selection.assets?.[0]) return;
+      const asset = selection.assets[0];
+
+      if (asset.fileSize && asset.fileSize > 8 * 1024 * 1024) {
+        showError('Photo too large', 'Choose a JPG, PNG, or WEBP photo smaller than 8 MB.');
+        return;
+      }
+
+      setUploadingPhoto(true);
+      const result = await uploadAndSaveProfileMedia({
+        userId: user.id,
+        isGuru: true,
+        kind: 'avatar',
+        localUri: asset.uri,
+        fileName: asset.fileName || 'guru-profile.jpg',
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+      setPhotoUrl(result.uploaded.publicUrl);
+      showSaved('Guru photo updated', 'Your new photo is saved to your Guru account.');
+    } catch (error) {
+      showError('Could not save your photo',
+        error instanceof Error ? error.message : 'Try choosing the photo again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function persistAndAdvance(nextStep: StepNumber, complete = false) {
@@ -374,10 +427,8 @@ export default function GuruSetupScreen() {
     }
 
     try {
-      if (step > currentStep) {
-        const saved = await persistAndAdvance(step);
-        if (!saved) return;
-      }
+      const saved = await persistAndAdvance(step);
+      if (!saved) return;
 
       setCurrentStep(step);
     } finally {
@@ -389,18 +440,29 @@ export default function GuruSetupScreen() {
     if (currentStep === 1) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.photoUploadCard}>
+          <BubblePressable
+            accessibilityRole="button"
+            accessibilityLabel={currentPhotoUrl ? 'Change your Guru profile photo' : 'Upload your Guru profile photo'}
+            disabled={uploadingPhoto}
+            onPress={() => void chooseGuruPhoto()}
+            style={styles.photoUploadCard}
+          >
             <View style={styles.photoIconBox}>
-              <Text style={styles.photoIcon}>＋</Text>
+              {currentPhotoUrl ? (
+                <Image source={{ uri: currentPhotoUrl }} style={styles.profilePhotoImage}
+                  resizeMode="cover" accessibilityLabel="Your Guru profile photo" />
+              ) : (
+                <Text style={styles.photoIcon}>＋</Text>
+              )}
             </View>
 
             <View style={styles.photoCopy}>
-              <Text style={styles.photoTitle}>Profile photo</Text>
+              <Text style={styles.photoTitle}>{uploadingPhoto ? 'Saving photo...' : currentPhotoUrl ? 'Change profile photo' : 'Add profile photo'}</Text>
               <Text style={styles.photoText}>
-                Add a clear, friendly profile photo later. This should be the image Pet Parents see in search.
+                Tap here to choose a clear photo. Pet Parents can recognize you when they search or book.
               </Text>
             </View>
-          </View>
+          </BubblePressable>
 
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
             <Field
@@ -814,22 +876,29 @@ export default function GuruSetupScreen() {
             </View>
           </View>
 
-          <View style={styles.heroPhotoCard}>
-            <View style={styles.heroPhotoPlaceholder}>
-              <Text style={styles.heroPhotoIcon}>🏡</Text>
-              <Text style={styles.heroPhotoTitle}>Guru photo area</Text>
-              <Text style={styles.heroPhotoText}>
-                Add a profile, pet care, walking, boarding, or visit photo here later.
-              </Text>
-            </View>
-
-            <View style={styles.heroFloatingCard}>
-              <Text style={styles.heroFloatingTitle}>Search visibility</Text>
-              <Text style={styles.heroFloatingText}>
-                Profile, service area, services, and readiness help you appear in search.
-              </Text>
-            </View>
-          </View>
+          {isWide ? (
+            <BubblePressable style={styles.heroPhotoCard}
+              accessibilityRole="button"
+              accessibilityLabel="Update Guru profile photo"
+              disabled={uploadingPhoto}
+              onPress={() => void chooseGuruPhoto()}>
+              <View style={styles.heroPhotoPlaceholder}>
+                {currentPhotoUrl ? (
+                  <Image source={{ uri: currentPhotoUrl }} style={styles.heroAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.heroPhotoIcon}>🐾</Text>
+                )}
+                <Text style={styles.heroPhotoTitle}>{uploadingPhoto ? 'Saving photo...' : 'Your Guru profile photo'}</Text>
+                <Text style={styles.heroPhotoText}>Tap to {currentPhotoUrl ? 'change' : 'upload'} your photo</Text>
+              </View>
+              <View style={styles.heroFloatingCard}>
+                <Text style={styles.heroFloatingTitle}>Findable &amp; bookable</Text>
+                <Text style={styles.heroFloatingText}>
+                  Add a friendly profile and accurate services to help local Pet Parents discover you.
+                </Text>
+              </View>
+            </BubblePressable>
+          ) : null}
         </View>
 
         <View style={styles.stepsRail}>
@@ -1069,10 +1138,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: SitGuruColors.text,
-    fontSize: 42,
+    fontSize: 33,
     fontWeight: '900',
-    letterSpacing: -1.1,
-    lineHeight: 45,
+    letterSpacing: -0.7,
+    lineHeight: 39,
   },
   subtitle: {
     color: SitGuruColors.textMuted,
@@ -1130,6 +1199,13 @@ const styles = StyleSheet.create({
   heroPhotoIcon: {
     fontSize: 44,
   },
+  heroAvatarImage: {
+    height: 150,
+    width: 150,
+    borderRadius: 75,
+    borderWidth: 4,
+    borderColor: SitGuruColors.primaryLight,
+  },
   heroPhotoTitle: {
     color: SitGuruColors.text,
     fontSize: 18,
@@ -1174,12 +1250,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
     flexDirection: 'row',
     gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   stepPillActive: {
     backgroundColor: SitGuruColors.primary,
@@ -1305,13 +1382,13 @@ const styles = StyleSheet.create({
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 1.5,
     color: SitGuruColors.text,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
   },
   multilineInput: {
     minHeight: 110,
@@ -1346,9 +1423,14 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 20,
     borderWidth: 1,
-    height: 64,
+    height: 76,
     justifyContent: 'center',
-    width: 64,
+    overflow: 'hidden',
+    width: 76,
+  },
+  profilePhotoImage: {
+    height: '100%',
+    width: '100%',
   },
   photoIcon: {
     color: SitGuruColors.primary,
@@ -1605,7 +1687,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bottomDockSpacer: {
-    height: 88,
+    height: 104,
   },
   bottomDock: {
     alignItems: 'center',
