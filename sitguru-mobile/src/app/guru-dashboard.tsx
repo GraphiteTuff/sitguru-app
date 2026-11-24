@@ -4353,34 +4353,32 @@ function createStyles(
     },
     quickActions: {
       flexDirection: 'row',
-      gap: 8,
+      flexWrap: 'wrap',
+      gap: 10,
     },
     quickAction: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.border,
-      borderRadius: 17,
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 19,
       borderWidth: 1,
-      flex: 1,
-      gap: 6,
-      justifyContent:
-        'center',
-      minHeight: 74,
-      paddingHorizontal: 5,
-      paddingVertical: 9,
+      flexBasis: '46%',
+      flexGrow: 1,
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 104,
+      minWidth: 120,
+      paddingHorizontal: 12,
+      paddingVertical: 13,
     },
     quickActionIcon: {
       alignItems: 'center',
-      backgroundColor:
-        palette.primarySoft,
-      borderRadius: 999,
-      height: 37,
-      justifyContent:
-        'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 14,
+      height: 43,
+      justifyContent: 'center',
       position: 'relative',
-      width: 37,
+      width: 43,
     },
     quickActionBadge: {
       alignItems: 'center',
@@ -4407,8 +4405,8 @@ function createStyles(
     },
     quickActionLabel: {
       color: palette.title,
-      fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
       textAlign: 'center',
     },
     requestCard: {
@@ -4440,13 +4438,13 @@ function createStyles(
       color: palette.title,
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 13,
+      fontSize: 16,
     },
     requestMeta: {
       color: palette.muted,
       fontFamily:
         AppFonts.medium,
-      fontSize: 9,
+      fontSize: 12,
     },
     requestButtonRow: {
       flexDirection: 'row',
@@ -4458,40 +4456,35 @@ function createStyles(
     },
     filledButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.primary,
-      borderRadius: 999,
+      backgroundColor: palette.primary,
+      borderRadius: 18,
       flex: 1,
-      justifyContent:
-        'center',
-      minHeight: 38,
+      justifyContent: 'center',
+      minHeight: 56,
       paddingHorizontal: 10,
     },
     filledButtonText: {
       color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     outlineButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.primary,
-      borderRadius: 999,
-      borderWidth: 1,
+      backgroundColor: palette.surface,
+      borderColor: palette.primary,
+      borderRadius: 18,
+      borderWidth: 1.5,
       flex: 1,
-      justifyContent:
-        'center',
-      minHeight: 38,
+      justifyContent: 'center',
+      minHeight: 56,
       paddingHorizontal: 10,
     },
     outlineButtonText: {
       color: palette.primary,
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     statusGrid: {
       flexDirection: 'row',
