@@ -250,7 +250,7 @@ export default function GuruWorkspaceHome({
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{action.detail}</p>
           </div>
         </div>
-        <Link href={action.href} className="mt-5 inline-flex min-h-[60px] w-full items-center justify-center gap-2 rounded-[1.15rem] bg-[#FF7300] px-5 py-3 text-center text-base font-black !text-white shadow-lg shadow-orange-600/15 transition hover:bg-[#E86100] active:scale-[0.99] focus-visible:outline focus-visible:outline-4 focus-visible:outline-orange-300 sm:max-w-[370px]">
+        <Link href={action.href} className="mt-5 inline-flex min-h-[60px] w-full items-center justify-center gap-2 rounded-[1.15rem] bg-[#C54D00] px-5 py-3 text-center text-base font-black !text-white shadow-lg shadow-orange-600/15 transition hover:bg-[#A74400] active:scale-[0.99] focus-visible:outline focus-visible:outline-4 focus-visible:outline-orange-300 sm:max-w-[370px]">
           {action.label}<ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />
         </Link>
       </section>
