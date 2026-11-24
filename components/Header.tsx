@@ -1017,6 +1017,18 @@ export default function Header({ user = null }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {isLoggedIn && isCustomer && pathname === "/customer/dashboard" ? (
+            <button
+              type="button"
+              aria-label="Open your profile and switch SitGuru workspace"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((value) => !value)}
+              className="inline-flex min-h-11 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 text-emerald-900 shadow-sm lg:hidden"
+            >
+              {renderAvatar("h-9 w-9")}
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
           {!loadingUser && !isLoggedIn ? (
             <Link
               href="/login?mode=phone"

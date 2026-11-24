@@ -695,6 +695,7 @@ export default function RequestBookingScreen() {
   const guruLabel = guruDisplayLabel(guruTargetSlug, guruTargetId);
   const paramPetId = paramText(params.petId);
   const paramServiceType = paramText(params.serviceType);
+  const paramDate = paramText(params.date);
   const conversationId = paramText(params.conversationId);
 
   const profileRecord = (profile ?? {}) as RecordRow;
@@ -768,6 +769,14 @@ export default function RequestBookingScreen() {
     setSelectedTime(match.mode === 'single' ? 'Midday' : 'Flexible handoff');
   }, [paramServiceType]);
 
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paramDate)) return;
+    const date = dateFromId(paramDate);
+    if (Number.isNaN(date.getTime()) || toDateId(date) !== paramDate || date < todayStart()) return;
+    setStartDateId(paramDate);
+    setDisplayMonth(monthStart(date));
+  }, [paramDate]);
+
   const draftKey = bookingDraftKey(guruTargetId, guruTargetSlug);
   const draftHydratedRef = useRef('');
 
@@ -782,13 +791,13 @@ export default function RequestBookingScreen() {
 
       if (draft && draft.guruKey === draftKey) {
         setCurrentStep(draft.currentStep);
-        setSelectedPetId(draft.selectedPetId);
+        if (!paramPetId) setSelectedPetId(draft.selectedPetId);
         if (!paramServiceType) {
           setSelectedServiceId(draft.selectedServiceId);
           setSelectedTime(draft.selectedTime);
           setEndDateId(draft.endDateId);
         }
-        setStartDateId(draft.startDateId);
+        if (!paramDate) setStartDateId(draft.startDateId);
         setAdditionalPets(draft.additionalPets);
         setApplyPawPerks(draft.applyPawPerks);
         setApplyReferralCredit(draft.applyReferralCredit);
@@ -805,7 +814,7 @@ export default function RequestBookingScreen() {
     return () => {
       active = false;
     };
-  }, [draftKey, paramServiceType]);
+  }, [draftKey, paramPetId, paramServiceType, paramDate]);
 
   useEffect(() => {
     if (draftHydratedRef.current !== draftKey || submitOutcome) return;

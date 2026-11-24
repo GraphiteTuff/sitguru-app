@@ -1302,7 +1302,7 @@ function GuruResultPhoto({
   const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   return (
-    <div className="relative h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
+    <div className="relative h-44 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-60 md:h-auto md:min-h-[360px] md:w-[210px] md:self-stretch xl:w-[240px]">
       {showPhoto ? (
         <img
           src={photoUrl}
@@ -2538,8 +2538,8 @@ function SearchPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
+    <main className="min-h-screen bg-gradient-to-b from-[#f1fbf5] via-white to-[#f8fcfd] text-slate-900">
+      <section className="relative overflow-hidden border-b border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#e4f9e9_100%)]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
           <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
@@ -2551,18 +2551,16 @@ function SearchPageContent() {
               Find a Guru
             </p>
 
-            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Find pet care that feels like a perfect match
+            <h1 className="mt-3 max-w-5xl text-3xl font-black tracking-tight text-[#0D3B2C] sm:text-5xl lg:text-6xl">
+              Matching Gurus near you
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Start with your ZIP code and meet trusted local Gurus who are
-              ready to care for your pet. We’ll fill in the location details
-              and bring nearby matches right to you.
+              Discover real Gurus who match your service and location. Compare their profiles, rates, reviews, and available booking options before choosing care.
             </p>
           </div>
 
-          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+          <Card className="mt-6 rounded-[1.7rem] border-emerald-100 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
@@ -2571,7 +2569,7 @@ function SearchPageContent() {
                 <select
                   value={serviceFilter}
                   onChange={(event) => setServiceFilter(event.target.value)}
-                  className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                  className="min-h-[56px] w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 >
                   <option value="">All services</option>
                   {SERVICE_OPTIONS.map((service) => (
@@ -2595,7 +2593,7 @@ function SearchPageContent() {
                   placeholder="18951"
                   autoComplete="postal-code"
                   style={{ fontSize: 16 }}
-                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[16px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="min-h-[56px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[16px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -2608,7 +2606,7 @@ function SearchPageContent() {
                   value={cityFilter}
                   onChange={(event) => setCityFilter(event.target.value)}
                   placeholder="Quakertown"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="min-h-[56px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -2621,7 +2619,7 @@ function SearchPageContent() {
                   value={stateFilter}
                   onChange={(event) => setStateFilter(event.target.value)}
                   placeholder="PA"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="min-h-[56px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -2634,7 +2632,7 @@ function SearchPageContent() {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Name, bio, title, services"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="min-h-[56px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -2642,7 +2640,7 @@ function SearchPageContent() {
                 <button
                   type="button"
                   onClick={() => clearFilters("top_filter_bar")}
-                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 xl:w-auto"
+                  className="inline-flex min-h-[56px] w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50 xl:w-auto"
                 >
                   Clear filters
                 </button>
@@ -2720,7 +2718,7 @@ function SearchPageContent() {
                 ) : null}
               </div>
 
-              <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
+              <div className="h-[220px] min-[420px]:h-[280px] sm:h-[380px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
                 <ProviderMap
                   markers={providerMapMarkers as unknown as Record<string, unknown>[]}
                   center={
@@ -2752,7 +2750,7 @@ function SearchPageContent() {
                     <button
                       type="button"
                       onClick={() => clearFilters("no_results_reset")}
-                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      className="inline-flex min-h-[58px] items-center justify-center rounded-2xl bg-gradient-to-r from-orange-500 to-[#ff7200] px-2 py-3 text-sm font-black text-white transition hover:from-orange-600 hover:to-orange-500"
                     >
                       Show all Gurus
                     </button>
@@ -2827,7 +2825,7 @@ function SearchPageContent() {
                   return (
                     <Card
                       key={guruMapMarkerId}
-                      className={`relative overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
+                      className={`relative overflow-hidden rounded-[1.65rem] border border-emerald-100 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:min-h-[360px] ${
                         isSelectedGuru
                           ? "border-emerald-400 ring-4 ring-emerald-100"
                           : ""
@@ -2859,21 +2857,21 @@ function SearchPageContent() {
                               guruName: guruFirstName,
                             });
                           }}
-                          className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
+                          className="absolute right-3 top-3 z-20 hidden items-center gap-1.5 sm:inline-flex rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
                         >
                           <Zap className="h-3.5 w-3.5" />
                           Quick Book
                         </button>
                       ) : null}
 
-                      <div className="flex min-h-[380px] flex-col md:h-full md:min-h-0 md:flex-row md:items-stretch">
+                      <div className="flex flex-col md:min-h-[360px] md:flex-row md:items-stretch">
                         <GuruResultPhoto
                           photoUrl={photoUrl}
                           guruName={guruName}
                         />
 
-                        <div className="flex min-w-0 flex-1 flex-col p-5 md:h-full md:min-h-0 lg:p-6">
-                          <div className="min-h-0 flex-1 overflow-hidden">
+                        <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5 lg:p-6">
+                          <div className="min-h-0 flex-1">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -3026,14 +3024,14 @@ function SearchPageContent() {
                             </div>
                           </div>
 
-                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                          <div className="mt-5 grid grid-cols-2 gap-3">
                             <Link
                               href={getGuruHref(guru)}
                               prefetch={true}
                               onClick={() =>
                                 trackGuruProfileClick(guru, `Meet ${guruFirstName}`)
                               }
-                              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                              className="inline-flex min-h-[58px] items-center justify-center rounded-2xl border-2 border-emerald-700 bg-white px-2 py-3 text-sm font-black text-emerald-800 transition hover:bg-slate-50"
                             >
                               Meet {guruFirstName}
                             </Link>
@@ -3043,7 +3041,7 @@ function SearchPageContent() {
                                 type="button"
                                 disabled
                                 aria-disabled="true"
-                                className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white opacity-55"
+                                className="inline-flex min-h-[58px] cursor-not-allowed items-center justify-center rounded-2xl bg-emerald-600 px-2 py-3 text-sm font-black text-white opacity-55"
                               >
                                 {bookingButtonLabel}
                               </button>
@@ -3059,7 +3057,7 @@ function SearchPageContent() {
                                 onClick={() => {
                                   trackBookingCtaClick(guru);
                                 }}
-                                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                                className="inline-flex min-h-[58px] items-center justify-center rounded-2xl bg-gradient-to-r from-orange-500 to-[#ff7200] px-2 py-3 text-sm font-black text-white transition hover:from-orange-600 hover:to-orange-500"
                               >
                                 {bookingButtonLabel}
                               </Link>
@@ -3117,8 +3115,8 @@ function SearchPageContent() {
 
 function SearchPageFallback() {
   return (
-    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
+    <main className="min-h-screen bg-gradient-to-b from-[#f1fbf5] via-white to-[#f8fcfd] text-slate-900">
+      <section className="relative overflow-hidden border-b border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#e4f9e9_100%)]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
           <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
@@ -3130,18 +3128,16 @@ function SearchPageFallback() {
               Find a Guru
             </p>
 
-            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Find pet care that feels like a perfect match
+            <h1 className="mt-3 max-w-5xl text-3xl font-black tracking-tight text-[#0D3B2C] sm:text-5xl lg:text-6xl">
+              Matching Gurus near you
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Start with your ZIP code and meet trusted local Gurus who are
-              ready to care for your pet. We’ll fill in the location details
-              and bring nearby matches right to you.
+              Discover real Gurus who match your service and location. Compare their profiles, rates, reviews, and available booking options before choosing care.
             </p>
           </div>
 
-          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+          <Card className="mt-6 rounded-[1.7rem] border-emerald-100 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
               <div className="h-[72px] rounded-2xl bg-slate-100" />
               <div className="h-[72px] rounded-2xl bg-slate-100" />

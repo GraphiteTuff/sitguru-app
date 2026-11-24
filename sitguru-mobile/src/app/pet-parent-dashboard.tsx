@@ -3,8 +3,11 @@ import {
   Bell,
   CalendarDays,
   ChevronRight,
+  ChevronDown,
+  Camera,
   CreditCard,
   Gift,
+  Heart,
   MapPin,
   MessageCircle,
   PawPrint,
@@ -45,8 +48,6 @@ import ServiceCoreGrid, {
 import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
 import ConvertActionBar from '@/components/mobile/ConvertActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
-import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
-import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
@@ -235,6 +236,10 @@ export default function PetParentDashboardScreen() {
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
+  const [selectedPetId, setSelectedPetId] = useState('');
+  const [bookingChoice, setBookingChoice] = useState<'pet' | 'service' | 'dates' | 'location' | null>(null);
+  const [careDate, setCareDate] = useState<'flexible' | 'today' | 'tomorrow'>('flexible');
+  const [showAllServices, setShowAllServices] = useState(false);
   const [searchZip, setSearchZip] = useState('');
   const [zipEdited, setZipEdited] = useState(false);
   const [needsVisitReview, setNeedsVisitReview] = useState(false);
@@ -792,6 +797,28 @@ export default function PetParentDashboardScreen() {
   const selectedService = CARE_SERVICES.find(
     (service) => service.key === selectedServiceKey,
   );
+  const selectedPet = dashboardData.pets.find((pet) => pet.id === selectedPetId) || dashboardData.pets[0];
+  const bookingDate = (() => {
+    if (careDate === 'flexible') return '';
+    const date = new Date();
+    if (careDate === 'tomorrow') date.setDate(date.getDate() + 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  })();
+  function findMatchingGurus() {
+    const zip = searchZip.replace(/\D/g, '').slice(0, 5);
+    router.push({
+      pathname: '/find-care',
+      params: {
+        ...(selectedService ? { service: selectedService.serviceType } : {}),
+        ...(zip.length === 5 ? { zip } : {}),
+        ...(selectedPet ? { petId: selectedPet.id } : {}),
+        ...(bookingDate ? { date: bookingDate } : {}),
+      },
+    });
+  }
 
   const idleBrowse = primaryAction.route === '/find-care';
   const requestCareLabel =
@@ -875,26 +902,20 @@ export default function PetParentDashboardScreen() {
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={styles.dashboardTitle}>
-                  {firstName === 'there' ? 'Hi there! 👋' : `Hi, ${firstName}! 👋`}
+                  {firstName && firstName !== 'there'
+                    ? 'Welcome Back, ' + firstName + '!'
+                    : 'Welcome Back!'}
                 </Text>
                 <Text style={styles.welcomeText}>
-                  Ready to book trusted pet care?
+                  Your pets, your care, all in one place.
                 </Text>
-
-                <SitGuruRoleStatus role="pet_parent" />
-
                 {profileLocation ? (
                   <View style={styles.locationRow}>
-                    <MapPin
-                      color={palette.primary}
-                      size={13}
-                      strokeWidth={2.4}
-                    />
+                    <MapPin color={palette.primary} size={15} strokeWidth={2.4} />
                     <Text style={styles.locationText}>{profileLocation}</Text>
                   </View>
                 ) : null}
               </View>
-
               <View style={styles.headerActions}>
                 <TouchTarget
                   accessibilityRole="button"
@@ -902,8 +923,7 @@ export default function PetParentDashboardScreen() {
                   onPress={() => router.push('/notifications')}
                   style={styles.headerIconButton}
                 >
-                  <Bell color={palette.title} size={18} strokeWidth={2.2} />
-
+                  <Bell color="#FFFFFF" size={21} strokeWidth={2.2} />
                   {dashboardData.unreadNotifications > 0 ? (
                     <View style={styles.headerBadge}>
                       <Text style={styles.headerBadgeText}>
@@ -912,12 +932,9 @@ export default function PetParentDashboardScreen() {
                     </View>
                   ) : null}
                 </TouchTarget>
-
-                <SitGuruThemeToggle />
-
                 <TouchTarget
                   accessibilityRole="button"
-                  accessibilityLabel="Switch workspace"
+                  accessibilityLabel="Open profile and switch SitGuru role"
                   onPress={() => setWorkspaceSwitcherOpen(true)}
                   style={styles.profileButton}
                 >
@@ -925,12 +942,130 @@ export default function PetParentDashboardScreen() {
                     fallback={getInitials(profileName)}
                     imageUrl={avatarUrl}
                     palette={palette}
-                    size={42}
+                    size={48}
                   />
+                  <ChevronDown color="#FFFFFF" size={16} strokeWidth={3} />
                 </TouchTarget>
               </View>
             </View>
 
+            <View style={styles.bookingFinder}>
+              <Text style={styles.bookingEyebrow}>BOOK TRUSTED PET CARE</Text>
+              <Text style={styles.bookingTitle}>Find the perfect Guru for your pet</Text>
+              <Text style={styles.bookingSubtitle}>Fast, personalized pet care near you.</Text>
+              <View style={styles.bookingGrid}>
+                <BookingPickerTile
+                  icon={<PawPrint color="#F97316" size={26} strokeWidth={2.6} />}
+                  title="Your Pet"
+                  value={selectedPet?.name || 'Choose a pet'}
+                  active={bookingChoice === 'pet'}
+                  onPress={() => setBookingChoice(bookingChoice === 'pet' ? null : 'pet')}
+                  styles={styles}
+                />
+                <BookingPickerTile
+                  icon={<Heart color="#F97316" size={26} strokeWidth={2.6} />}
+                  title="Service"
+                  value={selectedService?.label || 'Choose service'}
+                  active={bookingChoice === 'service'}
+                  onPress={() => setBookingChoice(bookingChoice === 'service' ? null : 'service')}
+                  styles={styles}
+                />
+                <BookingPickerTile
+                  icon={<CalendarDays color="#F97316" size={26} strokeWidth={2.6} />}
+                  title="Dates"
+                  value={careDate === 'today' ? 'Today' : careDate === 'tomorrow' ? 'Tomorrow' : 'Flexible dates'}
+                  active={bookingChoice === 'dates'}
+                  onPress={() => setBookingChoice(bookingChoice === 'dates' ? null : 'dates')}
+                  styles={styles}
+                />
+                <BookingPickerTile
+                  icon={<MapPin color="#F97316" size={26} strokeWidth={2.6} />}
+                  title="Location"
+                  value={searchZip.length === 5 ? 'ZIP ' + searchZip : 'Choose your ZIP'}
+                  active={bookingChoice === 'location'}
+                  onPress={() => setBookingChoice(bookingChoice === 'location' ? null : 'location')}
+                  styles={styles}
+                />
+              </View>
+              {bookingChoice === 'pet' ? (
+                <View style={styles.bookingPickerPanel}>
+                  {dashboardData.pets.map((pet) => (
+                    <TouchTarget key={pet.id} accessibilityRole="button"
+                      accessibilityLabel={'Book care for ' + pet.name}
+                      accessibilityState={{ selected: selectedPet?.id === pet.id }}
+                      onPress={() => { setSelectedPetId(pet.id); setBookingChoice(null); }}
+                      style={[styles.bookingPickerOption, selectedPet?.id === pet.id && styles.bookingPickerOptionActive]}>
+                      <Text style={styles.bookingPickerOptionText}>{pet.name}</Text>
+                      {selectedPet?.id === pet.id ? <ShieldCheck color="#007343" size={20} /> : null}
+                    </TouchTarget>
+                  ))}
+                  <TouchTarget accessibilityRole="button" onPress={() => router.push('/pet-passports')}
+                    style={styles.bookingPickerOption}>
+                    <Plus color="#007343" size={20} />
+                    <Text style={styles.bookingPickerOptionText}>Add or edit a pet</Text>
+                  </TouchTarget>
+                </View>
+              ) : null}
+              {bookingChoice === 'service' ? (
+                <View style={styles.bookingPickerPanel}>
+                  {CARE_SERVICES.map((choice) => (
+                    <TouchTarget key={choice.key} accessibilityRole="button"
+                      accessibilityState={{ selected: selectedServiceKey === choice.key }}
+                      onPress={() => { setSelectedServiceKey(choice.key); setBookingChoice(null); }}
+                      style={[styles.bookingPickerOption, selectedServiceKey === choice.key && styles.bookingPickerOptionActive]}>
+                      <Text style={styles.bookingPickerOptionText}>{choice.label}</Text>
+                      {selectedServiceKey === choice.key ? <ShieldCheck color="#007343" size={20} /> : null}
+                    </TouchTarget>
+                  ))}
+                </View>
+              ) : null}
+              {bookingChoice === 'dates' ? (
+                <View style={styles.bookingPickerPanel}>
+                  {([
+                    { key: 'flexible' as const, label: 'Flexible — choose dates when booking' },
+                    { key: 'today' as const, label: 'Today' },
+                    { key: 'tomorrow' as const, label: 'Tomorrow' },
+                  ]).map(({ key, label }) => (
+                    <TouchTarget key={key} accessibilityRole="button"
+                      accessibilityState={{ selected: careDate === key }}
+                      onPress={() => { setCareDate(key); setBookingChoice(null); }}
+                      style={[styles.bookingPickerOption, careDate === key && styles.bookingPickerOptionActive]}>
+                      <Text style={styles.bookingPickerOptionText}>{label}</Text>
+                    </TouchTarget>
+                  ))}
+                  <Text style={styles.bookingPickerHint}>Multiple dates and check-in/out times are selected during the booking request.</Text>
+                </View>
+              ) : null}
+              {bookingChoice === 'location' ? (
+                <View style={styles.bookingPickerPanel}>
+                  <Text style={styles.bookingPickerOptionText}>Enter your care ZIP code</Text>
+                  <TextInput
+                    value={searchZip}
+                    onChangeText={(value) => { setZipEdited(true); setSearchZip(value.replace(/\D/g, '').slice(0, 5)); }}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    placeholder="5-digit ZIP code"
+                    accessibilityLabel="Care ZIP code"
+                    placeholderTextColor="#64748B"
+                    style={styles.bookingZipInput}
+                  />
+                  <TouchTarget accessibilityRole="button" onPress={() => setBookingChoice(null)}
+                    style={[styles.bookingPickerOption, { justifyContent: 'center', backgroundColor: '#DCFCE7' }]}>
+                    <Text style={styles.bookingPickerOptionText}>Use This ZIP</Text>
+                  </TouchTarget>
+                </View>
+              ) : null}
+              <TouchTarget
+                accessibilityRole="button"
+                accessibilityLabel="Find My Guru — search matching local caregivers"
+                onPress={findMatchingGurus}
+                style={styles.bookingSearchButton}
+              >
+                <Search color="#FFFFFF" size={26} strokeWidth={2.8} />
+                <Text style={styles.bookingSearchText}>Find My Guru</Text>
+                <ChevronRight color="#FFFFFF" size={27} strokeWidth={2.8} />
+              </TouchTarget>
+            </View>
             {loadMessage ? (
               <View style={styles.loadNotice}>
                 <Text style={styles.loadNoticeText}>{loadMessage}</Text>
@@ -943,35 +1078,21 @@ export default function PetParentDashboardScreen() {
               <PriorityCarousel label="Priority" cards={priorityCards} />
             )}
 
-            <ServiceCoreGrid
-              selectedKey={selectedServiceKey}
-              onSelect={(service) => {
-                setSelectedServiceKey(service.key);
-              }}
-            />
-            <TextInput
-              value={searchZip}
-              onChangeText={(value) => {
-                setZipEdited(true);
-                setSearchZip(value.replace(/\D/g, '').slice(0, 5));
-              }}
-              keyboardType="number-pad"
-              maxLength={5}
-              placeholder="Search ZIP"
-              accessibilityLabel="Search ZIP code"
-              placeholderTextColor="#94a3b8"
-              style={{
-                minHeight: 48,
-                marginTop: 12,
-                borderWidth: 1,
-                borderColor: '#d1fae5',
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                fontSize: 16,
-                color: '#0f172a',
-                backgroundColor: '#ffffff',
-              }}
-            />
+            <TouchTarget accessibilityRole="button"
+              accessibilityLabel={showAllServices ? 'Hide all services' : 'Show all care services'}
+              onPress={() => setShowAllServices((value) => !value)}
+              style={styles.allServicesToggle}>
+              <Text style={styles.allServicesToggleText}>
+                {showAllServices ? 'Hide all services' : 'Explore all care services'}
+              </Text>
+              <ChevronDown color={palette.primary} size={20} strokeWidth={2.5} />
+            </TouchTarget>
+            {showAllServices ? (
+              <ServiceCoreGrid
+                selectedKey={selectedServiceKey}
+                onSelect={(choice) => { setSelectedServiceKey(choice.key); setShowAllServices(false); }}
+              />
+            ) : null}
 
             <PriorityCarousel
               label="SitGuru experiences"
@@ -1001,14 +1122,20 @@ export default function PetParentDashboardScreen() {
 
               <QuickAction
                 icon={
-                  <CalendarDays
+                  <Camera
                     color={palette.primary}
                     size={21}
                     strokeWidth={2.4}
                   />
                 }
-                label="Request"
-                onPress={() => router.push('/find-care')}
+                label="Pet Moments"
+                onPress={() => router.push({
+                  pathname: '/community-studio',
+                  params: {
+                    from: 'pet-moment',
+                    ...(selectedPet ? { petName: selectedPet.name } : {}),
+                  },
+                })}
                 styles={styles}
               />
 
@@ -1603,6 +1730,36 @@ function CompletedCareCard({
         <Text style={styles.completedButtonText}>Rate Guru</Text>
       </BubblePressable>
     </View>
+  );
+}
+
+function BookingPickerTile({
+  icon,
+  title,
+  value,
+  active,
+  onPress,
+  styles,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  active: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <TouchTarget accessibilityRole="button"
+      accessibilityLabel={title + ': ' + value}
+      accessibilityState={{ expanded: active }}
+      onPress={onPress}
+      style={[styles.bookingTile, active && styles.bookingTileActive]}>
+      {icon}
+      <View style={styles.bookingTileCopy}>
+        <Text style={styles.bookingTileTitle}>{title}</Text>
+        <Text style={styles.bookingTileValue} numberOfLines={2}>{value}</Text>
+      </View>
+    </TouchTarget>
   );
 }
 
@@ -2601,6 +2758,157 @@ function createStyles(isDark: boolean) {
   const palette = getPalette(isDark);
 
   return StyleSheet.create({
+    bookingFinder: {
+      backgroundColor: '#005333',
+      borderColor: '#006E42',
+      borderRadius: 26,
+      borderWidth: 1,
+      gap: 10,
+      padding: 16,
+      shadowColor: '#003B26',
+      shadowOffset: { width: 0, height: 7 },
+      shadowOpacity: 0.12,
+      shadowRadius: 15,
+    },
+    bookingEyebrow: {
+      color: '#D9F99D',
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+      letterSpacing: 1.15,
+    },
+    bookingTitle: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 25,
+      lineHeight: 29,
+    },
+    bookingSubtitle: {
+      color: '#E2FCE9',
+      fontFamily: AppFonts.medium,
+      fontSize: 14,
+      lineHeight: 21,
+      marginBottom: 5,
+    },
+    bookingGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    bookingTile: {
+      alignItems: 'flex-start',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 19,
+      borderColor: '#ECFDF5',
+      borderWidth: 2,
+      flexBasis: '47%',
+      flexGrow: 1,
+      gap: 7,
+      justifyContent: 'center',
+      minHeight: 122,
+      minWidth: '45%',
+      padding: 12,
+    },
+    bookingTileActive: {
+      borderColor: '#FB923C',
+      backgroundColor: '#FFF7ED',
+    },
+    bookingTileCopy: {
+      flex: 1,
+      width: '100%',
+      gap: 2,
+    },
+    bookingTileTitle: {
+      color: '#102339',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 17,
+      lineHeight: 21,
+    },
+    bookingTileValue: {
+      color: '#506174',
+      fontFamily: AppFonts.medium,
+      fontSize: 13,
+      lineHeight: 17,
+    },
+    bookingPickerPanel: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      gap: 8,
+      padding: 12,
+    },
+    bookingPickerOption: {
+      alignItems: 'center',
+      borderColor: '#CFE6D9',
+      borderRadius: 15,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 12,
+      minHeight: 56,
+      paddingHorizontal: 15,
+    },
+    bookingPickerOptionActive: {
+      backgroundColor: '#E8F9EF',
+      borderColor: '#0A8A51',
+    },
+    bookingPickerOptionText: {
+      color: '#102339',
+      flex: 1,
+      fontFamily: AppFonts.bold,
+      fontSize: 15,
+    },
+    bookingPickerHint: {
+      color: '#4B6355',
+      fontFamily: AppFonts.medium,
+      fontSize: 12,
+      lineHeight: 19,
+      marginHorizontal: 4,
+      marginTop: 4,
+    },
+    bookingZipInput: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#CBD5E1',
+      borderRadius: 15,
+      borderWidth: 1,
+      color: '#102339',
+      fontFamily: AppFonts.bold,
+      fontSize: 18,
+      minHeight: 58,
+      paddingHorizontal: 15,
+    },
+    bookingSearchButton: {
+      alignItems: 'center',
+      backgroundColor: '#F97316',
+      borderRadius: 20,
+      flexDirection: 'row',
+      gap: 12,
+      justifyContent: 'center',
+      minHeight: 62,
+      paddingHorizontal: 15,
+      shadowColor: '#7C2D12',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.22,
+      shadowRadius: 8,
+    },
+    bookingSearchText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 21,
+    },
+    allServicesToggle: {
+      alignItems: 'center',
+      backgroundColor: '#E7F8EF',
+      borderColor: '#D1EDDC',
+      borderRadius: 17,
+      borderWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 56,
+      paddingHorizontal: 17,
+    },
+    allServicesToggleText: {
+      color: '#005333',
+      fontFamily: AppFonts.bold,
+      fontSize: 15,
+    },
     previewCanvas: {
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -2754,8 +3062,13 @@ function createStyles(isDark: boolean) {
 
     header: {
       alignItems: 'center',
+      backgroundColor: '#005333',
+      borderRadius: 23,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      minHeight: 112,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
     },
     headerCopy: {
       flex: 1,
@@ -2763,14 +3076,14 @@ function createStyles(isDark: boolean) {
       paddingRight: 8,
     },
     dashboardTitle: {
-      color: palette.title,
+      color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
       fontSize: 21,
       letterSpacing: -0.45,
       lineHeight: 25,
     },
     welcomeText: {
-      color: palette.muted,
+      color: '#E4FBEA',
       fontFamily: AppFonts.medium,
       fontSize: 12,
     },
@@ -2784,7 +3097,7 @@ function createStyles(isDark: boolean) {
       marginTop: 2,
     },
     locationText: {
-      color: palette.muted,
+      color: '#D5F5E3',
       fontFamily: AppFonts.medium,
       fontSize: 10,
     },
@@ -2795,8 +3108,8 @@ function createStyles(isDark: boolean) {
     },
     headerIconButton: {
       alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderColor: 'rgba(255,255,255,0.28)',
       borderRadius: 999,
       borderWidth: 1,
       height: TOUCH_MIN,
@@ -2845,7 +3158,14 @@ function createStyles(isDark: boolean) {
       backgroundColor: isDark ? 'rgba(226,170,45,0.18)' : '#FFF4D8',
     },
     profileButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 999,
+      flexDirection: 'row',
+      gap: 3,
+      minHeight: 52,
+      paddingHorizontal: 4,
+      paddingRight: 9,
     },
 
     loadNotice: {
