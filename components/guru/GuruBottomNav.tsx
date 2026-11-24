@@ -68,7 +68,7 @@ export default function GuruBottomNav() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={
-                "flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-[10px] font-black leading-tight transition active:scale-[0.98] " +
+                "flex min-h-[60px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-[11px] font-black leading-tight transition active:scale-[0.98] " +
                 (active ? "text-[#0D5C3A]" : "text-slate-600 hover:bg-emerald-50")
               }
             >
