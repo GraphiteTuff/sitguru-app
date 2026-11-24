@@ -2718,108 +2718,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
-        id="ai-companions"
-        aria-label="AI Pet Companions"
-        className="bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
-              Meet the pack
-            </p>
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
-              AI Pet Companions
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
-              Tap a companion to chat — Rogue for Pet Parents, Taco for
-              Ambassadors, Scout for Gurus, Delilah for Pet Events.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 md:gap-8">
-            {aiPetCompanions.map((companion) => (
-              <div
-                key={companion.name}
-                className="flex flex-col items-center text-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackHomepageClick(
-                      `AI companion ${companion.name}`,
-                      companionChatHref(companion.id),
-                    );
-                    if (companion.id === "rogue") {
-                      openCompanionChat("rogue");
-                      return;
-                    }
-                    window.location.assign(companionChatHref(companion.id));
-                  }}
-                  className="group relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 transition hover:-translate-y-1 hover:ring-[#0D5C3A]/35 sm:h-32 sm:w-32"
-                  aria-label={companion.ctaLabel}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={companion.avatarSrc}
-                    alt={companion.name}
-                    width={128}
-                    height={128}
-                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    style={{ objectPosition: companion.objectPosition }}
-                  />
-                </button>
-                <h3 className="mt-5 text-xl font-black tracking-tight text-slate-950">
-                  {companion.name}
-                </h3>
-                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
-                  {companion.role}
-                </p>
-                <p className="mt-4 max-w-sm text-sm font-semibold leading-6 tracking-wide text-slate-600 sm:text-[15px] sm:leading-7">
-                  &ldquo;{companion.statement}&rdquo;
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackHomepageClick(
-                      `AI companion CTA ${companion.name}`,
-                      companionChatHref(companion.id),
-                    );
-                    if (companion.id === "rogue") {
-                      openCompanionChat("rogue");
-                      return;
-                    }
-                    window.location.assign(companionChatHref(companion.id));
-                  }}
-                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#0D5C3A] px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#0a4a2e]"
-                >
-                  {companion.ctaLabel}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section
-        aria-label="SitGuru premium payment integrations"
-        className="relative overflow-hidden bg-gradient-to-b from-[#f8fcfd] via-emerald-50/40 to-white py-12 sm:py-16"
-      >
-        {/* Soft atmospheric wash behind the showcase card */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-100/40 to-transparent"
-        />
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <PaymentIntegrationsGrid
-            heading="Premium payments"
-            description="Book with confidence using SitGuru’s trusted payment stack — Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid — with Trust & Safety built into every booking."
-            ariaLabel="Secure payment options for SitGuru bookings"
-          />
-        </div>
-      </section>
-
       <HomepagePawReportExperience onTrack={trackHomepageClick} />
 
       <section className="bg-white py-12 sm:py-16">
@@ -2927,8 +2825,110 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section
+        id="ai-companions"
+        aria-label="Pet Companions"
+        className="bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
+              Meet the pack
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
+              Pet Companions
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
+              Tap a companion to chat — Rogue for Pet Parents, Taco for
+              Ambassadors, Scout for Gurus, Delilah for Pet Events.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 md:gap-8">
+            {aiPetCompanions.map((companion) => (
+              <div
+                key={companion.name}
+                className="flex flex-col items-center text-center"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackHomepageClick(
+                      `AI companion ${companion.name}`,
+                      companionChatHref(companion.id),
+                    );
+                    if (companion.id === "rogue") {
+                      openCompanionChat("rogue");
+                      return;
+                    }
+                    window.location.assign(companionChatHref(companion.id));
+                  }}
+                  className="group relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 transition hover:-translate-y-1 hover:ring-[#0D5C3A]/35 sm:h-32 sm:w-32"
+                  aria-label={companion.ctaLabel}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={companion.avatarSrc}
+                    alt={companion.name}
+                    width={128}
+                    height={128}
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    style={{ objectPosition: companion.objectPosition }}
+                  />
+                </button>
+                <h3 className="mt-5 text-xl font-black tracking-tight text-slate-950">
+                  {companion.name}
+                </h3>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+                  {companion.role}
+                </p>
+                <p className="mt-4 max-w-sm text-sm font-semibold leading-6 tracking-wide text-slate-600 sm:text-[15px] sm:leading-7">
+                  &ldquo;{companion.statement}&rdquo;
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackHomepageClick(
+                      `AI companion CTA ${companion.name}`,
+                      companionChatHref(companion.id),
+                    );
+                    if (companion.id === "rogue") {
+                      openCompanionChat("rogue");
+                      return;
+                    }
+                    window.location.assign(companionChatHref(companion.id));
+                  }}
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#0D5C3A] px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#0a4a2e]"
+                >
+                  {companion.ctaLabel}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <CompactPartnerSection onTrack={trackHomepageClick} />
       <DrBaldwinPartnerSpotlight onTrack={trackHomepageClick} />
+      <section
+        aria-label="SitGuru premium payment integrations"
+        className="relative overflow-hidden bg-gradient-to-b from-[#f8fcfd] via-emerald-50/40 to-white py-12 sm:py-16"
+      >
+        {/* Soft atmospheric wash behind the showcase card */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-100/40 to-transparent"
+        />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PaymentIntegrationsGrid
+            heading="Premium payments"
+            description="Book with confidence using SitGuru’s trusted payment stack — Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid — with Trust & Safety built into every booking."
+            ariaLabel="Secure payment options for SitGuru bookings"
+          />
+        </div>
+      </section>
+
       <HomepageEventsSectionClient />
       <HomepagePlacesTeaser />
     </main>
