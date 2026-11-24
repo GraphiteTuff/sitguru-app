@@ -66,6 +66,7 @@ function applySchedule(
 export function buildDashboardSearchHref(input: {
   service: string;
   location: string;
+  petId?: string;
   timing: CareTiming;
   dates?: string[];
   rangeStart?: string;
@@ -75,6 +76,7 @@ export function buildDashboardSearchHref(input: {
   const params = new URLSearchParams();
   const service = input.service.trim();
   if (service) params.set("service", service);
+  if (input.petId?.trim()) params.set("petId", input.petId.trim());
 
   const place = readSearchPlace(input.location);
   if (place.zip) params.set("zip", place.zip);
@@ -91,6 +93,7 @@ export function withBookingSelections(
   input: {
     service?: string;
     location?: string;
+    petId?: string;
     timing: CareTiming;
     dates?: string[];
     rangeStart?: string;
@@ -102,6 +105,7 @@ export function withBookingSelections(
     const url = new URL(href, "https://www.sitguru.com");
     const place = readSearchPlace(input.location || "");
     if (input.service) url.searchParams.set("service", input.service);
+    if (input.petId?.trim()) url.searchParams.set("petId", input.petId.trim());
     if (place.zip) url.searchParams.set("zip", place.zip);
     url.searchParams.delete("date");
     url.searchParams.delete("end");
