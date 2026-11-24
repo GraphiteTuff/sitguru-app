@@ -1550,6 +1550,7 @@ export default async function GuruDashboardEarningsPage({
   }
 
   const resolvedSearchParams = await Promise.resolve(searchParams || {});
+  const showPayoutPanel = resolvedSearchParams.panel === "payouts";
   const payoutSavedParam = resolvedSearchParams.payoutSaved;
   const payoutStatusParam = resolvedSearchParams.payoutStatus;
   const paypalStatusParam = resolvedSearchParams.paypal;
@@ -1834,9 +1835,9 @@ export default async function GuruDashboardEarningsPage({
               </p>
             </div>
           </div>
-          <a href="#guru-payout-methods" className="inline-flex min-h-[56px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300 sm:w-auto">
+          <Link href="/guru/dashboard/earnings?panel=payouts#guru-payout-methods" className="inline-flex min-h-[56px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300 sm:w-auto">
             {payoutReady ? "Manage payouts" : "Set up payouts"} <ArrowRight className="h-5 w-5" aria-hidden="true" />
-          </a>
+          </Link>
         </section>
 
         <section aria-label="Detailed earnings summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1855,7 +1856,7 @@ export default async function GuruDashboardEarningsPage({
           A Pet Parent paying for a booking does not by itself mean a Guru payout was sent.
         </p>
 
-        <details id="guru-payout-methods" open={!payoutReady} className="group scroll-mt-28 overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm">
+        <details id="guru-payout-methods" open={!payoutReady || showPayoutPanel || Boolean(payoutSaveStatus || paypalStatus || stripeReturnStatus || payoutSetupError)} className="group scroll-mt-28 overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm">
           <summary className="flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">SECURE PAYOUT METHODS</p>
