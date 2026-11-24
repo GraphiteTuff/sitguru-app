@@ -9,6 +9,9 @@ import {
   MapPin,
   MessageCircle,
   Navigation,
+  PawPrint,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useEffect, useMemo } from 'react';
 import {
@@ -17,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import LiveRouteHeader from '@/components/mobile/LiveRouteHeader';
@@ -47,6 +51,8 @@ function formatClock(date: Date | null) {
  * Pet Parent live PawReport tracker — walk API metrics + event badges/logs.
  */
 export default function PawReportLiveScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 760;
   const params = useLocalSearchParams<{ bookingId?: string }>();
   const bookingId = Array.isArray(params.bookingId)
     ? params.bookingId[0]
@@ -54,6 +60,8 @@ export default function PawReportLiveScreen() {
 
   const { snapshot, loading, error, refresh, bookingId: activeId } =
     usePawReportLive(bookingId);
+  const hasBooking = Boolean(activeId || bookingId);
+  const reviewReady = hasBooking && /completed|finished|ended/i.test(snapshot.statusLabel);
 
   const coords = useMemo<LiveCoords | null>(() => {
     if (
@@ -72,6 +80,9 @@ export default function PawReportLiveScreen() {
     };
   }, [snapshot.latitude, snapshot.longitude]);
 
+  // Only show real coordinates, never the map component's generic fallback center.
+  const hasRoute = Boolean(coords || snapshot.trail.length > 0);
+
   useEffect(() => {
     if (snapshot.isLive) {
       requestContextualPushPriming();
@@ -86,16 +97,14 @@ export default function PawReportLiveScreen() {
         onRefresh={() => void refresh()}
         footer={
           <StickyActionBar embedded>
-            {snapshot.isLive ? (
+            {snapshot.isLive && hasBooking ? (
               <>
                 <SitGuruButton
                   label="Message Guru"
                   onPress={() =>
                     router.push({
                       pathname: '/conversation',
-                      params: {
-                        bookingId: activeId || bookingId || '',
-                      },
+                      params: { bookingId: activeId || bookingId || '' },
                     })
                   }
                 />
@@ -105,22 +114,31 @@ export default function PawReportLiveScreen() {
                   onPress={() => router.push('/pet-parent-dashboard')}
                 />
               </>
-            ) : (
+            ) : reviewReady ? (
               <>
                 <SitGuruButton
-                  label="Submit Visit Review"
+                  label="Review completed visit"
                   onPress={() =>
                     router.push({
                       pathname: '/reviews',
-                      params: {
-                        bookingId: activeId || bookingId || '',
-                      },
+                      params: { bookingId: activeId || bookingId || '' },
                     })
                   }
-                  accessibilityLabel="Open end-of-visit review"
                 />
                 <SitGuruButton
-                  label="Skip for now"
+                  label="My bookings"
+                  variant="secondary"
+                  onPress={() => router.push('/bookings')}
+                />
+              </>
+            ) : (
+              <>
+                <SitGuruButton
+                  label={hasBooking ? 'My bookings' : 'Find care'}
+                  onPress={() => router.push(hasBooking ? '/bookings' : '/find-care')}
+                />
+                <SitGuruButton
+                  label="Back to dashboard"
                   variant="secondary"
                   onPress={() => router.push('/pet-parent-dashboard')}
                 />
@@ -129,23 +147,48 @@ export default function PawReportLiveScreen() {
           </StickyActionBar>
         }
       >
-        <View style={styles.header}>
-          <TouchTarget
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => router.push('/pet-parent-dashboard')}
-            style={styles.back}
-          >
-            <ChevronLeft color={SitGuruColors.text} size={22} strokeWidth={2.4} />
-          </TouchTarget>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>PawReport Live</Text>
-            <Text style={styles.subtitle}>
-              {snapshot.petName}
-              {snapshot.isLive ? ' · Live now' : ` · ${snapshot.statusLabel}`}
+        <View style={[styles.pageWidth, isWide && styles.pageWidthWide]}>
+          <View style={styles.header}>
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel="Back to Pet Parent dashboard"
+              onPress={() => router.push('/pet-parent-dashboard')}
+              style={styles.back}
+            >
+              <ChevronLeft color="#FFFFFF" size={22} strokeWidth={2.4} />
+            </TouchTarget>
+            <View style={styles.headerCopy}>
+              <View style={styles.eyebrowRow}>
+                <PawPrint color="#C6F68D" size={16} strokeWidth={2.5} />
+                <Text style={styles.eyebrow}>The SitGuru care experience</Text>
+              </View>
+              <Text style={styles.title}>PawReport Live</Text>
+              <Text style={styles.subtitle}>
+                {snapshot.petName}
+                {snapshot.isLive
+                  ? ' · Live now'
+                  : hasBooking
+                    ? ' · ' + snapshot.statusLabel
+                    : ' · Choose a booking'}
+              </Text>
+            </View>
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel="Refresh PawReport"
+              onPress={() => void refresh()}
+              style={styles.refresh}
+            >
+              <RefreshCw color="#FFFFFF" size={20} strokeWidth={2.4} />
+            </TouchTarget>
+          </View>
+          <View style={styles.contextRow}>
+            <ShieldCheck color="#147346" size={18} strokeWidth={2.3} />
+            <Text style={styles.contextText}>
+              {hasBooking
+                ? "Your Guru's shared updates, connected to this booking."
+                : 'Open a booking to view live visit details. No sample data is shown here.'}
             </Text>
           </View>
-        </View>
 
         {error ? (
           <View style={styles.notice}>
@@ -302,6 +345,7 @@ export default function PawReportLiveScreen() {
             </View>
           </>
         )}
+        </View>
       </MobileScreen>
     </RoleGate>
   );
