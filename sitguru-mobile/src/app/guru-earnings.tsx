@@ -588,13 +588,13 @@ export default function GuruEarningsScreen() {
                     </BubblePressable>
 
                     <View style={styles.headerCopy}>
-                      <Text numberOfLines={1} style={styles.title}>Earnings & Payouts</Text>
-                      <Text numberOfLines={1} style={styles.subtitle}>
-                        Track care income, rewards, and Stripe payouts.
+                      <Text numberOfLines={2} allowFontScaling style={styles.title}>Earnings &amp; Payouts</Text>
+                      <Text numberOfLines={2} allowFontScaling style={styles.subtitle}>
+                        Track care earnings and secure payouts.
                       </Text>
                     </View>
 
-                    <GuruHeaderActions avatarSize={38} />
+                    <GuruHeaderActions avatarSize={44} />
                   </View>
 
                   {message ? (
@@ -1005,8 +1005,8 @@ export default function GuruEarningsScreen() {
                               No earnings activity yet
                             </Text>
                             <Text style={styles.emptyActivityText}>
-                              Completed care payouts will land here with net
-                              totals for each booking.
+                              Completed care earnings appear here. Payout statuses
+                              update when confirmed by the provider.
                             </Text>
                           </View>
                         )}
@@ -1819,10 +1819,10 @@ function createStyles(isDark: boolean) {
       flex: 1,
     },
     scrollContent: {
-      gap: 13,
-      paddingBottom: 16,
-      paddingHorizontal: 16,
-      paddingTop: 10,
+      gap: 16,
+      paddingBottom: 22,
+      paddingHorizontal: 14,
+      paddingTop: 12,
     },
     header: {
       alignItems: 'center',
@@ -1831,10 +1831,10 @@ function createStyles(isDark: boolean) {
       borderRadius: 21,
       borderWidth: 1,
       flexDirection: 'row',
-      gap: 9,
-      minHeight: 96,
+      gap: 8,
+      minHeight: 112,
       paddingHorizontal: 12,
-      paddingVertical: 12,
+      paddingVertical: 16,
     },
     headerCopy: {
       flex: 1,
@@ -1858,9 +1858,9 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 999,
       borderWidth: 1,
-      height: 38,
+      height: 48,
       justifyContent: 'center',
-      width: 38,
+      width: 48,
     },
     modeToggle: {
       alignItems: 'center',
@@ -1913,9 +1913,9 @@ function createStyles(isDark: boolean) {
       alignItems: 'center',
       backgroundColor: palette.primarySoft,
       borderRadius: 13,
-      height: 44,
+      height: 48,
       justifyContent: 'center',
-      width: 44,
+      width: 48,
     },
     payoutStatusIconWarning: {
       backgroundColor: isDark ? '#3A251D' : '#FFF0E7',
@@ -1924,27 +1924,27 @@ function createStyles(isDark: boolean) {
     payoutStatusEyebrow: {
       color: palette.primary,
       fontFamily: AppFonts.bold,
-      fontSize: 7,
+      fontSize: 10,
       letterSpacing: 0.7,
     },
     payoutStatusTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 12,
+      fontSize: 15,
     },
     payoutStatusText: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
-      lineHeight: 12,
+      fontSize: 12,
+      lineHeight: 17,
     },
     payoutStatusButton: {
       alignItems: 'center',
       backgroundColor: palette.primary,
       borderRadius: 999,
-      height: 36,
+      height: 48,
       justifyContent: 'center',
-      width: 36,
+      width: 48,
     },
     loadingCard: {
       backgroundColor: palette.surface,
@@ -1983,9 +1983,9 @@ function createStyles(isDark: boolean) {
       shadowRadius: 17,
     },
     heroEyebrow: {
-      color: 'rgba(255,255,255,0.76)',
+      color: '#EAF7EF',
       fontFamily: AppFonts.bold,
-      fontSize: 7,
+      fontSize: 11,
       letterSpacing: 0.75,
     },
     heroValue: {
@@ -1995,9 +1995,9 @@ function createStyles(isDark: boolean) {
       letterSpacing: -0.6,
     },
     heroMeta: {
-      color: 'rgba(255,255,255,0.84)',
+      color: '#EAF7EF',
       fontFamily: AppFonts.medium,
-      fontSize: 8,
+      fontSize: 12,
     },
     trendChart: {
       alignItems: 'flex-end',
@@ -2032,12 +2032,13 @@ function createStyles(isDark: boolean) {
     heroMetricValue: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
+      fontSize: 13,
     },
     heroMetricLabel: {
-      color: 'rgba(255,255,255,0.68)',
+      color: '#EAF7EF',
       fontFamily: AppFonts.medium,
-      fontSize: 6,
+      fontSize: 10,
+      lineHeight: 14,
     },
     metricGrid: {
       flexDirection: 'row',
@@ -2051,9 +2052,9 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       flexBasis: '47%',
       flexGrow: 1,
-      gap: 3,
-      minHeight: 93,
-      padding: 11,
+      gap: 6,
+      minHeight: 114,
+      padding: 13,
     },
     metricIcon: {
       alignItems: 'center',
@@ -2072,7 +2073,8 @@ function createStyles(isDark: boolean) {
     metricLabel: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
+      fontSize: 12,
+      lineHeight: 17,
     },
     breakdownCard: {
       backgroundColor: palette.surface,
@@ -2155,13 +2157,13 @@ function createStyles(isDark: boolean) {
     cardEyebrow: {
       color: palette.primary,
       fontFamily: AppFonts.bold,
-      fontSize: 7,
+      fontSize: 11,
       letterSpacing: 0.75,
     },
     cardTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 14,
+      fontSize: 18,
       marginBottom: 5,
       marginTop: 2,
     },
@@ -2170,20 +2172,24 @@ function createStyles(isDark: boolean) {
       borderBottomColor: palette.border,
       borderBottomWidth: 1,
       flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
       justifyContent: 'space-between',
-      minHeight: 39,
+      minHeight: 52,
+      paddingVertical: 9,
     },
     breakdownRowLast: { borderBottomWidth: 0 },
     breakdownLabel: {
       color: palette.text,
       flex: 1,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
+      fontSize: 12,
+      lineHeight: 17,
     },
     breakdownValue: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     activityCard: {
       backgroundColor: palette.surface,
@@ -2210,9 +2216,10 @@ function createStyles(isDark: boolean) {
       borderBottomColor: palette.border,
       borderBottomWidth: 1,
       flexDirection: 'row',
-      gap: 9,
+      gap: 10,
       paddingHorizontal: 13,
-      paddingVertical: 10,
+      paddingVertical: 16,
+      minHeight: 84,
     },
     transactionRowLast: { borderBottomWidth: 0 },
     transactionIcon: {
@@ -2227,12 +2234,13 @@ function createStyles(isDark: boolean) {
     transactionTitle: {
       color: palette.title,
       fontFamily: AppFonts.bold,
-      fontSize: 10,
+      fontSize: 14,
     },
     transactionDetail: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 7,
+      fontSize: 11,
+      lineHeight: 16,
     },
     transactionAmountWrap: {
       alignItems: 'flex-end',
@@ -2241,13 +2249,13 @@ function createStyles(isDark: boolean) {
     transactionAmount: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 10,
+      fontSize: 13,
     },
     transactionAmountNegative: { color: palette.orange },
     transactionStatus: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 7,
+      fontSize: 11,
     },
     emptyActivity: {
       gap: 4,
@@ -2257,14 +2265,14 @@ function createStyles(isDark: boolean) {
     emptyActivityTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
+      fontSize: 16,
       textAlign: 'center',
     },
     emptyActivityText: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
-      lineHeight: 12,
+      fontSize: 12,
+      lineHeight: 18,
       textAlign: 'center',
     },
     stripeCard: {
@@ -2289,13 +2297,13 @@ function createStyles(isDark: boolean) {
     stripeTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
+      fontSize: 15,
     },
     stripeText: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
-      lineHeight: 12,
+      fontSize: 12,
+      lineHeight: 18,
     },
     actionStack: { gap: 8 },
     primaryButton: {
