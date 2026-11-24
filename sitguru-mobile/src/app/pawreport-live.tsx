@@ -303,7 +303,18 @@ export default function PawReportLiveScreen() {
                   ))}
                 </ScrollView>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.photoSection}>
+                <Text style={styles.sectionEyebrow}>Photos from your Guru</Text>
+                <Text style={styles.sectionTitle}>Visit gallery</Text>
+                <View style={styles.emptyPhotoRow}>
+                  <Camera color="#00844C" size={24} strokeWidth={2.3} />
+                  <Text style={styles.emptyPhotoText}>
+                    Photos your Guru shares during this visit will appear here.
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.section}>
               <Text style={styles.sectionEyebrow}>Care log</Text>
@@ -574,6 +585,21 @@ const styles = StyleSheet.create({
   photoTrack: {
     gap: MobileSpace.sm,
     paddingVertical: MobileSpace.xs,
+  },
+  emptyPhotoRow: {
+    backgroundColor: '#EFFAF4',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: MobileSpace.md,
+    padding: MobileSpace.md,
+  },
+  emptyPhotoText: {
+    color: '#425F50',
+    flex: 1,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 20,
   },
   photoThumb: {
     borderRadius: 16,
