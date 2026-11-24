@@ -1782,7 +1782,7 @@ function GuruDashboardProfilePageContent() {
     >
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+          <div data-brand-green="true" className="grid gap-8 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
@@ -1815,8 +1815,7 @@ function GuruDashboardProfilePageContent() {
               </div>
 
               <h1
-                className="max-w-4xl text-4xl font-extrabold tracking-[-0.045em] !text-slate-950 md:text-6xl lg:text-7xl"
-                style={{ color: "#07112f" }}
+                className="max-w-4xl text-3xl font-extrabold tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl lg:text-6xl"
               >
                 {activeStep === "1"
                   ? "Step 1: Complete your Guru profile"
@@ -1826,8 +1825,7 @@ function GuruDashboardProfilePageContent() {
               </h1>
 
               <p
-                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
-                style={{ color: "#1f2937" }}
+                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-[#EAF7EF] md:text-lg"
               >
                 Only this step is shown so you can focus. Save when finished,
                 then continue to the next step or return to the dashboard to see
@@ -1839,7 +1837,7 @@ function GuruDashboardProfilePageContent() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
+                  className="inline-flex min-h-[56px] min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-6 py-4 text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:bg-[#A74400] disabled:opacity-60"
                 >
                   {uploadingPhoto ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1900,20 +1898,17 @@ function GuruDashboardProfilePageContent() {
               ) : null}
 
               <h2
-                className="mt-6 text-3xl font-extrabold tracking-tight !text-slate-950 md:text-4xl"
-                style={{ color: "#07112f" }}
+                className="mt-6 text-3xl font-extrabold tracking-tight !text-white md:text-4xl"
               >
                 {publicPreviewName}
               </h2>
               <p
-                className="mt-2 text-lg font-semibold !text-slate-700"
-                style={{ color: "#334155" }}
+                className="mt-2 text-lg font-semibold !text-[#EAF7EF]"
               >
                 {publicPreviewHeadline}
               </p>
               <p
-                className="mt-1 max-w-xs text-sm font-semibold leading-6 !text-slate-600"
-                style={{ color: "#475569" }}
+                className="mt-1 max-w-xs text-sm font-semibold leading-6 !text-[#EAF7EF]"
               >
                 {publicPreviewLocation}
               </p>
