@@ -2477,7 +2477,7 @@ div.homepage-chat-panel__header,
 }
 
 /* Keep Scout above the native-style Guru web tab bar on small screens. */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   body:has([data-guru-mobile-bottom-nav]) [data-ai-scout-companion="true"] {
     bottom: calc(7rem + var(--sg-chrome-bottom, 0px)) !important;
     right: 1rem;
