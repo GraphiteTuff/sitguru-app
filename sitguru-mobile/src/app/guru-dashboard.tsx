@@ -1501,7 +1501,7 @@ export default function GuruDashboardScreen() {
                       }
                       label="Calendar"
                       onPress={() =>
-                        router.push('/guru-pricing?step=2')
+                        router.push({ pathname: '/guru-pricing', params: { step: '2' } })
                       }
                       styles={styles}
                     />
