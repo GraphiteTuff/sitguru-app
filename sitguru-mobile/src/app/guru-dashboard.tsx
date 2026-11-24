@@ -3959,9 +3959,13 @@ function createStyles(
     },
     header: {
       alignItems: 'center',
+      backgroundColor: '#06462F',
+      borderRadius: 24,
       flexDirection: 'row',
-      justifyContent:
-        'space-between',
+      justifyContent: 'space-between',
+      minHeight: 132,
+      paddingHorizontal: 14,
+      paddingVertical: 16,
     },
     headerCopy: {
       flex: 1,
@@ -3969,14 +3973,14 @@ function createStyles(
       paddingRight: 8,
     },
     dashboardTitle: {
-      color: palette.title,
+      color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
       fontSize: 21,
       letterSpacing: -0.45,
     },
     welcomeText: {
-      color: palette.muted,
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
       fontSize: 11,
@@ -3991,7 +3995,7 @@ function createStyles(
       marginTop: 2,
     },
     locationText: {
-      color: palette.muted,
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
       fontSize: 9,
@@ -4003,10 +4007,8 @@ function createStyles(
     },
     headerIconButton: {
       alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.border,
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderColor: 'rgba(255,255,255,0.28)',
       borderRadius: 999,
       borderWidth: 1,
       height: 38,
@@ -4065,7 +4067,22 @@ function createStyles(
         : '#FFF4D8',
     },
     profileButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 999,
+      flexDirection: 'row',
+      gap: 3,
+      minHeight: 54,
+      paddingHorizontal: 5,
+      paddingRight: 10,
+    },
+    roleStatusPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 999,
+      marginTop: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
     },
     loadNotice: {
       backgroundColor:
@@ -4085,15 +4102,12 @@ function createStyles(
     },
     primaryActionCard: {
       alignItems: 'center',
-      backgroundColor:
-        isDark
-          ? '#087A4C'
-          : '#087F50',
-      borderRadius: 21,
+      backgroundColor: '#006B45',
+      borderRadius: 23,
       flexDirection: 'row',
-      gap: 10,
-      minHeight: 92,
-      padding: 14,
+      gap: 12,
+      minHeight: 116,
+      padding: 16,
       shadowColor:
         palette.shadow,
       shadowOffset: {
@@ -4110,25 +4124,23 @@ function createStyles(
       gap: 2,
     },
     primaryActionEyebrow: {
-      color:
-        'rgba(255,255,255,0.78)',
+      color: '#F7E7B0',
       fontFamily: AppFonts.bold,
-      fontSize: 8,
+      fontSize: 11,
       letterSpacing: 0.8,
     },
     primaryActionTitle: {
       color: '#FFFFFF',
       fontFamily:
         AppFonts.extraBold,
-      fontSize: 18,
+      fontSize: 21,
     },
     primaryActionText: {
-      color:
-        'rgba(255,255,255,0.84)',
+      color: '#EAF7EF',
       fontFamily:
         AppFonts.medium,
-      fontSize: 10,
-      lineHeight: 14,
+      fontSize: 13,
+      lineHeight: 19,
     },
     primaryActionIcon: {
       alignItems: 'center',
