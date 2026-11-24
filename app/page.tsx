@@ -2827,7 +2827,7 @@ export default function HomePage() {
 
       <section
         id="ai-companions"
-        aria-label="Pet Companions"
+        aria-label="Your Pet Companions"
         className="bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -2836,7 +2836,7 @@ export default function HomePage() {
               Meet the pack
             </p>
             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
-              Pet Companions
+              Your Pet Companions
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
               Tap a companion to chat — Rogue for Pet Parents, Taco for
