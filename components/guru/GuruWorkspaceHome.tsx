@@ -60,7 +60,7 @@ function Portrait({
     <span
       className={
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-emerald-100 bg-emerald-50 font-black text-emerald-800 " +
-        (large ? "h-20 w-20 rounded-3xl sm:h-24 sm:w-24" : "h-20 w-20 rounded-2xl")
+        (large ? "h-24 w-24 rounded-3xl sm:h-28 sm:w-28" : "h-24 w-24 rounded-2xl")
       }
     >
       {src ? (
@@ -90,9 +90,9 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex min-h-[104px] min-w-0 flex-col justify-center gap-1.5 rounded-[1.3rem] border border-emerald-100 bg-white p-3.5 shadow-[0_10px_32px_rgba(15,23,42,0.05)] transition hover:border-emerald-300 hover:shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-400 sm:p-4"
+      className="group flex min-h-[128px] min-w-0 flex-col justify-center gap-2 rounded-[1.3rem] border border-emerald-100 bg-white p-3.5 shadow-[0_10px_32px_rgba(15,23,42,0.05)] transition hover:border-emerald-300 hover:bg-[#FAFFFC] hover:shadow-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-400 sm:min-h-[112px] sm:p-4"
     >
-      <span className="flex items-center gap-2.5">
+      <span className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#E8F8EF] text-[#0D5C3A]">
           <Icon className="h-6 w-6" aria-hidden="true" />
         </span>
@@ -236,6 +236,17 @@ export default function GuruWorkspaceHome({
         </div>
       </section>
 
+      <nav aria-label="Jump to Guru workspaces" className="grid grid-cols-2 gap-3">
+        <Link href="#guru-connect-care" className="flex min-h-[76px] items-center justify-between gap-2 rounded-[1.3rem] border-2 border-emerald-200 bg-white px-3 py-3 font-black text-emerald-950 shadow-sm transition hover:border-emerald-600 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-400 sm:px-5">
+          <span className="flex min-w-0 items-center gap-2"><PawPrint className="h-6 w-6 shrink-0 text-emerald-700" aria-hidden="true" /><span className="text-sm leading-tight sm:text-base">Connect &amp; Care</span></span>
+          <ChevronRight className="hidden h-5 w-5 shrink-0 text-emerald-700 sm:block" aria-hidden="true" />
+        </Link>
+        <Link href="#guru-promote-grow" className="flex min-h-[76px] items-center justify-between gap-2 rounded-[1.3rem] border-2 border-orange-200 bg-white px-3 py-3 font-black text-emerald-950 shadow-sm transition hover:border-orange-500 hover:bg-orange-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-orange-400 sm:px-5">
+          <span className="flex min-w-0 items-center gap-2"><Megaphone className="h-6 w-6 shrink-0 text-[#A74400]" aria-hidden="true" /><span className="text-sm leading-tight sm:text-base">Promote &amp; Grow</span></span>
+          <ChevronRight className="hidden h-5 w-5 shrink-0 text-[#A74400] sm:block" aria-hidden="true" />
+        </Link>
+      </nav>
+
       <section aria-labelledby="guru-priority-heading" className="rounded-[1.9rem] border border-emerald-100 bg-white p-4 shadow-[0_16px_42px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p id="guru-priority-heading" className="text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">WHAT NEEDS YOUR ATTENTION</p>
@@ -255,12 +266,19 @@ export default function GuruWorkspaceHome({
         </Link>
       </section>
 
-      <section aria-label="Guru quick actions" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <QuickAction href="/guru/dashboard/bookings" title="Bookings" helper="Requests and upcoming care" icon={CalendarDays} />
-        <QuickAction href="/guru/dashboard/availability" title="My Schedule" helper="Availability and time off" icon={Clock3} />
-        <QuickAction href="/guru/dashboard/messages" title="Messages" helper={messageCount === 1 ? "1 Pet Parent conversation" : String(messageCount) + " conversations"} icon={MessageCircle} />
-        <QuickAction href="/guru/dashboard/earnings" title="Earnings" helper="Payments and payouts" icon={CircleDollarSign} />
-      </section>
+      <section id="guru-connect-care" aria-label="Connect and Care" className="space-y-4 scroll-mt-28">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.15em] text-[#0D5C3A]">CONNECT &amp; CARE</p>
+          <h2 className="mt-1 text-xl font-black text-emerald-950 sm:text-2xl">Manage your day</h2>
+        </div>
+        <nav aria-label="Guru daily actions" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <QuickAction href="/guru/dashboard/bookings" title="Bookings" helper="Requests and upcoming care" icon={CalendarDays} />
+          <QuickAction href="/guru/dashboard/availability" title="My Schedule" helper="Availability and time off" icon={Clock3} />
+          <QuickAction href="/guru/dashboard/messages" title="Messages" helper={messageCount === 1 ? "1 Pet Parent conversation" : String(messageCount) + " conversations"} icon={MessageCircle} />
+          <QuickAction href="/guru/dashboard/earnings" title="Earnings" helper="Payments and payouts" icon={CircleDollarSign} />
+          <QuickAction href="/guru/dashboard/profile" title="My Profile" helper="Photos, bio and services" icon={UserRound} />
+          <QuickAction href="/guru/dashboard/promote" title="Share Profile" helper="Reach nearby Pet Parents" icon={Megaphone} />
+        </nav>
 
       <section aria-label="Guru activity summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatChip href="/guru/dashboard/bookings" label="New requests" value={String(requests.length)} />
@@ -324,7 +342,7 @@ export default function GuruWorkspaceHome({
                       <p className="mt-1 text-xs font-semibold text-slate-500">{visit.when}</p>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
                     <Link href={visit.detailHref} className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border-2 border-emerald-700 bg-white px-2 text-center text-sm font-black text-emerald-900 hover:bg-emerald-50">View Booking</Link>
                     <Link href={visit.reportHref} className="inline-flex min-h-[56px] items-center justify-center gap-1 rounded-2xl bg-[#0D5C3A] px-2 text-center text-sm font-black !text-white hover:bg-emerald-800"><PawPrint className="h-4 w-4" aria-hidden /> PawReport</Link>
                   </div>
@@ -335,7 +353,14 @@ export default function GuruWorkspaceHome({
         </section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      </section>
+
+      <section id="guru-promote-grow" aria-label="Promote and Grow" className="space-y-4 scroll-mt-28">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.15em] text-[#0D5C3A]">PROMOTE &amp; GROW</p>
+          <h2 className="mt-1 text-xl font-black text-emerald-950 sm:text-2xl">Build your Guru business</h2>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[1.9rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">GROW YOUR BUSINESS</p>
           <h2 className="mt-1 text-xl font-black !text-slate-950">Get more Pet Parent bookings</h2>
@@ -386,6 +411,7 @@ export default function GuruWorkspaceHome({
           })}
         </nav>
       </details>
+      </section>
     </div>
   );
 }

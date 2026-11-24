@@ -22,8 +22,6 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
-  UserCircle,
-  UserPlus,
   Wallet,
 } from "lucide-react";
 
@@ -89,48 +87,11 @@ type GuruDashboardHeaderProps = {
 };
 
 const navItems = [
-  {
-    label: "Dashboard",
-    href: "/guru/dashboard",
-    tab: "dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Bookings",
-    href: "/guru/dashboard/bookings",
-    tab: "bookings",
-    icon: CalendarDays,
-  },
-  {
-    label: "Referrals",
-    href: "/guru/dashboard/referrals",
-    tab: "referrals",
-    icon: UserPlus,
-  },
-  {
-    label: "Messages",
-    href: "/guru/dashboard/messages",
-    tab: "messages",
-    icon: MessageCircle,
-  },
-  {
-    label: "My Profile",
-    href: "/guru/dashboard/profile",
-    tab: "profile",
-    icon: UserCircle,
-  },
-  {
-    label: "Availability",
-    href: "/guru/dashboard/availability",
-    tab: "availability",
-    icon: CalendarDays,
-  },
-  {
-    label: "Earnings",
-    href: "/guru/dashboard/earnings",
-    tab: "earnings",
-    icon: Wallet,
-  },
+  { label: "Home", href: "/guru/dashboard", tab: "dashboard", icon: LayoutDashboard },
+  { label: "Bookings", href: "/guru/dashboard/bookings", tab: "bookings", icon: CalendarDays },
+  { label: "Messages", href: "/guru/dashboard/messages", tab: "messages", icon: MessageCircle },
+  { label: "Availability", href: "/guru/dashboard/availability", tab: "availability", icon: CalendarDays },
+  { label: "Earnings", href: "/guru/dashboard/earnings", tab: "earnings", icon: Wallet },
 ] as const;
 
 const guruAccountMenuLinks = [
@@ -262,6 +223,8 @@ export default function GuruDashboardHeader({
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const mobileTriggerRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setLoadedProfile((current) => ({
@@ -416,10 +379,11 @@ export default function GuruDashboardHeader({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        accountMenuRef.current &&
-        !accountMenuRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as Node;
+      const insideDesktop = accountMenuRef.current?.contains(target);
+      const insideMobileTrigger = mobileTriggerRef.current?.contains(target);
+      const insideMobilePanel = mobileMenuRef.current?.contains(target);
+      if (!insideDesktop && !insideMobileTrigger && !insideMobilePanel) {
         setAccountMenuOpen(false);
       }
     }
@@ -438,6 +402,10 @@ export default function GuruDashboardHeader({
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    setAccountMenuOpen(false);
+  }, [pathname]);
 
   const guruName = loadedProfile.name || "Guru";
   const guruEmail = loadedProfile.email || "";
@@ -483,7 +451,7 @@ export default function GuruDashboardHeader({
 
   return (
     <header className="sg-guru-header sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
-      <div className="mx-auto flex h-[84px] w-full max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[76px] w-full max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-[84px] sm:px-6 lg:px-8">
         <Link
           href="/guru/dashboard"
           className="inline-flex h-14 shrink-0 items-center justify-start bg-transparent transition hover:opacity-90 lg:h-16"
@@ -500,7 +468,7 @@ export default function GuruDashboardHeader({
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-4 xl:flex xl:gap-5">
+        <nav aria-label="Guru desktop navigation" className="hidden flex-1 items-center justify-center gap-4 xl:flex 2xl:gap-6">
           {navItems.map((item) => {
             const isActive =
               resolvedActiveTab === item.tab ||
@@ -510,7 +478,7 @@ export default function GuruDashboardHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="sg-guru-nav-link relative inline-flex h-[84px] items-center text-[14px] font-semibold tracking-[-0.015em] transition-colors hover:text-emerald-700 xl:text-[15px]"
+                className="sg-guru-nav-link relative inline-flex h-[84px] items-center whitespace-nowrap text-[14px] font-bold tracking-[-0.015em] transition-colors hover:text-emerald-700 2xl:text-[15px]"
                 style={{ color: isActive ? "#020617" : "#334155" }}
               >
                 <span style={{ color: isActive ? "#020617" : "#334155" }}>
@@ -536,7 +504,7 @@ export default function GuruDashboardHeader({
         <div className="hidden items-center gap-3 xl:flex">
           <Link
             href="/guru/success-center"
-            className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+            className="sg-guru-success-link hidden h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 2xl:inline-flex"
             style={{ color: "#0f172a" }}
           >
             <BookOpen
@@ -669,7 +637,7 @@ export default function GuruDashboardHeader({
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 xl:hidden">
+        <div ref={mobileTriggerRef} className="flex items-center gap-2 xl:hidden">
           <button
             type="button"
             onClick={() => setAccountMenuOpen((value) => !value)}
@@ -679,6 +647,7 @@ export default function GuruDashboardHeader({
             aria-label="Open Guru profile and switch workspace"
           >
             {renderGuruAvatar("h-11 w-11")}
+            <span className="hidden max-w-[105px] truncate text-sm font-bold text-emerald-950 min-[420px]:inline">{guruName.split(" ")[0]}</span>
             <ChevronDown className={"h-5 w-5 text-emerald-900 transition-transform " + (accountMenuOpen ? "rotate-180" : "")} aria-hidden="true" />
           </button>
         </div>
@@ -686,7 +655,10 @@ export default function GuruDashboardHeader({
 
             {accountMenuOpen ? (
         <div
-          className="border-t border-slate-200 bg-white px-4 py-4 xl:hidden"
+          ref={mobileMenuRef}
+          role="navigation"
+          aria-label="Guru account and workspaces"
+          className="absolute right-3 top-[calc(100%+0.5rem)] z-[70] max-h-[calc(100dvh-8rem)] w-[calc(100vw-1.5rem)] max-w-[420px] overflow-y-auto overscroll-contain rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.20)] xl:hidden"
           style={{ color: "#0f172a" }}
         >
           <div className="mx-auto grid max-w-[1500px] gap-2">
