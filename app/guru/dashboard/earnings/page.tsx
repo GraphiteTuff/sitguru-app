@@ -1797,7 +1797,7 @@ export default async function GuruDashboardEarningsPage({
             <Link href="#guru-earnings-history" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-center text-sm font-black !text-[#06462F] shadow-sm transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
               Earnings history <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
-            <Link href="#guru-payout-methods" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl border-2 border-white/60 bg-white/10 px-4 py-3 text-center text-sm font-black !text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
+            <Link href="/guru/dashboard/earnings?panel=payouts#guru-payout-methods" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl border-2 border-white/60 bg-white/10 px-4 py-3 text-center text-sm font-black !text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
               Payout settings <Wallet className="h-5 w-5 shrink-0" aria-hidden="true" />
             </Link>
           </nav>
@@ -1829,14 +1829,14 @@ export default async function GuruDashboardEarningsPage({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">PAYOUT ACCOUNT STATUS</p>
-              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">{payoutReady ? "Payout account ready" : "Finish payout setup"}</h2>
+              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">{payoutReady ? "Payout account ready" : payoutSetupError ? "Payout status needs a refresh" : "Finish payout setup"}</h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                {payoutReady ? "Payouts are enabled through " + payoutProvider + ". Individual transfers still depend on eligible bookings and provider processing." : "Connect Stripe or PayPal to receive payouts from eligible care bookings. Your bookings and earnings remain visible here."}
+                {payoutReady ? "Payouts are enabled through " + payoutProvider + ". Individual transfers still depend on eligible bookings and provider processing." : payoutSetupError ? "We couldn't confirm the latest payout account status. Open payout settings to check again." : "Connect Stripe or PayPal to receive payouts from eligible care bookings. Your bookings and earnings remain visible here."}
               </p>
             </div>
           </div>
           <Link href="/guru/dashboard/earnings?panel=payouts#guru-payout-methods" className="inline-flex min-h-[56px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300 sm:w-auto">
-            {payoutReady ? "Manage payouts" : "Set up payouts"} <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            {payoutReady ? "Manage payouts" : payoutSetupError ? "Check payout status" : "Set up payouts"} <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </Link>
         </section>
 
