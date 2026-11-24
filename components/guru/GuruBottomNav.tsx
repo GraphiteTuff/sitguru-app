@@ -52,7 +52,7 @@ export default function GuruBottomNav() {
   return (
     <nav
       aria-label="Guru mobile navigation"
-      className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-emerald-100 bg-white/95 shadow-[0_-10px_28px_rgba(15,23,42,0.09)] backdrop-blur-md lg:hidden"
+      className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-emerald-100 bg-white/95 shadow-[0_-10px_28px_rgba(15,23,42,0.09)] backdrop-blur-md xl:hidden"
       style={{
         bottom: "var(--sg-chrome-bottom, 0px)",
         paddingBottom: "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
