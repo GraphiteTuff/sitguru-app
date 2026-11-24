@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import {
   ArrowLeft,
   BadgeDollarSign,
@@ -296,20 +297,7 @@ export default function GuruActivityPage() {
   const messageItems = activity.filter((item) => item.type === "message").length;
   const bookingItems = activity.filter((item) => item.type === "booking").length;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F7FFFB] px-4 py-8 text-slate-950 sm:px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className={shellCardClasses("p-8 text-center")}>
-            <p className="text-lg font-semibold text-slate-950">Loading activity feed...</p>
-            <p className="mt-2 text-sm text-slate-600">
-              Pulling your guru alerts, bookings, trust, and payment signals.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <SitGuruPortalLoading portal="Guru" message="Loading your Guru activity..." />;
 
   if (!guru) {
     return (
@@ -335,7 +323,7 @@ export default function GuruActivityPage() {
               </Link>
               <Link
                 href="/guru/login"
-                className="rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                className="inline-flex min-h-[52px] items-center rounded-2xl bg-[#0D5C3A] px-5 py-2.5 text-sm font-black !text-white transition hover:bg-emerald-800"
               >
                 Back to Guru Login
               </Link>
