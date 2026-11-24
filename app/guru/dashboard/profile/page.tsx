@@ -1864,14 +1864,14 @@ function GuruDashboardProfilePageContent() {
 
                 <Link
                   href={publicProfileHref}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                  className="inline-flex min-h-[58px] min-w-0 items-center justify-center rounded-2xl bg-white px-3 py-3 text-center text-sm font-extrabold !text-emerald-950 shadow-sm ring-1 ring-white/80 transition hover:bg-emerald-50 sm:min-w-[160px] sm:px-6"
                 >
                   Preview profile
                 </Link>
 
                 <Link
                   href={routes.messages}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                  className="col-span-2 inline-flex min-h-[54px] min-w-0 items-center justify-center rounded-2xl border-2 border-white/70 bg-white/10 px-3 py-3 text-center text-sm font-extrabold !text-white transition hover:bg-white/20 sm:col-span-1 sm:min-w-[150px] sm:px-6"
                 >
                   Messages
                 </Link>
@@ -1881,20 +1881,26 @@ function GuruDashboardProfilePageContent() {
             <div className="flex flex-col items-center text-center">
               <div className="relative">
                 <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
-                <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  aria-label="Change your Guru profile photo"
+                  className="group relative flex h-48 w-48 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl transition hover:ring-4 hover:ring-lime-300 focus-visible:outline focus-visible:outline-4 focus-visible:outline-white sm:h-56 sm:w-56 md:h-60 md:w-60"
+                >
                   {profilePhotoUrl ? (
                     <Image
                       src={profilePhotoUrl}
                       alt={`${publicPreviewName} profile photo`}
                       fill
-                      sizes="224px"
+                      sizes="240px"
                       className="object-cover"
                       unoptimized
                     />
                   ) : (
                     publicPreviewName.charAt(0).toUpperCase()
                   )}
-                </div>
+                </button>
 
                 <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
                   🐾
@@ -1912,8 +1918,9 @@ function GuruDashboardProfilePageContent() {
                 </div>
               ) : null}
 
+              <p className="mt-4 text-sm font-extrabold !text-[#EAF7EF]">Tap your photo to change it</p>
               <h2
-                className="mt-6 text-3xl font-extrabold tracking-tight !text-white md:text-4xl"
+                className="mt-3 text-2xl font-extrabold tracking-tight !text-white sm:text-3xl md:text-4xl"
               >
                 {publicPreviewName}
               </h2>
@@ -1930,7 +1937,7 @@ function GuruDashboardProfilePageContent() {
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-6 md:px-8">
+          <div className="grid grid-cols-2 gap-2 bg-white px-3 py-4 sm:gap-3 sm:px-6 sm:py-6 md:grid-cols-3 xl:grid-cols-6 md:px-8">
             {[
               { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
               { label: "Services", value: services.length, icon: "🐾" },
@@ -1958,18 +1965,18 @@ function GuruDashboardProfilePageContent() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
+                className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200 sm:rounded-3xl sm:p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold !text-slate-500">
                       {item.label}
                     </p>
-                    <p className="mt-2 text-3xl font-extrabold !text-slate-950">
+                    <p className="mt-2 break-words text-xl font-extrabold !text-slate-950 sm:text-2xl">
                       {item.value}
                     </p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                  <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100 sm:flex">
                     {item.icon}
                   </div>
                 </div>
@@ -2052,7 +2059,7 @@ function GuruDashboardProfilePageContent() {
           </div>
         )}
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <section className="mt-5 grid gap-4 xl:grid-cols-[1.08fr_0.92fr] xl:gap-6">
           <div className="space-y-6">
             <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -2109,7 +2116,7 @@ function GuruDashboardProfilePageContent() {
                     id="profile"
                     className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
                   >
-                    <div className="mb-5 rounded-[1.3rem] bg-[#07132f] px-5 py-4">
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
                         Step 1
                       </p>
@@ -2138,7 +2145,7 @@ function GuruDashboardProfilePageContent() {
                             setDisplayName(event.target.value)
                           }
                           placeholder="Your public display name"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2156,7 +2163,7 @@ function GuruDashboardProfilePageContent() {
                             setSlug(slugify(event.target.value))
                           }
                           placeholder="your-public-slug"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2172,7 +2179,7 @@ function GuruDashboardProfilePageContent() {
                           value={headline}
                           onChange={(event) => setHeadline(event.target.value)}
                           placeholder="Ex: Trusted Pet Care Guru"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2201,7 +2208,7 @@ function GuruDashboardProfilePageContent() {
                           aria-required="true"
                           aria-invalid={experienceFieldError ? true : undefined}
                           aria-describedby="years_experience_help years_experience_error"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           id="years_experience_help"
@@ -2237,7 +2244,7 @@ function GuruDashboardProfilePageContent() {
                           onChange={(event) => setBio(event.target.value)}
                           rows={6}
                           placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2341,7 +2348,7 @@ function GuruDashboardProfilePageContent() {
                             setProfilePhotoUrl(event.target.value)
                           }
                           placeholder="https://..."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
                     </div>
@@ -2379,7 +2386,7 @@ function GuruDashboardProfilePageContent() {
                           value={city}
                           onChange={(event) => setCity(event.target.value)}
                           placeholder="Quakertown"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2398,7 +2405,7 @@ function GuruDashboardProfilePageContent() {
                           }
                           placeholder="PA"
                           maxLength={2}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2418,7 +2425,7 @@ function GuruDashboardProfilePageContent() {
                           placeholder="18951"
                           inputMode="numeric"
                           maxLength={5}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
@@ -2447,7 +2454,7 @@ function GuruDashboardProfilePageContent() {
                           }
                           placeholder="25"
                           inputMode="decimal"
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p
                           className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
@@ -2476,7 +2483,7 @@ function GuruDashboardProfilePageContent() {
                             setStreetAddress(event.target.value)
                           }
                           placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                       </div>
 
@@ -2510,7 +2517,7 @@ function GuruDashboardProfilePageContent() {
                     id="services"
                     className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
                   >
-                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0ea5e9_100%)] px-5 py-4">
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
                         Step 3
                       </p>
@@ -2628,7 +2635,7 @@ function GuruDashboardProfilePageContent() {
                                     }
                                     inputMode="decimal"
                                     disabled={service.rate_unit === "custom"}
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
 
@@ -2673,7 +2680,7 @@ function GuruDashboardProfilePageContent() {
                                     }
                                     placeholder="Optional"
                                     inputMode="numeric"
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
 
@@ -2691,7 +2698,7 @@ function GuruDashboardProfilePageContent() {
                                       )
                                     }
                                     placeholder="Example: Includes feeding, water refresh, and quick photo update."
-                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                   />
                                 </div>
                               </div>
@@ -2714,7 +2721,7 @@ function GuruDashboardProfilePageContent() {
                         onChange={(event) => setHourlyRate(event.target.value)}
                         placeholder="Optional standard hourly rate"
                         inputMode="decimal"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold !text-slate-950 placeholder:text-slate-500 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       />
                       <p
                         className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
