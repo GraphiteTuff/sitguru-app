@@ -258,7 +258,7 @@ export default function GuruWorkspaceHome({
       <section aria-label="Guru quick actions" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <QuickAction href="/guru/dashboard/bookings" title="Bookings" helper="Requests and upcoming care" icon={CalendarDays} />
         <QuickAction href="/guru/dashboard/availability" title="My Schedule" helper="Availability and time off" icon={Clock3} />
-        <QuickAction href="/guru/dashboard/messages" title="Messages" helper="Pet Parent conversations" icon={MessageCircle} />
+        <QuickAction href="/guru/dashboard/messages" title="Messages" helper={messageCount === 1 ? "1 Pet Parent conversation" : String(messageCount) + " conversations"} icon={MessageCircle} />
         <QuickAction href="/guru/dashboard/earnings" title="Earnings" helper="Payments and payouts" icon={CircleDollarSign} />
       </section>
 
