@@ -9,7 +9,7 @@ export default function SitGuruPortalLoading({
   portal = "SitGuru",
   message = "Getting your SitGuru space ready.",
 }: {
-  portal?: "Pet Parent" | "Guru" | "Manager" | "Intern" | "Admin" | "SitGuru";
+  portal?: "Pet Parent" | "Guru" | "Manager" | "Intern" | "Admin" | "Ambassador" | "SitGuru";
   message?: string;
 }) {
   const portalTitle = portal === "SitGuru" ? "Opening SitGuru" : `Opening your ${portal} portal`;
