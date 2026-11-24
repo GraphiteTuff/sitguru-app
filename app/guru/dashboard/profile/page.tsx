@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Camera,
   CheckCircle2,
   ImageIcon,
