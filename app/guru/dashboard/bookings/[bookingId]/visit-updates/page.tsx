@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { GuruLiveActionPanel } from "@/components/pawreport";
 import GuruVisitTracker from "@/components/visit-updates/GuruVisitTracker";
 import VisitUpdateTimeline from "@/components/visit-updates/VisitUpdateTimeline";
+import GuruPageHero from "@/components/guru/GuruPageHero";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -48,28 +48,14 @@ export default async function GuruVisitUpdatesPage({ params }: PageProps) {
   const { session, updates } = await getVisitData(bookingId);
 
   return (
-    <main className="min-h-screen !bg-slate-50 px-4 py-6 !text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#F7FFFB] px-4 py-6 !text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold !text-slate-600">Guru Dashboard</p>
-
-            <h1 className="text-4xl font-black tracking-tight !text-slate-950 sm:text-5xl">
-              SitGuru PawReport™
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm font-semibold !text-slate-700 sm:text-base">
-              Phone-first live walk controls stream instantly to the Pet Parent.
-            </p>
-          </div>
-
-          <Link
-            href="/guru/dashboard/bookings"
-            className="inline-flex rounded-2xl border border-slate-200 !bg-white px-4 py-2 text-sm font-black !text-slate-800 shadow-sm hover:!bg-slate-100"
-          >
-            Back to Bookings
-          </Link>
-        </div>
+        <GuruPageHero
+          eyebrow="LIVE VISIT UPDATES"
+          title="SitGuru PawReport™"
+          description="Manage this booking's care updates, photos, and visit records. Your Pet Parent sees the updates permitted for this visit."
+          action={{ href: "/guru/dashboard/bookings", label: "Back to Bookings" }}
+        />
 
         {/* Realtime Guru phone panel → SSE + push/in-app notifications */}
         <GuruLiveActionPanel bookingId={bookingId} />

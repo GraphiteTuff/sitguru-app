@@ -1474,10 +1474,24 @@ export default function GuruDashboardPricingPage() {
           -webkit-text-fill-color: #07132f !important;
           opacity: 1 !important;
         }
+        /* The brand hero uses light text on emerald, while form cards stay dark on white. */
+        .guru-pricing-readable [data-brand-green="true"] h1 {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+        .guru-pricing-readable [data-brand-green="true"] .sg-guru-pricing-intro {
+          color: #EAF7EF !important;
+          -webkit-text-fill-color: #EAF7EF !important;
+        }
+        .guru-pricing-readable .sg-guru-pricing-save,
+        .guru-pricing-readable .sg-guru-pricing-save * {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
       `}</style>
       <div className="mx-auto max-w-[1480px]">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
+          <div data-brand-green="true" className="grid gap-8 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
@@ -1499,11 +1513,11 @@ export default function GuruDashboardPricingPage() {
                 My Calendar pricing for website bookings
               </div>
 
-              <h1 className="max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
+              <h1 className="max-w-4xl text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl lg:text-6xl">
                 Manage pricing in 3 simple steps.
               </h1>
 
-              <p className="mt-5 max-w-3xl text-base font-bold leading-8 text-slate-800 md:text-xl">
+              <p className="sg-guru-pricing-intro mt-5 max-w-3xl text-base font-bold leading-8 !text-[#EAF7EF] md:text-lg">
                 Use this page to control the prices Pet Parents see on the
                 website booking calendar. Set service rates, daily prices,
                 multi-pet or multi-day discounts, peak-time rules, and open days
@@ -1515,7 +1529,7 @@ export default function GuruDashboardPricingPage() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving || !guruId}
-                  className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="sg-guru-pricing-save inline-flex min-h-[56px] min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-6 py-4 text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:-translate-y-0.5 hover:bg-[#A74400] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
