@@ -938,7 +938,7 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-5 !text-[#062f2b] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1280px] space-y-5">
         <section className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-sm">
-          <div className="grid gap-7 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-5 py-6 sm:px-7 md:px-10 md:py-9 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+          <div data-brand-green="true" className="grid gap-7 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <Link
                 href={guruRoutes.dashboard}
@@ -948,13 +948,13 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
                 Back to Dashboard
               </Link>
 
-              <p className="text-xs font-black uppercase tracking-[0.28em] !!text-slate-900/80">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-[#F7E7B0]">
                 SitGuru University
               </p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] !text-[#07132f] sm:text-5xl md:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl">
                 Learn SitGuru. Easy as 1, 2, 3.
               </h1>
-              <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !!text-slate-900/75 md:text-lg">
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-[#EAF7EF] md:text-lg">
                 Hi {firstName}, Guru Academy is optional — it is not required to
                 go bookable. Take it anytime to earn your Certified Guru badge.
                 Learn SitGuru basics, bookings, safe pet care, payouts, and how
