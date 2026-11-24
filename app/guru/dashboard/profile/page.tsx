@@ -1700,13 +1700,9 @@ function GuruDashboardProfilePageContent() {
       serviceRates,
     });
 
-    return Math.max(
-      10,
-      Math.round(
-        (publicReadiness.checks.filter((item) => item.complete).length /
-          publicReadiness.checks.length) *
-          100,
-      ),
+    return Math.round(
+      (publicReadiness.checks.filter((item) => item.complete).length /
+        publicReadiness.checks.length) * 100,
     );
   }, [
     displayName,
@@ -1830,6 +1826,9 @@ function GuruDashboardProfilePageContent() {
                 Guided Profile Builder
               </div>
 
+              <p className="mb-2 text-sm font-black !text-[#EAF7EF] sm:text-base">
+                Welcome back, {displayName.trim().split(/\s+/)[0] || "Guru"}!
+              </p>
               <h1
                 className="max-w-4xl text-[clamp(1.9rem,5vw,3.2rem)] font-extrabold leading-tight tracking-[-0.035em] !text-white"
               >
