@@ -580,7 +580,7 @@ export default function GuruDashboardReferralsPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <section className="overflow-hidden rounded-[2rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
+        <section data-brand-green="true" className="overflow-hidden rounded-[2rem] border border-emerald-800/15 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] shadow-[0_16px_42px_rgba(8,90,57,0.14)]">
           <div className="p-6 sm:p-8 lg:p-10">
             <Link
               href="/guru/dashboard"
@@ -592,13 +592,13 @@ export default function GuruDashboardReferralsPage() {
 
             <div className="mt-5 grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#07132f]/80">
+                <p className="text-xs font-black uppercase tracking-[0.16em] !text-[#F7E7B0]">
                   Guru Growth Studio
                 </p>
-                <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] !text-[#07132f] sm:text-5xl">
+                <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] !text-white sm:text-5xl">
                   Referrals, {firstName}
                 </h1>
-                <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-800/90 sm:text-lg">
+                <p className="mt-3 max-w-2xl text-base font-semibold leading-7 !text-[#EAF7EF] sm:text-lg">
                   Invite trusted pet caregivers to SitGuru. Share your link,
                   track progress, and earn {currency(baseReward)} after{" "}
                   {requiredBookings} completed bookings.
@@ -607,7 +607,7 @@ export default function GuruDashboardReferralsPage() {
                 <div className="mt-5 flex flex-wrap gap-3">
                   <a
                     href="#referral-share"
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#07132f] px-5 text-sm font-black text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:bg-[#0b1436]"
+                    className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-5 text-sm font-black !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:bg-[#A74400]"
                   >
                     Copy my link
                     <ArrowRight className="h-4 w-4" />
