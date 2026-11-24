@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import GuruEarningsHistory, { type GuruEarningsHistoryItem } from "@/components/guru/GuruEarningsHistory";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -7,6 +8,7 @@ import {
   ArrowRight,
   BadgeDollarSign,
   CalendarDays,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   CreditCard,
@@ -14,8 +16,6 @@ import {
   ExternalLink,
   HelpCircle,
   Landmark,
-  LayoutDashboard,
-  MessageCircle,
   PiggyBank,
   RefreshCw,
   ShieldCheck,
@@ -58,20 +58,7 @@ type GuruProfile = {
 
 type BookingRow = Record<string, unknown>;
 
-type EarningsRow = {
-  id: string;
-  rawDate: string;
-  date: string;
-  time: string;
-  service: string;
-  petParent: string;
-  petName: string;
-  customerPhotoUrl: string;
-  gross: number;
-  fee: number;
-  net: number;
-  status: string;
-};
+type EarningsRow = GuruEarningsHistoryItem;
 
 type GuruPayoutProvider = "stripe" | "paypal" | "set_up_later";
 
@@ -737,18 +724,6 @@ function formatDate(value?: string | null) {
   });
 }
 
-function formatTime(value?: string | null) {
-  if (!value) return "";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  return parsed.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function formatStatusCheckedAt(value?: string | null) {
   if (!value) return "Not checked yet";
 
@@ -771,45 +746,18 @@ function startOfCurrentMonth() {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-function statusClasses(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("paid")) {
-    return "border-emerald-200 bg-emerald-50 !text-emerald-700";
-  }
-
-  if (normalized.includes("processing")) {
-    return "border-sky-200 bg-sky-50 !text-sky-700";
-  }
-
-  if (normalized.includes("adjust") || normalized.includes("refund")) {
-    return "border-rose-200 bg-rose-50 !text-rose-700";
-  }
-
-  return "border-amber-200 bg-amber-50 !text-amber-700";
+function normalizedPayoutStatus(booking: BookingRow) {
+  return asTrimmedString(booking.payout_status).toLowerCase().replace(/[\s-]+/g, "_");
 }
 
-function initialsFromName(name: string) {
-  const parts = name
-    .split(" ")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length === 0) return "C";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-
-  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+function isConfirmedPaidPayout(payoutStatus: string) {
+  return ["paid", "paid_out", "sent", "transferred", "succeeded", "complete", "completed", "settled"]
+    .includes(payoutStatus.toLowerCase().replace(/[\s-]+/g, "_"));
 }
 
-function getBookingStatus(booking: BookingRow) {
-  return (
-    asTrimmedString(booking.payout_status) ||
-    asTrimmedString(booking.payment_status) ||
-    asTrimmedString(booking.status) ||
-    asTrimmedString(booking.booking_status) ||
-    asTrimmedString(booking.state) ||
-    "pending"
-  );
+function isPayoutInProgress(payoutStatus: string) {
+  return ["pending", "processing", "in_transit", "in_progress", "queued", "initiated", "on_hold"]
+    .includes(payoutStatus.toLowerCase().replace(/[\s-]+/g, "_"));
 }
 
 function getServiceName(booking: BookingRow) {
@@ -834,19 +782,6 @@ function getPetParentName(booking: BookingRow) {
   );
 }
 
-function getCustomerPhotoUrl(booking: BookingRow) {
-  return (
-    asTrimmedString(booking.customer_photo_url) ||
-    asTrimmedString(booking.customer_avatar_url) ||
-    asTrimmedString(booking.pet_parent_photo_url) ||
-    asTrimmedString(booking.owner_photo_url) ||
-    asTrimmedString(booking.avatar_url) ||
-    asTrimmedString(booking.profile_photo_url) ||
-    asTrimmedString(booking.customer_profile_photo_url) ||
-    ""
-  );
-}
-
 function getPetName(booking: BookingRow) {
   return (
     asTrimmedString(booking.pet_name) ||
@@ -859,6 +794,8 @@ function getPetName(booking: BookingRow) {
 
 function getBookingDateValue(booking: BookingRow) {
   return (
+    asTrimmedString(booking.care_completed_at) ||
+    asTrimmedString(booking.completed_at) ||
     asTrimmedString(booking.booking_date) ||
     asTrimmedString(booking.requested_date) ||
     asTrimmedString(booking.start_date) ||
@@ -913,14 +850,15 @@ function getNetAmount(booking: BookingRow, gross: number, fee: number) {
 }
 
 function isCompletedForEarnings(booking: BookingRow) {
-  const status = getBookingStatus(booking).toLowerCase();
-
-  return (
-    status.includes("complete") ||
-    status.includes("paid") ||
-    status.includes("processing") ||
-    status.includes("pending")
-  );
+  // A customer's card payment is not proof that the Guru finished care or received a payout.
+  const careStatus = (
+    asTrimmedString(booking.status) ||
+    asTrimmedString(booking.booking_status) ||
+    asTrimmedString(booking.state)
+  ).toLowerCase();
+  const hasCompletedCare = ["completed", "complete", "finished", "fulfilled"].includes(careStatus) ||
+    Boolean(asTrimmedString(booking.care_completed_at) || asTrimmedString(booking.completed_at));
+  return hasCompletedCare || isConfirmedPaidPayout(normalizedPayoutStatus(booking));
 }
 
 async function getGuruProfile(userId: string, email?: string | null) {
@@ -1007,25 +945,6 @@ function StatCard({
       icon={icon}
       tone={tone}
     />
-  );
-}
-
-function CustomerAvatar({
-  name,
-  photoUrl,
-}: {
-  name: string;
-  photoUrl: string;
-}) {
-  return (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-50 text-sm font-black !text-green-800 ring-2 ring-green-100">
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        initialsFromName(name)
-      )}
-    </div>
   );
 }
 
@@ -1616,29 +1535,6 @@ function PaymentSetupCard({
   );
 }
 
-function QuickActionLink({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: ReactNode;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-11 items-center justify-between gap-2 rounded-2xl border border-green-100 bg-green-50 px-3 py-2.5 text-xs font-black !text-green-950 transition hover:bg-green-100"
-    >
-      <span className="inline-flex items-center gap-2">
-        {icon}
-        {label}
-      </span>
-      <ArrowRight className="h-3.5 w-3.5" />
-    </Link>
-  );
-}
-
 export default async function GuruDashboardEarningsPage({
   searchParams,
 }: EarningsPageProps) {
@@ -1654,6 +1550,7 @@ export default async function GuruDashboardEarningsPage({
   }
 
   const resolvedSearchParams = await Promise.resolve(searchParams || {});
+  const showPayoutPanel = resolvedSearchParams.panel === "payouts";
   const payoutSavedParam = resolvedSearchParams.payoutSaved;
   const payoutStatusParam = resolvedSearchParams.payoutStatus;
   const paypalStatusParam = resolvedSearchParams.paypal;
@@ -1829,15 +1726,16 @@ export default async function GuruDashboardEarningsPage({
           `BK-${String(index + 1).padStart(4, "0")}`,
         rawDate,
         date: formatDate(rawDate),
-        time: formatTime(rawDate),
         service: getServiceName(booking),
         petParent: getPetParentName(booking),
         petName: getPetName(booking),
-        customerPhotoUrl: getCustomerPhotoUrl(booking),
         gross,
         fee,
         net,
-        status: getBookingStatus(booking),
+        bookingStatus: asTrimmedString(booking.status) ||
+          asTrimmedString(booking.booking_status) ||
+          asTrimmedString(booking.state) || "Not recorded",
+        payoutStatus: asTrimmedString(booking.payout_status),
       };
     },
   );
@@ -1846,18 +1744,18 @@ export default async function GuruDashboardEarningsPage({
     normalizedRows.reduce((sum, row) => sum + row.net, 0),
   );
 
+  const payoutStatusRows = normalizedRows.filter((row) => Boolean(row.payoutStatus.trim()));
+  const hasTrackedPayouts = payoutStatusRows.length > 0;
+
   const pendingPayouts = roundMoney(
-    normalizedRows
-      .filter((row) => {
-        const status = row.status.toLowerCase();
-        return !status.includes("paid") && !status.includes("adjust");
-      })
+    payoutStatusRows
+      .filter((row) => isPayoutInProgress(row.payoutStatus))
       .reduce((sum, row) => sum + row.net, 0),
   );
 
   const paidOut = roundMoney(
-    normalizedRows
-      .filter((row) => row.status.toLowerCase().includes("paid"))
+    payoutStatusRows
+      .filter((row) => isConfirmedPaidPayout(row.payoutStatus))
       .reduce((sum, row) => sum + row.net, 0),
   );
 
@@ -1877,303 +1775,114 @@ export default async function GuruDashboardEarningsPage({
       .reduce((sum, row) => sum + row.net, 0),
   );
 
-  const recentEarnings = normalizedRows.slice(0, 10);
+  const paypalPayoutReady = paypalOnboardingResponse?.account?.payoutsEnabled === true;
+  const stripePayoutReady = liveStripeComplete ||
+    payoutSetup?.accounts?.some((account) => account.provider === "stripe" && account.payoutsEnabled === true);
+  const payoutReady = Boolean(paypalPayoutReady || stripePayoutReady ||
+    payoutSetup?.readyAccount?.payoutsEnabled === true);
+  const payoutProvider = paypalPayoutReady ? "PayPal" : stripePayoutReady ? "Stripe" :
+    payoutSetup?.readyAccount?.provider === "paypal" ? "PayPal" :
+      payoutSetup?.readyAccount?.provider === "stripe" ? "Stripe" : "your payment provider";
 
   return (
     <main className="min-h-[100svh] bg-[#F7FFFB] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
-          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <div data-brand-green="true" className="bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 sm:p-7">
-              <p className="text-xs font-black uppercase tracking-[0.16em] !text-[#F7E7B0]">
-                Guru Earnings
-              </p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
-                Hey, {firstName} 👋
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-7 !text-[#EAF7EF]">
-                Track what you earned, what is on the way, and where your
-                payouts are going.
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-full border border-green-100 bg-white px-3 py-1 text-xs font-black !text-green-900">
-                  Marketplace Support: free during launch
-                </span>
-                <span className="rounded-full border border-green-100 bg-white px-3 py-1 text-xs font-black !text-green-900">
-                  Tips pass through 100%
-                </span>
-              </div>
-            </div>
-
-            <div className="border-t border-green-100 bg-white p-5 lg:border-l lg:border-t-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] !text-green-800">
-                Quick moves
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <QuickActionLink
-                  href="/guru/dashboard"
-                  icon={<LayoutDashboard className="h-4 w-4" />}
-                  label="Dashboard"
-                />
-                <QuickActionLink
-                  href="/guru/dashboard/bookings"
-                  icon={<CalendarDays className="h-4 w-4" />}
-                  label="Bookings"
-                />
-                <QuickActionLink
-                  href="/guru/dashboard/messages"
-                  icon={<MessageCircle className="h-4 w-4" />}
-                  label="Messages"
-                />
-                <QuickActionLink
-                  href="/guru/dashboard/pricing"
-                  icon={<BadgeDollarSign className="h-4 w-4" />}
-                  label="Pricing"
-                />
-              </div>
-
-              <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-4">
-                <div className="flex items-start gap-3">
-                  <Clock3 className="mt-0.5 h-5 w-5 shrink-0 !text-green-800" />
-                  <div>
-                    <p className="text-sm font-black !text-green-950">
-                      Payout timing
-                    </p>
-                    <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
-                      Eligible payouts can be released 48 hours after completed
-                      care when there are no open support or safety reviews.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <PaymentSetupCard
-          setup={payoutSetup}
-          loadError={payoutSetupError}
-          saveStatus={payoutSaveStatus}
-          paypalStatus={paypalStatus}
-          paypalMessage={paypalMessage}
-          paypalOnboarding={paypalOnboardingResponse}
-          stripeReturnStatus={stripeReturnStatus}
-          liveStripePendingReview={liveStripePendingReview}
-          liveStripeDetailsSubmitted={liveStripeDetailsSubmitted}
-          liveStripeComplete={liveStripeComplete}
-          liveStripeLastCheckedAt={liveStripeLastCheckedAt}
-        />
-
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <StatCard
-            title="Total earnings"
-            value={currency(totalEarnings)}
-            description="All time"
-            icon={<Wallet className="h-5 w-5" />}
-            tone="emerald"
-          />
-          <StatCard
-            title="Pending"
-            value={currency(pendingPayouts)}
-            description="Still on the way"
-            icon={<Clock3 className="h-5 w-5" />}
-            tone="amber"
-          />
-          <StatCard
-            title="Paid out"
-            value={currency(paidOut)}
-            description="Sent to you"
-            icon={<PiggyBank className="h-5 w-5" />}
-            tone="sky"
-          />
-          <StatCard
-            title="This month"
-            value={currency(thisMonth)}
-            description="Current month"
-            icon={<CalendarDays className="h-5 w-5" />}
-            tone="violet"
-          />
-          <StatCard
-            title="Bookings"
-            value={String(completedBookings)}
-            description="Earnings activity"
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            tone="rose"
-          />
-          <StatCard
-            title="Support fee"
-            value={currency(marketplaceSupportTotal)}
-            description="Free during launch"
-            icon={<BadgeDollarSign className="h-5 w-5" />}
-            tone="slate"
-          />
-        </section>
-
-        <section className="rounded-[28px] border border-[#dfe9e2] bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] !text-green-700">
-                Recent activity
-              </p>
-              <h2 className="mt-1 text-2xl font-black !text-green-950">
-                Your latest earnings
-              </h2>
-              <p className="mt-1 text-sm font-semibold !text-slate-600">
-                A clear booking-by-booking view of what came in and what you
-                take home.
-              </p>
-            </div>
-
-            <Link
-              href="/guru/dashboard/bookings"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-black !text-green-900 hover:bg-green-100"
-            >
-              View all bookings
-              <ArrowRight className="h-4 w-4" />
+        <section data-brand-green="true" className="overflow-hidden rounded-[1.8rem] border border-emerald-800/15 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 shadow-[0_16px_38px_rgba(8,90,57,0.13)] sm:p-7">
+          <p className="text-xs font-black uppercase tracking-[0.17em] !text-[#F7E7B0]">SITGURU · GURU EARNINGS</p>
+          <h1 className="mt-2 text-[clamp(1.8rem,4vw,3rem)] font-black leading-tight tracking-tight !text-white">Welcome back, {firstName}!</h1>
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-[#EAF7EF] sm:text-base">
+            See your care earnings, check whether payouts are ready, and find booking-level details in one place.
+          </p>
+          <nav aria-label="Earnings shortcuts" className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+            <Link href="#guru-earnings-history" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-center text-sm font-black !text-[#06462F] shadow-sm transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
+              Earnings history <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
+            <Link href="/guru/dashboard/earnings?panel=payouts#guru-payout-methods" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl border-2 border-white/60 bg-white/10 px-4 py-3 text-center text-sm font-black !text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
+              Payout settings <Wallet className="h-5 w-5 shrink-0" aria-hidden="true" />
+            </Link>
+          </nav>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2" aria-label="Key earnings totals">
+          <div className="rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-800"><CalendarDays className="h-6 w-6" aria-hidden="true" /></span>
+              <span className="text-sm font-black text-emerald-950">This month · completed care</span>
+            </div>
+            <p className="mt-3 break-words text-[clamp(2rem,5vw,3rem)] font-black leading-none tracking-tight text-emerald-950">{currency(thisMonth)}</p>
+            <p className="mt-3 text-sm font-semibold text-slate-600">Estimated net from completed care recorded this month.</p>
           </div>
+          <div className="rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-orange-50 text-[#A74400]"><Wallet className="h-6 w-6" aria-hidden="true" /></span>
+              <span className="text-sm font-black text-emerald-950">Recorded net earnings</span>
+            </div>
+            <p className="mt-3 break-words text-[clamp(2rem,5vw,3rem)] font-black leading-none tracking-tight text-emerald-950">{currency(totalEarnings)}</p>
+            <p className="mt-3 text-sm font-semibold text-slate-600">Estimated net from eligible records within the latest 100 bookings.</p>
+          </div>
+        </section>
 
-          {recentEarnings.length ? (
-            <>
-              <div className="mt-5 hidden overflow-hidden rounded-2xl border border-slate-200 lg:block">
-                <table className="min-w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase tracking-[0.14em] !text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3 font-black">Pet Parent</th>
-                      <th className="px-4 py-3 font-black">Service</th>
-                      <th className="px-4 py-3 font-black">Date</th>
-                      <th className="px-4 py-3 font-black">Gross</th>
-                      <th className="px-4 py-3 font-black">Support</th>
-                      <th className="px-4 py-3 font-black">You earn</th>
-                      <th className="px-4 py-3 font-black">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {recentEarnings.map((item) => (
-                      <tr key={item.id} className="text-sm">
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
-                            <CustomerAvatar
-                              name={item.petParent}
-                              photoUrl={item.customerPhotoUrl}
-                            />
-                            <div>
-                              <p className="font-black !text-slate-950">
-                                {item.petParent}
-                              </p>
-                              <p className="mt-1 text-xs font-semibold !text-slate-600">
-                                {item.petName}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 font-bold !text-slate-900">
-                          {item.service}
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="font-bold !text-slate-900">
-                            {item.date}
-                          </p>
-                          <p className="mt-1 text-xs font-semibold !text-slate-500">
-                            {item.time || item.id}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 font-bold !text-slate-900">
-                          {currency(item.gross)}
-                        </td>
-                        <td className="px-4 py-4 font-bold !text-rose-500">
-                          -{currency(item.fee)}
-                        </td>
-                        <td className="px-4 py-4 font-black !text-green-700">
-                          {currency(item.net)}
-                        </td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusClasses(
-                              item.status,
-                            )}`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-5 grid gap-3 lg:hidden">
-                {recentEarnings.map((item) => (
-                  <article
-                    key={item.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <CustomerAvatar
-                        name={item.petParent}
-                        photoUrl={item.customerPhotoUrl}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <p className="font-black !text-slate-950">
-                              {item.petParent}
-                            </p>
-                            <p className="mt-1 text-xs font-semibold !text-slate-600">
-                              {item.petName} • {item.service}
-                            </p>
-                          </div>
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusClasses(
-                              item.status,
-                            )}`}
-                          >
-                            {item.status}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-                            <p className="font-black !text-slate-500">Gross</p>
-                            <p className="mt-1 font-black !text-slate-950">
-                              {currency(item.gross)}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-                            <p className="font-black !text-slate-500">Support</p>
-                            <p className="mt-1 font-black !text-rose-500">
-                              -{currency(item.fee)}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-                            <p className="font-black !text-slate-500">You earn</p>
-                            <p className="mt-1 font-black !text-green-700">
-                              {currency(item.net)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <p className="mt-3 text-xs font-semibold !text-slate-500">
-                          {item.date} {item.time}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <p className="text-lg font-black !text-slate-950">
-                No earnings yet
-              </p>
-              <p className="mx-auto mt-2 max-w-lg text-sm font-semibold leading-6 !text-slate-600">
-                Once you complete paid bookings, the details will show up here.
+        <section aria-label="Payout account status" className="flex flex-col gap-4 rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className={"grid h-12 w-12 shrink-0 place-items-center rounded-2xl " + (payoutReady ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")}>
+              {payoutReady ? <CheckCircle2 className="h-6 w-6" aria-hidden="true" /> : <ShieldCheck className="h-6 w-6" aria-hidden="true" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">PAYOUT ACCOUNT STATUS</p>
+              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">{payoutReady ? "Payout account ready" : payoutSetupError ? "Payout status needs a refresh" : "Finish payout setup"}</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                {payoutReady ? "Payouts are enabled through " + payoutProvider + ". Individual transfers still depend on eligible bookings and provider processing." : payoutSetupError ? "We couldn't confirm the latest payout account status. Open payout settings to check again." : "Connect Stripe or PayPal to receive payouts from eligible care bookings. Your bookings and earnings remain visible here."}
               </p>
             </div>
-          )}
+          </div>
+          <Link href="/guru/dashboard/earnings?panel=payouts#guru-payout-methods" className="inline-flex min-h-[56px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300 sm:w-auto">
+            {payoutReady ? "Manage payouts" : payoutSetupError ? "Check payout status" : "Set up payouts"} <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Link>
         </section>
+
+        <section aria-label="Detailed earnings summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title="Payouts processing" value={hasTrackedPayouts ? currency(pendingPayouts) : "—"}
+            description="Only reported pending payouts" icon={<Clock3 className="h-5 w-5" />} tone="amber" />
+          <StatCard title="Payouts confirmed" value={hasTrackedPayouts ? currency(paidOut) : "—"}
+            description="Only confirmed payout records" icon={<PiggyBank className="h-5 w-5" />} tone="sky" />
+          <StatCard title="Completed care" value={String(completedBookings)}
+            description="Eligible booking records" icon={<CheckCircle2 className="h-5 w-5" />} tone="emerald" />
+          <StatCard title="Marketplace support" value={currency(marketplaceSupportTotal)}
+            description="Fees recorded on bookings" icon={<BadgeDollarSign className="h-5 w-5" />} tone="slate" />
+        </section>
+
+        <p className="px-1 text-xs font-semibold leading-5 text-slate-600">
+          Figures are calculated from your latest 100 booking records, not a complete bank statement. Only completed care or recorded confirmed payouts are counted as earnings.
+          A Pet Parent paying for a booking does not by itself mean a Guru payout was sent.
+        </p>
+
+        <details id="guru-payout-methods" open={!payoutReady || showPayoutPanel || Boolean(payoutSaveStatus || paypalStatus || stripeReturnStatus || payoutSetupError)} className="group scroll-mt-28 overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm">
+          <summary className="flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">SECURE PAYOUT METHODS</p>
+              <h2 className="mt-1 text-xl font-black text-emerald-950 sm:text-2xl">Stripe &amp; PayPal setup</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{payoutReady ? "Connected · open to manage or check status" : "Open to connect an account or continue setup"}</p>
+            </div>
+            <ChevronDown className="h-6 w-6 shrink-0 text-emerald-800 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-emerald-100 p-3 sm:p-4">
+            <PaymentSetupCard
+              setup={payoutSetup}
+              loadError={payoutSetupError}
+              saveStatus={payoutSaveStatus}
+              paypalStatus={paypalStatus}
+              paypalMessage={paypalMessage}
+              paypalOnboarding={paypalOnboardingResponse}
+              stripeReturnStatus={stripeReturnStatus}
+              liveStripePendingReview={liveStripePendingReview}
+              liveStripeDetailsSubmitted={liveStripeDetailsSubmitted}
+              liveStripeComplete={liveStripeComplete}
+              liveStripeLastCheckedAt={liveStripeLastCheckedAt}
+            />
+          </div>
+        </details>
+
+        <GuruEarningsHistory rows={normalizedRows} />
 
         <details className="group rounded-[28px] border border-green-100 bg-white shadow-sm">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
