@@ -1880,7 +1880,7 @@ function GuruDashboardProfilePageContent() {
 
             <div className="flex flex-col items-center text-center">
               <div className="relative">
-                <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
+                <div aria-hidden="true" className="pointer-events-none absolute -inset-4 rounded-full bg-white/30 blur-xl" />
                 <button
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
@@ -2061,7 +2061,7 @@ function GuruDashboardProfilePageContent() {
 
         <section className="mt-5 grid gap-4 xl:grid-cols-[1.08fr_0.92fr] xl:gap-6">
           <div className="space-y-6">
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-6">
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
@@ -2114,7 +2114,7 @@ function GuruDashboardProfilePageContent() {
                 {activeStep === "1" ? (
                   <section
                     id="profile"
-                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                    className="scroll-mt-36 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-3 sm:rounded-[1.75rem] sm:p-5"
                   >
                     <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
@@ -2515,7 +2515,7 @@ function GuruDashboardProfilePageContent() {
                 {activeStep === "3" ? (
                   <section
                     id="services"
-                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                    className="scroll-mt-36 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-3 sm:rounded-[1.75rem] sm:p-5"
                   >
                     <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(120deg,#06462F,#08734A)] px-4 py-4 sm:px-5">
                       <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
@@ -3089,44 +3089,41 @@ function GuruDashboardProfilePageContent() {
               </div>
             </section>
 
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Admin visibility
+            <section className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                KEEP GROWING
               </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                What Admin should also be able to see
+              <h2 className="mt-2 text-2xl font-black text-emerald-950">
+                Handy Guru shortcuts
               </h2>
-
-              <div className="mt-6 space-y-3">
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Make your profile easier to discover, book, and trust.
+              </p>
+              <nav aria-label="Guru profile quick actions" className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 {[
-                  "Updated Step 1 profile details and public title",
-                  "Updated Step 2 location, service ZIP, and travel radius",
-                  "Updated Step 3 service selections and service-specific rates",
-                  "Photo, bio, and profile completion data",
-                  "Customer-facing visibility only when setup requirements are met",
+                  { label: "Preview public profile", description: "See what Pet Parents see", href: publicProfileHref },
+                  { label: "Manage availability", description: "Set your schedule and time off", href: "/guru/dashboard/availability" },
+                  { label: "Promote my profile", description: "Share your Guru link", href: "/guru/dashboard/promote" },
+                  { label: "Review earnings", description: "Payout settings and history", href: "/guru/dashboard/earnings" },
                 ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-extrabold !text-slate-700"
-                  >
-                    {item}
-                  </div>
+                  <Link key={item.href} href={item.href}
+                    className="group flex min-h-[76px] items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-[#F8FFFB] px-4 py-3 text-emerald-950 transition hover:border-emerald-300 hover:bg-emerald-50">
+                    <span className="min-w-0">
+                      <span className="block text-base font-black">{item.label}</span>
+                      <span className="mt-1 block text-xs font-semibold text-slate-600">{item.description}</span>
+                    </span>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-emerald-700 transition group-hover:translate-x-0.5" aria-hidden="true" />
+                  </Link>
                 ))}
-              </div>
+              </nav>
             </section>
 
-            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Why this matters
-              </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                Better profile data strengthens the marketplace
-              </h2>
-              <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                The stronger your Guru profile is, the better it can perform for
-                customer trust, search visibility, and Admin operations. This
-                page is one of the core pieces powering the Guru side of
-                SitGuru.
+            <section className="rounded-[1.6rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">GURU TIP</p>
+              <h2 className="mt-2 text-xl font-black text-emerald-950">A complete profile helps Pet Parents choose you</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                Include a clear photo, friendly introduction, accurate service area, and the services you actually offer.
+                Public visibility and booking eligibility still depend on SitGuru readiness checks.
               </p>
             </section>
           </div>
