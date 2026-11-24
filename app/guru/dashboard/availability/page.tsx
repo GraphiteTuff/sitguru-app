@@ -952,7 +952,7 @@ export default function GuruAvailabilityPage() {
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffc_42%,#ecfdf5_100%)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 md:px-6 lg:px-8">
         <section className="rounded-[2.25rem] border border-emerald-100 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] md:p-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div data-brand-green="true" className="flex flex-col gap-6 rounded-[1.7rem] bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 sm:p-7 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <Link
                 href="/guru/dashboard"
@@ -964,14 +964,14 @@ export default function GuruAvailabilityPage() {
               </Link>
 
               <h1
-                className="mt-5 text-4xl font-black tracking-[-0.04em] md:text-6xl"
-                style={forcedDark}
+                className="mt-5 text-3xl font-black tracking-[-0.04em] !text-white sm:text-4xl md:text-5xl"
+                style={{ color: "#FFFFFF" }}
               >
                 Availability & Calendar
               </h1>
               <p
-                className="mt-3 max-w-3xl text-lg font-semibold leading-8"
-                style={forcedMuted}
+                className="mt-3 max-w-3xl text-base font-semibold leading-7 !text-[#EAF7EF] sm:text-lg"
+                style={{ color: "#EAF7EF" }}
               >
                 Keep your schedule current, protect blackout dates, and show
                 pet parents when you are available before they request care.
@@ -981,7 +981,7 @@ export default function GuruAvailabilityPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/guru/dashboard/earnings"
-                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-white/50 bg-white px-5 py-3 text-sm font-black shadow-sm transition hover:bg-emerald-50"
                 style={forcedGreen}
               >
                 View Earnings
@@ -990,7 +990,7 @@ export default function GuruAvailabilityPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-5 py-3 text-sm font-black !text-white shadow-lg shadow-orange-950/20 transition hover:bg-[#A74400] disabled:cursor-not-allowed disabled:opacity-70"
                 style={forcedWhite}
               >
                 {saving ? (
