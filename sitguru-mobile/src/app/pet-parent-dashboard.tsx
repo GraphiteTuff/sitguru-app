@@ -7,6 +7,7 @@ import {
   Camera,
   CreditCard,
   Gift,
+  Heart,
   MapPin,
   MessageCircle,
   PawPrint,
@@ -47,8 +48,6 @@ import ServiceCoreGrid, {
 import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
 import ConvertActionBar from '@/components/mobile/ConvertActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
-import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
-import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
@@ -1123,14 +1122,14 @@ export default function PetParentDashboardScreen() {
 
               <QuickAction
                 icon={
-                  <CalendarDays
+                  <Camera
                     color={palette.primary}
                     size={21}
                     strokeWidth={2.4}
                   />
                 }
-                label="Request"
-                onPress={() => router.push('/find-care')}
+                label="Pet Moments"
+                onPress={() => router.push('/community-studio')}
                 styles={styles}
               />
 
@@ -2753,6 +2752,157 @@ function createStyles(isDark: boolean) {
   const palette = getPalette(isDark);
 
   return StyleSheet.create({
+    bookingFinder: {
+      backgroundColor: '#005333',
+      borderColor: '#006E42',
+      borderRadius: 26,
+      borderWidth: 1,
+      gap: 10,
+      padding: 16,
+      shadowColor: '#003B26',
+      shadowOffset: { width: 0, height: 7 },
+      shadowOpacity: 0.12,
+      shadowRadius: 15,
+    },
+    bookingEyebrow: {
+      color: '#D9F99D',
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+      letterSpacing: 1.15,
+    },
+    bookingTitle: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 25,
+      lineHeight: 29,
+    },
+    bookingSubtitle: {
+      color: '#E2FCE9',
+      fontFamily: AppFonts.medium,
+      fontSize: 14,
+      lineHeight: 21,
+      marginBottom: 5,
+    },
+    bookingGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    bookingTile: {
+      alignItems: 'flex-start',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 19,
+      borderColor: '#ECFDF5',
+      borderWidth: 2,
+      flexBasis: '47%',
+      flexGrow: 1,
+      gap: 7,
+      justifyContent: 'center',
+      minHeight: 122,
+      minWidth: '45%',
+      padding: 12,
+    },
+    bookingTileActive: {
+      borderColor: '#FB923C',
+      backgroundColor: '#FFF7ED',
+    },
+    bookingTileCopy: {
+      flex: 1,
+      width: '100%',
+      gap: 2,
+    },
+    bookingTileTitle: {
+      color: '#102339',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 17,
+      lineHeight: 21,
+    },
+    bookingTileValue: {
+      color: '#506174',
+      fontFamily: AppFonts.medium,
+      fontSize: 13,
+      lineHeight: 17,
+    },
+    bookingPickerPanel: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      gap: 8,
+      padding: 12,
+    },
+    bookingPickerOption: {
+      alignItems: 'center',
+      borderColor: '#CFE6D9',
+      borderRadius: 15,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 12,
+      minHeight: 56,
+      paddingHorizontal: 15,
+    },
+    bookingPickerOptionActive: {
+      backgroundColor: '#E8F9EF',
+      borderColor: '#0A8A51',
+    },
+    bookingPickerOptionText: {
+      color: '#102339',
+      flex: 1,
+      fontFamily: AppFonts.bold,
+      fontSize: 15,
+    },
+    bookingPickerHint: {
+      color: '#4B6355',
+      fontFamily: AppFonts.medium,
+      fontSize: 12,
+      lineHeight: 19,
+      marginHorizontal: 4,
+      marginTop: 4,
+    },
+    bookingZipInput: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#CBD5E1',
+      borderRadius: 15,
+      borderWidth: 1,
+      color: '#102339',
+      fontFamily: AppFonts.bold,
+      fontSize: 18,
+      minHeight: 58,
+      paddingHorizontal: 15,
+    },
+    bookingSearchButton: {
+      alignItems: 'center',
+      backgroundColor: '#F97316',
+      borderRadius: 20,
+      flexDirection: 'row',
+      gap: 12,
+      justifyContent: 'center',
+      minHeight: 62,
+      paddingHorizontal: 15,
+      shadowColor: '#7C2D12',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.22,
+      shadowRadius: 8,
+    },
+    bookingSearchText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 21,
+    },
+    allServicesToggle: {
+      alignItems: 'center',
+      backgroundColor: '#E7F8EF',
+      borderColor: '#D1EDDC',
+      borderRadius: 17,
+      borderWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 56,
+      paddingHorizontal: 17,
+    },
+    allServicesToggleText: {
+      color: '#005333',
+      fontFamily: AppFonts.bold,
+      fontSize: 15,
+    },
     previewCanvas: {
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -2906,8 +3056,13 @@ function createStyles(isDark: boolean) {
 
     header: {
       alignItems: 'center',
+      backgroundColor: '#005333',
+      borderRadius: 23,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      minHeight: 112,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
     },
     headerCopy: {
       flex: 1,
@@ -2915,14 +3070,14 @@ function createStyles(isDark: boolean) {
       paddingRight: 8,
     },
     dashboardTitle: {
-      color: palette.title,
+      color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
       fontSize: 21,
       letterSpacing: -0.45,
       lineHeight: 25,
     },
     welcomeText: {
-      color: palette.muted,
+      color: '#E4FBEA',
       fontFamily: AppFonts.medium,
       fontSize: 12,
     },
@@ -2936,7 +3091,7 @@ function createStyles(isDark: boolean) {
       marginTop: 2,
     },
     locationText: {
-      color: palette.muted,
+      color: '#D5F5E3',
       fontFamily: AppFonts.medium,
       fontSize: 10,
     },
@@ -2947,8 +3102,8 @@ function createStyles(isDark: boolean) {
     },
     headerIconButton: {
       alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderColor: 'rgba(255,255,255,0.28)',
       borderRadius: 999,
       borderWidth: 1,
       height: TOUCH_MIN,
@@ -2997,7 +3152,14 @@ function createStyles(isDark: boolean) {
       backgroundColor: isDark ? 'rgba(226,170,45,0.18)' : '#FFF4D8',
     },
     profileButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 999,
+      flexDirection: 'row',
+      gap: 3,
+      minHeight: 52,
+      paddingHorizontal: 4,
+      paddingRight: 9,
     },
 
     loadNotice: {
