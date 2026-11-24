@@ -3358,6 +3358,7 @@ export default function CustomerDashboardPage() {
 
   const featuredCareBooking =
     liveCareBookings[0] || stats.nextBooking || latestBooking || null;
+  const commandCenterBooking = liveCareBookings[0] || stats.nextBooking || null;
 
   const featuredPawReport = featuredCareBooking
     ? pawReportMap.get(featuredCareBooking.id) || null
@@ -3559,7 +3560,7 @@ export default function CustomerDashboardPage() {
         </Suspense>
 
         <CustomerStickyCta
-          unpaidBookingId={null}
+          unpaidBookingId={unpaidBooking?.id || null}
           setupHref={stickySetup?.href}
           setupLabel={stickySetup?.label}
           findCareHref={routes.findGuru}
@@ -3575,23 +3576,24 @@ export default function CustomerDashboardPage() {
             upcomingCount={upcomingBookings.length}
             pawPerksLabel={formatMoney(pawPerksState.redeemedCashCredits)}
             visit={
-              stats.nextBooking
+              commandCenterBooking
                 ? {
-                    service: stats.nextBooking.service_type || "Pet care",
-                    petName: getBookingDisplayPet(stats.nextBooking, pets).name || "Your pet",
-                    petPhoto: getBookingDisplayPet(stats.nextBooking, pets).photoUrl || "",
-                    guruName: (stats.nextBooking.guru_name || "Your Guru").trim().split(/\s+/)[0] || "Your Guru",
-                    guruPhoto: stats.nextBooking.guru_avatar_url || "",
+                    service: commandCenterBooking.service_type || "Pet care",
+                    petName: getBookingDisplayPet(commandCenterBooking, pets).name || "Your pet",
+                    petPhoto: getBookingDisplayPet(commandCenterBooking, pets).photoUrl || "",
+                    guruName: (commandCenterBooking.guru_name || "Your Guru").trim().split(/\s+/)[0] || "Your Guru",
+                    guruPhoto: commandCenterBooking.guru_avatar_url || "",
                     when: [
-                      formatShortDate(getBookingDisplayDate(stats.nextBooking)),
-                      stats.nextBooking.time_window || formatTime(getBookingDisplayDate(stats.nextBooking)),
+                      formatShortDate(getBookingDisplayDate(commandCenterBooking)),
+                      commandCenterBooking.time_window || formatTime(getBookingDisplayDate(commandCenterBooking)),
                     ].filter(Boolean).join(" · "),
-                    place: getBookingLocation(stats.nextBooking) || "Care address on the booking",
-                    detailHref: getBookingDetailHref(stats.nextBooking.id),
-                    reportHref: getBookingPawReportHref(stats.nextBooking.id),
+                    place: getBookingLocation(commandCenterBooking) || "Care address on the booking",
+                    detailHref: getBookingDetailHref(commandCenterBooking.id),
+                    reportHref: getBookingPawReportHref(commandCenterBooking.id),
+                    isLive: Boolean(isCareLive && commandCenterBooking.id === featuredCareBooking?.id),
                     payHref:
-                      unpaidBooking?.id === stats.nextBooking.id
-                        ? getBookingDetailHref(stats.nextBooking.id)
+                      unpaidBooking?.id === commandCenterBooking.id
+                        ? getBookingDetailHref(commandCenterBooking.id)
                         : "",
                   }
                 : null
@@ -3661,6 +3663,12 @@ export default function CustomerDashboardPage() {
             }
             onZipReady={refreshNearbyGurusForZip}
           />
+          <details className="group rounded-[1.7rem] border border-emerald-100 bg-white/80 px-4 py-4 shadow-sm sm:px-6">
+            <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 text-base font-black text-emerald-900 marker:content-none">
+              More care details, rewards & shortcuts
+              <span aria-hidden="true" className="text-xl font-black text-orange-500 transition group-open:rotate-45">+</span>
+            </summary>
+            <div className="space-y-4 pb-3">
           {!isZeroBookingHome ? (
             <UniversityExpress
               variant="banner"
@@ -3992,6 +4000,9 @@ export default function CustomerDashboardPage() {
               </Link>
             ))}
           </section>
+
+            </div>
+          </details>
 
           {authUserId ? (
             <section className="mt-4">
