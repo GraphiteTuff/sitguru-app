@@ -673,53 +673,18 @@ export default function GuruDashboardHeader({
           <button
             type="button"
             onClick={() => setAccountMenuOpen((value) => !value)}
-            className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold tracking-[-0.01em] text-white shadow-sm"
+            className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 shadow-sm transition hover:bg-emerald-100 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300"
             aria-haspopup="menu"
             aria-expanded={accountMenuOpen}
+            aria-label="Open Guru profile and switch workspace"
           >
-            {accountMenuOpen ? "Close" : "Menu"}
+            {renderGuruAvatar("h-11 w-11")}
+            <ChevronDown className={"h-5 w-5 text-emerald-900 transition-transform " + (accountMenuOpen ? "rotate-180" : "")} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      <div className="border-t border-slate-100 bg-white lg:hidden">
-        <div className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              resolvedActiveTab === item.tab ||
-              isPathActive(pathname, item.href);
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={[
-                  "inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold tracking-[-0.01em] transition",
-                  isActive
-                    ? "border-emerald-300 bg-emerald-50"
-                    : "border-slate-200 bg-white hover:bg-slate-50",
-                ].join(" ")}
-                style={{ color: isActive ? "#065f46" : "#334155" }}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-
-          <Link
-            href="/guru/success-center"
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold tracking-[-0.01em] hover:bg-slate-50"
-            style={{ color: "#334155" }}
-          >
-            <BookOpen className="h-4 w-4" />
-            Guru Success Center
-          </Link>
-        </div>
-      </div>
-
-      {accountMenuOpen ? (
+            {accountMenuOpen ? (
         <div
           className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden"
           style={{ color: "#0f172a" }}
