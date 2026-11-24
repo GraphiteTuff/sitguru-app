@@ -377,13 +377,20 @@ export default function GuruSetupScreen() {
     setter([...values, value]);
   }
 
-  function goBack() {
-    if (currentStep === 1) {
-      router.push('/role-selection');
-      return;
+  async function goBack() {
+    if (saving || loading || !beginSingleSubmission(advanceLock.current)) return;
+    const previousStep = currentStep === 1 ? 1 : (currentStep - 1) as StepNumber;
+    try {
+      const saved = await persistAndAdvance(previousStep);
+      if (!saved) return;
+      if (currentStep === 1) {
+        router.push('/guru-dashboard');
+      } else {
+        setCurrentStep(previousStep);
+      }
+    } finally {
+      endSingleSubmission(advanceLock.current);
     }
-
-    setCurrentStep((currentStep - 1) as StepNumber);
   }
 
   async function goNext() {
@@ -892,7 +899,7 @@ export default function GuruSetupScreen() {
                 <Text style={styles.heroPhotoText}>Tap to {currentPhotoUrl ? 'change' : 'upload'} your photo</Text>
               </View>
               <View style={styles.heroFloatingCard}>
-                <Text style={styles.heroFloatingTitle}>Findable &amp; bookable</Text>
+                <Text style={styles.heroFloatingTitle}>Build confidence</Text>
                 <Text style={styles.heroFloatingText}>
                   Add a friendly profile and accurate services to help local Pet Parents discover you.
                 </Text>
@@ -984,12 +991,12 @@ export default function GuruSetupScreen() {
       <View style={styles.bottomDock}>
         <BubblePressable
           accessibilityRole="button"
-          disabled={saving}
-          onPress={goBack}
+          disabled={saving || loading}
+          onPress={() => void goBack()}
           style={styles.dockSecondaryAction}
         >
           <Text style={styles.dockSecondaryText}>
-            {currentStep === 1 ? 'Roles' : 'Back'}
+            {currentStep === 1 ? 'Dashboard' : 'Back'}
           </Text>
         </BubblePressable>
 
