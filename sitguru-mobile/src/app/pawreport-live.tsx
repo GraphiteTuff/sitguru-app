@@ -9,6 +9,9 @@ import {
   MapPin,
   MessageCircle,
   Navigation,
+  PawPrint,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useEffect, useMemo } from 'react';
 import {
@@ -17,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import LiveRouteHeader from '@/components/mobile/LiveRouteHeader';
@@ -47,6 +51,8 @@ function formatClock(date: Date | null) {
  * Pet Parent live PawReport tracker — walk API metrics + event badges/logs.
  */
 export default function PawReportLiveScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 760;
   const params = useLocalSearchParams<{ bookingId?: string }>();
   const bookingId = Array.isArray(params.bookingId)
     ? params.bookingId[0]
@@ -54,6 +60,8 @@ export default function PawReportLiveScreen() {
 
   const { snapshot, loading, error, refresh, bookingId: activeId } =
     usePawReportLive(bookingId);
+  const hasBooking = Boolean(activeId || bookingId);
+  const reviewReady = hasBooking && /completed|finished|ended/i.test(snapshot.statusLabel);
 
   const coords = useMemo<LiveCoords | null>(() => {
     if (
@@ -72,6 +80,9 @@ export default function PawReportLiveScreen() {
     };
   }, [snapshot.latitude, snapshot.longitude]);
 
+  // Only show real coordinates, never the map component's generic fallback center.
+  const hasRoute = Boolean(coords || snapshot.trail.length > 0);
+
   useEffect(() => {
     if (snapshot.isLive) {
       requestContextualPushPriming();
@@ -86,16 +97,14 @@ export default function PawReportLiveScreen() {
         onRefresh={() => void refresh()}
         footer={
           <StickyActionBar embedded>
-            {snapshot.isLive ? (
+            {snapshot.isLive && hasBooking ? (
               <>
                 <SitGuruButton
                   label="Message Guru"
                   onPress={() =>
                     router.push({
                       pathname: '/conversation',
-                      params: {
-                        bookingId: activeId || bookingId || '',
-                      },
+                      params: { bookingId: activeId || bookingId || '' },
                     })
                   }
                 />
@@ -105,22 +114,31 @@ export default function PawReportLiveScreen() {
                   onPress={() => router.push('/pet-parent-dashboard')}
                 />
               </>
-            ) : (
+            ) : reviewReady ? (
               <>
                 <SitGuruButton
-                  label="Submit Visit Review"
+                  label="Review completed visit"
                   onPress={() =>
                     router.push({
                       pathname: '/reviews',
-                      params: {
-                        bookingId: activeId || bookingId || '',
-                      },
+                      params: { bookingId: activeId || bookingId || '' },
                     })
                   }
-                  accessibilityLabel="Open end-of-visit review"
                 />
                 <SitGuruButton
-                  label="Skip for now"
+                  label="My bookings"
+                  variant="secondary"
+                  onPress={() => router.push('/bookings')}
+                />
+              </>
+            ) : (
+              <>
+                <SitGuruButton
+                  label={hasBooking ? 'My bookings' : 'Find care'}
+                  onPress={() => router.push(hasBooking ? '/bookings' : '/find-care')}
+                />
+                <SitGuruButton
+                  label="Back to dashboard"
                   variant="secondary"
                   onPress={() => router.push('/pet-parent-dashboard')}
                 />
@@ -129,23 +147,48 @@ export default function PawReportLiveScreen() {
           </StickyActionBar>
         }
       >
-        <View style={styles.header}>
-          <TouchTarget
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => router.push('/pet-parent-dashboard')}
-            style={styles.back}
-          >
-            <ChevronLeft color={SitGuruColors.text} size={22} strokeWidth={2.4} />
-          </TouchTarget>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>PawReport Live</Text>
-            <Text style={styles.subtitle}>
-              {snapshot.petName}
-              {snapshot.isLive ? ' · Live now' : ` · ${snapshot.statusLabel}`}
+        <View style={[styles.pageWidth, isWide && styles.pageWidthWide]}>
+          <View style={styles.header}>
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel="Back to Pet Parent dashboard"
+              onPress={() => router.push('/pet-parent-dashboard')}
+              style={styles.back}
+            >
+              <ChevronLeft color="#FFFFFF" size={22} strokeWidth={2.4} />
+            </TouchTarget>
+            <View style={styles.headerCopy}>
+              <View style={styles.eyebrowRow}>
+                <PawPrint color="#C6F68D" size={16} strokeWidth={2.5} />
+                <Text style={styles.eyebrow}>The SitGuru care experience</Text>
+              </View>
+              <Text style={styles.title}>PawReport Live</Text>
+              <Text style={styles.subtitle}>
+                {snapshot.petName}
+                {snapshot.isLive
+                  ? ' · Live now'
+                  : hasBooking
+                    ? ' · ' + snapshot.statusLabel
+                    : ' · Choose a booking'}
+              </Text>
+            </View>
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel="Refresh PawReport"
+              onPress={() => void refresh()}
+              style={styles.refresh}
+            >
+              <RefreshCw color="#FFFFFF" size={20} strokeWidth={2.4} />
+            </TouchTarget>
+          </View>
+          <View style={styles.contextRow}>
+            <ShieldCheck color="#147346" size={18} strokeWidth={2.3} />
+            <Text style={styles.contextText}>
+              {hasBooking
+                ? "Your Guru's shared updates, connected to this booking."
+                : 'Open a booking to view live visit details. No sample data is shown here.'}
             </Text>
           </View>
-        </View>
 
         {error ? (
           <View style={styles.notice}>
@@ -188,20 +231,32 @@ export default function PawReportLiveScreen() {
                   <MapPin color={SitGuruColors.primary} size={18} strokeWidth={2.4} />
                 }
                 label="Status"
-                value={snapshot.isLive ? 'Live' : 'Idle'}
+                value={snapshot.isLive ? 'Live' : hasBooking ? 'Waiting' : 'No visit'}
               />
             </View>
 
-            <LiveRouteHeader
-              locationLabel={`${snapshot.petName} with ${snapshot.guruName}`}
-              live={snapshot.isLive}
-              coords={coords}
-              trail={snapshot.trail}
-              photoPins={snapshot.photoPins}
-              distanceMiles={snapshot.distanceMiles}
-              expanded
-              autoCenter
-            />
+            {hasRoute ? (
+              <LiveRouteHeader
+                locationLabel={snapshot.petName + ' with ' + snapshot.guruName}
+                live={snapshot.isLive}
+                coords={coords}
+                trail={snapshot.trail}
+                photoPins={snapshot.photoPins}
+                distanceMiles={snapshot.distanceMiles}
+                expanded
+                autoCenter
+              />
+            ) : (
+              <View style={styles.emptyRoute}>
+                <View style={styles.emptyRouteIcon}>
+                  <MapPin color="#00844C" size={28} strokeWidth={2.2} />
+                </View>
+                <Text style={styles.emptyRouteTitle}>Walk map</Text>
+                <Text style={styles.emptyRouteText}>
+                  Your Guru's route will appear here when GPS tracking is available for this booking.
+                </Text>
+              </View>
+            )}
 
             {snapshot.badges.length ? (
               <View style={styles.badgeRow}>
@@ -228,7 +283,7 @@ export default function PawReportLiveScreen() {
 
             {snapshot.photos.length ? (
               <View style={styles.photoSection}>
-                <Text style={styles.sectionEyebrow}>Live photos</Text>
+                <Text style={styles.sectionEyebrow}>Photos from your Guru</Text>
                 <Text style={styles.sectionTitle}>
                   {snapshot.photoCount} new photo
                   {snapshot.photoCount === 1 ? '' : 's'}
@@ -248,11 +303,22 @@ export default function PawReportLiveScreen() {
                   ))}
                 </ScrollView>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.photoSection}>
+                <Text style={styles.sectionEyebrow}>Photos from your Guru</Text>
+                <Text style={styles.sectionTitle}>Visit gallery</Text>
+                <View style={styles.emptyPhotoRow}>
+                  <Camera color="#00844C" size={24} strokeWidth={2.3} />
+                  <Text style={styles.emptyPhotoText}>
+                    Photos your Guru shares during this visit will appear here.
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.section}>
               <Text style={styles.sectionEyebrow}>Care log</Text>
-              <Text style={styles.sectionTitle}>Custom updates</Text>
+              <Text style={styles.sectionTitle}>Care timeline</Text>
               <Text style={styles.message}>{snapshot.message}</Text>
 
               {snapshot.logs.length === 0 ? (
@@ -302,6 +368,7 @@ export default function PawReportLiveScreen() {
             </View>
           </>
         )}
+        </View>
       </MobileScreen>
     </RoleGate>
   );
@@ -319,38 +386,118 @@ function Metric({
   return (
     <View style={styles.metric}>
       {icon}
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  pageWidth: {
+    width: '100%',
+    alignSelf: 'center',
+    gap: MobileSpace.md,
+  },
+  pageWidthWide: {
+    maxWidth: 980,
+    paddingHorizontal: MobileSpace.lg,
+  },
   header: {
     alignItems: 'center',
+    backgroundColor: '#005438',
+    borderRadius: 24,
     flexDirection: 'row',
     gap: MobileSpace.sm,
-    marginBottom: MobileSpace.md,
+    minHeight: 122,
+    padding: MobileSpace.md,
   },
   back: {
-    backgroundColor: SitGuruColors.surfaceSoft,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderRadius: 14,
+    height: TOUCH_MIN,
+    width: TOUCH_MIN,
+  },
+  refresh: {
+    backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 14,
     height: TOUCH_MIN,
     width: TOUCH_MIN,
   },
   headerCopy: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+    minWidth: 0,
+  },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eyebrow: {
+    color: '#C6F68D',
+    fontFamily: AppFonts.bold,
+    fontSize: MobileType.micro,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    flexShrink: 1,
   },
   title: {
-    color: SitGuruColors.text,
+    color: '#FFFFFF',
     fontFamily: AppFonts.extraBold,
     fontSize: MobileType.title,
   },
   subtitle: {
-    color: SitGuruColors.textMuted,
+    color: '#E8FFF2',
     fontFamily: AppFonts.medium,
-    fontSize: MobileType.body,
+    fontSize: MobileType.caption,
+  },
+  contextRow: {
+    backgroundColor: '#E9F7EF',
+    borderColor: '#D1EBDD',
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: MobileSpace.sm,
+    padding: MobileSpace.md,
+  },
+  contextText: {
+    flex: 1,
+    color: '#174B36',
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 20,
+  },
+  emptyRoute: {
+    alignItems: 'center',
+    backgroundColor: '#EDFAF2',
+    borderColor: '#CEEADA',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: MobileSpace.sm,
+    justifyContent: 'center',
+    minHeight: 205,
+    padding: MobileSpace.xl,
+  },
+  emptyRouteIcon: {
+    alignItems: 'center',
+    backgroundColor: '#D7F2E3',
+    borderRadius: 18,
+    height: 60,
+    justifyContent: 'center',
+    width: 60,
+  },
+  emptyRouteTitle: {
+    color: '#123D2C',
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.section,
+  },
+  emptyRouteText: {
+    color: '#425F50',
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 21,
+    textAlign: 'center',
   },
   notice: {
     backgroundColor: '#FEF3F2',
@@ -379,13 +526,14 @@ const styles = StyleSheet.create({
   },
   metric: {
     alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1EBDD',
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
-    gap: 4,
-    minHeight: 88,
+    gap: 5,
+    minWidth: 0,
+    minHeight: 100,
     padding: MobileSpace.sm,
   },
   metricValue: {
@@ -437,6 +585,21 @@ const styles = StyleSheet.create({
   photoTrack: {
     gap: MobileSpace.sm,
     paddingVertical: MobileSpace.xs,
+  },
+  emptyPhotoRow: {
+    backgroundColor: '#EFFAF4',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: MobileSpace.md,
+    padding: MobileSpace.md,
+  },
+  emptyPhotoText: {
+    color: '#425F50',
+    flex: 1,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 20,
   },
   photoThumb: {
     borderRadius: 16,

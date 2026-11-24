@@ -24,6 +24,8 @@ type PawReportLiveDashboardProps = {
   role?: PawReportRole;
   /** Allow switching roles in demos / homepage showcase. */
   allowRoleSwitch?: boolean;
+  /** Public education mode; never display simulated updates as actual bookings. */
+  isDemo?: boolean;
   petName?: string;
   guruName?: string;
   className?: string;
@@ -84,6 +86,7 @@ type MobileTab = "live" | "photos" | "status" | "history";
 export default function PawReportLiveDashboard({
   role: initialRole = "pet_parent",
   allowRoleSwitch = false,
+  isDemo = false,
   petName = "Scout",
   guruName = "Your Guru",
   className = "",
@@ -112,15 +115,15 @@ export default function PawReportLiveDashboard({
           : item,
       ),
     );
-    flash(`${key[0].toUpperCase()}${key.slice(1)} update saved`);
+    flash(isDemo ? "Sample care update changed (demo only)" : `${key[0].toUpperCase()}${key.slice(1)} update saved`);
   }
 
   function handleLogWalk() {
-    flash("Walk update logged");
+    flash(isDemo ? "Sample walk action (not saved)" : "Walk update logged");
   }
 
   function handleUploadPhoto() {
-    flash("Photo upload placeholder ready");
+    flash(isDemo ? "Photos are shared by Gurus during real bookings." : "Photo upload placeholder ready");
   }
 
   const headerSubtitle = isGuru
@@ -137,7 +140,7 @@ export default function PawReportLiveDashboard({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-              PawReport Live
+              PawReport Live {isDemo ? "· Interactive demo" : ""}
             </p>
             <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950 sm:text-3xl">
               {petName}&apos;s Walk
@@ -153,7 +156,7 @@ export default function PawReportLiveDashboard({
                 aria-hidden="true"
                 className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
               />
-              Live
+              {isDemo ? "Sample" : "Live"}
             </span>
 
             {allowRoleSwitch ? (
@@ -165,6 +168,7 @@ export default function PawReportLiveDashboard({
                 <button
                   type="button"
                   onClick={() => setRole("pet_parent")}
+                  aria-pressed={!isGuru}
                   className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${
                     !isGuru
                       ? "bg-emerald-700 text-white"
@@ -176,6 +180,7 @@ export default function PawReportLiveDashboard({
                 <button
                   type="button"
                   onClick={() => setRole("guru")}
+                  aria-pressed={isGuru}
                   className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${
                     isGuru
                       ? "bg-emerald-700 text-white"
@@ -203,10 +208,17 @@ export default function PawReportLiveDashboard({
         ) : null}
       </div>
 
+      {isDemo ? (
+        <p className="border-b border-emerald-100 bg-emerald-50/70 px-4 py-2.5 text-xs font-semibold leading-5 text-emerald-900 sm:px-6 lg:px-8">
+          Demo only: roles, care events, photos, times, and route are examples. Nothing you change here is saved or sent to a Guru.
+        </p>
+      ) : null}
+
       {/* Desktop / tablet multi-column */}
       <div className="hidden gap-5 p-5 md:grid md:grid-cols-2 lg:grid-cols-[1.15fr_0.85fr] lg:gap-6 lg:p-7">
         <div className="space-y-5">
           <WalkTracker
+            demo={isDemo}
             interactive={isGuru}
             onLogWalk={handleLogWalk}
           />
@@ -233,6 +245,7 @@ export default function PawReportLiveDashboard({
           {mobileTab === "live" ? (
             <>
               <WalkTracker
+                demo={isDemo}
                 interactive={isGuru}
                 onLogWalk={handleLogWalk}
               />
@@ -279,6 +292,7 @@ export default function PawReportLiveDashboard({
                   key={tab}
                   type="button"
                   onClick={() => setMobileTab(tab)}
+                  aria-pressed={active}
                   className={`flex min-h-14 flex-col items-center justify-center rounded-2xl px-1 text-[10px] font-black transition ${
                     active
                       ? "bg-emerald-700 text-white"
