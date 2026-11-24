@@ -1159,21 +1159,21 @@ export default async function GuruBookingsPage({
     <main className="min-h-screen bg-[#f6fffb] px-4 py-6 !text-[#061638] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1700px] space-y-6">
         <section className="space-y-6">
-          <div className="rounded-[28px] border border-[#dfeee7] bg-white p-6 shadow-[0_12px_32px_rgba(16,24,40,0.06)] xl:p-8">
-            <p className="text-sm font-black uppercase tracking-[0.24em] !text-emerald-600">
+          <div data-brand-green="true" className="rounded-[2rem] border border-emerald-800/15 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 shadow-[0_16px_42px_rgba(8,90,57,0.14)] sm:p-7 xl:p-8">
+            <p className="text-xs font-black uppercase tracking-[0.16em] !text-[#F7E7B0]">
               Guru Workspace
             </p>
 
-            <h1 className="mt-4 max-w-5xl text-4xl font-black leading-tight tracking-tight !text-[#061638] sm:text-5xl lg:text-6xl">
+            <h1 className="mt-3 max-w-5xl text-[clamp(1.9rem,4vw,3.2rem)] font-black leading-tight tracking-tight !text-white">
               Bookings & PawReports
             </h1>
 
-            <p className="mt-4 max-w-sm text-base font-semibold leading-7 !text-slate-600">
+            <p className="mt-3 max-w-2xl text-base font-semibold leading-7 !text-[#EAF7EF]">
               Manage bookings, deliver SitGuru PawReports™, and build trust with
               Pet Parents after every visit.
             </p>
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-xl">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
                 <p className="text-xs font-black uppercase tracking-wide !text-emerald-700">
                   PawReports
@@ -1195,9 +1195,9 @@ export default async function GuruBookingsPage({
               </div>
             </div>
 
-            <p className="mt-3 text-sm font-semibold !text-slate-600">
+            <p className="mt-4 text-sm font-semibold !text-[#EAF7EF]">
               Viewing activity for{" "}
-              <span className="font-black !text-emerald-700">{guruName}</span>
+              <span className="font-black !text-[#F7E7B0]">{guruName}</span>
             </p>
           </div>
 
