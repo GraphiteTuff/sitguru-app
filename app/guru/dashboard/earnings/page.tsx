@@ -1880,18 +1880,18 @@ export default async function GuruDashboardEarningsPage({
   const recentEarnings = normalizedRows.slice(0, 10);
 
   return (
-    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
+    <main className="min-h-[100svh] bg-[#F7FFFB] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
           <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-green-700 sm:text-xs">
+            <div data-brand-green="true" className="bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 sm:p-7">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-[#F7E7B0]">
                 Guru Earnings
               </p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight !text-green-950 sm:text-4xl">
+              <h1 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
                 Hey, {firstName} 👋
               </h1>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-7 !text-[#EAF7EF]">
                 Track what you earned, what is on the way, and where your
                 payouts are going.
               </p>
