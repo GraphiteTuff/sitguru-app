@@ -18,6 +18,7 @@ import {
   MessageCircle,
   PawPrint,
   Search,
+  ShieldCheck,
   Star,
   RotateCcw,
   UserRound,
