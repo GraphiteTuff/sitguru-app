@@ -1,5 +1,6 @@
 "use client";
 
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -474,16 +475,7 @@ export default function GuruServicesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-6 py-12 text-white">
-        <div className="mx-auto max-w-7xl">
-          <div className={shellCardClasses("p-8 text-center")}>
-            <p className="text-lg font-semibold text-white">Loading services...</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Pulling your guru profile and service management workspace.
-            </p>
-          </div>
-        </div>
-      </div>
+      <SitGuruPortalLoading portal="Guru" message="Loading your services..." />
     );
   }
 
