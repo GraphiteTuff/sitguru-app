@@ -1,5 +1,6 @@
 "use client";
 
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -897,19 +898,7 @@ export default function GuruAvailabilityPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffc_42%,#ecfdf5_100%)] px-4 py-10 md:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-center">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
-            <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
-            <p className="mt-3 text-lg font-extrabold" style={forcedDark}>
-              Loading availability...
-            </p>
-            <p className="mt-1 text-sm font-semibold" style={forcedMuted}>
-              Pulling your Guru profile and calendar workspace.
-            </p>
-          </div>
-        </div>
-      </main>
+      <SitGuruPortalLoading portal="Guru" message="Loading your availability..." />
     );
   }
 

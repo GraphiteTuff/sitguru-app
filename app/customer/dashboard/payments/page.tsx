@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Header from "@/components/Header";
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import FinishPaymentButton, {
   isUnpaidBookingPayment,
 } from "@/components/customer/FinishPaymentButton";
@@ -300,6 +301,15 @@ export default function CustomerPaymentsPage() {
       ),
     [paidBookings],
   );
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#eef7f2]">
+        <Header />
+        <SitGuruPortalLoading portal="Pet Parent" message="Loading your payments..." />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#eef7f2] pb-16 text-slate-950">

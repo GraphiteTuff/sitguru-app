@@ -1,5 +1,6 @@
 "use client";
 
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -337,16 +338,7 @@ export default function CustomerPawPerksPage() {
     return (
       <main className="min-h-screen bg-[#f7faf7]">
         <Header />
-        <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-16">
-          <div className="w-full rounded-[28px] border border-emerald-100 bg-white px-6 py-8 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
-              <Gift size={22} />
-            </div>
-            <p className="text-base font-bold text-slate-700">
-              Loading your PawPerks Rewards...
-            </p>
-          </div>
-        </div>
+        <SitGuruPortalLoading portal="Pet Parent" message="Loading your PawPerks Rewards..." />
       </main>
     );
   }

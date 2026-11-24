@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Header from "@/components/Header";
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import { supabase } from "@/lib/supabase";
 import { getPetParentSetupStatus } from "@/lib/pet-parent-readiness";
 
@@ -610,14 +611,7 @@ export default function CustomerServiceLocationPage() {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)]">
         <Header />
-        <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-16">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" />
-            <p className="mt-3 text-base font-bold text-slate-700">
-              Loading Service Location...
-            </p>
-          </div>
-        </div>
+        <SitGuruPortalLoading portal="Pet Parent" message="Loading Service Location..." />
       </main>
     );
   }
