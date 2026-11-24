@@ -773,7 +773,7 @@ export default function PetParentDashboardScreen() {
     () =>
       AI_COMPANIONS.map((companion) => ({
         id: companion.id,
-        eyebrow: 'AI Companion',
+        eyebrow: 'Your Pet Companions',
         title: `${companion.name} · ${companion.title}`,
         helper: companion.helper,
         tone: companion.id === 'rogue' ? 'primary' : 'surface',
