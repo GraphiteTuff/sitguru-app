@@ -7,7 +7,6 @@ import {
   BedDouble,
   ArrowRight,
   Camera,
-  ChevronDown,
   CalendarDays,
   CreditCard,
   Gift,
@@ -18,7 +17,6 @@ import {
   MapPin,
   MessageCircle,
   PawPrint,
-  Plus,
   Search,
   Star,
   RotateCcw,
@@ -195,7 +193,6 @@ export default function CustomerCareCommandCenter({
   const [pickedDates, setPickedDates] = useState<string[]>([]);
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
-  const [showMoreServices, setShowMoreServices] = useState(false);
   const [unread, setUnread] = useState<number | null>(null);
   const requestedZip = useRef("");
   const onZipReadyRef = useRef(onZipReady);
