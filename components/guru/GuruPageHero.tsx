@@ -49,7 +49,7 @@ export default function GuruPageHero({
         {action ? (
           <Link
             href={action.href}
-            className="inline-flex min-h-[56px] shrink-0 items-center justify-center rounded-2xl bg-white px-5 py-3 text-center text-sm font-black !text-[#06462F] shadow-md transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300"
+            className="inline-flex min-h-[56px] w-full shrink-0 items-center justify-center rounded-2xl bg-white px-5 py-3 text-center text-base font-black !text-[#06462F] shadow-md transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:w-auto"
           >
             {action.label}
           </Link>
