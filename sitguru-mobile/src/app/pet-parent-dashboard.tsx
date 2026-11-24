@@ -1129,7 +1129,13 @@ export default function PetParentDashboardScreen() {
                   />
                 }
                 label="Pet Moments"
-                onPress={() => router.push('/community-studio')}
+                onPress={() => router.push({
+                  pathname: '/community-studio',
+                  params: {
+                    from: 'pet-moment',
+                    ...(selectedPet ? { petName: selectedPet.name } : {}),
+                  },
+                })}
                 styles={styles}
               />
 
