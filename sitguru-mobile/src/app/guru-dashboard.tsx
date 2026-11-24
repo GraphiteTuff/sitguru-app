@@ -659,7 +659,7 @@ export default function GuruDashboardScreen() {
           title:
             'Finish Your Guru Profile',
           helper: `${profileCompletion}% complete • Improve booking readiness.`,
-          route: '/guru-profile',
+          route: '/guru-setup',
           icon: 'profile',
         };
       }
@@ -1808,7 +1808,7 @@ export default function GuruDashboardScreen() {
                         accessibilityRole="button"
                         onPress={() =>
                           router.push(
-                            '/guru-profile',
+                            '/guru-setup',
                           )
                         }
                         style={
