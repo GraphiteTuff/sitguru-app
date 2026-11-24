@@ -218,6 +218,7 @@ export default function PawReportLiveDashboard({
       <div className="hidden gap-5 p-5 md:grid md:grid-cols-2 lg:grid-cols-[1.15fr_0.85fr] lg:gap-6 lg:p-7">
         <div className="space-y-5">
           <WalkTracker
+            demo={isDemo}
             interactive={isGuru}
             onLogWalk={handleLogWalk}
           />
@@ -244,6 +245,7 @@ export default function PawReportLiveDashboard({
           {mobileTab === "live" ? (
             <>
               <WalkTracker
+                demo={isDemo}
                 interactive={isGuru}
                 onLogWalk={handleLogWalk}
               />
