@@ -606,7 +606,7 @@ export default function GuruBackgroundCheckPage() {
     >
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="relative bg-[radial-gradient(circle_at_82%_14%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(135deg,#d9fff3_0%,#b9f3e6_36%,#d8eefc_100%)] px-6 py-8 md:px-10 md:py-12">
+          <div data-brand-green="true" className="relative bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10">
             <HeroPawDecor />
 
             <div className="relative z-10 mb-5 flex flex-wrap items-center gap-3">
@@ -636,15 +636,15 @@ export default function GuruBackgroundCheckPage() {
             </p>
 
             <h1
-              className="relative z-10 mt-5 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] md:text-6xl lg:text-7xl"
-              style={textDark}
+              className="relative z-10 mt-5 max-w-4xl text-3xl font-extrabold tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl"
+              style={{ color: "#FFFFFF", WebkitTextFillColor: "#FFFFFF" }}
             >
               Step 4: Trust & Safety Screening Fee Waived Through 2026
             </h1>
 
             <p
-              className="relative z-10 mt-5 max-w-3xl text-base font-bold leading-8 md:text-xl"
-              style={textSlate}
+              className="relative z-10 mt-5 max-w-3xl text-base font-bold leading-8 !text-[#EAF7EF] md:text-lg"
+              style={{ color: "#EAF7EF", WebkitTextFillColor: "#EAF7EF" }}
             >
               Hi {firstName}. SitGuru is waiving the Trust & Safety
               Screening fee for all Gurus through {TRUST_SAFETY_WAIVER_END_DISPLAY}
