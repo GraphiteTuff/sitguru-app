@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadGuruProfileForUser } from "@/lib/gurus/load-guru-profile-for-user";
