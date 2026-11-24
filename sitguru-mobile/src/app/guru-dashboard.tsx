@@ -2,6 +2,7 @@ import { router, type Href } from 'expo-router';
 import {
   Bell,
   CalendarDays,
+  ChevronDown,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -959,9 +960,7 @@ export default function GuruDashboardScreen() {
                           styles.dashboardTitle
                         }
                       >
-                        {firstName === 'there'
-                          ? `Good ${dayPart()}`
-                          : `Good ${dayPart()}, ${firstName}`}
+                        {firstName === 'there' ? 'Welcome Back, Guru!' : `Welcome Back, ${firstName}!`}
                       </Text>
 
                       <Text
@@ -969,11 +968,13 @@ export default function GuruDashboardScreen() {
                           styles.welcomeText
                         }
                       >
-                        Connect with Pet Parents. Grow your care business.
+                        Your pet care business at a glance.
                       </Text>
 
 
-                      <SitGuruRoleStatus role="guru" />
+                      <View style={styles.roleStatusPill}>
+                        <SitGuruRoleStatus role="guru" />
+                      </View>
 
                       {city || state ? (
                         <View
@@ -983,7 +984,7 @@ export default function GuruDashboardScreen() {
                         >
                           <MapPin
                             color={
-                              palette.primary
+                              '#EAF7EF'
                             }
                             size={12}
                             strokeWidth={
@@ -1036,9 +1037,9 @@ export default function GuruDashboardScreen() {
                       >
                         <Bell
                           color={
-                            palette.title
+                            '#FFFFFF'
                           }
-                          size={18}
+                          size={20}
                           strokeWidth={
                             2.3
                           }
@@ -1144,8 +1145,9 @@ export default function GuruDashboardScreen() {
                           palette={
                             palette
                           }
-                          size={42}
+                          size={46}
                         />
+                      <ChevronDown color="#FFFFFF" size={17} strokeWidth={2.8} />
                       </BubblePressable>
                     </View>
                   </View>
@@ -2205,7 +2207,7 @@ function RequestCard({
             request.petPhotoUrl
           }
           palette={palette}
-          size={52}
+          size={80}
         />
 
         <View
