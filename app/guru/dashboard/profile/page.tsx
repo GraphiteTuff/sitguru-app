@@ -1796,14 +1796,14 @@ function GuruDashboardProfilePageContent() {
     <main
       className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] !text-slate-950"
     >
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div data-brand-green="true" className="grid gap-8 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-5 py-7 sm:px-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+      <div className="mx-auto max-w-[1500px] px-3 py-4 pb-24 sm:px-6 sm:py-6 lg:px-8">
+        <section className="overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[2.25rem]">
+          <div data-brand-green="true" className="grid gap-6 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] px-4 py-5 sm:gap-8 sm:px-8 sm:py-8 md:px-10 md:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
                   href={routes.dashboard}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-white/85 px-4 py-2 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
+                  className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-extrabold !text-[#06462F] shadow-sm ring-1 ring-white/70 transition hover:bg-emerald-50"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Guru Dashboard
@@ -1825,13 +1825,13 @@ function GuruDashboardProfilePageContent() {
                 ) : null}
               </div>
 
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.13em] text-emerald-800 shadow-sm ring-1 ring-white/70">
                 <ShieldCheck className="h-4 w-4" />
                 Guided Profile Builder
               </div>
 
               <h1
-                className="max-w-4xl text-3xl font-extrabold tracking-[-0.045em] !text-white sm:text-4xl md:text-5xl lg:text-6xl"
+                className="max-w-4xl text-[clamp(1.9rem,5vw,3.2rem)] font-extrabold leading-tight tracking-[-0.035em] !text-white"
               >
                 {activeStep === "1"
                   ? "Step 1: Complete your Guru profile"
@@ -1841,19 +1841,18 @@ function GuruDashboardProfilePageContent() {
               </h1>
 
               <p
-                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-[#EAF7EF] md:text-lg"
+                className="mt-3 max-w-3xl text-sm font-semibold leading-6 !text-[#EAF7EF] sm:text-base sm:leading-7"
               >
-                Only this step is shown so you can focus. Save when finished,
-                then continue to the next step or return to the dashboard to see
-                this step turn green and know exactly what to do next.
+                Edit your photo, bio, location, and services one step at a time.
+                Save your progress whenever you like, then preview what Pet Parents see.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="inline-flex min-h-[56px] min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-[#C54D00] px-6 py-4 text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:bg-[#A74400] disabled:opacity-60"
+                  className="inline-flex min-h-[58px] min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#A74400] px-3 py-3 text-center text-sm font-extrabold !text-white shadow-lg shadow-orange-950/10 transition hover:bg-[#8C3900] disabled:opacity-60 sm:min-w-[160px] sm:px-6"
                 >
                   {uploadingPhoto ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
