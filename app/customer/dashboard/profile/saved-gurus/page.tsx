@@ -1,5 +1,6 @@
 "use client";
 
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -12,7 +13,6 @@ import {
   Gift,
   Handshake,
   Heart,
-  Loader2,
   Megaphone,
   MessageCircle,
   PawPrint,
@@ -357,14 +357,7 @@ export default function CustomerSavedGurusSetupPage() {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)]">
         <Header />
-        <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-16">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" />
-            <p className="mt-3 text-base font-bold text-slate-700">
-              Loading Step 7...
-            </p>
-          </div>
-        </div>
+        <SitGuruPortalLoading portal="Pet Parent" message="Loading your saved Gurus..." />
       </main>
     );
   }
