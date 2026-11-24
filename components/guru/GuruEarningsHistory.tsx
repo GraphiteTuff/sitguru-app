@@ -58,7 +58,8 @@ function statusBadge(payoutStatus: string) {
 function csvCell(value: string | number) {
   const raw = String(value ?? "").replace(/[\r\n\t]+/g, " ");
   // Prevent spreadsheet formula injection if names or service labels are user-supplied.
-  const safe = /^\s*[=+\-@]/.test(raw) ? "'" + raw : raw;
+  const isPlainNumber = /^-?\d+(?:\.\d+)?$/.test(raw.trim());
+  const safe = !isPlainNumber && /^\s*[=+\-@]/.test(raw) ? "'" + raw : raw;
   return '"' + safe.replace(/"/g, '""') + '"';
 }
 
