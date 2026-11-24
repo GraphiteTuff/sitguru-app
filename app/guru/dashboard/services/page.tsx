@@ -122,17 +122,17 @@ const starterServices: ServiceItem[] = [
 ];
 
 function shellCardClasses(extra = "") {
-  return `rounded-[28px] border border-white/10 bg-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm ${extra}`;
+  return `rounded-[1.8rem] border border-emerald-100 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] ${extra}`;
 }
 
 function categoryTone(category: ServiceCategory) {
   switch (category) {
     case "premium":
-      return "border-violet-400/20 bg-violet-400/10 text-violet-300";
+      return "border-violet-200 bg-violet-50 text-violet-800";
     case "add-on":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+      return "border-amber-200 bg-amber-50 text-amber-800";
     default:
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
   }
 }
 
@@ -481,29 +481,29 @@ export default function GuruServicesPage() {
 
   if (!guru) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-6 py-12 text-white">
+      <div className="min-h-screen bg-[#F7FFFB] px-4 py-8 text-slate-950 sm:px-6">
         <div className="mx-auto max-w-4xl">
           <div className={shellCardClasses("p-8")}>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
               Guru Services
             </p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white">
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
               Guru profile not found
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
+            <p className="mt-3 text-sm leading-6 text-slate-600">
               We could not find a guru profile connected to your account.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href="/guru/dashboard"
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="min-h-[52px] rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 transition hover:bg-white/10"
               >
                 Back to Dashboard
               </Link>
               <Link
                 href="/guru/login"
-                className="rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                className="min-h-[52px] rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black !text-white transition hover:bg-emerald-400"
               >
                 Back to Guru Login
               </Link>
@@ -515,54 +515,54 @@ export default function GuruServicesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_26%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_24%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F7FFFB] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
+        <section data-brand-green="true" className="overflow-hidden rounded-[2rem] border border-emerald-800/15 bg-[linear-gradient(125deg,#06462F_0%,#08734A_62%,#0C8756_100%)] p-5 shadow-[0_16px_42px_rgba(8,90,57,0.14)] sm:p-7 lg:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
               <Link
                 href="/guru/dashboard"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-300 transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#EAF7EF] transition hover:bg-white/10"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to Guru Dashboard
               </Link>
 
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#F7E7B0]">
                 <PawPrint className="h-3.5 w-3.5" />
                 Guru Services
               </div>
 
-              <h1 className="mt-4 text-4xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] sm:text-5xl">
+              <h1 className="mt-4 text-4xl font-black tracking-tight !text-white sm:text-5xl">
                 Control what customers can book
               </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-200 sm:text-base">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-[#EAF7EF] sm:text-base">
                 Activate services, tune pricing, keep units consistent, and shape the
                 public booking options customers see on your guru profile.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              <div className="rounded-3xl border border-white/30 bg-white/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#EAF7EF]">
                   Active services
                 </p>
                 <p className="mt-2 text-2xl font-black text-white">{activeServices}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              <div className="rounded-3xl border border-white/30 bg-white/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#EAF7EF]">
                   Featured
                 </p>
                 <p className="mt-2 text-2xl font-black text-white">{featuredServices}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              <div className="rounded-3xl border border-white/30 bg-white/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#EAF7EF]">
                   Premium live
                 </p>
                 <p className="mt-2 text-2xl font-black text-white">{premiumServices}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              <div className="rounded-3xl border border-white/30 bg-white/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#EAF7EF]">
                   Avg. price
                 </p>
                 <p className="mt-2 text-2xl font-black text-white">
@@ -574,27 +574,27 @@ export default function GuruServicesPage() {
         </section>
 
         {pageNotice ? (
-          <div className="rounded-3xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-300">
+          <div className="rounded-3xl border border-sky-200 bg-sky-100 px-4 py-3 text-sm text-sky-800">
             {pageNotice}
           </div>
         ) : null}
 
         {saveMessage ? (
-          <div className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-300">
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm text-emerald-800">
             {saveMessage}
           </div>
         ) : null}
 
         <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
           <section className={shellCardClasses("p-6")}>
-            <div className="border-b border-white/10 pb-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <div className="border-b border-emerald-100 pb-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Service catalog
               </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 ">
                 Manage offerings, pricing, and visibility
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 Customers should always see clear pricing units. Core services now
                 follow fixed booking labels like per visit, per night, per day, and
                 per walk.
@@ -605,21 +605,21 @@ export default function GuruServicesPage() {
               <button
                 type="button"
                 onClick={() => applyPreset("starter")}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="min-h-[52px] rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-900 transition hover:bg-emerald-50"
               >
                 Starter preset
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("flex")}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="min-h-[52px] rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-900 transition hover:bg-emerald-50"
               >
                 Flexible preset
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("premium")}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="min-h-[52px] rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-900 transition hover:bg-emerald-50"
               >
                 Premium preset
               </button>
@@ -629,12 +629,12 @@ export default function GuruServicesPage() {
               {services.map((service) => (
                 <div
                   key={service.id}
-                  className="rounded-3xl border border-white/10 bg-slate-950/60 p-5"
+                  className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5"
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xl font-black text-white">{service.name}</p>
+                        <p className="text-xl font-black text-slate-950">{service.name}</p>
 
                         <span
                           className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${categoryTone(
@@ -645,33 +645,33 @@ export default function GuruServicesPage() {
                         </span>
 
                         {service.featured ? (
-                          <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">
+                          <span className="rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800">
                             Featured
                           </span>
                         ) : null}
 
                         {service.active ? (
-                          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                          <span className="rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
                             Active
                           </span>
                         ) : (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                          <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
                             Hidden
                           </span>
                         )}
                       </div>
 
-                      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
+                      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
                         {service.description}
                       </p>
 
                       <div className="mt-5 grid gap-4 md:grid-cols-3">
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Price
                           </label>
-                          <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <span className="mr-2 text-sm font-semibold text-slate-300">$</span>
+                          <div className="mt-2 flex items-center rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                            <span className="mr-2 text-sm font-semibold text-slate-600">$</span>
                             <input
                               type="number"
                               min="0"
@@ -680,17 +680,17 @@ export default function GuruServicesPage() {
                               onChange={(e) =>
                                 updateService(service.id, "price", e.target.value)
                               }
-                              className="w-full bg-transparent text-sm font-semibold text-white outline-none"
+                              className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Duration
                           </label>
-                          <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <Clock3 className="mr-2 h-4 w-4 text-slate-300" />
+                          <div className="mt-2 flex items-center rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                            <Clock3 className="mr-2 h-4 w-4 text-slate-600" />
                             <input
                               type="number"
                               min="0"
@@ -699,23 +699,23 @@ export default function GuruServicesPage() {
                               onChange={(e) =>
                                 updateService(service.id, "duration", e.target.value)
                               }
-                              className="w-full bg-transparent text-sm font-semibold text-white outline-none"
+                              className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
                             />
-                            <span className="ml-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            <span className="ml-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                               min
                             </span>
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Customer unit
                           </label>
-                          <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <p className="text-sm font-semibold text-white">
+                          <div className="mt-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                            <p className="text-sm font-semibold text-slate-950">
                               / {service.unitLabel}
                             </p>
-                            <p className="mt-1 text-xs text-slate-400">
+                            <p className="mt-1 text-xs text-slate-500">
                               Fixed for this service type
                             </p>
                           </div>
@@ -728,10 +728,10 @@ export default function GuruServicesPage() {
                           onClick={() =>
                             updateService(service.id, "active", !service.active)
                           }
-                          className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                          className={`min-h-[52px] rounded-2xl px-4 py-2.5 text-sm font-bold transition ${
                             service.active
-                              ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15"
-                              : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              ? "border border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-400/15"
+                              : "border border-emerald-100 bg-white text-slate-950 hover:bg-emerald-50"
                           }`}
                         >
                           {service.active ? "Active on profile" : "Hidden from profile"}
@@ -744,35 +744,35 @@ export default function GuruServicesPage() {
                           }
                           className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                             service.featured
-                              ? "border border-sky-400/20 bg-sky-400/10 text-sky-300 hover:bg-sky-400/15"
-                              : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              ? "border border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-400/15"
+                              : "border border-emerald-100 bg-white text-slate-950 hover:bg-emerald-50"
                           }`}
                         >
                           {service.featured ? "Featured service" : "Set as featured"}
                         </button>
                       </div>
 
-                      <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                      <div className="mt-5 rounded-2xl border border-emerald-100 bg-white px-4 py-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Public pricing preview
                             </p>
-                            <p className="mt-1 text-lg font-black text-white">
+                            <p className="mt-1 text-lg font-black text-slate-950">
                               {formatMoney(service.price)} / {service.unitLabel}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Duration preview
                             </p>
-                            <p className="mt-1 text-sm font-semibold text-white">
+                            <p className="mt-1 text-sm font-semibold text-slate-950">
                               {formatDuration(service.duration)}
                             </p>
                           </div>
                         </div>
 
-                        <p className="mt-3 text-xs leading-6 text-slate-400">
+                        <p className="mt-3 text-xs leading-6 text-slate-500">
                           {serviceUnitHint(service)}
                         </p>
                       </div>
@@ -783,7 +783,7 @@ export default function GuruServicesPage() {
             </div>
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-slate-600">
                 Save this pricing workspace when you are ready to publish updated
                 service visibility and customer-facing prices.
               </p>
@@ -792,7 +792,7 @@ export default function GuruServicesPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#0D5C3A] min-h-[56px] px-5 py-3 text-sm font-black !text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {saving ? (
                   <>
@@ -811,63 +811,63 @@ export default function GuruServicesPage() {
 
           <div className="space-y-8">
             <section className={shellCardClasses("p-6")}>
-              <div className="border-b border-white/10 pb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="border-b border-emerald-100 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Pricing controls
                 </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 ">
                   Premium adjustments
                 </h2>
               </div>
 
               <div className="mt-6 space-y-4">
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Same-day booking premium
                   </label>
-                  <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <BadgeDollarSign className="mr-2 h-4 w-4 text-emerald-300" />
+                  <div className="mt-2 flex items-center rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                    <BadgeDollarSign className="mr-2 h-4 w-4 text-emerald-800" />
                     <input
                       type="number"
                       min="0"
                       inputMode="decimal"
                       value={sameDayPremium}
                       onChange={(e) => setSameDayPremium(e.target.value)}
-                      className="w-full bg-transparent text-sm font-semibold text-white outline-none"
+                      className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Holiday premium
                   </label>
-                  <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <BadgeDollarSign className="mr-2 h-4 w-4 text-amber-300" />
+                  <div className="mt-2 flex items-center rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                    <BadgeDollarSign className="mr-2 h-4 w-4 text-amber-800" />
                     <input
                       type="number"
                       min="0"
                       inputMode="decimal"
                       value={holidayPremium}
                       onChange={(e) => setHolidayPremium(e.target.value)}
-                      className="w-full bg-transparent text-sm font-semibold text-white outline-none"
+                      className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Travel fee
                   </label>
-                  <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <BadgeDollarSign className="mr-2 h-4 w-4 text-sky-300" />
+                  <div className="mt-2 flex items-center rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                    <BadgeDollarSign className="mr-2 h-4 w-4 text-sky-800" />
                     <input
                       type="number"
                       min="0"
                       inputMode="decimal"
                       value={travelFee}
                       onChange={(e) => setTravelFee(e.target.value)}
-                      className="w-full bg-transparent text-sm font-semibold text-white outline-none"
+                      className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
                     />
                   </div>
                 </div>
@@ -875,33 +875,33 @@ export default function GuruServicesPage() {
             </section>
 
             <section className={shellCardClasses("p-6")}>
-              <div className="border-b border-white/10 pb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="border-b border-emerald-100 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Publishing notes
                 </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 ">
                   Better customer pricing clarity
                 </h2>
               </div>
 
               <div className="mt-6 space-y-4">
-                <div className="flex gap-3 rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
-                  <p className="text-sm leading-6 text-slate-300">
+                <div className="flex gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-800" />
+                  <p className="text-sm leading-6 text-slate-600">
                     Keep your active services clear and focused so customers understand what to book immediately.
                   </p>
                 </div>
 
-                <div className="flex gap-3 rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
-                  <p className="text-sm leading-6 text-slate-300">
+                <div className="flex gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-800" />
+                  <p className="text-sm leading-6 text-slate-600">
                     Fixed unit labels make your public profile feel more trustworthy and easier to compare.
                   </p>
                 </div>
 
-                <div className="flex gap-3 rounded-3xl border border-white/10 bg-slate-950/60 p-4">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" />
-                  <p className="text-sm leading-6 text-slate-300">
+                <div className="flex gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-violet-800" />
+                  <p className="text-sm leading-6 text-slate-600">
                     Pair strong service pricing with clean availability and fast replies for better conversion.
                   </p>
                 </div>
@@ -909,60 +909,60 @@ export default function GuruServicesPage() {
             </section>
 
             <section className={shellCardClasses("p-6")}>
-              <div className="border-b border-white/10 pb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="border-b border-emerald-100 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Reputation
                 </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 ">
                   Guru performance snapshot
                 </h2>
               </div>
 
               <div className="mt-6 space-y-4">
-                <div className="flex items-start gap-4 rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <Star className="h-5 w-5 text-violet-300" />
+                <div className="flex items-start gap-4 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5">
+                  <div className="rounded-2xl border border-emerald-100 bg-white p-3">
+                    <Star className="h-5 w-5 text-violet-800" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-300">Average rating</p>
-                    <p className="mt-1 text-xl font-black text-white">
-                      {guru.rating_avg ? guru.rating_avg.toFixed(2) : "0.00"}
+                    <p className="text-sm font-semibold text-slate-600">Average rating</p>
+                    <p className="mt-1 text-xl font-black text-slate-950">
+                      {typeof guru.rating_avg === "number" && (guru.review_count ?? 0) > 0 ? guru.rating_avg.toFixed(2) : "—"}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4 rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <ShieldCheck className="h-5 w-5 text-emerald-300" />
+                <div className="flex items-start gap-4 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5">
+                  <div className="rounded-2xl border border-emerald-100 bg-white p-3">
+                    <ShieldCheck className="h-5 w-5 text-emerald-800" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-300">Review count</p>
-                    <p className="mt-1 text-xl font-black text-white">
+                    <p className="text-sm font-semibold text-slate-600">Review count</p>
+                    <p className="mt-1 text-xl font-black text-slate-950">
                       {guru.review_count || 0}
                     </p>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5">
                   <div className="flex items-start gap-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <Sparkles className="h-5 w-5 text-sky-300" />
+                    <div className="rounded-2xl border border-emerald-100 bg-white p-3">
+                      <Sparkles className="h-5 w-5 text-sky-800" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-300">Featured setup</p>
-                      <p className="mt-1 text-xl font-black text-white">{featuredSummary}</p>
+                      <p className="text-sm font-semibold text-slate-600">Featured setup</p>
+                      <p className="mt-1 text-xl font-black text-slate-950">{featuredSummary}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5">
                   <div className="flex items-start gap-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <ShieldCheck className="h-5 w-5 text-violet-300" />
+                    <div className="rounded-2xl border border-emerald-100 bg-white p-3">
+                      <ShieldCheck className="h-5 w-5 text-violet-800" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-300">Payout readiness</p>
-                      <p className="mt-1 text-xl font-black text-white">
+                      <p className="text-sm font-semibold text-slate-600">Payout readiness</p>
+                      <p className="mt-1 text-xl font-black text-slate-950">
                         {guru.payouts_enabled ? "Ready" : "Needs Stripe setup"}
                       </p>
                     </div>
@@ -972,11 +972,11 @@ export default function GuruServicesPage() {
             </section>
 
             <section className={shellCardClasses("p-6")}>
-              <div className="border-b border-white/10 pb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="border-b border-emerald-100 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Recommended public labels
                 </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 ">
                   How customers should see pricing
                 </h2>
               </div>
@@ -987,21 +987,21 @@ export default function GuruServicesPage() {
                   .map((service) => (
                     <div
                       key={`${service.id}-public`}
-                      className="flex items-center justify-between rounded-3xl border border-white/10 bg-slate-950/60 p-4"
+                      className="flex items-center justify-between rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4"
                     >
                       <div className="min-w-0 pr-4">
-                        <p className="text-sm font-bold text-white">{service.name}</p>
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="text-sm font-bold text-slate-950">{service.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">
                           {formatDuration(service.duration)}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                        <span className="text-sm font-black text-white">
+                      <div className="flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2">
+                        <span className="text-sm font-black text-slate-950">
                           {formatMoney(service.price)}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
                           / {service.unitLabel}
                         </span>
                       </div>
