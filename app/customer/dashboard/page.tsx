@@ -31,6 +31,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
+import SitGuruPortalLoading from "@/components/sitguru/SitGuruPortalLoading";
 import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
 import FinishPaymentButton, {
   isUnpaidBookingPayment,
@@ -3469,30 +3470,7 @@ export default function CustomerDashboardPage() {
     universityProgress.totalSteps,
   ]);
 
-  if (loading) {
-    return (
-      <main
-        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] px-4 py-10 md:px-6 lg:px-8"
-      >
-        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center">
-          <div className="w-full max-w-md rounded-[2rem] border border-emerald-100 bg-white p-7 text-center shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-emerald-50 text-3xl ring-1 ring-emerald-100">
-              🐾
-            </div>
-            <p className="mt-5 text-lg font-black text-slate-950">
-              Getting your pet care hub ready
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-              Loading pets, bookings, PawReports, Gurus, and PawPerks.
-            </p>
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-emerald-50">
-              <div className="h-full w-2/3 animate-pulse rounded-full bg-emerald-500" />
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <SitGuruPortalLoading portal="Pet Parent" />;
 
   return (
     <>
