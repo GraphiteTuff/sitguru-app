@@ -231,20 +231,32 @@ export default function PawReportLiveScreen() {
                   <MapPin color={SitGuruColors.primary} size={18} strokeWidth={2.4} />
                 }
                 label="Status"
-                value={snapshot.isLive ? 'Live' : 'Idle'}
+                value={snapshot.isLive ? 'Live' : hasBooking ? 'Waiting' : 'No visit'}
               />
             </View>
 
-            <LiveRouteHeader
-              locationLabel={`${snapshot.petName} with ${snapshot.guruName}`}
-              live={snapshot.isLive}
-              coords={coords}
-              trail={snapshot.trail}
-              photoPins={snapshot.photoPins}
-              distanceMiles={snapshot.distanceMiles}
-              expanded
-              autoCenter
-            />
+            {hasRoute ? (
+              <LiveRouteHeader
+                locationLabel={snapshot.petName + ' with ' + snapshot.guruName}
+                live={snapshot.isLive}
+                coords={coords}
+                trail={snapshot.trail}
+                photoPins={snapshot.photoPins}
+                distanceMiles={snapshot.distanceMiles}
+                expanded
+                autoCenter
+              />
+            ) : (
+              <View style={styles.emptyRoute}>
+                <View style={styles.emptyRouteIcon}>
+                  <MapPin color="#00844C" size={28} strokeWidth={2.2} />
+                </View>
+                <Text style={styles.emptyRouteTitle}>Walk map</Text>
+                <Text style={styles.emptyRouteText}>
+                  Your Guru's route will appear here when GPS tracking is available for this booking.
+                </Text>
+              </View>
+            )}
 
             {snapshot.badges.length ? (
               <View style={styles.badgeRow}>
@@ -271,7 +283,7 @@ export default function PawReportLiveScreen() {
 
             {snapshot.photos.length ? (
               <View style={styles.photoSection}>
-                <Text style={styles.sectionEyebrow}>Live photos</Text>
+                <Text style={styles.sectionEyebrow}>Photos from your Guru</Text>
                 <Text style={styles.sectionTitle}>
                   {snapshot.photoCount} new photo
                   {snapshot.photoCount === 1 ? '' : 's'}
@@ -295,7 +307,7 @@ export default function PawReportLiveScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionEyebrow}>Care log</Text>
-              <Text style={styles.sectionTitle}>Custom updates</Text>
+              <Text style={styles.sectionTitle}>Care timeline</Text>
               <Text style={styles.message}>{snapshot.message}</Text>
 
               {snapshot.logs.length === 0 ? (
@@ -363,38 +375,118 @@ function Metric({
   return (
     <View style={styles.metric}>
       {icon}
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  pageWidth: {
+    width: '100%',
+    alignSelf: 'center',
+    gap: MobileSpace.md,
+  },
+  pageWidthWide: {
+    maxWidth: 980,
+    paddingHorizontal: MobileSpace.lg,
+  },
   header: {
     alignItems: 'center',
+    backgroundColor: '#005438',
+    borderRadius: 24,
     flexDirection: 'row',
     gap: MobileSpace.sm,
-    marginBottom: MobileSpace.md,
+    minHeight: 122,
+    padding: MobileSpace.md,
   },
   back: {
-    backgroundColor: SitGuruColors.surfaceSoft,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderRadius: 14,
+    height: TOUCH_MIN,
+    width: TOUCH_MIN,
+  },
+  refresh: {
+    backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 14,
     height: TOUCH_MIN,
     width: TOUCH_MIN,
   },
   headerCopy: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+    minWidth: 0,
+  },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eyebrow: {
+    color: '#C6F68D',
+    fontFamily: AppFonts.bold,
+    fontSize: MobileType.micro,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    flexShrink: 1,
   },
   title: {
-    color: SitGuruColors.text,
+    color: '#FFFFFF',
     fontFamily: AppFonts.extraBold,
     fontSize: MobileType.title,
   },
   subtitle: {
-    color: SitGuruColors.textMuted,
+    color: '#E8FFF2',
     fontFamily: AppFonts.medium,
-    fontSize: MobileType.body,
+    fontSize: MobileType.caption,
+  },
+  contextRow: {
+    backgroundColor: '#E9F7EF',
+    borderColor: '#D1EBDD',
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: MobileSpace.sm,
+    padding: MobileSpace.md,
+  },
+  contextText: {
+    flex: 1,
+    color: '#174B36',
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 20,
+  },
+  emptyRoute: {
+    alignItems: 'center',
+    backgroundColor: '#EDFAF2',
+    borderColor: '#CEEADA',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: MobileSpace.sm,
+    justifyContent: 'center',
+    minHeight: 205,
+    padding: MobileSpace.xl,
+  },
+  emptyRouteIcon: {
+    alignItems: 'center',
+    backgroundColor: '#D7F2E3',
+    borderRadius: 18,
+    height: 60,
+    justifyContent: 'center',
+    width: 60,
+  },
+  emptyRouteTitle: {
+    color: '#123D2C',
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.section,
+  },
+  emptyRouteText: {
+    color: '#425F50',
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
+    lineHeight: 21,
+    textAlign: 'center',
   },
   notice: {
     backgroundColor: '#FEF3F2',
@@ -423,13 +515,14 @@ const styles = StyleSheet.create({
   },
   metric: {
     alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1EBDD',
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
-    gap: 4,
-    minHeight: 88,
+    gap: 5,
+    minWidth: 0,
+    minHeight: 100,
     padding: MobileSpace.sm,
   },
   metricValue: {
