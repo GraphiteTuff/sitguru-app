@@ -732,6 +732,8 @@ export default function FindCareScreen() {
   const routeParams = useLocalSearchParams<{
     service?: string | string[];
     zip?: string | string[];
+    petId?: string | string[];
+    date?: string | string[];
   }>();
 
   const initialServiceParam = Array.isArray(routeParams.service)
@@ -740,6 +742,10 @@ export default function FindCareScreen() {
   const initialZipParam = Array.isArray(routeParams.zip)
     ? routeParams.zip[0]
     : routeParams.zip;
+  const initialPetParam = Array.isArray(routeParams.petId) ? routeParams.petId[0] : routeParams.petId;
+  const initialDateParam = Array.isArray(routeParams.date) ? routeParams.date[0] : routeParams.date;
+  const requestedCareDate = /^\d{4}-\d{2}-\d{2}$/.test(String(initialDateParam || ''))
+    ? String(initialDateParam) : '';
   const hasServiceRouteParam = Boolean(
     String(initialServiceParam || "").trim(),
   );
@@ -1454,9 +1460,13 @@ export default function FindCareScreen() {
 
       router.push({
         pathname: "/request-booking",
-        params: slug
-          ? { guruId: guru.id, guruSlug: slug }
-          : { guruId: guru.id },
+        params: {
+          guruId: guru.id,
+          ...(slug ? { guruSlug: slug } : {}),
+          ...(initialPetParam ? { petId: initialPetParam } : {}),
+          ...(hasServiceRouteParam ? { serviceType: selectedService.label } : {}),
+          ...(requestedCareDate ? { date: requestedCareDate } : {}),
+        },
       });
       return;
     }
