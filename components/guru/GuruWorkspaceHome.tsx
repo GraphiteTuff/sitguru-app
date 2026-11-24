@@ -60,7 +60,7 @@ function Portrait({
     <span
       className={
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-emerald-100 bg-emerald-50 font-black text-emerald-800 " +
-        (large ? "h-20 w-20 rounded-3xl sm:h-24 sm:w-24" : "h-20 w-20 rounded-2xl")
+        (large ? "h-24 w-24 rounded-3xl sm:h-28 sm:w-28" : "h-24 w-24 rounded-2xl")
       }
     >
       {src ? (
