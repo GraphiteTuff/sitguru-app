@@ -2475,3 +2475,11 @@ div.homepage-chat-panel__header,
 .admin-theme .admin-desk-surface h6 {
   color: #0f2744 !important;
 }
+
+/* Keep Scout above the native-style Guru web tab bar on small screens. */
+@media (max-width: 1023px) {
+  body:has([data-guru-mobile-bottom-nav]) [data-ai-scout-companion="true"] {
+    bottom: calc(7rem + var(--sg-chrome-bottom, 0px)) !important;
+    right: 1rem;
+  }
+}
