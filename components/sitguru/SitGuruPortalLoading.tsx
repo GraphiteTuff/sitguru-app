@@ -6,16 +6,19 @@ import { PawIcon } from "@/components/ui/PawIcon";
  * Replaces itself automatically once the requested portal is ready.
  */
 export default function SitGuruPortalLoading({
-  portal,
+  portal = "SitGuru",
+  message = "Getting your SitGuru space ready.",
 }: {
-  portal: "Pet Parent" | "Guru";
+  portal?: "Pet Parent" | "Guru" | "Manager" | "Intern" | "Admin" | "SitGuru";
+  message?: string;
 }) {
+  const portalTitle = portal === "SitGuru" ? "Opening SitGuru" : `Opening your ${portal} portal`;
   return (
     <div
       role="status"
       aria-live="polite"
-      aria-label={"Opening your " + portal + " portal"}
-      data-sitguru-portal-loading={portal.toLowerCase().replace(" ", "-")}
+      aria-label={portalTitle}
+      data-sitguru-portal-loading={portal.toLowerCase().replaceAll(" ", "-")}
       className="flex min-h-[70dvh] w-full items-center justify-center bg-gradient-to-b from-white via-[#f7fffb] to-emerald-50/70 px-4 py-12"
     >
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
@@ -32,10 +35,10 @@ export default function SitGuruPortalLoading({
           />
         </span>
         <p className="text-lg font-black text-[#0D5C3A] sm:text-xl">
-          Opening your {portal} portal
+          {portalTitle}
         </p>
         <p className="text-sm font-semibold leading-6 text-slate-600">
-          Getting your SitGuru space ready.
+          {message}
         </p>
       </div>
     </div>
