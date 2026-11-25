@@ -30,3 +30,31 @@ test("dashboard progress and deadlines only count visible, relevant records", ()
   assert.deepEqual(summary.upcoming.map(({ id }) => id).sort(), ["ours", "social", "unclassified"]);
   assert.equal(summary.assignments.length, 3);
 });
+
+test("links approved hours to one assignment and its explicit pillar", () => {
+  const data = documentationInternWorkspace();
+  const [base] = data.tasks;
+  data.tasks = [
+    { ...base, id: "assigned-task", internId: data.intern.id, status: "in_progress",
+      briefPayload: { category: "Content", primaryGrowthPillar: "community", targetAudiences: ["Pet Parents", "Gurus"] } },
+  ];
+  const time = {
+    id: "linked-time", internId: data.intern.id, workedOn: "2027-03-08", hours: 2.25,
+    activity: "Campus content", workItemType: "task", workItemId: "assigned-task",
+    weekNumber: 5, notes: "", evidenceUrl: "", status: "ava_approved",
+    submittedAt: null, managerReviewedAt: null,
+  };
+  data.timeLogs = [
+    time,
+    { ...time, status: "supervisor_verified" },
+    { ...time, id: "draft", status: "draft" },
+    { ...time, id: "other-intern", internId: "another-intern" },
+    { ...time, id: "unlinked", workItemId: "" },
+  ];
+  const summary = buildLearningDashboard(data, "2027-03-08");
+
+  assert.deepEqual(summary.pillars.map(({ id, assigned, approvedHours }) => [id, assigned, approvedHours]), [
+    ["community", 1, 2.25],
+    ["social", 0, 0],
+  ]);
+});

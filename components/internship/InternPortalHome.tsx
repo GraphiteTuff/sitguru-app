@@ -88,6 +88,9 @@ export default function InternPortalHome({
                 Planned workload · {pillar.weight}%
                 {targetHours != null ? ` · ${formatHours(targetHours * pillar.weight / 100)} hours` : ""}
               </p>
+              {pillar.approvedHours > 0 ? (
+                <p className="mt-1 text-sm font-semibold text-slate-700">{formatHours(pillar.approvedHours)} approved hours linked to this pillar</p>
+              ) : null}
               {pillar.assigned ? (
                 <div className="mt-3">
                   <progress aria-label={`${pillar.label} assignments completed`} value={pillar.completed} max={pillar.assigned} className={`block h-2 w-full ${pillar.id === "community" ? "accent-emerald-700" : "accent-orange-700"}`} />
@@ -99,6 +102,7 @@ export default function InternPortalHome({
             </article>
           ))}
         </div>
+        <p className="mt-3 text-sm text-slate-600">Pillar hours come from approved time entries linked to classified assignments.</p>
         {unclassified > 0 ? (
           <p className="mt-3 text-sm text-slate-600">{unclassified} {unclassified === 1 ? "assignment has" : "assignments have"} no clear pillar category yet.</p>
         ) : null}

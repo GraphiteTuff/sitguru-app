@@ -1,5 +1,8 @@
+import { formatHours } from "@/lib/internship/hours";
+import { approvedHoursByAssignment } from "@/lib/internship/learning-dashboard";
+import { GROWTH_PILLARS, SYLLABUS_CORE_DELIVERABLES } from "@/lib/internship/university-syllabus";
 import Link from "next/link";
-import { readAssignmentBrief, isHttpUrl } from "@/lib/internship/manager-assignment";
+import { assignmentGrowthPillar, readAssignmentBrief, isHttpUrl } from "@/lib/internship/manager-assignment";
 import { legacyStatusToStage } from "@/lib/internship/review-flow";
 import { taskStatusLabel } from "@/lib/internship/labels";
 import { saveInternAssignmentProgress } from "@/lib/internship/intern-assignment-progress";
@@ -30,6 +33,9 @@ export default function InternAssignmentDetailLayout({
   flash?: { ok?: string; error?: string };
 }) {
   const brief = readAssignmentBrief(task.briefPayload);
+  const pillar = GROWTH_PILLARS.find((row) => row.id === assignmentGrowthPillar(brief));
+  const objective = SYLLABUS_CORE_DELIVERABLES.find((row) => row.id === brief.learningObjective);
+  const approvedHours = approvedHoursByAssignment(workspace).get(task.id);
   const work = task.briefPayload?.internWork && typeof task.briefPayload.internWork === "object"
     ? task.briefPayload.internWork as Record<string, unknown> : {};
   const stage = legacyStatusToStage(task.status, task.reviewStage);
@@ -87,7 +93,7 @@ export default function InternAssignmentDetailLayout({
         <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
           <p className="font-black">Admin preview · {workspace.intern.fullName} · Read only</p>
           <p className="mt-1">
-            You are viewing this intern's actual assignment data without signing in as them. Saving, submitting, and editing are disabled. Use Employer review to manage work.
+            You are viewing this intern&apos;s actual assignment data without signing in as them. Saving, submitting, and editing are disabled. Use Employer review to manage work.
           </p>
         </div>
       ) : null}
@@ -116,6 +122,17 @@ export default function InternAssignmentDetailLayout({
           <span>Review: {brief.review || "Manager review required"}</span>
         </div>
 
+        {(pillar || objective || brief.targetAudiences?.length || brief.estimatedHours || approvedHours || brief.expectedOutcomes) ? (
+          <dl className="mt-4 grid gap-3 rounded-xl bg-emerald-50 p-4 text-sm text-slate-800 sm:grid-cols-2">
+            {pillar ? <div><dt className="font-bold">Growth pillar</dt><dd>{pillar.label}</dd></div> : null}
+            {objective ? <div><dt className="font-bold">Syllabus objective</dt><dd>{objective.title}</dd></div> : null}
+            {brief.targetAudiences?.length ? <div><dt className="font-bold">Target audiences</dt><dd>{brief.targetAudiences.join(", ")}</dd></div> : null}
+            {brief.estimatedHours ? <div><dt className="font-bold">Estimated hours</dt><dd>{brief.estimatedHours}</dd></div> : null}
+            {approvedHours ? <div><dt className="font-bold">Approved linked hours</dt><dd>{formatHours(approvedHours)}</dd></div> : null}
+            {brief.expectedOutcomes ? <div className="min-w-0 sm:col-span-2"><dt className="font-bold">Expected outcomes</dt><dd className="whitespace-pre-wrap break-words">{brief.expectedOutcomes}</dd></div> : null}
+          </dl>
+        ) : null}
+
         {flash?.ok ? (
           <p role="status" className="mt-4 rounded-xl border border-green-200 bg-green-50 px-3 py-3 text-sm font-semibold text-green-800">{flash.ok}</p>
         ) : null}
@@ -143,7 +160,7 @@ export default function InternAssignmentDetailLayout({
             </p>
           )}
           {!adminPreview ? (
-            <Link href="/intern/growth" className="mt-3 inline-flex min-h-10 items-center text-xs font-black text-blue-800 underline">
+            <Link href="/intern/final-project" className="mt-3 inline-flex min-h-10 items-center text-xs font-black text-blue-800 underline">
               Open my Business Growth Report →
             </Link>
           ) : null}

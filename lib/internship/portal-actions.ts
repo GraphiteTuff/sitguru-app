@@ -128,6 +128,14 @@ export async function saveTimeEntry(formData: FormData) {
   const activity = text(formData, "activity");
   if (activity.length < 3) bounce("/intern?tab=home", "error", "Name the activity in a few words.");
 
+  const workItemId = text(formData, "workItemId");
+  const workItemType = text(formData, "workItemType");
+  if (workItemId && workItemType === "task") {
+    const { data: task, error } = await supabaseAdmin.from("internship_tasks")
+      .select("id").eq("id", workItemId).eq("intern_id", intern.id).neq("status", "draft").maybeSingle();
+    if (error || !task) bounce("/intern/time", "error", "Choose an assignment from your own workspace.");
+  }
+
   const submit = text(formData, "submit") === "yes";
   const now = new Date().toISOString();
   const { data: inserted, error } = await supabaseAdmin
@@ -137,8 +145,8 @@ export async function saveTimeEntry(formData: FormData) {
       worked_on: workedOn,
       hours: hours.hours,
       activity,
-      work_item_type: text(formData, "workItemType"),
-      work_item_id: text(formData, "workItemId"),
+      work_item_type: workItemType,
+      work_item_id: workItemId,
       week_number: weekNumberForEntry(intern.academicStartDate, workedOn),
       notes: text(formData, "notes"),
       evidence_url: text(formData, "evidenceUrl"),

@@ -236,15 +236,14 @@ export default function ManagerAssignmentsHome({
           {notice.message}
         </p>
       ) : null}
-      <CreateAssignmentDialog
+      {open ? <CreateAssignmentDialog
         interns={interns}
         milestones={milestones}
         projects={projects}
-        open={open}
         focusIntern={focusIntern}
         initial={editing}
         onClose={() => setOpen(false)}
-      />
+      /> : null}
     </ManagerSectionScaffold>
   );
 }

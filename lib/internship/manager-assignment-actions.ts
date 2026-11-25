@@ -60,6 +60,11 @@ export async function saveManagerAssignment(formData: FormData) {
     resources: list(formData, "resource"),
     notes: field(formData, "notes"),
     clientRequestId: field(formData, "clientRequestId"),
+    primaryGrowthPillar: field(formData, "primaryGrowthPillar"),
+    targetAudiences: list(formData, "targetAudience"),
+    learningObjective: field(formData, "learningObjective"),
+    estimatedHours: field(formData, "estimatedHours"),
+    expectedOutcomes: field(formData, "expectedOutcomes"),
   };
   const checked = validateManagerAssignment(draft, intent);
   if (!checked.ok) {
@@ -113,6 +118,10 @@ export async function saveManagerAssignment(formData: FormData) {
   }
 
   const brief = assignmentBrief(value, actor.id);
+  const { primaryGrowthPillar, targetAudiences, learningObjective, estimatedHours, expectedOutcomes, ...existingFields } = brief;
+  const assignmentFields = formData.has("primaryGrowthPillar")
+    ? { ...existingFields, primaryGrowthPillar, targetAudiences, learningObjective, estimatedHours, expectedOutcomes }
+    : existingFields;
   const payload = {
     intern_id: intern.id,
     project_id: value.projectId || null,
@@ -129,7 +138,7 @@ export async function saveManagerAssignment(formData: FormData) {
       value.notes,
     ].filter(Boolean).join("\n\n"),
     supervisor_notes: `Priority: ${value.priority} · Review: ${value.review} · Creative freedom: ${value.freedom}`,
-    brief_payload: brief,
+    brief_payload: assignmentFields,
     updated_at: new Date().toISOString(),
   };
 
@@ -148,31 +157,37 @@ export async function saveManagerAssignment(formData: FormData) {
   if (savedId) {
     const { data: current } = await supabaseAdmin
       .from("internship_tasks")
-      .select("id,intern_id,status,student_notes,work_url,brief_payload")
+      .select("id,intern_id,status,student_notes,work_url,supervisor_notes,brief_payload,updated_at")
       .eq("id", savedId)
       .maybeSingle();
     if (!current || current.intern_id !== intern.id) bounce("error", "That assignment is not on your team.");
     const priorBrief = current.brief_payload && typeof current.brief_payload === "object"
       ? current.brief_payload as Record<string, unknown> : {};
     const internWork = priorBrief.internWork;
-    const managerAutomation = priorBrief.managerAutomation;
     const alreadyPublished = current.status !== "draft";
+    const workStarted = (alreadyPublished && current.status !== "todo") ||
+      (internWork && typeof internWork === "object");
     const updatedPayload = {
       ...payload,
       // Editing an assignment must not reset intern work or the manager's
       // reminder schedule stored alongside the assignment instructions.
       status: alreadyPublished ? current.status : payload.status,
       brief_payload: {
-        ...brief,
-        ...(managerAutomation && typeof managerAutomation === "object" ? { managerAutomation } : {}),
-        ...(internWork && typeof internWork === "object" ? { internWork } : {}),
+        ...priorBrief,
+        ...assignmentFields,
       },
-      ...(internWork && typeof internWork === "object" ? {
+      ...(alreadyPublished ? { supervisor_notes: current.supervisor_notes } : {}),
+      ...(workStarted ? {
         student_notes: current.student_notes,
         work_url: current.work_url,
       } : {}),
     };
-    const { error } = await supabaseAdmin.from("internship_tasks").update(updatedPayload).eq("id", savedId);
+    const update = supabaseAdmin.from("internship_tasks").update(updatedPayload)
+      .eq("id", savedId).eq("intern_id", intern.id).eq("status", current.status);
+    if (current.updated_at) update.eq("updated_at", current.updated_at);
+    else update.is("updated_at", null);
+    const { data: updated, error } = await update.select("id").maybeSingle();
+    if (!error && !updated) bounce("error", "The assignment changed. Reopen it before saving your edits.");
     if (error) {
       console.warn("saveManagerAssignment update", error.message);
       bounce("error", "We couldn't create this assignment. Please try again.");

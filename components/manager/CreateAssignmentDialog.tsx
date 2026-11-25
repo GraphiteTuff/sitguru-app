@@ -12,6 +12,7 @@ import {
   type AssignmentDraft,
 } from "@/lib/internship/manager-assignment";
 import { routeAssignmentCategory } from "@/lib/admin/growth/work-routing";
+import { GROWTH_AUDIENCES, GROWTH_PILLARS, SYLLABUS_CORE_DELIVERABLES } from "@/lib/internship/university-syllabus";
 import { defaultFinalSectionForCategory } from "@/lib/internship/syllabus-alignment";
 import { FINAL_CONTRIBUTION_SECTIONS, FINAL_PROJECT_OUTPUTS } from "@/lib/internship/final-project";
 
@@ -59,7 +60,6 @@ export default function CreateAssignmentDialog({
   interns,
   milestones,
   projects,
-  open,
   focusIntern = false,
   initial,
   onClose,
@@ -67,31 +67,23 @@ export default function CreateAssignmentDialog({
   interns: AssignmentInternOption[];
   milestones: AssignmentMilestoneOption[];
   projects: AssignmentProjectOption[];
-  open: boolean;
   focusIntern?: boolean;
   initial?: AssignmentFormValue | null;
   onClose: () => void;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [form, setForm] = useState<AssignmentFormValue>(() => initial || blank(crypto.randomUUID()));
-  const [baseline, setBaseline] = useState("");
+  const [startingForm] = useState<AssignmentFormValue>(() => initial || blank(crypto.randomUUID()));
+  const [form, setForm] = useState(startingForm);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!open) return;
-    const next = initial || blank(crypto.randomUUID());
-    setForm(next);
-    setBaseline(JSON.stringify(next));
-    setErrors({});
-    setConfirmDiscard(false);
     const node = panelRef.current?.querySelector<HTMLElement>(focusIntern ? "select[name='internId']" : "input[name='title']");
     node?.focus();
-  }, [open, initial, focusIntern]);
+  }, [focusIntern]);
 
   useEffect(() => {
-    if (!open) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -102,9 +94,7 @@ export default function CreateAssignmentDialog({
     return () => document.removeEventListener("keydown", onKey);
   });
 
-  if (!open) return null;
-
-  const dirty = JSON.stringify(form) !== baseline;
+  const dirty = JSON.stringify(form) !== JSON.stringify(startingForm);
   const milestoneChoices = milestones.filter((item) => item.internId === form.internId);
   const projectChoices = projects.filter((item) => item.internId === form.internId);
   const selectedFinalSection = FINAL_CONTRIBUTION_SECTIONS.find((row) => row.id === form.finalSection);
@@ -242,9 +232,9 @@ export default function CreateAssignmentDialog({
             </fieldset>
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4">
-              <p className="text-sm font-black text-[#0D5C3A]">How this assignment builds the intern's final project</p>
+              <p className="text-sm font-black text-[#0D5C3A]">How this assignment builds the intern&apos;s final project</p>
               <p className="mt-1 text-xs font-medium leading-5 text-slate-600">
-                The intern completes this one task in SitGuru. Ava's approval places the evidence
+                The intern completes this one task in SitGuru. Ava&apos;s approval places the evidence
                 in the selected chapter of the existing Business Growth Report, Playbook or Portfolio.
                 No duplicate assignment is created.
               </p>
@@ -286,6 +276,52 @@ export default function CreateAssignmentDialog({
                 </label>
               </div>
             </div>
+
+            <fieldset className="space-y-3 rounded-2xl border border-emerald-200 px-4 py-3">
+              <legend className="px-2 text-sm font-black text-emerald-950">Growth and syllabus classification</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block min-w-0 text-sm font-semibold">
+                  Primary growth pillar
+                  <select name="primaryGrowthPillar" value={form.primaryGrowthPillar || ""} onChange={(event) => patch({ primaryGrowthPillar: event.target.value })} className="mt-1 min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base">
+                    <option value="">Use existing category when applicable</option>
+                    {GROWTH_PILLARS.map((pillar) => <option key={pillar.id} value={pillar.id}>{pillar.label}</option>)}
+                  </select>
+                  {errors.primaryGrowthPillar ? <span className="text-rose-800">{errors.primaryGrowthPillar}</span> : null}
+                </label>
+                <label className="block min-w-0 text-sm font-semibold">
+                  Syllabus learning objective
+                  <select name="learningObjective" value={form.learningObjective || ""} onChange={(event) => patch({ learningObjective: event.target.value })} className="mt-1 min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base">
+                    <option value="">Choose an objective</option>
+                    {SYLLABUS_CORE_DELIVERABLES.map((objective) => <option key={objective.id} value={objective.id}>{objective.title}</option>)}
+                  </select>
+                  {errors.learningObjective ? <span className="text-rose-800">{errors.learningObjective}</span> : null}
+                </label>
+              </div>
+              <fieldset>
+                <legend className="text-sm font-semibold">Target audiences</legend>
+                <div className="flex flex-wrap gap-x-4">
+                  {GROWTH_AUDIENCES.map((audience) => {
+                    const selected = form.targetAudiences || [];
+                    return (
+                      <label key={audience} className="inline-flex min-h-11 items-center gap-2 text-sm">
+                        <input type="checkbox" name="targetAudience" value={audience} checked={selected.includes(audience)}
+                          onChange={(event) => patch({ targetAudiences: event.target.checked ? [...selected, audience] : selected.filter((item) => item !== audience) })} />
+                        {audience}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <label className="block text-sm font-semibold">
+                Estimated hours
+                <input name="estimatedHours" inputMode="decimal" value={form.estimatedHours || ""} onChange={(event) => patch({ estimatedHours: event.target.value })} className="mt-1 block min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base sm:max-w-xs" />
+                {errors.estimatedHours ? <span className="text-rose-800">{errors.estimatedHours}</span> : null}
+              </label>
+              <label className="block text-sm font-semibold">
+                Expected measurable outcomes
+                <textarea name="expectedOutcomes" rows={2} maxLength={2000} value={form.expectedOutcomes || ""} onChange={(event) => patch({ expectedOutcomes: event.target.value })} className="mt-1 block w-full rounded-xl border border-slate-300 p-3 text-base" />
+              </label>
+            </fieldset>
 
             <details className="rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-4">
               <summary className="cursor-pointer text-sm font-black text-blue-700">

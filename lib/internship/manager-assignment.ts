@@ -1,6 +1,10 @@
 /** Manager assignment form rules. Stored on the existing internship task row. */
 import { defaultFinalSectionForCategory, isValidFinalSection } from "@/lib/internship/syllabus-alignment";
 
+import { GROWTH_AUDIENCES, GROWTH_PILLARS, SYLLABUS_CORE_DELIVERABLES } from "@/lib/internship/university-syllabus";
+
+export type GrowthPillarId = (typeof GROWTH_PILLARS)[number]["id"];
+
 export const ASSIGNMENT_CATEGORIES = [
   "Content",
   "Social Media",
@@ -39,6 +43,11 @@ export type AssignmentDraft = {
   resources: string[];
   notes: string;
   clientRequestId: string;
+  primaryGrowthPillar?: string;
+  targetAudiences?: string[];
+  learningObjective?: string;
+  estimatedHours?: string;
+  expectedOutcomes?: string;
 };
 
 export type AssignmentErrors = Partial<Record<keyof AssignmentDraft | "form", string>>;
@@ -102,7 +111,28 @@ export function validateManagerAssignment(input: AssignmentDraft, intent: "draft
     notes: input.notes.trim(),
     clientRequestId: input.clientRequestId.trim(),
   };
+  value.primaryGrowthPillar = input.primaryGrowthPillar?.trim() || "";
+  value.targetAudiences = [...new Set(cleanList(input.targetAudiences || []))];
+  value.learningObjective = input.learningObjective?.trim() || "";
+  value.estimatedHours = input.estimatedHours?.trim() || "";
+  value.expectedOutcomes = input.expectedOutcomes?.trim() || "";
   const errors: AssignmentErrors = {};
+
+  if (value.primaryGrowthPillar && !GROWTH_PILLARS.some((pillar) => pillar.id === value.primaryGrowthPillar)) {
+    errors.primaryGrowthPillar = "Choose a supported growth pillar.";
+  }
+  if (value.targetAudiences.some((audience) => !GROWTH_AUDIENCES.some((known) => known === audience))) {
+    errors.targetAudiences = "Choose one or more SitGuru audiences.";
+  }
+  if (value.learningObjective && !SYLLABUS_CORE_DELIVERABLES.some((objective) => objective.id === value.learningObjective)) {
+    errors.learningObjective = "Choose an existing syllabus learning objective.";
+  }
+  if (value.estimatedHours && (!/^\d{1,4}(\.\d{1,2})?$/.test(value.estimatedHours) || Number(value.estimatedHours) <= 0)) {
+    errors.estimatedHours = "Enter positive estimated hours with up to two decimal places.";
+  }
+  if (value.expectedOutcomes.length > TEXT_MAX) {
+    errors.expectedOutcomes = `Keep measurable outcomes under ${TEXT_MAX} characters.`;
+  }
 
   if (!value.internId) errors.internId = "Choose an intern on your team.";
   if (!value.title) errors.title = "Add an assignment title.";
@@ -147,6 +177,11 @@ export function assignmentIsVisibleToIntern(status: string) {
 export function assignmentBrief(value: AssignmentDraft, actorUserId: string) {
   return {
     category: value.category,
+    primaryGrowthPillar: value.primaryGrowthPillar || "",
+    targetAudiences: value.targetAudiences || [],
+    learningObjective: value.learningObjective || "",
+    estimatedHours: value.estimatedHours ? Number(value.estimatedHours) : null,
+    expectedOutcomes: value.expectedOutcomes || "",
     milestoneId: value.milestoneId,
     projectId: value.projectId || "",
     finalSection: value.finalSection || defaultFinalSectionForCategory(value.category),
@@ -168,6 +203,11 @@ export function readAssignmentBrief(payload: unknown): Partial<AssignmentDraft> 
     Array.isArray(row[key]) ? row[key].map((item) => String(item || "").trim()).filter(Boolean) : [];
   return {
     category: String(row.category || ""),
+    primaryGrowthPillar: String(row.primaryGrowthPillar || ""),
+    targetAudiences: list("targetAudiences"),
+    learningObjective: String(row.learningObjective || ""),
+    estimatedHours: String(row.estimatedHours ?? ""),
+    expectedOutcomes: String(row.expectedOutcomes || ""),
     milestoneId: String(row.milestoneId || ""),
     projectId: String(row.projectId || ""),
     finalSection: String(row.finalSection || ""),
@@ -180,4 +220,18 @@ export function readAssignmentBrief(payload: unknown): Partial<AssignmentDraft> 
     description: String(row.description || ""),
     clientRequestId: String(row.clientRequestId || ""),
   };
+}
+
+const legacyCategoryPillars: ReadonlyMap<string, GrowthPillarId> = new Map([
+  ["Community Outreach", "community"],
+  ["Events", "community"],
+  ["Ambassador Program", "community"],
+  ["Campus Growth", "community"],
+  ["Content", "social"],
+  ["Social Media", "social"],
+]);
+
+export function assignmentGrowthPillar(brief: Pick<AssignmentDraft, "primaryGrowthPillar"> & { category?: string }) {
+  const explicit = GROWTH_PILLARS.find((pillar) => pillar.id === brief.primaryGrowthPillar);
+  return explicit?.id ?? legacyCategoryPillars.get(brief.category || "") ?? null;
 }

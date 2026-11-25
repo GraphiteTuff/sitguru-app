@@ -14,12 +14,16 @@
 | --- | --- | --- |
 | 1. Intern dashboard | Partial | Dashboard uses the authenticated intern workspace. The progress cards show completed versus assigned work for clear legacy categories, alongside separate 50/50 planned workload. Deadlines come from open assigned tasks and applicable milestones. My Files lists the intern's assignment folders. The final project route uses the existing project board. A private Announcements destination is in the Phase 2 changes. Gradebook access and authenticated acceptance checks remain outstanding. |
 | 2. Instructor and supervisor | Partial | Shared workspace is wired into Manager Portal and Admin HQ. It uses the existing authorized roster and review queue, review events, hours workflow, and student preview. The instructor can publish recipient-specific announcements. Dedicated module management and midpoint/final grading controls remain outstanding. |
-| 3. Syllabus and growth pillars | Open | The previous branch adds both pillars to the existing syllabus. Persist assignment classification, validate approved program allocations, and attribute each approved time log and outcome once. |
+| 3. Syllabus and growth pillars | Partial | The current syllabus stays in place. The existing assignment brief now stores one primary pillar, target audiences, syllabus objective, estimated hours and expected outcomes. Approved time logs linked to an owned assignment contribute once to its primary pillar. Verified outcome attribution and enrollment acceptance remain outstanding. |
 | 4. Assignment workspace and Speed Review | Open | Existing SharePoint-backed draft handling and review events are available. Preserve submission versions and verify resubmission, secure previews, and role-scoped review. |
 | 5. Private gradebooks | Open | Legacy employer grades and program evaluations exist. Implement versioned rubric and release handling with tested isolation. |
 | 6. Partnerships and sponsorships | Open | The growth playbook lists two proposals. Verify persistence, outreach, asset, evidence, approval and referral workflows before enabling financial actions. |
 | 7. Native and responsive verification | Open | Dashboard fixture passed at 320, 390, 768 and 1440 CSS pixels. Native authenticated workflows and builds remain unverified. |
 | 8. Release | Blocked | The full verification gate must pass before merge, production migration or deployment. |
+
+## Enrollment records
+
+The production read-only audit returned Ryan at 150 hours and Lola at 150 hours, both with pending requirements and student-reported verification. Lalita was prospective with no recorded hour total. The planning request is 75 hours per pillar for Ryan and 150 per pillar for Lalita. Lola’s allocation needs the approved agreement. The dashboard only calculates hour targets from confirmed program records. This work did not change enrollment or university approval fields.
 
 ## Verification to date
 

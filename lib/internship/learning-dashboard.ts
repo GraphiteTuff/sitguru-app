@@ -1,17 +1,7 @@
-import { assignmentIsVisibleToIntern, isAssignmentDate, readAssignmentBrief } from "@/lib/internship/manager-assignment";
+import { isApprovedInternshipHourStatus } from "@/lib/internship/hours";
+import { assignmentGrowthPillar, assignmentIsVisibleToIntern, isAssignmentDate, readAssignmentBrief } from "@/lib/internship/manager-assignment";
 import type { InternshipTask, InternshipWorkspaceData } from "@/lib/internship/types";
 import { GROWTH_PILLARS } from "@/lib/internship/university-syllabus";
-
-type GrowthPillar = (typeof GROWTH_PILLARS)[number]["id"];
-
-const legacyCategoryPillars: ReadonlyMap<string, GrowthPillar> = new Map([
-  ["Community Outreach", "community"],
-  ["Events", "community"],
-  ["Ambassador Program", "community"],
-  ["Campus Growth", "community"],
-  ["Content", "social"],
-  ["Social Media", "social"],
-]);
 
 const completed = new Set(["approved", "complete", "completed", "done"]);
 const closed = new Set(["cancelled", "canceled", "not_accepted", "excused"]);
@@ -24,16 +14,38 @@ function assignmentComplete(task: InternshipTask) {
   return completed.has(task.status) || task.supervisorApproved || finalReviewStages.has(task.reviewStage || "");
 }
 
+export function approvedHoursByAssignment(workspace: InternshipWorkspaceData) {
+  const eligible = new Set(workspace.tasks.filter(
+    (task) => task.internId === workspace.intern.id && assignmentIsVisibleToIntern(task.status),
+  ).map((task) => task.id));
+  const seen = new Set<string>();
+  const hours = new Map<string, number>();
+  for (const entry of workspace.timeLogs || []) {
+    if (entry.internId !== workspace.intern.id || !entry.id || seen.has(entry.id) ||
+      !isApprovedInternshipHourStatus(entry.status) || !Number.isFinite(entry.hours) || entry.hours <= 0 ||
+      entry.workItemType !== "task" || !eligible.has(entry.workItemId)) continue;
+    seen.add(entry.id);
+    hours.set(entry.workItemId, (hours.get(entry.workItemId) || 0) + entry.hours);
+  }
+  return hours;
+}
+
 export function buildLearningDashboard(workspace: InternshipWorkspaceData, today: string) {
   const assignments = workspace.tasks.filter(
     (task) => task.internId === workspace.intern.id && assignmentIsVisibleToIntern(task.status),
   );
   const categorized = assignments.filter((task) => !closed.has(task.status));
+  const approvedHours = approvedHoursByAssignment(workspace);
   const pillars = GROWTH_PILLARS.map((pillar) => {
     const tasks = categorized.filter(
-      (task) => legacyCategoryPillars.get(readAssignmentBrief(task.briefPayload).category || "") === pillar.id,
+      (task) => assignmentGrowthPillar(readAssignmentBrief(task.briefPayload)) === pillar.id,
     );
-    return { ...pillar, assigned: tasks.length, completed: tasks.filter(assignmentComplete).length };
+    return {
+      ...pillar,
+      assigned: tasks.length,
+      completed: tasks.filter(assignmentComplete).length,
+      approvedHours: tasks.reduce((total, task) => total + (approvedHours.get(task.id) || 0), 0),
+    };
   });
   const upcoming = [
     ...assignments
