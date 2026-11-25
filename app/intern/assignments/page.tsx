@@ -1,3 +1,4 @@
+import SyllabusGrowthOverview from "@/components/internship/SyllabusGrowthOverview";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -34,5 +35,5 @@ export default async function InternAssignmentsPage() {
     if (item.provider === "canva" && item.externalUrl) current.canva = item.externalUrl;
     links[item.assignmentId] = current;
   }
-  return <InternAssignmentsPageView workspace={data.workspace} links={links} />;
+  return <div className="space-y-4"><SyllabusGrowthOverview mode="intern" /><InternAssignmentsPageView workspace={data.workspace} links={links} /></div>;
 }
