@@ -2484,17 +2484,12 @@ div.homepage-chat-panel__header,
   }
 }
 
-/* Ambassador mobile: Taco is accessed from the sticky Menu instead of a
-   floating teaser. A closed companion never covers navigation, tabs, or forms.
-   When explicitly opened, keep the dialog above the mobile tab bar. */
+/* Taco uses Rogue's compact floating-avatar pattern on Ambassador mobile.
+   The launcher sits ABOVE the Guru-style tabs; never show a wide intro tip. */
 @media (max-width: 1023px) {
-  [data-ai-taco-companion="true"][data-taco-mode="workspace"][data-taco-open="false"] {
-    display: none !important;
-  }
-
-  [data-ai-taco-companion="true"][data-taco-mode="workspace"][data-taco-open="true"] {
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] {
     bottom: calc(
-      6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+      6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
     ) !important;
     right: 0.75rem !important;
     max-width: calc(100vw - 1.5rem);
@@ -2504,7 +2499,13 @@ div.homepage-chat-panel__header,
     display: none !important;
   }
 
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] > .homepage-chat-launcher {
+    width: 56px;
+    height: 56px;
+  }
+
   [data-ai-taco-companion="true"][data-taco-mode="workspace"] [role="dialog"] {
     max-height: min(68svh, 640px);
+    max-width: min(94vw, 440px);
   }
 }
