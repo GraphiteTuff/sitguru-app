@@ -46,7 +46,7 @@ async function approvedPortrait(raw: string | null): Promise<Buffer | null> {
 export async function GET(request: Request, context: { params: Promise<{ code: string }> }) {
   const { code } = await context.params;
   const referral = await resolvePublicReferral(code);
-  if (!referral || !referral.ambassadorId || !referral.isPublicAmbassador) {
+  if (!referral || !referral.ambassadorId) {
     return new Response("Ambassador poster not found", { status: 404, headers: { "Cache-Control": "no-store" } });
   }
 
