@@ -17,6 +17,8 @@ import {
   Users,
 } from "lucide-react";
 import AmbassadorReferralCardClient from "@/components/ambassador/AmbassadorReferralCardClient";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -453,6 +455,7 @@ function mapReferral(
 
 async function getReferralData(
   ambassadorId: string,
+  periodStart: string | null,
 ): Promise<ReferralData> {
   const { data, error } = await supabaseAdmin
     .from("ambassador_referrals")
@@ -485,7 +488,10 @@ async function getReferralData(
     };
   }
 
-  const rows = (data || []) as AmbassadorReferralRow[];
+  const allRows = (data || []) as AmbassadorReferralRow[];
+  const rows = allRows.filter(row => isReferralActivitySince(
+    asString(row.signup_date) || asString(row.created_at), periodStart,
+  ));
   const petParentRows = rows.filter(
     (row) => normalizeReferralType(row.referral_type) === "pet_parent",
   );
@@ -495,7 +501,8 @@ async function getReferralData(
   const businessRows = rows.filter(
     (row) => normalizeReferralType(row.referral_type) === "business",
   );
-  const completedRows = rows.filter(isCompletedBooking);
+  const completedRows = allRows.filter(row => isCompletedBooking(row) &&
+    isReferralActivitySince(asString(row.completed_booking_at) || asString(row.created_at), periodStart));
 
   return {
     recent: rows.slice(0, 20).map((row) =>
@@ -567,9 +574,11 @@ async function getReferralCodeRow({
 async function getVisitStats({
   ambassadorId,
   referralCode,
+  periodStart,
 }: {
   ambassadorId: string;
   referralCode: string;
+  periodStart: string | null;
 }): Promise<VisitStats> {
   const referralCodeRow = await getReferralCodeRow({
     ambassadorId,
@@ -587,10 +596,12 @@ async function getVisitStats({
     };
   }
 
-  const { data, error } = await supabaseAdmin
+  let clicksQuery = supabaseAdmin
     .from("referral_clicks")
     .select("*")
-    .eq("referral_code_id", referralCodeId)
+    .eq("referral_code_id", referralCodeId);
+  if (periodStart) clicksQuery = clicksQuery.gte("created_at", periodStart);
+  const { data, error } = await clicksQuery
     .order("created_at", { ascending: false })
     .limit(10000);
 
@@ -921,11 +932,13 @@ export default async function AmbassadorDashboardReferralsPage() {
   });
   const petParentUrl = getAbsoluteReferralUrl(petParentPath);
 
+  const epoch = await getReferralReportingEpoch();
   const [referralData, visitStats] = await Promise.all([
-    getReferralData(ambassador.id),
+    getReferralData(ambassador.id, epoch?.startedAt ?? null),
     getVisitStats({
       ambassadorId: ambassador.id,
       referralCode,
+      periodStart: epoch?.startedAt ?? null,
     }),
   ]);
 
@@ -939,6 +952,7 @@ export default async function AmbassadorDashboardReferralsPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_42%,#EEF6FF_100%)] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1600px] space-y-4">
+        <ReferralResetBanner epoch={epoch} />
         <section className="overflow-hidden rounded-[1.8rem] border border-sky-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#bae6fd_0%,#e0f2fe_42%,#bbf7d0_100%)] px-6 py-7 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div>
