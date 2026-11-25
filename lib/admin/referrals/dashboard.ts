@@ -112,6 +112,7 @@ async function safeSelect(
   table: string,
   columns = "*",
   limit = 500,
+  dateFilter?: { column: string; start: string },
 ): Promise<SafeResult> {
   const extractMissingColumn = (message: string): string | null => {
     const patterns = [
@@ -147,10 +148,15 @@ async function safeSelect(
 
   for (let attempt = 0; attempt < 10; attempt += 1) {
     try {
-      const { data, error, count } = await supabaseAdmin
+      let query = supabaseAdmin
         .from(table)
         .select(activeColumns, { count: "exact" })
         .limit(limit);
+      if (dateFilter) {
+        query = query.gte(dateFilter.column, dateFilter.start)
+          .order(dateFilter.column, { ascending: false });
+      }
+      const { data, error, count } = await query;
 
       if (!error) {
         const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
@@ -194,7 +200,7 @@ async function safeSelect(
   };
 }
 
-export async function getReferralsDashboardData(): Promise<ReferralsDashboardData> {
+export async function getReferralsDashboardData(periodStart: string | null = null): Promise<ReferralsDashboardData> {
   const [
     codesResult,
     canonicalResult,
@@ -214,18 +220,21 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
     safeSelect("pawperks_account_referral_codes", "id, created_at, updated_at, status, code", 300),
     safeSelect(
       "pawperks_referral_relationships",
-      "id, created_at, updated_at, status, referral_code, referrer_display_name, referred_display_name, referrer_role, referred_role, referral_stage",
+      "id, created_at, signup_at, updated_at, status, referral_code, referrer_display_name, referred_display_name, referrer_role, referred_role, referral_stage",
       300,
+      periodStart ? { column: "signup_at", start: periodStart } : undefined,
     ),
     safeSelect(
       "pawperks_referral_events",
       "id, created_at, occurred_at, event_type, conversion_status, submitted_code",
       500,
+      periodStart ? { column: "occurred_at", start: periodStart } : undefined,
     ),
     safeSelect(
       "referral_activity",
       "id, created_at, code, activity_type, conversion_status, payout_status",
       200,
+      periodStart ? { column: "created_at", start: periodStart } : undefined,
     ),
     safeSelect(
       "pawperks_referral_conflicts",
