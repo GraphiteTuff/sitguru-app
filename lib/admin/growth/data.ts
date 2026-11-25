@@ -224,7 +224,9 @@ export async function listPromotablePartners(): Promise<GrowthPromoteItem[]> {
       id: text(row.id),
       name: text(row.business_name) || "Partner",
       detail: text(row.partner_type).replaceAll("_", " ") || "Local partner",
-      href: text(row.slug) ? `/partners/${text(row.slug)}` : "/partners",
+      href: text(row.slug) === "annabel-s-touch-chiropractic"
+        ? "/partners/spotlight/dr-gracyn-baldwin"
+        : text(row.slug) ? `/partners/${text(row.slug)}` : "/partners",
       imageUrl: "",
       market: [text(row.city), text(row.state)].filter(Boolean).join(", "),
     }));
