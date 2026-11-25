@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, BadgeCheck, CalendarDays, Handshake, MousePointerClick, QrCode, RefreshCw, UserPlus } from "lucide-react";
+import { Activity, BadgeCheck, CalendarDays, Gift, Handshake, MousePointerClick, QrCode, RefreshCw, UserPlus } from "lucide-react";
 import type { ReferralGrowthReport } from "@/lib/referrals/growth-report";
 
 const n = (value: number) => new Intl.NumberFormat("en-US").format(value);
@@ -10,6 +10,7 @@ function when(raw: string | null) {
 }
 
 export default function ReferralGrowthOverview({ report, audience = "admin" }: { report: ReferralGrowthReport; audience?: "admin" | "manager" | "intern" }) {
+  const baseHref = audience === "admin" ? "/admin/referrals" : audience === "manager" ? "/manager/referrals" : "/intern/growth/referrals";
   const data = [
     { title: "Link Visits", value: report.totals.visits, label: "Tracked non-QR referral events", icon: MousePointerClick },
     { title: "QR Scans", value: report.totals.qr, label: "Recorded QR visits", icon: QrCode },
@@ -17,6 +18,7 @@ export default function ReferralGrowthOverview({ report, audience = "admin" }: {
     { title: "First Bookings", value: report.totals.bookings, label: "Attributed booking events", icon: BadgeCheck },
     { title: "Active Codes", value: report.totals.codes, label: "From SitGuru code registry", icon: Activity },
     { title: "Partner Campaigns", value: report.totals.partnerCampaigns, label: "Active partner campaigns", icon: Handshake },
+    { title: "Reward Reviews", value: report.totals.rewardsPending, label: "Pending or approved, all time", icon: Gift },
   ];
   return (
     <section id="referral-growth-center" aria-label="Referral Growth Center" className="space-y-4 rounded-[28px] border border-emerald-100 bg-[linear-gradient(180deg,#f3fcf9_0%,#ffffff_45%)] p-4 shadow-sm sm:p-6">
@@ -28,11 +30,17 @@ export default function ReferralGrowthOverview({ report, audience = "admin" }: {
             One operational view of linked referrals, QR scans, captured registrations, bookings and partner activity. Based on recorded events, not forecasts.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-900">
-          <CalendarDays size={16} aria-hidden="true" /> Last {report.dateWindowDays} days
-        </div>
+        <nav aria-label="Referral reporting period" className="flex flex-wrap items-center gap-1 rounded-xl border border-emerald-100 bg-white p-1 text-xs font-black text-emerald-900">
+          <CalendarDays size={17} className="mx-2" aria-hidden="true" />
+          {[7,30,90].map(days => (
+            <Link key={days} href={`${baseHref}?days=${days}#referral-growth-center`} aria-current={days === report.dateWindowDays ? "page" : undefined}
+              className={`inline-flex min-h-10 items-center justify-center rounded-lg px-3 transition ${days === report.dateWindowDays ? "bg-emerald-800 !text-white" : "text-emerald-900 hover:bg-emerald-50"}`}>
+              {days}d
+            </Link>
+          ))}
+        </nav>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {data.map(item => {
           const Icon = item.icon;
           return (
