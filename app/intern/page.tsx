@@ -1,3 +1,4 @@
+import InstructorCenter from "@/components/internship/InstructorCenter";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -226,6 +227,7 @@ export default async function InternPortalPage({
           </div>
         </section>
       ) : null}
+      {!preview ? <InstructorCenter mode="intern" /> : null}
       <InternStudentDashboard
         data={workspace}
         events={promoteEvents}
