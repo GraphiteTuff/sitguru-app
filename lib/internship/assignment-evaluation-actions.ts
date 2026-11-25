@@ -40,6 +40,7 @@ export async function saveAssignmentEvaluation(form: FormData) {
   if (read("evaluatedSubmissionAt") !== String(task.submitted_at || "")) {
     return fail("This assignment changed. Review the latest submission before saving an evaluation.");
   }
+  if (intent === "release") return fail("Official semester evaluation release is disabled during pre-launch.");
   if (intent === "release" && kind !== "supervisor" &&
       ["submitted_to_jason", "ceo_review_required"].includes(String(task.review_stage))) {
     return fail("This assignment is waiting for supervisor review.");
