@@ -109,11 +109,23 @@ export default function AmbassadorQuickStartClient({
     await copyUrl(audience);
   }
 
+  function openWorkspace(view: "today" | "calendar" | "activities" | "marketing" | "leads", create?: "lead" | "activity" | "marketing") {
+    window.dispatchEvent(
+      new CustomEvent("sitguru:ambassador-workspace", {
+        detail: { view, create },
+      }),
+    );
+    document.getElementById("ambassador-workspace")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   const quickActions = [
     {
       title: "Log a Lead",
       description: "Record local outreach",
-      href: "/ambassador/dashboard/command-center?view=leads&new=lead",
+      action: () => openWorkspace("leads", "lead"),
       icon: <Handshake size={22} aria-hidden="true" />,
     },
     {
@@ -138,9 +150,12 @@ export default function AmbassadorQuickStartClient({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0D5C3A] via-green-800 to-emerald-950 p-5 text-white shadow-[0_12px_38px_rgba(10,80,50,0.15)] sm:p-6">
+      <section
+        id="ambassador-home"
+        className="scroll-mt-24 overflow-hidden rounded-[28px] border border-emerald-100 bg-[radial-gradient(circle_at_86%_18%,rgba(255,255,255,0.96),transparent_20%),linear-gradient(120deg,#bbf7e1_0%,#dff9f0_46%,#ccefff_100%)] p-5 text-slate-950 shadow-[0_12px_38px_rgba(10,80,50,0.08)] sm:p-6"
+      >
         <div className="flex items-center gap-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-white/80 bg-white text-xl font-black text-green-900">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white text-xl font-black text-green-900 shadow-sm">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="Your Ambassador profile" className="h-full w-full object-cover" />
@@ -149,21 +164,21 @@ export default function AmbassadorQuickStartClient({
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold tracking-wide text-green-100">Your SitGuru Ambassador Home</p>
-            <h1 className="mt-0.5 text-[clamp(1.5rem,6vw,2.25rem)] font-black leading-tight tracking-tight">
+            <p className="text-xs font-black uppercase tracking-wide text-emerald-800">Your SitGuru Ambassador Home</p>
+            <h1 className="mt-1 text-[clamp(1.6rem,5vw,2.25rem)] font-black leading-tight tracking-tight !text-slate-950">
               Welcome back, {firstName}!
             </h1>
-            <p className="mt-1 text-sm font-semibold text-green-100">
+            <p className="mt-1 text-sm font-semibold text-slate-700">
               Share SitGuru. Grow your community.
             </p>
           </div>
         </div>
-        <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/10 p-3.5">
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/90 bg-white/90 p-3.5 shadow-sm">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-green-100">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-800">
               Your referral code
             </p>
-            <p className="mt-1 break-all text-xl font-black tracking-wide text-white">{referralCode}</p>
+            <p className="mt-1 break-all text-xl font-black tracking-wide text-green-950">{referralCode}</p>
           </div>
           <button
             type="button"
@@ -175,7 +190,7 @@ export default function AmbassadorQuickStartClient({
                 setFeedback("Press and hold your referral code to copy it.");
               }
             }}
-            className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-green-950 transition hover:bg-green-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black !text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
             aria-label="Copy your Ambassador referral code"
           >
             <Copy size={17} aria-hidden="true" />
@@ -184,7 +199,7 @@ export default function AmbassadorQuickStartClient({
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-green-100 bg-white p-4 shadow-sm sm:p-5" aria-label="Invite someone to SitGuru">
+      <section id="ambassador-share" className="scroll-mt-24 rounded-[28px] border border-green-100 bg-white p-4 shadow-sm sm:p-5" aria-label="Invite someone to SitGuru">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-green-700">Start sharing</p>
@@ -267,28 +282,38 @@ export default function AmbassadorQuickStartClient({
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {quickActions.map((action) => (
-            <Link
-              key={action.title}
-              href={action.href}
-              className="flex min-h-32 flex-col justify-between rounded-[22px] border border-green-100 bg-white p-4 text-left shadow-sm transition hover:border-green-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-800">{action.icon}</span>
-              <span className="mt-2 block text-base font-black text-green-950">{action.title}</span>
-              <span className="mt-0.5 text-xs font-semibold text-slate-600">{action.description}</span>
-            </Link>
-          ))}
+          {quickActions.map((action) => {
+            const contents = (
+              <>
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-800">{action.icon}</span>
+                <span className="mt-2 block text-base font-black text-green-950">{action.title}</span>
+                <span className="mt-0.5 text-xs font-semibold text-slate-600">{action.description}</span>
+              </>
+            );
+            const className = "flex min-h-32 w-full flex-col justify-between rounded-[22px] border border-green-100 bg-white p-4 text-left shadow-sm transition hover:border-green-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800";
+
+            return "action" in action && action.action ? (
+              <button key={action.title} type="button" onClick={action.action} className={className}>
+                {contents}
+              </button>
+            ) : (
+              <Link key={action.title} href={action.href || "/ambassador/dashboard"} className={className}>
+                {contents}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      <Link
-        href="/ambassador/dashboard/command-center"
-        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 text-base font-black text-white transition hover:bg-green-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
+      <button
+        type="button"
+        onClick={() => openWorkspace("today")}
+        className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 text-base font-black !text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
       >
         <BriefcaseBusiness size={21} aria-hidden="true" />
-        Open Ambassador Portal
+        Go to my outreach workspace
         <ArrowRight size={19} aria-hidden="true" />
-      </Link>
+      </button>
 
       {selected ? (
         <div
