@@ -1,3 +1,4 @@
+import InstructorCenter from "@/components/internship/InstructorCenter";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
 import ManagerAssignmentsHome, {
@@ -171,6 +172,7 @@ export default async function ManagerAssignmentsPage({
   const error = first(params.error);
 
   return (
+    <div className="space-y-4"><InstructorCenter mode="manager" />
     <ManagerAssignmentsHome
       rows={rows}
       interns={interns}
@@ -179,6 +181,6 @@ export default async function ManagerAssignmentsPage({
       initialOpen={first(params.create) === "true"}
       links={links}
       notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
-    />
+    /></div>
   );
 }
