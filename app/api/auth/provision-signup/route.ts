@@ -2103,15 +2103,57 @@ export async function POST(request: NextRequest) {
         "@/lib/growth-center-v2/attribution"
       );
       const tracking = getTrackingValues(body, metadata);
+      // Never report an arbitrary query parameter as a verified referral.
+      // Signup provenance must come from the same owner-resolved capture
+      // used by PawPerks and the commission audit ledger.
+      const verifiedOwner =
+        referral.applied && referralResolution.status === "resolved"
+          ? referralResolution.owner
+          : null;
       await recordGrowthSignupAttribution({
         userId,
         profileId: userId,
         role: requestedIntent,
         tracking: {
           ...tracking,
-          referralCode: submittedReferralCode || null,
+          referralCode: verifiedOwner?.code || null,
+          referralOwnerType: verifiedOwner?.ownerType || null,
         },
       });
+
+      // Feed the existing partner admin/campaign dashboards without granting
+      // a reward automatically. An idempotent signup event is audited by owner.
+      if (verifiedOwner?.partnerId) {
+        const { data: prior } = await supabaseAdmin
+          .from("partner_tracking_events")
+          .select("id")
+          .eq("partner_id", verifiedOwner.partnerId)
+          .eq("user_id", userId)
+          .eq("event_type", "signup")
+          .limit(1);
+        if (!prior?.length) {
+          const { error: partnerSignupError } = await supabaseAdmin
+            .from("partner_tracking_events")
+            .insert({
+              partner_id: verifiedOwner.partnerId,
+              referral_code: verifiedOwner.code,
+              user_id: userId,
+              event_type: "signup",
+              event_source: tracking.source || "sitguru_signup",
+              event_medium: tracking.medium || "registration",
+              event_campaign: tracking.campaign || "partner_referral",
+              landing_page: "/signup",
+              revenue_amount: 0,
+              reward_amount: 0,
+              metadata: {
+                idempotency_key: `partner_signup:${verifiedOwner.partnerId}:${userId}`,
+                registered_role: requestedIntent,
+                verification: "signup_provisioning",
+              },
+            });
+          if (partnerSignupError) console.warn("Partner signup tracking skipped:", partnerSignupError.message);
+        }
+      }
     } catch (growthError) {
       console.warn("Growth Center signup attribution skipped:", growthError);
     }
