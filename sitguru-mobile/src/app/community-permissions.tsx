@@ -13,7 +13,12 @@ export default function CommunityPermissionsScreen() {
   const [items,setItems]=useState<CommunityParentPermission[]>([]);const [error,setError]=useState('');
   const [social,setSocial]=useState<Record<string,boolean>>({});const [busy,setBusy]=useState(false);
   const blocked=communityDevelopmentError();
-  async function load(){if(blocked||!session)return;const result=await sitguruApiFetch<{items:CommunityParentPermission[]}>('/api/community-studio/permissions',{cache:'no-store'});if(result.error)setError(result.error);else setItems(result.data?.items||[]);}
+  async function load(){
+    if(blocked||!session)return;
+
+    return sitguruApiFetch<{items:CommunityParentPermission[]}>('/api/community-studio/permissions',{cache:'no-store'}).then(async (result) => {if(result.error)setError(result.error);else setItems(result.data?.items||[]);
+    });
+  }
   useEffect(()=>{void load();},[session?.user.id,blocked]);
   async function decide(item:CommunityParentPermission,decision:string){
     if(blocked)return;setBusy(true);setError('');

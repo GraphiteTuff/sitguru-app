@@ -48,7 +48,7 @@ export default function SupportDashboardClient({
   const [sender, setSender] = useState<SupportSenderProfile | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [liveState, setLiveState] = useState<"connecting" | "live" | "idle">(
-    "connecting"
+    "idle"
   );
   const [, startTransition] = useTransition();
   const { toasts, pushToast, dismissToast } = useSupportToasts();
@@ -159,9 +159,11 @@ export default function SupportDashboardClient({
     [pushToast, upsertCase]
   );
 
-  useEffect(() => {
+  const [previousCases, setPreviousCases] = useState(initialCases);
+  if (previousCases !== initialCases) {
+    setPreviousCases(initialCases);
     setCases(initialCases);
-  }, [initialCases]);
+  }
 
   useEffect(() => {
     let active = true;
@@ -214,7 +216,7 @@ export default function SupportDashboardClient({
         });
     } catch (error) {
       console.warn("Support realtime unavailable:", error);
-      if (active) setLiveState("idle");
+      // The existing polling fallback remains available if subscription setup fails.
     }
 
     return () => {

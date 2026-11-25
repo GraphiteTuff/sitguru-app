@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { canReadPrivateInternRecord } from "./manager-access";
 import {
+  assignmentBrief,
   assignmentIsVisibleToIntern,
+  readAssignmentBrief,
   validateManagerAssignment,
   type AssignmentDraft,
 } from "./manager-assignment";
@@ -75,4 +77,21 @@ describe("manager assignment form", () => {
     assert.equal(assignmentIsVisibleToIntern("draft"), false);
     assert.equal(assignmentIsVisibleToIntern("todo"), true);
   });
+  it("validates and preserves supported classification fields", () => {
+    const result = validateManagerAssignment({
+      ...base, primaryGrowthPillar: "community", targetAudiences: ["Gurus", "Gurus", "Pet Parents"],
+      learningObjective: "community", estimatedHours: "5.50", expectedOutcomes: "Three opted-in prospects",
+    }, "create");
+    assert.equal(result.ok, true);
+    const brief = assignmentBrief(result.value, "manager");
+    assert.equal(brief.estimatedHours, 5.5);
+    assert.deepEqual(readAssignmentBrief(brief).targetAudiences, ["Gurus", "Pet Parents"]);
+
+    const invalid = validateManagerAssignment({
+      ...base, primaryGrowthPillar: "both", learningObjective: "unmapped", estimatedHours: "-1",
+    }, "create");
+    assert.equal(invalid.ok, false);
+    assert.deepEqual(Object.keys(invalid.errors).sort(), ["estimatedHours", "learningObjective", "primaryGrowthPillar"]);
+  });
+
 });

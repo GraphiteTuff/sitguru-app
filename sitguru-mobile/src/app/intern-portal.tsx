@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import {
   ArrowDown,
@@ -5,7 +6,7 @@ import {
   GraduationCap,
   Minus,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -37,9 +38,11 @@ type TaskItem = {
   id: string;
   title: string;
   status: string;
+  dueOn?: string;
   workUrl?: string;
   studentNotes?: string;
   employerLetter?: string;
+  briefPayload?: { internWork?: { researchLink?: string; notes?: string; supportingLinks?: string[]; attachmentUrl?: string } };
 };
 
 type GrowthSummary = {
@@ -91,7 +94,10 @@ export default function InternPortalScreen() {
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [workUrl, setWorkUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [supportingLinks, setSupportingLinks] = useState('');
+  const [attachment, setAttachment] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const hydratedTaskId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const path = internId
@@ -140,28 +146,48 @@ export default function InternPortalScreen() {
     void load();
   }, [session, load]);
 
-  async function submitWork() {
+  useEffect(() => {
+    const taskId = selectedTask?.id || null;
+    if (taskId === hydratedTaskId.current) return;
+    hydratedTaskId.current = taskId;
+    const draft = selectedTask?.briefPayload?.internWork;
+    setWorkUrl(draft ? draft.researchLink || '' : selectedTask?.workUrl || '');
+    setNotes(draft ? draft.notes || '' : selectedTask?.studentNotes || '');
+    setSupportingLinks(draft?.supportingLinks?.join('\n') || '');
+    setAttachment(null);
+  }, [selectedTask]);
+
+  async function pickAttachment() {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+      if (!picked.canceled) setAttachment(picked.assets[0]);
+    } catch {
+      setError('Could not open your files. Reopen the assignment and try again.');
+    }
+  }
+
+  async function saveWork(action: 'save' | 'submit') {
     const id = payload?.workspace?.intern?.id;
     if (!id || !selectedTask) return;
     setBusy(true);
-    const result = await sitguruApiFetch('/api/internship/work', {
-      method: 'POST',
-      body: {
-        action: 'submit',
-        internId: id,
-        itemType: 'task',
-        id: selectedTask.id,
-        workUrl,
-        studentNotes: notes,
-      },
-    });
+    const fields = {
+      action, internId: id, itemType: 'task', id: selectedTask.id,
+      workUrl, studentNotes: notes, supportingLinks,
+    };
+    let body: typeof fields | FormData = fields;
+    if (attachment) {
+      body = new FormData();
+      for (const [key, value] of Object.entries(fields)) body.append(key, value);
+      const file = attachment.file || { uri: attachment.uri, name: attachment.name, type: attachment.mimeType || 'application/octet-stream' };
+      body.append('supportingFile', file as Blob);
+    }
+    const result = await sitguruApiFetch('/api/internship/work', { method: 'POST', body, timeoutMs: 90_000 });
     setBusy(false);
     if (result.error) {
       setError(result.error);
       return;
     }
-    setWorkUrl('');
-    setNotes('');
+    setAttachment(null);
     await load();
   }
 
@@ -192,6 +218,9 @@ export default function InternPortalScreen() {
     return <InternOnboardingFlow payload={onboarding} onReload={load} />;
   }
 
+  const editableTask = payload?.mode === 'intern' && selectedTask &&
+    ['todo', 'in_progress', 'revision_requested'].includes(selectedTask.status) ? selectedTask : null;
+
   const standing = payload?.standing;
   const TrendIcon =
     standing?.trend?.direction === 'up'
@@ -209,11 +238,11 @@ export default function InternPortalScreen() {
           setRefreshing(false);
         }}
         footer={
-          payload?.mode === 'intern' && selectedTask ? (
+          editableTask ? (
             <StickyActionBar>
               <TouchTarget
                 disabled={busy}
-                onPress={() => void submitWork()}
+                onPress={() => void saveWork('submit')}
                 style={styles.primaryBtn}
               >
                 <Text style={styles.primaryBtnText}>
@@ -234,6 +263,12 @@ export default function InternPortalScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {payload?.mode === 'intern' ? (
+          <TouchTarget accessibilityRole="button" onPress={() => router.push('/intern-learning')} style={styles.card}>
+            <Text style={styles.cardTitle}>Learning &amp; Growth Center</Text>
+            <Text style={styles.body}>Growth pillars, deadlines, grades, announcements and partnerships.</Text>
+          </TouchTarget>
+        ) : null}
         <TouchTarget accessibilityRole="button" onPress={() => router.push('/community-studio' as never)} style={styles.card}>
           <Text style={styles.cardTitle}>Community Studio</Text>
           <Text style={styles.body}>Create Pack stories, nominate Pet of the Week, and follow manager feedback.</Text>
@@ -241,7 +276,7 @@ export default function InternPortalScreen() {
 
         <TouchTarget accessibilityRole="button" onPress={() => router.push('/guru-match-share')} style={styles.card}>
           <Text style={styles.cardTitle}>Guru Match &amp; Share</Text>
-          <Text style={styles.body}>Find local Gurus by city, state and service, prepare tracked QR cards, and request Ava's approval.</Text>
+          <Text style={styles.body}>Find local Gurus by city, state and service, prepare tracked QR cards, and request Ava&apos;s approval.</Text>
         </TouchTarget>
         <TouchTarget accessibilityRole="button" onPress={() => router.push('/content-studio')} style={styles.card}>
           <Text style={styles.cardTitle}>Content Studio · Live work</Text>
@@ -321,11 +356,7 @@ export default function InternPortalScreen() {
         {(payload?.workspace?.tasks || []).map((task) => (
           <TouchTarget
             key={task.id}
-            onPress={() => {
-              setSelectedTask(task);
-              setWorkUrl(task.workUrl || '');
-              setNotes(task.studentNotes || '');
-            }}
+            onPress={() => setSelectedTask(task)}
             style={[
               styles.card,
               selectedTask?.id === task.id && styles.cardSelected,
@@ -334,14 +365,18 @@ export default function InternPortalScreen() {
             <Text style={styles.cardTitle}>{task.title}</Text>
             <Text style={styles.caption}>
               {task.status.replaceAll('_', ' ')}
+              {task.dueOn ? ` · Due ${task.dueOn}` : ''}
               {task.employerLetter ? ` · Letter ${task.employerLetter}` : ''}
             </Text>
           </TouchTarget>
         ))}
 
-        {payload?.mode === 'intern' && selectedTask ? (
+        {editableTask ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Turn in {selectedTask.title}</Text>
+            <Text style={styles.cardTitle}>Turn in {editableTask.title}</Text>
+            <TouchTarget accessibilityRole="button" onPress={() => void saveWork('save')} disabled={busy} style={styles.row}>
+              <Text style={styles.rowTitle}>Save draft</Text>
+            </TouchTarget>
             <TextInput
               autoCapitalize="none"
               onChangeText={setWorkUrl}
@@ -358,6 +393,11 @@ export default function InternPortalScreen() {
               style={[styles.input, styles.notes]}
               value={notes}
             />
+            <TextInput multiline autoCapitalize="none" onChangeText={setSupportingLinks} value={supportingLinks}
+              placeholder="Additional URLs, one per line" placeholderTextColor={BrandColors.muted} style={styles.input} />
+            <TouchTarget accessibilityRole="button" onPress={() => void pickAttachment()} disabled={busy} style={styles.row}>
+              <Text style={styles.rowTitle}>{attachment?.name || 'Choose a supporting file'}</Text>
+            </TouchTarget>
           </View>
         ) : null}
       </MobileScreen>

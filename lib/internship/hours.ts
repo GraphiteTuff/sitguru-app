@@ -47,6 +47,10 @@ export type HourSummary = {
 const SUBMITTED = new Set(["submitted", "ava_approved", "supervisor_verified"]);
 const APPROVED = new Set(["ava_approved", "supervisor_verified"]);
 
+export function isApprovedInternshipHourStatus(status: string) {
+  return APPROVED.has(status);
+}
+
 export function formatHours(value: number) {
   const rounded = Math.round(value * 100) / 100;
   if (Number.isInteger(rounded)) return String(rounded);
@@ -164,7 +168,7 @@ export function summarizeInternshipHours(input: {
   );
   const approvedHours = roundHours(
     entries
-      .filter((row) => APPROVED.has(row.status))
+      .filter((row) => isApprovedInternshipHourStatus(row.status))
       .reduce((sum, row) => sum + Number(row.hours || 0), 0),
   );
   const verifiedHours = roundHours(

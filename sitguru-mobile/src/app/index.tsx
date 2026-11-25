@@ -1,3 +1,12 @@
+import assetSitguruHomepageHeroPoster from '../assets/images/sitguru-homepage-hero-poster.jpg';
+import assetSitguruGivingThanksHomepage from '../assets/videos/sitguru-giving-thanks-homepage.mp4';
+import assetSitguruGivingThanksHomepagePoster from '../assets/images/sitguru-giving-thanks-homepage-poster.jpg';
+import assetSitguruHomepageHero from '../assets/videos/sitguru-homepage-hero.mp4';
+import assetSitguruHomepageHero2 from '../assets/videos/sitguru-homepage-hero-2.mp4';
+import assetSitguruHomepageHero3Ambassadors from '../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4';
+import assetSitguruThanksgivingLogoDark from '../assets/images/sitguru-thanksgiving-logo-dark.png';
+import assetPawBackgroundMark from '../assets/images/paw-background-mark.png';
+import assetSitguruWalksIcon from '../assets/images/sitguru-walks-icon.png';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { Redirect, router } from 'expo-router';
 import {
@@ -93,36 +102,36 @@ function loadHeroMedia() {
 }
 
 function loadHeroVideoAssets() {
-  const defaultPoster = require('../assets/images/sitguru-homepage-hero-poster.jpg') as ImageSourcePropType;
+  const defaultPoster = assetSitguruHomepageHeroPoster;
 
   return [
     {
-      source: require('../assets/videos/sitguru-giving-thanks-homepage.mp4') as number,
-      poster: require('../assets/images/sitguru-giving-thanks-homepage-poster.jpg') as ImageSourcePropType,
+      source: assetSitguruGivingThanksHomepage,
+      poster: assetSitguruGivingThanksHomepagePoster,
     },
     {
-      source: require('../assets/videos/sitguru-homepage-hero.mp4') as number,
+      source: assetSitguruHomepageHero,
       poster: defaultPoster,
     },
     {
-      source: require('../assets/videos/sitguru-homepage-hero-2.mp4') as number,
+      source: assetSitguruHomepageHero2,
       poster: defaultPoster,
     },
     {
-      source: require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4') as number,
+      source: assetSitguruHomepageHero3Ambassadors,
       poster: defaultPoster,
     },
   ] as const;
 }
 
 const sitGuruLogoDark =
-  require('../assets/images/sitguru-thanksgiving-logo-dark.png') as ImageSourcePropType;
+  assetSitguruThanksgivingLogoDark;
 
 const pawBackgroundAsset =
-  require('../assets/images/paw-background-mark.png') as ImageSourcePropType;
+  assetPawBackgroundMark;
 
 const walksIconAsset =
-  require('../assets/images/sitguru-walks-icon.png') as ImageSourcePropType;
+  assetSitguruWalksIcon;
 
 const themeOptions: ThemeOption[] = [
   { label: 'Light', value: 'light', icon: 'sun' },

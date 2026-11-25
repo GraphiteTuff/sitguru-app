@@ -62,9 +62,11 @@ export default function DeskSettings({
   const back = audience === "manager" ? "/manager/settings" : "/intern/settings";
   const home = audience === "manager" ? "/manager" : "/intern";
 
-  useEffect(() => {
+  const [previousAvatarUrl, setPreviousAvatarUrl] = useState(avatarUrl);
+  if (previousAvatarUrl !== avatarUrl) {
+    setPreviousAvatarUrl(avatarUrl);
     setPhotoPreview(avatarUrl);
-  }, [avatarUrl]);
+  }
 
   useEffect(() => {
     if (notice && /photo/i.test(notice)) {

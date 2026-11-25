@@ -35,7 +35,7 @@ export function useCompanionTypingReply<T extends ChatLikeMessage>({
   idPrefix?: string;
 }) {
   const [localTyping, setLocalTyping] = useState(false);
-  const [streamRevealReady, setStreamRevealReady] = useState(true);
+  const [streamRevealReady, setStreamRevealReady] = useState(!isLoading);
   const streamStartedAtRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busyRef = useRef(false);
@@ -46,26 +46,18 @@ export function useCompanionTypingReply<T extends ChatLikeMessage>({
     };
   }, []);
 
+  const [previousLoading, setPreviousLoading] = useState(isLoading);
+  if (previousLoading !== isLoading) {
+    setPreviousLoading(isLoading);
+    setStreamRevealReady(!isLoading);
+  }
   useEffect(() => {
     if (!isLoading) {
       streamStartedAtRef.current = null;
-      setStreamRevealReady(true);
       return;
     }
-
-    if (streamStartedAtRef.current == null) {
-      streamStartedAtRef.current = Date.now();
-      setStreamRevealReady(false);
-    }
-
-    const remaining =
-      COMPANION_MIN_TYPING_MS - (Date.now() - streamStartedAtRef.current);
-
-    if (remaining <= 0) {
-      setStreamRevealReady(true);
-      return;
-    }
-
+    streamStartedAtRef.current ??= Date.now();
+    const remaining = Math.max(0, COMPANION_MIN_TYPING_MS - (Date.now() - streamStartedAtRef.current));
     const timer = setTimeout(() => setStreamRevealReady(true), remaining);
     return () => clearTimeout(timer);
   }, [isLoading]);

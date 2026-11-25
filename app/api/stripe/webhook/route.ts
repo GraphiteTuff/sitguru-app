@@ -365,7 +365,7 @@ async function safePaymentLedgerUpsert(
     checkoutSessionId,
   });
 
-  let writePayload: Record<string, unknown> = {
+  const writePayload: Record<string, unknown> = {
     ...payload,
     provider: firstNonEmpty(payload.provider, "stripe"),
     currency: firstNonEmpty(payload.currency, "usd").toLowerCase(),
@@ -513,7 +513,7 @@ async function safeBookingUpdateById(
 ) {
   if (!bookingId) return false;
 
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const { error } = await supabaseAdmin
@@ -552,7 +552,7 @@ async function safeBookingUpdateByPaymentIntent(
 ) {
   if (!paymentIntentId) return false;
 
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const { error } = await supabaseAdmin

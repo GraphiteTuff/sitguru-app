@@ -1074,12 +1074,9 @@ export default function FinancialExportCenterPage() {
   );
 
   async function loadHistory() {
-    setHistoryLoading(true);
-
-    try {
-      const response = await fetch("/api/admin/financials/export-history", {
+    return fetch("/api/admin/financials/export-history", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
       const json = (await response.json()) as ExportHistoryResponse;
 
       if (!response.ok || !json.ok) {
@@ -1097,7 +1094,7 @@ export default function FinancialExportCenterPage() {
           ? json.message || "Live export history connected."
           : json.message || "No saved export records yet. Use Save record on a package to start history.",
       );
-    } catch (error) {
+    }).catch((error) => {
       setHistory([]);
       setHistoryLive(false);
       setHistoryMessage(
@@ -1105,16 +1102,15 @@ export default function FinancialExportCenterPage() {
           ? error.message
           : "Unable to load live export history. Starter templates are shown.",
       );
-    } finally {
+    }).finally(() => {
       setHistoryLoading(false);
-    }
+    });
   }
 
   async function loadGrowthFinancials() {
-    try {
-      const response = await fetch("/api/admin/financials/growth-referrals", {
+    return fetch("/api/admin/financials/growth-referrals", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
       const json = (await response.json()) as GrowthReferralFinancialsResponse;
 
       if (!response.ok || !json.ok) {
@@ -1126,7 +1122,7 @@ export default function FinancialExportCenterPage() {
       }
 
       setGrowthFinancials(json);
-    } catch (error) {
+    }).catch((error) => {
       setGrowthFinancials({
         ...fallbackGrowthReferralFinancials,
         message:
@@ -1134,7 +1130,7 @@ export default function FinancialExportCenterPage() {
             ? error.message
             : "Unable to load Growth & Referrals export support.",
       });
-    }
+    });
   }
 
   async function createExportRecord(input: CreateExportRecordInput) {
@@ -1177,10 +1173,10 @@ export default function FinancialExportCenterPage() {
             : "");
 
       setCreateMessage("Export record saved to history.");
-      await loadHistory();
+      await refreshHistory();
 
       if ((input.openAfterCreate ?? true) && savedHref) {
-        window.location.href = savedHref;
+        window.location.assign(savedHref);
       }
     } catch (error) {
       setCreateMessage(
@@ -1227,6 +1223,11 @@ export default function FinancialExportCenterPage() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  }
+
+  async function refreshHistory() {
+    setHistoryLoading(true);
+    await loadHistory();
   }
 
   useEffect(() => {
@@ -1561,7 +1562,7 @@ export default function FinancialExportCenterPage() {
               <p className="text-sm font-bold leading-6 text-slate-700">{historyMessage}</p>
               <button
                 type="button"
-                onClick={loadHistory}
+                onClick={refreshHistory}
                 disabled={historyLoading}
                 className="rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
               >

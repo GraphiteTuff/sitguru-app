@@ -38,8 +38,10 @@ function formatDue(iso: string | null | undefined) {
 export function InternAssignmentsPageView({
   workspace,
   links = {},
+  today,
 }: {
   workspace: InternshipWorkspaceData;
+  today: string;
   links?: Record<string, { planner?: string; files?: string; teams?: string; canva?: string }>;
 }) {
   const tasks = workspace.tasks || [];
@@ -72,7 +74,7 @@ export function InternAssignmentsPageView({
         },
         {
           label: "Past Due",
-          value: open.filter((task) => task.dueOn && new Date(`${task.dueOn}T23:59:59`).getTime() < Date.now()).length,
+          value: open.filter((task) => task.dueOn && task.dueOn.slice(0, 10) < today).length,
           detail: "Needs attention",
           tone: "amber",
           icon: <Flag size={18} />,
@@ -181,7 +183,7 @@ export function InternMilestonesPageView({
       <section className="grid gap-4 xl:grid-cols-3">
         <article className={DESK_UI.card + " p-4 sm:p-5 xl:col-span-2"}>
           <h2 className="text-lg font-black text-[#0F2744]">Your Program Milestones</h2>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Shared SitGuru milestones appear alongside dates applicable to your own university, never another school's deadlines.</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Shared SitGuru milestones appear alongside dates applicable to your own university, never another school&apos;s deadlines.</p>
           {milestones.length ? (
             <ol className="mt-4 space-y-3">
               {milestones.map((item, index) => {
@@ -227,12 +229,13 @@ export function InternMilestonesPageView({
   );
 }
 
-export function InternCheckInsPageView({
+export function InternCheckInsPageView({semesterCheckIns = false,
   workspace,
   hourSummary,
   notice = "",
   error = "",
 }: {
+  semesterCheckIns?: boolean;
   workspace: InternshipWorkspaceData;
   hourSummary: HourSummary;
   notice?: string;
@@ -245,7 +248,7 @@ export function InternCheckInsPageView({
   const nowKey=new Date().toLocaleDateString("en-CA",{timeZone:"America/New_York"});
   const monday=weekMonday(nowKey);
   const start=workspace.intern.academicStartDate||workspace.cohort?.startsOn||"";
-  const canSubmit=workspace.intern.status==="active" && Boolean(start) && start<=nowKey;
+  const canSubmit=semesterCheckIns && workspace.intern.status==="active" && Boolean(start) && start<=nowKey;
   const thisWeek=reviews.find(row=>weekMonday(row.weekOf)===monday);
   const currentSubmitted=Boolean(thisWeek && isSubmittedWeeklyReview(String(thisWeek.reviewStatus||"")));
   const nextFriday=new Date(`${monday}T12:00:00Z`);
@@ -290,7 +293,7 @@ export function InternCheckInsPageView({
               <label className="block text-xs font-black text-[#0F2744]">What did the data show?
                 <textarea name="dataShowed" rows={2} defaultValue={thisWeek?.dataShowed||""} placeholder="Record only observed or verified numbers; leave blank if unavailable" className={fieldClass}/>
               </label>
-              <label className="block text-xs font-black text-[#0F2744]">Challenges and what didn't work
+              <label className="block text-xs font-black text-[#0F2744]">Challenges and what didn&apos;t work
                 <textarea name="didntWork" rows={2} defaultValue={thisWeek?.didntWork||""} className={fieldClass}/>
               </label>
               <label className="block text-xs font-black text-[#0F2744]">What will you change next week?
@@ -304,7 +307,7 @@ export function InternCheckInsPageView({
             </form>
           ):(
             <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-              Weekly check-in submission opens when your approved internship reaches its academic start date and your status is Active. You can review past check-ins now.
+              Official weekly check-ins open after semester activation, check-in verification, and your approved academic start date. Past check-ins remain available.
             </p>
           )}
         </article>

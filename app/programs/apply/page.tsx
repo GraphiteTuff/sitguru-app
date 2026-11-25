@@ -487,12 +487,14 @@ function ProgramApplyContent() {
     programImpliesVeteransOptIn || formState.joinVeteransMilitaryFamilies;
   const shouldShowMilitaryBackground = joinedVeteransMilitaryFamilies;
 
-  useEffect(() => {
+  const [previousProgram, setPreviousProgram] = useState(selectedProgramFromUrl);
+  if (selectedProgramFromUrl !== previousProgram) {
+    setPreviousProgram(selectedProgramFromUrl);
     setFormState((prev) => ({
       ...prev,
       program: selectedProgramFromUrl,
     }));
-  }, [selectedProgramFromUrl]);
+  }
 
   useEffect(() => {
     trackEvent({
@@ -508,20 +510,18 @@ function ProgramApplyContent() {
     });
   }, [selectedProgramFromUrl]);
 
-  useEffect(() => {
-    const normalizedZip = normalizeZipCode(formState.zipCode);
-
-    if (!normalizedZip) {
-      setZipLookupStatus("idle");
-      setZipLookupMessage("");
-      return;
-    }
-
+  const normalizedZip = normalizeZipCode(formState.zipCode);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== normalizedZip) {
+    setPreviousLookupInput(normalizedZip);
     if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setZipLookupMessage("Enter a 5-digit ZIP code to autofill city and state.");
-      return;
+      setZipLookupMessage(normalizedZip ? "Enter a 5-digit ZIP code to autofill city and state." : "");
     }
+  }
+
+  useEffect(() => {
+    if (normalizedZip.length < 5) return;
 
     let isMounted = true;
 
@@ -585,26 +585,26 @@ function ProgramApplyContent() {
       isMounted = false;
       window.clearTimeout(timeout);
     };
-  }, [formState.zipCode, formState.program]);
+  }, [normalizedZip, formState.program]);
 
-  useEffect(() => {
-    if (!isStudentProgram) {
+  const schoolQuery = formState.schoolName.trim();
+  const schoolSearchKey = (isStudentProgram ? "student:" : "other:") + schoolQuery;
+  const [previousSchoolSearchKey, setPreviousSchoolSearchKey] = useState<string | null>(null);
+  if (previousSchoolSearchKey !== schoolSearchKey) {
+    setPreviousSchoolSearchKey(schoolSearchKey);
+    if (!isStudentProgram || schoolQuery.length < 2) {
       setSchoolSearchResults([]);
       setIsSchoolSearchLoading(false);
       setSchoolSearchMessage("");
+    }
+    if (!isStudentProgram) {
       setIsSchoolDropdownOpen(false);
       setSelectedSchoolResultId("");
-      return;
     }
+  }
 
-    const schoolQuery = formState.schoolName.trim();
-
-    if (schoolQuery.length < 2) {
-      setSchoolSearchResults([]);
-      setIsSchoolSearchLoading(false);
-      setSchoolSearchMessage("");
-      return;
-    }
+  useEffect(() => {
+    if (!isStudentProgram || schoolQuery.length < 2) return;
 
     let isMounted = true;
     const controller = new AbortController();
@@ -683,7 +683,7 @@ function ProgramApplyContent() {
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [formState.schoolName, formState.program, isStudentProgram]);
+  }, [schoolQuery, formState.program, isStudentProgram]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

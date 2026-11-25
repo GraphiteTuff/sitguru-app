@@ -448,42 +448,38 @@ export default function CustomerEmergencyContactPage() {
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : "border-amber-200 bg-amber-50 text-amber-800";
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
+  const fetchLoadPage = useCallback(async () => {
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
       router.replace(routes.login);
       return;
     }
 
-    try {
-      const [profileData, setupData] = await Promise.all([
+    return Promise.all([
         fetchEmergencyProfile(user),
         fetchSetupStatus(user.id),
-      ]);
+      ]).then(async ([profileData, setupData]) => {
 
       setProfile(profileData);
       setForm(profileToForm(profileData));
       setSetupStatus(setupData);
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not load your Emergency Contact.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+
   useEffect(() => {
-    void loadPage();
+    void fetchLoadPage();
 
     const {
       data: { subscription },
@@ -496,7 +492,7 @@ export default function CustomerEmergencyContactPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadPage, router]);
+  }, [fetchLoadPage, router]);
 
   async function handleSave(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();

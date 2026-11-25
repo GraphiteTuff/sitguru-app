@@ -232,7 +232,7 @@ export default function PetParentDashboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
@@ -247,13 +247,8 @@ export default function PetParentDashboardScreen() {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const profileRecord = (profile ?? {}) as RecordRow;
-  useEffect(() => {
-    if (zipEdited || searchZip) return;
-    const saved = getFirstString(profileRecord, ['zip_code', 'zip', 'service_zip'])
-      .replace(/\D/g, '')
-      .slice(0, 5);
-    if (saved) setSearchZip(saved);
-  }, [profileRecord, searchZip, zipEdited]);
+  const savedZip = getFirstString(profileRecord, ['zip_code', 'zip', 'service_zip']).replace(/\D/g, '').slice(0, 5);
+  if (!zipEdited && !searchZip && savedZip) setSearchZip(savedZip);
   const profileName =
     getFirstString(profileRecord, ['full_name', 'display_name']) ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -292,37 +287,48 @@ export default function PetParentDashboardScreen() {
     ]) ?? 0,
   );
 
-  const refreshDashboard = useCallback(
+  const accountId = user?.id;
+  const fetchRefreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
-        setDashboardData(EMPTY_DATA);
-        setIsLoading(false);
-        setIsRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
-
-      try {
-        const data = await loadPetParentDashboard(user.id);
+    return loadPetParentDashboard(accountId).then(async (data) => {
         setDashboardData(data);
         setLoadMessage('');
-      } catch {
+    }).catch(() => {
         setLoadMessage(
           'Some live details could not be loaded. Pull down to try again.',
         );
-      } finally {
+      }).finally(() => {
         setIsLoading(false);
         setIsRefreshing(false);
-      }
-    },
-    [user?.id],
+      });
+  },
+    [accountId],
   );
 
+  const refreshDashboard = useCallback((showRefresh = false) => {
+    if (showRefresh) setIsRefreshing(true);
+      else setIsLoading(true);
+    return fetchRefreshDashboard(showRefresh);
+  }, [fetchRefreshDashboard, setIsRefreshing, setIsLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setDashboardData(EMPTY_DATA);
+        setIsLoading(false);
+        setIsRefreshing(false);
+    } else {
+      setIsLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void refreshDashboard(false);
-  }, [refreshDashboard]);
+    void fetchRefreshDashboard(false);
+  }, [fetchRefreshDashboard]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
@@ -413,23 +419,21 @@ export default function PetParentDashboardScreen() {
   const activeCare = dashboardData.activeCare;
   const recentCompletedCare = dashboardData.recentCompletedCare;
 
+  const reviewBookingId = activeCare ? null : recentCompletedCare?.bookingId || recentCompletedCare?.id || null;
+  const [previousReviewBookingId, setPreviousReviewBookingId] = useState<string | null>(null);
+  if (previousReviewBookingId !== reviewBookingId) {
+    setPreviousReviewBookingId(reviewBookingId);
+    setNeedsVisitReview(false);
+  }
+
   useEffect(() => {
+    if (!reviewBookingId) return;
     let cancelled = false;
-    const bookingId = recentCompletedCare?.bookingId || recentCompletedCare?.id;
-
-    if (!bookingId || activeCare) {
-      setNeedsVisitReview(false);
-      return;
-    }
-
-    void isVisitReviewClosed(bookingId).then((closed) => {
+    void isVisitReviewClosed(reviewBookingId).then((closed) => {
       if (!cancelled) setNeedsVisitReview(!closed);
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCare, recentCompletedCare]);
+    return () => { cancelled = true; };
+  }, [reviewBookingId]);
 
   const primaryAction = useMemo(() => {
     if (activeCare) {

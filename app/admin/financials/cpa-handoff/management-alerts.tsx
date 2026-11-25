@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
+import { useMemo, useState } from "react";
 
 export type ManagementAlert = {
   id: string;
@@ -74,7 +75,7 @@ export default function ManagementAlerts({
 }) {
   const safeAlerts = Array.isArray(alerts) ? alerts : [];
 
-  const [showPopup, setShowPopup] = useState(false);
+  const [popupOverride, setPopupOverride] = useState<{ id: string; open: boolean } | null>(null);
   const [sendingAlertId, setSendingAlertId] = useState<string | null>(null);
   const [lastReminderResponse, setLastReminderResponse] =
     useState<ReminderResponse | null>(null);
@@ -105,15 +106,18 @@ export default function ManagementAlerts({
     );
   }, [safeAlerts]);
 
-  useEffect(() => {
-    if (!priorityAlert) return;
+  const alertSnoozed = useBrowserSnapshot(() => {
+    if (!priorityAlert) return true;
+    try { return window.localStorage.getItem(getTodaySnoozeKey(priorityAlert.id)) === "true"; }
+    catch { return false; }
+  }, true);
+  const showPopup = priorityAlert
+    ? (popupOverride?.id === priorityAlert.id ? popupOverride.open : !alertSnoozed)
+    : false;
 
-    const snoozeKey = getTodaySnoozeKey(priorityAlert.id);
-
-    if (window.localStorage.getItem(snoozeKey) !== "true") {
-      setShowPopup(true);
-    }
-  }, [priorityAlert]);
+  function setShowPopup(open: boolean) {
+    if (priorityAlert) setPopupOverride({ id: priorityAlert.id, open });
+  }
 
   function snoozeToday() {
     if (!priorityAlert) return;

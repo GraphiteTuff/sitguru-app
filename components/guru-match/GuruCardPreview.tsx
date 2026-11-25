@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import {  useState } from "react";
 import { ArrowUpRight, Download, RefreshCw } from "lucide-react";
 
 const action = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-4 py-2 text-sm font-black text-[#0F2744] hover:bg-[#DBEAFE] disabled:cursor-not-allowed disabled:opacity-50";
@@ -16,7 +16,12 @@ export default function GuruCardPreview({url,guruName,filename}:{
   const href=url.startsWith("https://www.sitguru.com/")
     ? url.slice("https://www.sitguru.com".length):url;
   const previewUrl=href+(href.includes("?")?"&":"?")+"preview="+attempt;
-  useEffect(()=>{setState("loading");setMessage("");},[href,attempt]);
+  const [previousPreviewUrl, setPreviousPreviewUrl] = useState(previewUrl);
+  if (previousPreviewUrl !== previewUrl) {
+    setPreviousPreviewUrl(previewUrl);
+    setState("loading");
+    setMessage("");
+  }
 
   async function download(){
     if(state!=="ready"||downloading)return;

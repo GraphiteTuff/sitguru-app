@@ -1002,7 +1002,7 @@ export default function GuruSetupScreen() {
 
         <BubblePressable
           accessibilityRole="button"
-          disabled={saving || loading || advanceLock.current.current}
+          disabled={saving || loading}
           onPress={() => void goNext()}
           style={styles.dockPrimaryAction}
         >

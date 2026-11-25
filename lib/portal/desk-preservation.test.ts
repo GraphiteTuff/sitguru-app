@@ -14,10 +14,14 @@ test('Desk identities and established Manager navigation groups are retained',()
 });
 test('new capabilities stay adjacent to approved peers without replacing Intern destinations',()=>{
   const manager=MANAGER_PORTAL_SIDEBAR.map(item=>item.label);
-  assert.equal(manager[manager.indexOf('Content Studio')+1],'Community Studio');
+  assert.deepEqual(manager.slice(manager.indexOf('Content Studio'), manager.indexOf('Content Studio') + 3), [
+    'Content Studio', 'Reads & Media', 'Community Studio',
+  ]);
   assert.equal(manager[manager.indexOf('Campus Growth')+1],'Market Density');
-  assert.deepEqual(INTERN_PORTAL_SIDEBAR.filter(item=>item.id!=='community').map(item=>item.id),[
-    'home','portal','work','content','assignments','milestones','hours','checkins','messages','results','calendar','metrics','growth','toolkit','campus','training','resources','help',
+  assert.deepEqual(INTERN_PORTAL_SIDEBAR.map(item=>item.id),[
+    'home','portal','work','content','reads','community','guruMatch','assignments','milestones',
+    'hours','checkins','messages','results','calendar','metrics','insights','socialIntelligence',
+    'growth','toolkit','campus','training','resources','help',
   ]);
   assert.ok(INTERN_PORTAL_MOBILE_MORE.some(item=>item.href==='/intern/community-studio'));
 });

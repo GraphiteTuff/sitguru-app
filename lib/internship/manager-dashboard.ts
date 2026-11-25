@@ -1,3 +1,4 @@
+import { assignmentGrowthPillar, readAssignmentBrief, type GrowthPillarId } from "@/lib/internship/manager-assignment";
 import { summarizeInternshipHours, type HourSummary } from "@/lib/internship/hours";
 import { assignmentIsVisibleToIntern } from "@/lib/internship/manager-assignment";
 import { isWeekZeroReady } from "@/lib/internship/week-zero";
@@ -57,6 +58,8 @@ export type ManagerReviewItem = {
   stage: string;
   evidence: string;
   ceo: boolean;
+  milestoneId?: string;
+  pillarId?: GrowthPillarId | null;
 };
 
 export type ManagerQuestion = InternshipQuestion & { internName: string; avatarUrl?: string };
@@ -294,6 +297,7 @@ export function buildManagerReviewQueue(input: {
   for (const task of input.tasks) {
     const view = displayWorkStatus(task.status, task.reviewStage);
     if (view.stage !== "submitted_to_ava" && view.stage !== "submitted_to_jason") continue;
+    const brief = readAssignmentBrief(task.briefPayload);
     items.push({
       id: task.id,
       internId: task.internId,
@@ -309,6 +313,8 @@ export function buildManagerReviewQueue(input: {
       stage: view.stage,
       evidence: task.workUrl,
       ceo: view.stage === "submitted_to_jason",
+      milestoneId: brief.milestoneId,
+      pillarId: assignmentGrowthPillar(brief),
     });
   }
 

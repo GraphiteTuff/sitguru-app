@@ -405,8 +405,7 @@ export default function SitterDashboardPage() {
   async function refreshStripeStatus(accountId?: string | null, sitterId?: string | null) {
     if (!accountId || !sitterId) return;
 
-    try {
-      const res = await fetch("/api/stripe/connect/account-status", {
+    return fetch("/api/stripe/connect/account-status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -415,7 +414,7 @@ export default function SitterDashboardPage() {
           accountId,
           sitterId,
         }),
-      });
+      }).then(async (res) => {
 
       const data = await res.json();
 
@@ -429,10 +428,10 @@ export default function SitterDashboardPage() {
           ? "Stripe setup complete. Payouts are enabled."
           : "Stripe account updated. Finish any remaining onboarding steps to enable payouts."
       );
-    } catch (err) {
+    }).catch((err) => {
       const message = err instanceof Error ? err.message : "Unable to refresh Stripe account.";
       setError(message);
-    }
+    });
   }
 
   async function handleConnectStripe() {

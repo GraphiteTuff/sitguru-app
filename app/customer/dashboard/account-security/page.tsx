@@ -277,25 +277,20 @@ export default function CustomerAccountSecurityPage() {
     return Boolean(currentEmail && nextRecoveryEmail === currentEmail);
   }, [profile?.email, recoveryEmailForm.recoveryEmail]);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
+  const fetchLoadPage = useCallback(async () => {
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
       router.replace(routes.login);
       return;
     }
 
-    try {
-      const profileData = await fetchAccountSecurityProfile(
+    return fetchAccountSecurityProfile(
         user.id,
         user.email ?? null,
-      );
+      ).then(async (profileData) => {
 
       setProfile(profileData);
       setEmailForm({
@@ -304,19 +299,20 @@ export default function CustomerAccountSecurityPage() {
       setRecoveryEmailForm({
         recoveryEmail: profileData.recovery_email || "",
       });
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not load Account Security.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+
   useEffect(() => {
-    void loadPage();
+    void fetchLoadPage();
 
     const {
       data: { subscription },
@@ -329,7 +325,7 @@ export default function CustomerAccountSecurityPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadPage, router]);
+  }, [fetchLoadPage, router]);
 
   async function handlePasswordUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

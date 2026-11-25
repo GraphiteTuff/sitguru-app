@@ -64,7 +64,7 @@ export default function InternCampusGrowthHome({
         quote={"Learn. Create.\nMake an impact.\nHappier pets.\nBrighter communities."}
       />
       <div id="campus-policy-form" className="scroll-mt-24 rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-xs font-semibold leading-5 text-[#1D4ED8]">
-        Follow your campus's published rules and ask Ava to document official permissions. Your university course requirements, assignments and formal internship hours remain separate from these optional Campus Quests.
+        Follow your campus&apos;s published rules and ask Ava to document official permissions. Your university course requirements, assignments and formal internship hours remain separate from these optional Campus Quests.
       </div>
       <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600">
         {card.campusName} · <InternName name={card.internName} src={card.avatarUrl} /> · Social Media & Community Growth Intern{card.semester ? ` · ${card.semester}` : ""}

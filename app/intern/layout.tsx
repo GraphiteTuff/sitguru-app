@@ -1,3 +1,5 @@
+import ProgramStatusBanner from "@/components/internship/ProgramStatusBanner";
+import { getProgramStatus } from "@/lib/internship/program-controls";
 import { Suspense } from "react";
 import GrowthWorkstreamSwitcher from "@/components/portal/GrowthWorkstreamSwitcher";
 import InternPortalShell from "@/components/internship/InternPortalShell";
@@ -20,6 +22,7 @@ export default async function InternLayout({
         <WorkspaceLiveSyncMount />
         <Suspense fallback={<div className="min-h-dvh bg-[#F3F6F4]" />}>
           <InternPortalShell assigned onboarded>
+            <ProgramStatusBanner status="pre_launch" />
             <GrowthWorkstreamSwitcher role="intern" />
             {children}
           </InternPortalShell>
@@ -29,8 +32,11 @@ export default async function InternLayout({
   }
 
   const intern = await currentAssignedIntern();
-  const ack = intern ? await getInternOnboarding(intern.id) : null;
-  const school = intern?.universityId ? await getUniversity(intern.universityId) : null;
+  const [ack, school, status] = await Promise.all([
+    intern ? getInternOnboarding(intern.id) : null,
+    intern?.universityId ? getUniversity(intern.universityId) : null,
+    intern ? getProgramStatus(intern.cohortId) : null,
+  ]);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const unreadMessages = user ? await countDeskUnread(user.id) : 0;
@@ -45,6 +51,7 @@ export default async function InternLayout({
           schoolLogoUrl={school?.logoUrl || ""}
           unreadMessages={unreadMessages}
         >
+          {intern ? <ProgramStatusBanner status={status} /> : null}
           <GrowthWorkstreamSwitcher role="intern" />
           {children}
         </InternPortalShell>

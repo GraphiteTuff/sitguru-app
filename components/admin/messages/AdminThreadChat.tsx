@@ -89,11 +89,13 @@ export default function AdminThreadChat({
     deletableIds.length > 0 && selectedCount === deletableIds.length;
   const someMessagesSelected = selectedCount > 0 && !allMessagesSelected;
 
-  useEffect(() => {
+  const [previousThreadId, setPreviousThreadId] = useState(thread.id);
+  if (previousThreadId !== thread.id) {
+    setPreviousThreadId(thread.id);
     setOptimistic([]);
     setHiddenMessageIds(new Set());
     setSelectedMessageIds(new Set());
-  }, [thread.id]);
+  }
 
   function toggleMessage(id: string) {
     setSelectedMessageIds((current) => {

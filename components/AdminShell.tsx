@@ -26,6 +26,7 @@ import {
   MapPin,
   Users,
   WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 import { ReactNode, useMemo, useState } from "react";
 
@@ -36,7 +37,7 @@ type AdminShellProps = {
 type AdminNavItem = {
   label: string;
   href: string;
-  icon: any;
+  icon: LucideIcon;
   pageTitle?: string;
 };
 
@@ -117,7 +118,7 @@ function NavItem({
 }: {
   label: string;
   href: string;
-  icon: any;
+  icon: LucideIcon;
   active: boolean;
 }) {
   return (

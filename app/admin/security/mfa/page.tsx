@@ -103,56 +103,60 @@ export default function AdminMfaPage() {
 
   const hasVerifiedMfa = verifiedFactors.length > 0;
 
-  async function loadMfaState() {
-    setError("");
-    setMessage("");
-
-    const {
+  async function fetchLoadMfaState() {
+    return supabase.auth.getUser().then(async ({
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    }) => {
 
-    if (userError || !user) {
-      router.push("/admin/login");
-      return;
-    }
+      if (userError || !user) {
+        router.push("/admin/login");
+        return;
+      }
 
-    setAuthEmail(user.email || null);
+      setAuthEmail(user.email || null);
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
 
-    if (profileError || profile?.role !== "admin") {
-      router.push("/admin/login");
-      return;
-    }
+      if (profileError || profile?.role !== "admin") {
+        router.push("/admin/login");
+        return;
+      }
 
-    const { data: factorsData, error: factorsError } =
-      await supabase.auth.mfa.listFactors();
+      const { data: factorsData, error: factorsError } =
+        await supabase.auth.mfa.listFactors();
 
-    if (factorsError) {
-      setError(normalizeError(factorsError));
-    } else {
-      const allFactors = (factorsData?.all || []) as MfaFactor[];
-      setFactors(allFactors);
-    }
+      if (factorsError) {
+        setError(normalizeError(factorsError));
+      } else {
+        const allFactors = (factorsData?.all || []) as MfaFactor[];
+        setFactors(allFactors);
+      }
 
-    const { data: aalData, error: aalError } =
-      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const { data: aalData, error: aalError } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-    if (!aalError && aalData) {
-      setCurrentLevel(aalData.currentLevel || "aal1");
-      setNextLevel(aalData.nextLevel || "aal1");
-    }
+      if (!aalError && aalData) {
+        setCurrentLevel(aalData.currentLevel || "aal1");
+        setNextLevel(aalData.nextLevel || "aal1");
+      }
 
-    setLoading(false);
+      setLoading(false);
+    });
+  }
+
+  function loadMfaState() {
+    setError("");
+    setMessage("");
+    return fetchLoadMfaState();
   }
 
   useEffect(() => {
-    loadMfaState();
+    fetchLoadMfaState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -8,6 +8,8 @@
  * Scout remains the Guru companion. Taco is Ambassador-only.
  */
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -195,7 +197,7 @@ export default function AITacoCompanion({
     : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES) ||
       mode === "workspace";
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -219,16 +221,20 @@ export default function AITacoCompanion({
         : null,
   );
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const companionSearch = useBrowserSearch();
+  const [previousCompanionSearch, setPreviousCompanionSearch] = useState("");
+  if (companionSearch !== previousCompanionSearch) {
+    setPreviousCompanionSearch(companionSearch);
+    if (new URLSearchParams(companionSearch).get("chat")?.trim().toLowerCase() === "taco") {
+      setIsOpen(true);
+    }
+  }
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const chat = params.get("chat")?.trim().toLowerCase();
       if (chat !== "taco") return;
-      setIsOpen(true);
       params.delete("chat");
       const next = `${window.location.pathname}${
         params.toString() ? `?${params}` : ""
@@ -237,7 +243,7 @@ export default function AITacoCompanion({
     } catch {
       // ignore
     }
-  }, []);
+  }, [companionSearch]);
 
   useEffect(() => {
     function onOpenCompanionChat(event: Event) {

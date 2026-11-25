@@ -73,23 +73,24 @@ export function usePushRegistration(options?: { enabled?: boolean }) {
   }, [enabled, isAuthenticated, user?.id]);
 
   /** Shows the system dialog. Call this only after the user has opted in. */
+  const accountId = user?.id;
   const requestPermission = useCallback(async () => {
-    if (!user?.id) {
+    if (!accountId) {
       return { token: null, saved: false, error: 'Sign in required.' };
     }
 
     setLoading(true);
 
-    const next = await registerAndPersistPushToken(user.id, { prompt: true });
+    const next = await registerAndPersistPushToken(accountId, { prompt: true });
     const status = await getPushPermissionStatus();
 
-    lastUserIdRef.current = user.id;
+    lastUserIdRef.current = accountId;
     setResult(next);
     setPermission(status);
     setLoading(false);
 
     return next;
-  }, [user?.id]);
+  }, [accountId]);
 
   return {
     loading,

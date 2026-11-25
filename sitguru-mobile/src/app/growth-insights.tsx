@@ -62,18 +62,17 @@ function GrowthInsightsBody() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
+  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const result = await sitguruApiFetch<Snapshot>(
       '/api/growth-center/v2/snapshot?preset=last_7',
       { method: 'GET', cache: 'no-store' },
     );
+    if (!isCurrent()) return;
     if (result.error || !result.data) {
       setError(result.error || 'Could not load Growth Center Insights.');
       setSnapshot(null);
     } else {
+      setError(null);
       setSnapshot(result.data);
     }
     setLoading(false);
@@ -81,11 +80,13 @@ function GrowthInsightsBody() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let current = true;
+    void Promise.resolve().then(() => current ? load(() => current) : undefined);
+    return () => { current = false; };
   }, [load]);
 
   return (
-    <MobileScreen refreshing={refreshing} onRefresh={() => void load(true)}>
+    <MobileScreen refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }}>
       <View style={styles.content}>
         <Text style={styles.title}>Growth Insights</Text>
         <Text style={styles.subtitle}>SitGuru Growth Center 2.0</Text>
@@ -97,6 +98,9 @@ function GrowthInsightsBody() {
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => router.push('/content-studio')} style={styles.helpButton}>
           <Text style={styles.helpButtonText}>Content Studio · Current review queue &amp; publications →</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/intern-learning', params: { mode: 'instructor' } })} style={styles.helpButton}>
+          <Text style={styles.helpButtonText}>SitGuru Speed Review</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => router.push('/manager-help')} style={styles.helpButton}>
           <Text style={styles.helpButtonText}>Manager Help · How-tos, FAQs & troubleshooting →</Text>

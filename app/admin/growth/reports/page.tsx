@@ -29,7 +29,7 @@ export default async function AdminGrowthReportsPage({
   return (
     <main className="space-y-4 pb-20">
       <div className="rounded-2xl bg-[#0F2744] p-4 text-sm font-semibold text-white">
-        CEO read-only reporting · Ava's submitted reports are preserved in Microsoft 365.
+        CEO read-only reporting · Ava&apos;s submitted reports are preserved in Microsoft 365.
         <Link href="/admin" className="ml-3 font-black underline">Back to Admin HQ</Link>
       </div>
       <ManagerGrowthReportingCenter

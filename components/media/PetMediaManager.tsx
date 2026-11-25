@@ -44,23 +44,26 @@ export default function PetMediaManager({
 
   const kind: PetMediaKind = tab === "photos" ? "photo" : "video";
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const rows = await listPetMedia(petId, kind);
+  const fetchRefresh = useCallback(async () => {
+    return listPetMedia(petId, kind).then(async (rows) => {
       setItems(rows);
-    } catch (err) {
+    }).catch((err) => {
       setError(err instanceof Error ? err.message : "Unable to load media.");
       setItems([]);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [petId, kind]);
 
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setError("");
+    return fetchRefresh();
+  }, [fetchRefresh, setLoading, setError]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void fetchRefresh();
+  }, [fetchRefresh]);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

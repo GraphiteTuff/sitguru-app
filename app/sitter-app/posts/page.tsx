@@ -128,133 +128,136 @@ export default function GuruPostsPage() {
   const [postType, setPostType] = useState<"photo" | "video" | "story" | "update" | "text">(
     "photo"
   );
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  function setSelectedFiles(files: File[]) {
+    setFiles(files);
+    setPreviewUrls(files.map(file => URL.createObjectURL(file)));
+  }
 
-  async function loadPage() {
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    const {
+  async function fetchLoadPage() {
+    return supabase.auth.getUser().then(async ({
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    }) => {
 
-    if (authError || !user) {
-      router.push("/login");
-      return;
-    }
+      if (authError || !user) {
+        router.push("/login");
+        return;
+      }
 
-    const { data: profileRow, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, role, account_type, first_name, last_name")
-      .eq("id", user.id)
-      .maybeSingle();
+      const { data: profileRow, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, role, account_type, first_name, last_name")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (profileError || !profileRow) {
-      setError(profileError?.message || "Could not load guru profile.");
-      setLoading(false);
-      return;
-    }
-
-    const normalizedRole = String(profileRow.role || "").toLowerCase();
-    const normalizedAccountType = String(profileRow.account_type || "").toLowerCase();
-
-    const allowed =
-      ["sitter", "walker", "caretaker", "provider", "admin"].includes(normalizedRole) ||
-      normalizedAccountType.includes("provider") ||
-      normalizedAccountType.includes("sitter") ||
-      normalizedAccountType.includes("walker") ||
-      normalizedAccountType.includes("caretaker");
-
-    if (!allowed) {
-      router.push("/dashboard");
-      return;
-    }
-
-    setProfile(profileRow as ProfileRow);
-
-    const { data: sitterRow, error: sitterError } = await supabase
-      .from("sitters")
-      .select("id, profile_id, slug, full_name, title, city, state, image_url, is_active")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-
-    if (sitterError) {
-      setError(sitterError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (sitterRow) {
-      setSitter(sitterRow as SitterRow);
-    }
-
-    const { data: postRows, error: postsError } = await supabase
-      .from("posts")
-      .select("*")
-      .eq("author_profile_id", user.id)
-      .eq("is_provider_post", true)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (postsError) {
-      setError(postsError.message);
-      setLoading(false);
-      return;
-    }
-
-    const safePosts = (postRows as PostRow[]) || [];
-    const postIds = safePosts.map((post) => post.id);
-
-    let mediaRows: PostMediaRow[] = [];
-
-    if (postIds.length > 0) {
-      const { data: mediaData, error: mediaError } = await supabase
-        .from("post_media")
-        .select("*")
-        .in("post_id", postIds)
-        .order("sort_order", { ascending: true });
-
-      if (mediaError) {
-        setError(mediaError.message);
+      if (profileError || !profileRow) {
+        setError(profileError?.message || "Could not load guru profile.");
         setLoading(false);
         return;
       }
 
-      mediaRows = (mediaData as PostMediaRow[]) || [];
-    }
+      const normalizedRole = String(profileRow.role || "").toLowerCase();
+      const normalizedAccountType = String(profileRow.account_type || "").toLowerCase();
 
-    const mediaMap = new Map<string, PostMediaRow[]>();
+      const allowed =
+        ["sitter", "walker", "caretaker", "provider", "admin"].includes(normalizedRole) ||
+        normalizedAccountType.includes("provider") ||
+        normalizedAccountType.includes("sitter") ||
+        normalizedAccountType.includes("walker") ||
+        normalizedAccountType.includes("caretaker");
 
-    mediaRows.forEach((item) => {
-      const existing = mediaMap.get(item.post_id) || [];
-      existing.push(item);
-      mediaMap.set(item.post_id, existing);
+      if (!allowed) {
+        router.push("/dashboard");
+        return;
+      }
+
+      setProfile(profileRow as ProfileRow);
+
+      const { data: sitterRow, error: sitterError } = await supabase
+        .from("sitters")
+        .select("id, profile_id, slug, full_name, title, city, state, image_url, is_active")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+
+      if (sitterError) {
+        setError(sitterError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (sitterRow) {
+        setSitter(sitterRow as SitterRow);
+      }
+
+      const { data: postRows, error: postsError } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("author_profile_id", user.id)
+        .eq("is_provider_post", true)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (postsError) {
+        setError(postsError.message);
+        setLoading(false);
+        return;
+      }
+
+      const safePosts = (postRows as PostRow[]) || [];
+      const postIds = safePosts.map((post) => post.id);
+
+      let mediaRows: PostMediaRow[] = [];
+
+      if (postIds.length > 0) {
+        const { data: mediaData, error: mediaError } = await supabase
+          .from("post_media")
+          .select("*")
+          .in("post_id", postIds)
+          .order("sort_order", { ascending: true });
+
+        if (mediaError) {
+          setError(mediaError.message);
+          setLoading(false);
+          return;
+        }
+
+        mediaRows = (mediaData as PostMediaRow[]) || [];
+      }
+
+      const mediaMap = new Map<string, PostMediaRow[]>();
+
+      mediaRows.forEach((item) => {
+        const existing = mediaMap.get(item.post_id) || [];
+        existing.push(item);
+        mediaMap.set(item.post_id, existing);
+      });
+
+      const mergedPosts: PostWithMedia[] = safePosts.map((post) => ({
+        ...post,
+        media: mediaMap.get(post.id) || [],
+      }));
+
+      setPosts(mergedPosts);
+      setLoading(false);
     });
+  }
 
-    const mergedPosts: PostWithMedia[] = safePosts.map((post) => ({
-      ...post,
-      media: mediaMap.get(post.id) || [],
-    }));
-
-    setPosts(mergedPosts);
-    setLoading(false);
+  function loadPage() {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    return fetchLoadPage();
   }
 
   useEffect(() => {
-    loadPage();
+    fetchLoadPage();
   }, []);
 
-  useEffect(() => {
-    const nextPreviewUrls = selectedFiles.map((file) => URL.createObjectURL(file));
-    setPreviewUrls(nextPreviewUrls);
-
-    return () => {
-      nextPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [selectedFiles]);
+  useEffect(() => () => {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, [previewUrls]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);

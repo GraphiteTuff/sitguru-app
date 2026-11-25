@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Platform, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, Image, Platform, Share, StyleSheet, Switch, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import MobileScreen from '@/components/mobile/MobileScreen';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
@@ -19,6 +19,21 @@ import { COMMUNITY_COLLECTIONS, communityDevelopmentError, type CommunityItem, t
 type Mode = 'public' | 'member' | 'manager';
 type Mutation = { ok: boolean; error: string; message: string };
 
+function CommunityAction({ label, onPress, disabled = false, busy, buttonStyle }: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  busy: boolean;
+  buttonStyle: StyleProp<ViewStyle>;
+}) {
+  return (
+    <TouchTarget accessibilityRole="button" disabled={disabled || busy} onPress={onPress}
+      style={[buttonStyle, (disabled || busy) && styles.disabled]}>
+      <Text style={styles.buttonText}>{label}</Text>
+    </TouchTarget>
+  );
+}
+
 export default function CommunityStudioScreen() {
   const { session, loading, roles } = useAuth();
   const params = useLocalSearchParams<{ from?: string | string[]; petName?: string | string[] }>();
@@ -28,7 +43,8 @@ export default function CommunityStudioScreen() {
   const { colors } = useTheme();
   const [mode, setMode] = useState<Mode>('public');
   const [workspace, setWorkspace] = useState<CommunityWorkspace | null>(null);
-  const [fetching, setFetching] = useState(false);
+  const developmentError = communityDevelopmentError();
+  const [fetching, setFetching] = useState(!developmentError);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -53,54 +69,70 @@ export default function CommunityStudioScreen() {
   const [publishAt, setPublishAt] = useState('');
   const [weekOf, setWeekOf] = useState('');
   const requestId = useRef(0);
-  const developmentError = communityDevelopmentError();
 
-  const load = useCallback(async (quiet = false) => {
+  const load = useCallback(() => {
     if (developmentError || (mode !== 'public' && !session)) return;
     const request = ++requestId.current;
-    if (!quiet) setFetching(true);
-    const result = await sitguruApiFetch<CommunityWorkspace>(`/api/community-studio?mode=${mode}`, { auth: mode !== 'public', cache: 'no-store' });
-    if (request !== requestId.current) return;
-    setFetching(false);
-    if (result.error || !result.data) { setError(result.error || 'Community Studio could not load.'); return; }
-    setWorkspace(result.data);
-    setError(result.data.error || '');
+    return sitguruApiFetch<CommunityWorkspace>(`/api/community-studio?mode=${mode}`, {
+      auth: mode !== 'public',
+      cache: 'no-store',
+    }).then(result => {
+      if (request !== requestId.current) return;
+      setFetching(false);
+      if (result.error || !result.data) {
+        setError(result.error || 'Community Studio could not load.');
+        return;
+      }
+      setWorkspace(result.data);
+      setError(result.data.error || '');
+    });
   }, [developmentError, mode, session]);
   useEffect(() => { void load(); return () => { requestId.current += 1; }; }, [load]);
-  useWorkspaceLiveSync({ userId: session?.user.id, enabled: !developmentError, onRefresh: () => { void load(true); } });
+  useWorkspaceLiveSync({ userId: session?.user.id, enabled: !developmentError, onRefresh: () => { void load(); } });
   useFocusEffect(useCallback(() => {
     if (mode !== 'public' || developmentError) return;
     let timer: ReturnType<typeof setInterval> | undefined;
     const activate = (visible: boolean) => {
       if (timer) clearInterval(timer);
       timer = undefined;
-      if (visible) timer = setInterval(() => { void load(true); }, 30_000);
+      if (visible) timer = setInterval(() => { void load(); }, 30_000);
     };
     activate(AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
     const subscription = AppState.addEventListener('change', (state) => {
       activate(state === 'active');
-      if (state === 'active') void load(true);
+      if (state === 'active') void load();
     });
     return () => { if (timer) clearInterval(timer); subscription.remove(); };
   }, [developmentError, load, mode]));
-  useEffect(() => { setWorkspace(null); setReviewing(null); setComposing(false); }, [session?.user.id]);
-  // Pet Parents arrive here from the dashboard and should go straight to the existing
-  // private draft / moderated community story workflow, not a staff workspace.
-  useEffect(() => {
-    if (!fromPetMoments || !session) return;
-    setMode('member');
-    setKind('gallery');
-    setPetName(selectedPetName || '');
-    setComposing(true);
-    setStep(0);
-  }, [fromPetMoments, selectedPetName, session?.user.id]);
+  const accountId = session?.user.id;
+  const [previousAccountId, setPreviousAccountId] = useState(accountId);
+  if (previousAccountId !== accountId) {
+    setPreviousAccountId(accountId);
+    setFetching(!developmentError && (mode === 'public' || Boolean(accountId)));
+    setWorkspace(null);
+    setReviewing(null);
+    setComposing(false);
+  }
+
+  // Pet Moments is a direct entry into the private story composer.
+  const petMomentsEntry = fromPetMoments && accountId ? accountId + ':' + (selectedPetName || '') : null;
+  const [previousPetMomentsEntry, setPreviousPetMomentsEntry] = useState<string | null>(null);
+  if (petMomentsEntry !== previousPetMomentsEntry) {
+    setPreviousPetMomentsEntry(petMomentsEntry);
+    if (petMomentsEntry) {
+      setMode('member');
+      setKind('gallery');
+      setPetName(selectedPetName || '');
+      setComposing(true);
+      setStep(0);
+    }
+  }
 
   const cardStyle = [styles.card, { backgroundColor: colors.card, borderColor: colors.border }];
   const inputStyle = [styles.input, { backgroundColor: colors.input, color: colors.inputText, borderColor: colors.border }];
   const buttonStyle = [styles.button, { backgroundColor: '#0D5C3A' }];
   const labelStyle = [styles.label, { color: colors.text }];
   const bodyStyle = [styles.body, { color: colors.textSecondary }];
-  const button = (label: string, action: () => void, disabled = false) => <TouchTarget accessibilityRole="button" disabled={disabled || busy} onPress={action} style={[buttonStyle, (disabled || busy) && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></TouchTarget>;
 
   function compose(item?: CommunityItem) {
     setEditing(item || null); setKind(item?.kind || 'pack'); setTitle(item?.title || '');
@@ -155,7 +187,11 @@ export default function CommunityStudioScreen() {
 
   const sections=nativePackSections(workspace?.items || []);
   const visibleItems=mode==='public'?sections.gallery:workspace?.items;
-  return <MobileScreen refreshing={fetching} onRefresh={() => { void load(); }} footer={session && !developmentError && (workspace?.ready !== false || mode === 'public') ? <StickyActionBar>{composing ? button(busy ? 'Saving…' : step<2?'Continue':'Submit for manager review', () => {if(step<2)setStep(step+1);else void save('submit');}, busy || (step===0 && kind!=='pack'&&!photo&&!editing?.imageUrl)||(step===1&&(!title.trim()||story.trim().length<20))||(step===2&&(!consent||(featuresClientPet&&!bookingId)))) : button('Share a community story', () => { setMode('member'); compose(); })}</StickyActionBar> : undefined}>
+  return <MobileScreen refreshing={fetching} onRefresh={() => {
+    if (developmentError || (mode !== 'public' && !session)) return;
+    setFetching(true);
+    void load();
+  }} footer={session && !developmentError && (workspace?.ready !== false || mode === 'public') ? <StickyActionBar>{composing ? <CommunityAction busy={busy} buttonStyle={buttonStyle} label={busy ? 'Saving…' : step<2?'Continue':'Submit for manager review'} onPress={() => {if(step<2)setStep(step+1);else void save('submit');}} disabled={busy || (step===0 && kind!=='pack'&&!photo&&!editing?.imageUrl)||(step===1&&(!title.trim()||story.trim().length<20))||(step===2&&(!consent||(featuresClientPet&&!bookingId)))} /> : <CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Share a community story'} onPress={() => { setMode('member'); compose(); }} />}</StickyActionBar> : undefined}>
     <TouchTarget accessibilityRole="button" onPress={() => router.back()} style={styles.back}><Text style={[styles.label, { color: colors.primary }]}>← Back</Text></TouchTarget>
     <View style={[styles.hero, { backgroundColor: '#0D5C3A' }]}><Text style={styles.kicker}>{fromPetMoments ? 'YOUR SITGURU COMMUNITY' : 'COMMUNITY STUDIO'}</Text><Text style={styles.title}>{fromPetMoments ? 'Pet Moments' : 'The SitGuru Pack'}</Text><Text style={styles.heroBody}>{fromPetMoments ? 'Share your pet’s photos, videos and favorite memories. Private until you choose to submit for review.' : 'Every pet has a story. Celebrate yours with the people who care.'}</Text></View>
     {developmentError ? <Text accessibilityRole="alert" style={[styles.message, { color: colors.danger, backgroundColor: colors.card }]}>{developmentError}</Text> : <>
@@ -163,18 +199,18 @@ export default function CommunityStudioScreen() {
         <View style={cardStyle}>
           <Text style={[styles.heading,{color:colors.text}]}>Staff outreach tools</Text>
           <Text style={bodyStyle}>Use the same tracked Guru promotions and Content Studio results as desktop.</Text>
-          {button('Guru Match & Share · QR tracking',()=>router.push('/guru-match-share'))}
-          {button('Content Studio · Live reviews',()=>router.push('/content-studio'))}
-          {button('Social Intelligence · Latest results',()=>router.push('/social-intelligence'))}
+          {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Guru Match & Share · QR tracking'} onPress={()=>router.push('/guru-match-share')} />}
+          {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Content Studio · Live reviews'} onPress={()=>router.push('/content-studio')} />}
+          {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Social Intelligence · Latest results'} onPress={()=>router.push('/social-intelligence')} />}
         </View>
       ) : null}
-      {button('Add photos or video',()=>{if(!session)router.push('/login');else {setMode('member');compose();setKind('gallery');}})}
-      {session && <View style={styles.tabs}>{([{ id: 'public', label: 'The Pack' }, { id: 'member', label: 'My stories' }, { id: 'manager', label: 'Review' }] as const).filter(tab=>tab.id!=='manager'||workspace?.canModerate||mode==='manager').map((tab) => <TouchTarget key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: mode === tab.id }} onPress={() => { setMode(tab.id); setWorkspace(null); setComposing(false); setReviewing(null); setError(''); }} style={[styles.tab, { backgroundColor: mode === tab.id ? colors.primarySoft : colors.card, borderColor: colors.border }]}><Text style={[styles.label, { color: mode === tab.id ? colors.primary : colors.text }]}>{tab.label}</Text></TouchTarget>)}</View>}
-      {session && button('Pet Parent permission requests',()=>router.push('/community-permissions'))}
+      {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Add photos or video'} onPress={()=>{if(!session)router.push('/login');else {setMode('member');compose();setKind('gallery');}}} />}
+      {session && <View style={styles.tabs}>{([{ id: 'public', label: 'The Pack' }, { id: 'member', label: 'My stories' }, { id: 'manager', label: 'Review' }] as const).filter(tab=>tab.id!=='manager'||workspace?.canModerate||mode==='manager').map((tab) => <TouchTarget key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: mode === tab.id }} onPress={() => { if (tab.id !== mode) setFetching(true); setMode(tab.id); setWorkspace(null); setComposing(false); setReviewing(null); setError(''); }} style={[styles.tab, { backgroundColor: mode === tab.id ? colors.primarySoft : colors.card, borderColor: colors.border }]}><Text style={[styles.label, { color: mode === tab.id ? colors.primary : colors.text }]}>{tab.label}</Text></TouchTarget>)}</View>}
+      {session && <CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Pet Parent permission requests'} onPress={()=>router.push('/community-permissions')} />}
       {loading || (fetching && !workspace) ? <ActivityIndicator color={colors.primary} /> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.message, { color: colors.danger, backgroundColor: colors.card }]}>{error}</Text> : null}
       {notice ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.success, backgroundColor: colors.card }]}>{notice}</Text> : null}
-      {!session && mode !== 'public' ? <View style={cardStyle}><Text style={bodyStyle}>Sign in to save stories or open your authorized moderation queue.</Text>{button('Sign in', () => router.push('/login'))}</View> : null}
+      {!session && mode !== 'public' ? <View style={cardStyle}><Text style={bodyStyle}>Sign in to save stories or open your authorized moderation queue.</Text>{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Sign in'} onPress={() => router.push('/login')} />}</View> : null}
       {composing && session ? <View style={cardStyle}>
         <Text style={[styles.heading,{color:colors.text}]}>{['1. Choose media','2. Add your caption or story','3. Permissions & submit'][step]}</Text>
         {step===1 && <><Text style={labelStyle}>Story details</Text>
@@ -186,8 +222,8 @@ export default function CommunityStudioScreen() {
         </>}
         {step===0 && <>
           {photo?<CommunityMedia uri={photo.uri} mime={photo.mimeType || (photo.type==='video'?'video/mp4':'image/jpeg')} label="Selected community media"/>:editing?.imageUrl?<CommunityMedia {...imageSource(editing)} uri={imageSource(editing).uri} mime={editing.mediaMime} label={editing.title}/>:null}
-          {button('Choose photo or video',()=>void pickPhoto())}{button('Use camera',()=>void pickPhoto(true))}
-          {button('Share a story without media',()=>{setKind('pack');setPhoto(null);setStep(1);})}
+          {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Choose photo or video'} onPress={()=>void pickPhoto()} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Use camera'} onPress={()=>void pickPhoto(true)} />}
+          {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Share a story without media'} onPress={()=>{setKind('pack');setPhoto(null);setStep(1);}} />}
           <Text style={bodyStyle}>Photos, MP4 or MOV videos up to 25 MB. Pet of the Week needs a photo.</Text>
         </>}
         {step===2 && <>
@@ -196,19 +232,19 @@ export default function CommunityStudioScreen() {
         <View style={styles.consent}><Switch accessibilityLabel="Required website display permission" value={consent} onValueChange={setConsent} /><Text style={[bodyStyle, styles.flex]}>I allow public display on SitGuru after permission checks and manager review.</Text></View>
         <View style={styles.consent}><Switch accessibilityLabel="Optional social media reuse" value={socialConsent} onValueChange={setSocialConsent}/><Text style={[bodyStyle,styles.flex]}>Optional: allow reuse on SitGuru’s social channels.</Text></View>
         <View style={styles.consent}><Switch accessibilityLabel="Client pet content" value={featuresClientPet} onValueChange={setFeaturesClientPet}/><Text style={[bodyStyle,styles.flex]}>This features a client’s pet. Their verified Pet Parent must approve.</Text></View>
-        {featuresClientPet && <View><Text style={bodyStyle}>Choose your assigned care booking. A checkbox is not Pet Parent authorization.</Text>{workspace?.bookings?.map(booking=>button((bookingId===booking.id?'✓ ':'')+booking.label,()=>setBookingId(booking.id)))}</View>}
+        {featuresClientPet && <View><Text style={bodyStyle}>Choose your assigned care booking. A checkbox is not Pet Parent authorization.</Text>{workspace?.bookings?.map(booking=><CommunityAction key={booking.id} busy={busy} buttonStyle={buttonStyle} label={(bookingId===booking.id?'✓ ':'')+booking.label} onPress={()=>setBookingId(booking.id)} />)}</View>}
         </>}
-        {step>0&&button('Back',()=>setStep(step-1))}
+        {step>0&&<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Back'} onPress={()=>setStep(step-1)} />}
         {busy&&<Text accessibilityLiveRegion="polite" style={bodyStyle}>Uploading / checking media: {progress}%</Text>}
-        {button('Save private draft', () => { void save('draft'); }, !title.trim())}{button('Cancel', () => setComposing(false))}
+        {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Save private draft'} onPress={() => { void save('draft'); }} disabled={!title.trim()} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Cancel'} onPress={() => setComposing(false)} />}
       </View> : null}
       {reviewing && workspace?.canModerate ? <View style={cardStyle}>
         <Text style={[styles.heading, { color: colors.text }]}>Review: {reviewing.title}</Text><Text style={labelStyle}>Feedback</Text><TextInput accessibilityLabel="Manager feedback" multiline value={feedback} onChangeText={setFeedback} maxLength={3000} style={[inputStyle, styles.storyInput]} />
-        {reviewing.status === 'pending' ? <>{button('Approve', () => { void review('approve'); })}{button('Request changes', () => { void review('request_changes'); }, !feedback.trim())}{button('Reject', () => { void review('reject'); }, !feedback.trim())}</> : null}
-        {['approved', 'scheduled'].includes(reviewing.status) ? <><CommunitySchedulePicker publishAt={publishAt} onPublishAt={setPublishAt} petOfWeek={reviewing.kind === 'pet_of_week'} weekOf={weekOf} onWeekOf={setWeekOf} disabled={busy} />{button('Schedule publication', () => { void review('schedule'); }, !publishAt || (reviewing.kind === 'pet_of_week' && !weekOf))}{button('Publish now', () => { void review('publish'); }, reviewing.kind === 'pet_of_week' && !weekOf)}</> : null}
-        {button('Archive story', () => { void review('archive'); })}{button('Close review', () => setReviewing(null))}
+        {reviewing.status === 'pending' ? <>{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Approve'} onPress={() => { void review('approve'); }} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Request changes'} onPress={() => { void review('request_changes'); }} disabled={!feedback.trim()} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Reject'} onPress={() => { void review('reject'); }} disabled={!feedback.trim()} />}</> : null}
+        {['approved', 'scheduled'].includes(reviewing.status) ? <><CommunitySchedulePicker publishAt={publishAt} onPublishAt={setPublishAt} petOfWeek={reviewing.kind === 'pet_of_week'} weekOf={weekOf} onWeekOf={setWeekOf} disabled={busy} />{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Schedule publication'} onPress={() => { void review('schedule'); }} disabled={!publishAt || (reviewing.kind === 'pet_of_week' && !weekOf)} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Publish now'} onPress={() => { void review('publish'); }} disabled={reviewing.kind === 'pet_of_week' && !weekOf} />}</> : null}
+        {<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Archive story'} onPress={() => { void review('archive'); }} />}{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Close review'} onPress={() => setReviewing(null)} />}
       </View> : null}
-      {!composing && mode==='public' && <><Text style={[styles.heading,{color:colors.text}]}>Pet of the Week</Text>{sections.featured?<View style={cardStyle}><CommunityMedia {...imageSource(sections.featured)} uri={imageSource(sections.featured).uri} mime={sections.featured.mediaMime} label={sections.featured.petName}/><Text style={[styles.heading,{color:colors.text}]}>{sections.featured.petName}</Text><Text style={bodyStyle}>{sections.featured.story}</Text>{button('Share this pet',()=>{void Share.share({message:sections.featured?.title+'\n'+getSitGuruApiBaseUrl()+'/pack'});})}</View>:<Text style={bodyStyle}>Our next featured pet is on the way.</Text>}<Text style={[styles.heading,{color:colors.text}]}>Community Gallery</Text></>}
+      {!composing && mode==='public' && <><Text style={[styles.heading,{color:colors.text}]}>Pet of the Week</Text>{sections.featured?<View style={cardStyle}><CommunityMedia {...imageSource(sections.featured)} uri={imageSource(sections.featured).uri} mime={sections.featured.mediaMime} label={sections.featured.petName}/><Text style={[styles.heading,{color:colors.text}]}>{sections.featured.petName}</Text><Text style={bodyStyle}>{sections.featured.story}</Text>{<CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Share this pet'} onPress={()=>{void Share.share({message:sections.featured?.title+'\n'+getSitGuruApiBaseUrl()+'/pack'});}} />}</View>:<Text style={bodyStyle}>Our next featured pet is on the way.</Text>}<Text style={[styles.heading,{color:colors.text}]}>Community Gallery</Text></>}
       {!composing ? visibleItems?.map((item) => <View key={item.id} style={cardStyle}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>{COMMUNITY_COLLECTIONS.find((collection) => collection.id === item.kind)?.label}</Text>
         {item.imageUrl ? <CommunityMedia {...imageSource(item)} uri={imageSource(item).uri} mime={item.mediaMime} label={item.petName || item.title}/> : null}
@@ -216,9 +252,9 @@ export default function CommunityStudioScreen() {
         {item.petName || item.location ? <Text style={bodyStyle}>{[item.petName, item.location].filter(Boolean).join(' · ')}</Text> : null}
         {mode !== 'public' ? <Text style={[styles.badge, { color: colors.primary }]}>{item.status.replace(/_/g, ' ')}</Text> : null}
         {item.feedback ? <View style={[styles.message, { backgroundColor: colors.primarySoft }]}><Text style={labelStyle}>Manager feedback</Text><Text style={bodyStyle}>{item.feedback}</Text></View> : null}
-        {item.canEdit ? button('Edit story', () => compose(item)) : null}
-        {item.canReview && workspace?.canModerate ? button('Review story', () => { setReviewing(item); setFeedback(item.feedback); setWeekOf(item.weekOf); setPublishAt(item.publishAt ? item.publishAt.slice(0, 16) : ''); setError(''); }) : null}
-        {item.status === 'published' ? button('Share story', () => { void Share.share({ message: `${item.title}\n${getSitGuruApiBaseUrl()}/pack#story-${item.id}` }).catch(() => setError('Sharing could not open.')); }) : null}
+        {item.canEdit ? <CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Edit story'} onPress={() => compose(item)} /> : null}
+        {item.canReview && workspace?.canModerate ? <CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Review story'} onPress={() => { setReviewing(item); setFeedback(item.feedback); setWeekOf(item.weekOf); setPublishAt(item.publishAt ? item.publishAt.slice(0, 16) : ''); setError(''); }} /> : null}
+        {item.status === 'published' ? <CommunityAction busy={busy} buttonStyle={buttonStyle} label={'Share story'} onPress={() => { void Share.share({ message: `${item.title}\n${getSitGuruApiBaseUrl()}/pack#story-${item.id}` }).catch(() => setError('Sharing could not open.')); }} /> : null}
       </View>) : null}
       {workspace && !fetching && !workspace.items.length && !composing && !error ? <View style={cardStyle}><Text style={[styles.heading, { color: colors.text }]}>{mode === 'public' ? 'A new chapter for the Pack' : 'Your queue is clear'}</Text><Text style={bodyStyle}>{mode === 'public' ? 'Approved community stories will appear here when published.' : 'Saved stories and review updates will appear here automatically.'}</Text></View> : null}
     </>}

@@ -1,3 +1,5 @@
+import ProgramStatusBanner from "@/components/internship/ProgramStatusBanner";
+import { getProgramStatus, PROGRAM_CONTROL_PATHS } from "@/lib/internship/program-controls";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -24,9 +26,19 @@ export default async function InternshipProgramDashboardPage({
   const cohort = await getActiveCohort();
   const dashboard = cohort ? await getCohortDashboard(cohort.id) : null;
   const milestones = cohort ? await listCohortMilestones(cohort.id) : [];
+  const status = cohort ? await getProgramStatus(cohort.id) : null;
 
   return (
     <>
+      {cohort ? <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-5 lg:px-6"><ProgramStatusBanner status={status} /></div> : null}
+      {canAdministerInternshipOnboarding(actor) ? (
+        <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-3 pt-3 sm:px-5 lg:px-6">
+          <Link href="/admin/internship/instructor" className="inline-flex min-h-12 items-center rounded-xl bg-[#10583f] px-4 text-sm font-bold !text-white">
+            Instructor &amp; Supervisor Center
+          </Link>
+          <Link href={PROGRAM_CONTROL_PATHS.admin} className="inline-flex min-h-12 items-center rounded-xl border border-emerald-900 px-4 text-sm font-bold text-emerald-950">Program Controls</Link>
+        </div>
+      ) : null}
       {actor.isSuperUser ? (
         <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
           <Link href="/admin/internship/connection-health" className="inline-flex min-h-11 items-center rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#1D4ED8] hover:bg-[#DBEAFE]">

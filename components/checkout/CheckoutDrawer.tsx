@@ -141,6 +141,12 @@ export default function CheckoutDrawer({
       ? formatPawPerksDiscountBanner(display.discountTotal)
       : null;
 
+  const contextPetName = bookingContextProp?.petName;
+  const contextPetPhotoUrl = bookingContextProp?.petPhotoUrl;
+  const contextGuruName = bookingContextProp?.guruName;
+  const contextGuruAvatarUrl = bookingContextProp?.guruAvatarUrl;
+  const contextStartDate = bookingContextProp?.startDate;
+  const contextEndDate = bookingContextProp?.endDate;
   const createIntent = useCallback(
     async (nextSaveCard: boolean, nextPoints: number) => {
       setLoadingIntent(true);
@@ -159,12 +165,12 @@ export default function CheckoutDrawer({
             ambassadorCode: pricingOptions.ambassadorCode,
             saveCard: nextSaveCard,
             pawperksPointsToRedeem: nextPoints,
-            petName: bookingContextProp?.petName,
-            petPhotoUrl: bookingContextProp?.petPhotoUrl,
-            guruName: bookingContextProp?.guruName,
-            guruAvatarUrl: bookingContextProp?.guruAvatarUrl,
-            startDate: bookingContextProp?.startDate,
-            endDate: bookingContextProp?.endDate,
+            petName: contextPetName,
+            petPhotoUrl: contextPetPhotoUrl,
+            guruName: contextGuruName,
+            guruAvatarUrl: contextGuruAvatarUrl,
+            startDate: contextStartDate,
+            endDate: contextEndDate,
           }),
         });
 
@@ -197,12 +203,12 @@ export default function CheckoutDrawer({
       pricingOptions.additionalPets,
       pricingOptions.holidaySurge,
       pricingOptions.ambassadorCode,
-      bookingContextProp?.petName,
-      bookingContextProp?.petPhotoUrl,
-      bookingContextProp?.guruName,
-      bookingContextProp?.guruAvatarUrl,
-      bookingContextProp?.startDate,
-      bookingContextProp?.endDate,
+      contextPetName,
+      contextPetPhotoUrl,
+      contextGuruName,
+      contextGuruAvatarUrl,
+      contextStartDate,
+      contextEndDate,
     ],
   );
 
@@ -216,23 +222,27 @@ export default function CheckoutDrawer({
     [createIntent],
   );
 
-  useEffect(() => {
-    if (!open) {
-      setClientSecret(null);
-      setServerPricing(null);
-      setError(null);
-      setLoadingIntent(false);
-      setPaid(false);
-      setCostExpanded(true);
-      setSaveCard(false);
-      setRedeemEnabled(false);
-      setPointsToRedeem(0);
-      setAvailablePoints(0);
-      setContext(fallbackContext);
-      return;
-    }
-
+  const [previousOpen, setPreviousOpen] = useState(open);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
     setContext(fallbackContext);
+      if (!open) {
+        setClientSecret(null);
+        setServerPricing(null);
+        setError(null);
+        setLoadingIntent(false);
+        setPaid(false);
+        setCostExpanded(true);
+        setSaveCard(false);
+        setRedeemEnabled(false);
+        setPointsToRedeem(0);
+        setAvailablePoints(0);
+
+      }
+  }
+
+  useEffect(() => {
+    if (!open) return;
 
     // Load vault, then create PaymentIntent
     void (async () => {

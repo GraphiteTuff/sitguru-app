@@ -1311,7 +1311,7 @@ async function getMarketplaceFeePercentForBooking(
 }
 
 async function safeBookingUpdate(bookingId: string, payload: Record<string, unknown>) {
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const { error } = await supabaseAdmin

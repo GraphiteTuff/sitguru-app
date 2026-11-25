@@ -257,9 +257,11 @@ export default function ChatInsightsPanel({
   const [success, setSuccess] = useState("");
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
+  const [previousInsights, setPreviousInsights] = useState(initialInsights);
+  if (previousInsights !== initialInsights) {
+    setPreviousInsights(initialInsights);
     setInsights(initialInsights);
-  }, [initialInsights]);
+  }
 
   const topicOptions = useMemo(() => {
     const counts = new Map<string, number>();

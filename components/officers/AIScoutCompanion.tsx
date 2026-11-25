@@ -7,6 +7,8 @@
  * Public surfaces never call useGuruAuth / never wait on a session.
  */
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -210,12 +212,20 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const chips = isPublic ? PUBLIC_CHIPS : WORKSPACE_CHIPS;
 
 
+  const companionSearch = useBrowserSearch();
+  const [previousCompanionSearch, setPreviousCompanionSearch] = useState("");
+  if (companionSearch !== previousCompanionSearch) {
+    setPreviousCompanionSearch(companionSearch);
+    if (new URLSearchParams(companionSearch).get("chat")?.trim().toLowerCase() === "scout") {
+      setIsOpen(true);
+    }
+  }
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const chat = params.get("chat")?.trim().toLowerCase();
       if (chat !== "scout") return;
-      setIsOpen(true);
       params.delete("chat");
       const next = `${window.location.pathname}${
         params.toString() ? `?${params}` : ""
@@ -224,7 +234,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [companionSearch]);
 
   useEffect(() => {
     function onOpenCompanionChat(event: Event) {
@@ -441,7 +451,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                   if (!window.confirm("End this chat and clear the conversation history?")) return;
                   setMessages([
                     {
-                      id: `scout-hello-reset-${Date.now()}`,
+                      id: "scout-hello-reset",
                       role: "assistant",
                       content: greeting,
                     },
@@ -647,7 +657,7 @@ function AIScoutCompanion({
   currentPath,
 }: AIScoutCompanionProps) {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
 
   const resolvedPath =
     currentPath ||
@@ -658,10 +668,6 @@ function AIScoutCompanion({
   const publicVariant = resolvePublicFormVariant(mode);
   const bot = getBotConfig({ mode, currentPath: resolvedPath });
   const variant = publicVariant ?? bot.variant;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted || !variant) return null;
   if (!publicVariant && !bot.shouldRender) return null;

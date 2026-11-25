@@ -390,35 +390,36 @@ export default function NotificationBell({ compact = false }: { compact?: boolea
   );
 
   const loadNotifications = useCallback(async () => {
-    const {
+    return supabase.auth.getUser().then(async ({
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    }) => {
 
-    if (userError || !user) {
-      setUserId(null);
-      setNotifications([]);
+      if (userError || !user) {
+        setUserId(null);
+        setNotifications([]);
+        setLoading(false);
+        return;
+      }
+
+      setUserId(user.id);
+
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, user_id, title, body, type, href, link, is_read, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(8);
+
+      if (error) {
+        setNotifications([]);
+        setLoading(false);
+        return;
+      }
+
+      setNotifications((data as NotificationRow[]) || []);
       setLoading(false);
-      return;
-    }
-
-    setUserId(user.id);
-
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("id, user_id, title, body, type, href, link, is_read, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(8);
-
-    if (error) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
-
-    setNotifications((data as NotificationRow[]) || []);
-    setLoading(false);
+    });
   }, []);
 
   useEffect(() => {

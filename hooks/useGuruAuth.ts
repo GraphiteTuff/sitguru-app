@@ -40,9 +40,8 @@ export function useGuruAuth(): GuruAuthState {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let session = sessionData?.session ?? null;
+    return supabase.auth.getSession().then(async ({ data: sessionData }) => {
+      const session = sessionData?.session ?? null;
       let authUser = session?.user ?? null;
 
       // Fallback for cookie/session races where getSession is briefly empty.
@@ -87,12 +86,12 @@ export function useGuruAuth(): GuruAuthState {
         name,
         firstName: resolveFirstName(name),
       });
-    } catch (error) {
+    }).catch((error) => {
       console.error("useGuruAuth refresh failed:", error);
       setUser(null);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {

@@ -97,7 +97,7 @@ export default function MetaPublishedContentPanel({
           <h2 className="mt-1 text-xl font-black text-[#0F2744] sm:text-2xl">Recently published across SitGuru social media</h2>
           <p className="mt-1 max-w-3xl text-xs font-medium leading-5 text-slate-600">
             Facebook, Instagram, TikTok, X and YouTube in one view. See imported official posts and published Content Studio links,
-            with each channel's actual connection and post-data status.
+            with each channel&apos;s actual connection and post-data status.
           </p>
         </div>
         {canRefresh ? (

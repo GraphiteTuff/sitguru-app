@@ -175,7 +175,11 @@ export function SiteAccountMenu({
     };
   }, []);
 
-  useEffect(() => { setOpen(false); }, [pathname]);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
+    setOpen(false);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -245,7 +249,7 @@ export function SiteAccountMenu({
     router.refresh();
   }
 
-  function Avatar({ sizeClass }: { sizeClass: string }) {
+  function renderAvatar(sizeClass: string) {
     const desk = variant === "desk";
     return (
       <span
@@ -298,7 +302,7 @@ export function SiteAccountMenu({
       <>
           <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
             <div className="flex items-center gap-4">
-              <Avatar sizeClass="h-16 w-16" />
+              {renderAvatar("h-16 w-16")}
               <div className="min-w-0">
                 <p className="truncate text-xl font-semibold leading-tight text-slate-950">
                   {loadedAccount.name}
@@ -390,7 +394,7 @@ export function SiteAccountMenu({
         aria-expanded={open}
         aria-label="Open account menu"
       >
-        <Avatar sizeClass={compact && variant !== "desk" ? "h-9 w-9" : variant === "desk" ? "h-12 w-12" : "h-11 w-11"} />
+        {renderAvatar(compact && variant !== "desk" ? "h-9 w-9" : variant === "desk" ? "h-12 w-12" : "h-11 w-11")}
         {variant === "desk" ? (
           <>
             <span className="hidden max-w-[9.5rem] shrink text-left sm:block">

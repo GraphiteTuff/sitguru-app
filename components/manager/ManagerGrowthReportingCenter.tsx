@@ -207,7 +207,7 @@ export default function ManagerGrowthReportingCenter({
       <section className={DESK_UI.card + " p-5 sm:p-6"}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-[#0F2744]">Ava's assessment & leadership submission</h2>
+            <h2 className="text-xl font-black text-[#0F2744]">Ava&apos;s assessment & leadership submission</h2>
             <p className="mt-1 text-sm text-slate-600">SitGuru measures outcomes; Ava explains what happened, what was learned, and what happens next.</p>
           </div>
           {isSubmitted ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={16} /> Finalized</span> : null}

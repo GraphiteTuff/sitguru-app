@@ -14,7 +14,7 @@ import {
   Star,
   X,
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Alert,
   Image,
@@ -1063,14 +1063,12 @@ export default function FindCareScreen() {
     });
   }, [discoveryScope, homeLocation, mapPoints, searchQuery]);
 
-  useEffect(() => {
+  const currentMapTarget = [targetMapRegion.latitude, targetMapRegion.longitude, targetMapRegion.latitudeDelta, targetMapRegion.longitudeDelta] as const;
+  const [previousMapTarget, setPreviousMapTarget] = useState(currentMapTarget);
+  if (currentMapTarget.some((value, index) => value !== previousMapTarget[index])) {
+    setPreviousMapTarget(currentMapTarget);
     setMapRegion(targetMapRegion);
-  }, [
-    targetMapRegion.latitude,
-    targetMapRegion.longitude,
-    targetMapRegion.latitudeDelta,
-    targetMapRegion.longitudeDelta,
-  ]);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -1164,31 +1162,37 @@ export default function FindCareScreen() {
     return () => clearTimeout(timeout);
   }, [isEditingHomeZip, keyboardHeight]);
 
-  useEffect(() => {
-    setFavoriteGuruIds(readFavoriteGuruIds());
-  }, []);
+  const savedFavorite = useSyncExternalStore(subscribeToDiscoveryStorage, () => JSON.stringify(readFavoriteGuruIds()), () => "");
+  const [previousFavorite, setPreviousFavorite] = useState("");
+  if (previousFavorite !== savedFavorite) {
+    setPreviousFavorite(savedFavorite);
+    if (savedFavorite) setFavoriteGuruIds(((snapshot: string) => JSON.parse(snapshot) as string[])(savedFavorite));
+  }
 
-  useEffect(() => {
-    setDiscoveryScope(readDiscoveryScope());
-  }, []);
+  const savedScope = useSyncExternalStore(subscribeToDiscoveryStorage, () => readDiscoveryScope(), () => "");
+  const [previousScope, setPreviousScope] = useState("");
+  if (previousScope !== savedScope) {
+    setPreviousScope(savedScope);
+    if (savedScope) setDiscoveryScope(((snapshot: string) => snapshot as DiscoveryScope)(savedScope));
+  }
 
-  useEffect(() => {
-    if (sessionSearchPreferences) return;
-
-    const restored = readStoredSearchPreferences();
-    if (!restored) return;
-
-    persistSearchPreferences(restored);
+  const storedSearch = useSyncExternalStore(
+    subscribeToDiscoveryStorage,
+    () => JSON.stringify(readStoredSearchPreferences()),
+    () => "null",
+  );
+  const [hasRestoredSearch, setHasRestoredSearch] = useState(Boolean(sessionSearchPreferences));
+  if (!hasRestoredSearch && storedSearch !== "null") {
+    setHasRestoredSearch(true);
+    const restored = JSON.parse(storedSearch) as SearchPreferences;
     setSortKey(restored.sortKey);
     setFilters(restored.filters);
 
     // A service passed in the route is an explicit request and outranks the
     // stored choice.
-    if (hasServiceRouteParam) return;
-
     const restoredService = findServiceByValue(restored.serviceValue);
-    if (restoredService) setSelectedService(restoredService);
-  }, [hasServiceRouteParam]);
+    if (!hasServiceRouteParam && restoredService) setSelectedService(restoredService);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -1224,7 +1228,15 @@ export default function FindCareScreen() {
     };
   }, []);
 
-  useEffect(() => {
+  const currentResults = JSON.stringify([
+    displayedGurus.map(guru => String(guru.id)),
+    mapPoints.map(point => point.id),
+    selectedService.value,
+    searchQuery,
+  ]);
+  const [previousResults, setPreviousResults] = useState(currentResults);
+  if (currentResults !== previousResults) {
+    setPreviousResults(currentResults);
     const availableIds = new Set([
       ...mapPoints.map((point) => point.id),
       ...displayedGurus.map((guru) => String(guru.id)),
@@ -1241,7 +1253,7 @@ export default function FindCareScreen() {
       );
     });
     setIsMapPreviewExpanded(false);
-  }, [displayedGurus, mapPoints, selectedService.value, searchQuery]);
+  }
 
   function handleSelectService(service: ServiceOption) {
     setSelectedService(service);
@@ -3713,6 +3725,12 @@ function writeHomeLocation(location: HomeLocation) {
     // Account metadata still preserves the preference when browser storage fails.
   }
 }
+
+const subscribeToDiscoveryStorage = (listener: () => void) => {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", listener);
+  return () => window.removeEventListener("storage", listener);
+};
 
 function readDiscoveryScope(): DiscoveryScope {
   try {

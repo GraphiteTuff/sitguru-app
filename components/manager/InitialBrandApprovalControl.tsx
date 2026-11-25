@@ -32,7 +32,7 @@ export default function InitialBrandApprovalControl({ pendingCount }: { pendingC
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-black text-[#0F2744]">
-            <ShieldCheck size={17} aria-hidden="true" /> Founder's one-time library approval
+            <ShieldCheck size={17} aria-hidden="true" /> Founder&apos;s one-time library approval
           </p>
           <p className="mt-1 text-xs font-medium leading-5 text-slate-700">
             {done ? `${done} existing files approved and audit-logged.` : `${pendingCount} verified existing draft/review files awaiting the initial approval. Archived and future intern submissions are excluded.`}

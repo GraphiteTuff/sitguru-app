@@ -33,9 +33,11 @@ export default function GlobalTapPawFeedback() {
     setPaw(null);
   }, []);
 
-  useEffect(() => {
-    clearPaw();
-  }, [pathname, clearPaw]);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
+    setPaw(null);
+  }
 
   useEffect(() => {
     const show = (intent: TapFeedbackIntent) => {

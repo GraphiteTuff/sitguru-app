@@ -323,13 +323,11 @@ function FloatingTabItem({
   const emphasis = useSharedValue(active ? 1 : 0);
   const Icon = tab.icon;
   const color = active ? tintColor : mutedColor;
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const showAvatar = Boolean(tab.avatarUrl || tab.avatarInitials);
+  const avatarFailed = Boolean(tab.avatarUrl && failedImageSrc === tab.avatarUrl);
   const showAvatarImage = Boolean(tab.avatarUrl) && !avatarFailed;
 
-  useEffect(() => {
-    setAvatarFailed(false);
-  }, [tab.avatarUrl]);
 
   useEffect(() => {
     emphasis.set(
@@ -393,7 +391,7 @@ function FloatingTabItem({
               {showAvatarImage ? (
                 <Image
                   accessibilityLabel={`${tab.label} avatar`}
-                  onError={() => setAvatarFailed(true)}
+                  onError={() => setFailedImageSrc(tab.avatarUrl ?? null)}
                   resizeMode="cover"
                   source={{ uri: tab.avatarUrl! }}
                   style={styles.tabAvatarImage}

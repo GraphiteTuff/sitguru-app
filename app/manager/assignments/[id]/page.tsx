@@ -1,3 +1,8 @@
+import { canReleaseOfficialGrades } from "@/lib/internship/program-controls";
+import AssignmentEvaluationForm from "@/components/internship/AssignmentEvaluationForm";
+import { listInstructorAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
+import AssignmentSubmissionHistory from "@/components/internship/AssignmentSubmissionHistory";
+import { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -35,7 +40,7 @@ export default async function ManagerAssignmentDetailPage({
   const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
   const { data: task } = await supabaseAdmin
     .from("internship_tasks")
-    .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,student_notes,brief_payload")
+    .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,student_notes,review_stage,submitted_at,brief_payload")
     .eq("id", id)
     .maybeSingle();
   if (!task?.id) notFound();
@@ -72,7 +77,12 @@ export default async function ManagerAssignmentDetailPage({
   const { data: linkedProject } = task.project_id
     ? await supabaseAdmin.from("internship_projects").select("name").eq("id", task.project_id).eq("cohort_id", intern.cohortId).maybeSingle()
     : { data: null };
-  const links = await listAssignmentIntegrations([String(task.id)]);
+  const [canRelease, links, history, evaluations] = await Promise.all([
+    canReleaseOfficialGrades(intern.cohortId),
+    listAssignmentIntegrations([String(task.id)]),
+    listAssignmentSubmissionHistory(intern.id, String(task.id)),
+    listInstructorAssignmentEvaluations(intern.id, String(task.id)),
+  ]);
   const pick = (provider: string) => links.find((item) => item.provider === provider);
   const isLola = intern.fullName.trim().toLowerCase() === "lola uhl";
   const folderFallback = isLola ? expectedInternAssignmentFolder(intern.fullName, String(task.title)).url : "";
@@ -115,7 +125,7 @@ export default async function ManagerAssignmentDetailPage({
           {linkedProject?.name ? <p className="mt-1 text-xs text-slate-600">Cohort project: {linkedProject.name}</p> : null}
           <p className="mt-2 text-xs text-slate-600">
             Approved intern evidence feeds the selected chapter. Use Edit in Manager Assignments
-            to correct the project or final chapter without replacing the intern's work.
+            to correct the project or final chapter without replacing the intern&apos;s work.
           </p>
         </div>
         {brief.deliverables?.length ? (
@@ -168,8 +178,8 @@ export default async function ManagerAssignmentDetailPage({
       />
       {work ? (
         <section className={`${DESK_UI.card} p-5 sm:p-6`}>
-          <h2 className="text-xl font-black text-[#0F2744]">Intern's saved assignment work</h2>
-          <p className="mt-2 text-sm text-slate-600">Review the intern's actual SharePoint-backed research without modifying their draft or submitting on their behalf.</p>
+          <h2 className="text-xl font-black text-[#0F2744]">Intern&apos;s saved assignment work</h2>
+          <p className="mt-2 text-sm text-slate-600">Open the intern’s saved SharePoint work and supporting links.</p>
           {work.notes ? <p className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">{String(work.notes)}</p> : null}
           {typeof work.researchLink === "string" && isHttpUrl(work.researchLink) ? (
             <a href={work.researchLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex break-all text-sm font-bold text-blue-700 underline">Open supporting work link</a>
@@ -179,6 +189,11 @@ export default async function ManagerAssignmentDetailPage({
           ) : null}
         </section>
       ) : null}
+      <AssignmentSubmissionHistory {...history} />
+      <AssignmentEvaluationForm canRelease={canRelease} taskId={String(task.id)} internId={intern.id}
+        submittedAt={String(task.submitted_at || "")} canCustomize={kind === "supervisor"}
+        canEvaluate={["submitted", "approved", "revision_requested"].includes(String(task.status))}
+        {...evaluations} />
       {pick("canva")?.externalUrl ? (
         <a href={pick("canva")?.externalUrl} className="inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold text-[#0F2744]">Open Canva design</a>
       ) : null}

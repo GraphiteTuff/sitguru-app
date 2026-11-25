@@ -24,7 +24,6 @@ export type ManagerAssignmentRow = AssignmentFormValue & {
   avatarUrl?: string;
   dueLabel: string;
   statusLabel: string;
-  progress: number;
 };
 
 export default function ManagerAssignmentsHome({
@@ -33,6 +32,7 @@ export default function ManagerAssignmentsHome({
   milestones,
   projects,
   notice,
+  today,
   initialOpen = false,
   links = {},
 }: {
@@ -41,6 +41,7 @@ export default function ManagerAssignmentsHome({
   milestones: AssignmentMilestoneOption[];
   projects: AssignmentProjectOption[];
   notice?: { kind: "ok" | "error"; message: string } | null;
+  today: string;
   initialOpen?: boolean;
   links?: Record<string, { planner: string; files: string; teams: string; plannerUrl: string; filesUrl: string; teamsUrl: string }>;
 }) {
@@ -48,7 +49,9 @@ export default function ManagerAssignmentsHome({
   const [focusIntern, setFocusIntern] = useState(false);
   const [editing, setEditing] = useState<AssignmentFormValue | null>(null);
   const active = rows.filter((row) => row.statusLabel !== "Draft").length;
-  const onTrack = rows.filter((row) => /progress|track|not started|to do/i.test(row.statusLabel)).length;
+  const closed = new Set(["Approved", "Excused", "Draft", "not accepted"]);
+  const upcoming = rows.filter((row) => row.dueOn >= today && !closed.has(row.statusLabel)).slice(0, 4);
+  const openWork = rows.filter((row) => !closed.has(row.statusLabel)).length;
   const inProgress = rows.filter((row) => /progress/i.test(row.statusLabel)).length;
   const needsReview = rows.filter((row) => /review/i.test(row.statusLabel)).length;
   const internCount = new Set(rows.map((row) => row.internId).filter(Boolean)).size;
@@ -77,11 +80,11 @@ export default function ManagerAssignmentsHome({
           href: "/manager/assignments",
         },
         {
-          label: "On Track",
-          value: onTrack,
+          label: "Open work",
+          value: openWork,
           tone: "green",
           icon: <CheckCircle2 size={18} />,
-          progress: percentage(onTrack),
+          progress: percentage(openWork),
         },
         {
           label: "In Progress",
@@ -125,7 +128,6 @@ export default function ManagerAssignmentsHome({
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Due</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Progress</th>
                 <th className="px-4 py-3">Planner</th>
                 <th className="px-4 py-3">Files</th>
                 <th className="px-4 py-3">Teams</th>
@@ -155,14 +157,6 @@ export default function ManagerAssignmentsHome({
                       {row.statusLabel}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${row.progress}%` }} />
-                      </div>
-                      <span className="text-xs font-bold text-slate-500">{row.progress}%</span>
-                    </div>
-                  </td>
                   {(["planner", "files", "teams"] as const).map((key) => {
                     const item = links[row.id];
                     const label = item?.[key] || "Not configured";
@@ -177,7 +171,7 @@ export default function ManagerAssignmentsHome({
               ))}
               {!rows.length ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-6 text-sm font-medium text-slate-500">No assignments yet.</td>
+                  <td colSpan={8} className="px-4 py-6 text-sm font-medium text-slate-500">No assignments yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -200,7 +194,7 @@ export default function ManagerAssignmentsHome({
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Upcoming Deadlines</h2>
           <ul className="mt-4 space-y-2 text-sm font-medium text-slate-700">
-            {rows.filter((row) => row.dueOn && row.statusLabel !== "Draft").slice(0, 4).map((item) => (
+            {upcoming.map((item) => (
               <li key={item.id} className="rounded-2xl bg-[#F8FAFC] px-3 py-3">
                 <span className="font-bold text-[#0F2744]">{item.title}</span>
                 <span className="mt-1 block text-xs text-slate-500">
@@ -208,7 +202,7 @@ export default function ManagerAssignmentsHome({
                 </span>
               </li>
             ))}
-            {!rows.some((row) => row.dueOn && row.statusLabel !== "Draft") ? (
+            {!upcoming.length ? (
               <li className="rounded-2xl bg-[#F8FAFC] px-3 py-3 text-slate-500">No upcoming deadlines.</li>
             ) : null}
           </ul>
@@ -222,11 +216,11 @@ export default function ManagerAssignmentsHome({
             <button type="button" onClick={() => openCreate(true)} className="rounded-2xl bg-[#EFF6FF] px-3 py-3 text-center text-sm font-bold text-[#1D4ED8]">
               Assign to Intern
             </button>
-            <Link href="/manager/analytics" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
-              View Progress Report
+            <Link href="/manager/instructor" className="rounded-2xl bg-[#F0FDF4] px-3 py-3 text-center text-sm font-bold text-[#166534]">
+              View Intern Progress
             </Link>
             <Link href="/manager/milestones" className="rounded-2xl bg-[#F5F3FF] px-3 py-3 text-center text-sm font-bold text-[#6D28D9]">
-              View Templates
+              View Milestones
             </Link>
           </div>
         </article>
@@ -236,15 +230,14 @@ export default function ManagerAssignmentsHome({
           {notice.message}
         </p>
       ) : null}
-      <CreateAssignmentDialog
+      {open ? <CreateAssignmentDialog
         interns={interns}
         milestones={milestones}
         projects={projects}
-        open={open}
         focusIntern={focusIntern}
         initial={editing}
         onClose={() => setOpen(false)}
-      />
+      /> : null}
     </ManagerSectionScaffold>
   );
 }

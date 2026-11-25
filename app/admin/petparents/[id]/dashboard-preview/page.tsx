@@ -472,13 +472,19 @@ function buildMessageRecipientFilters(customerId: string) {
   );
 }
 
+function selectRows(table: string, columns: string) {
+  return supabaseAdmin.from(table).select(columns);
+}
+
+type PreviewQuery = ReturnType<typeof selectRows>;
+
 async function safeSelect(
   table: string,
   select: string,
-  filter: (query: any) => any,
+  filter: (query: PreviewQuery) => PromiseLike<{ data: unknown; error: unknown }>,
 ) {
   try {
-    const query = supabaseAdmin.from(table).select(select);
+    const query = selectRows(table, select);
     const result = await filter(query);
 
     if (result.error) return [];

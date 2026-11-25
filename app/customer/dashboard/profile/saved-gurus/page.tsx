@@ -304,41 +304,37 @@ export default function CustomerSavedGurusSetupPage() {
 
   const setupPercent = Math.round((setupCompleteCount / 6) * 100);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
+  const fetchLoadPage = useCallback(async () => {
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
       router.replace(routes.login);
       return;
     }
 
-    try {
-      const [profileData, setupData] = await Promise.all([
+    return Promise.all([
         fetchCustomerProfile(user.id, user.email ?? null),
         fetchSetupStatus(user.id),
-      ]);
+      ]).then(async ([profileData, setupData]) => {
 
       setProfile(profileData);
       setSetupStatus(setupData);
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not load Step 7.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+
   useEffect(() => {
-    void loadPage();
+    void fetchLoadPage();
 
     const {
       data: { subscription },
@@ -351,7 +347,7 @@ export default function CustomerSavedGurusSetupPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadPage, router]);
+  }, [fetchLoadPage, router]);
 
   if (loading) {
     return (

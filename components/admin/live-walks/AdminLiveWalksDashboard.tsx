@@ -5,7 +5,7 @@
  * Desktop enterprise Live Walks Map Dashboard — realtime sync + Leaflet focus map.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import LiveWalksKpiHeader from "@/components/admin/live-walks/LiveWalksKpiHeader";
@@ -63,22 +63,24 @@ export default function AdminLiveWalksDashboard() {
     refresh,
   } = useAdminLiveWalksSync({ query, pollIntervalMs: 5000 });
 
-  const prevStatusesRef = useRef<Map<string, string>>(new Map());
 
   // Auto-select first / flagged walk
-  useEffect(() => {
-    if (!selectedBookingId && rows.length) {
+  if (!selectedBookingId && rows.length) {
       const flagged = rows.find(
         (row) =>
           row.globalTrackingStatus === "FLAGGED_ALERT" || row.isStaleAlert,
       );
       setSelectedBookingId(flagged?.bookingId || rows[0].bookingId);
     }
-  }, [rows, selectedBookingId]);
 
   // Detect COMPLETED transitions for graceful UI freeze
-  useEffect(() => {
-    const prev = prevStatusesRef.current;
+  const [previousRows, setPreviousRows] = useState<null | typeof rows>(null);
+  const [previousSelectedBookingId, setPreviousSelectedBookingId] = useState(selectedBookingId);
+  const [previousStatuses, setPreviousStatuses] = useState(() => new Map<string, string>());
+  if (previousRows !== rows || previousSelectedBookingId !== selectedBookingId) {
+    setPreviousRows(rows);
+    setPreviousSelectedBookingId(selectedBookingId);
+    const prev = previousStatuses;
     const next = new Map<string, string>();
 
     for (const row of rows) {
@@ -111,10 +113,9 @@ export default function AdminLiveWalksDashboard() {
       prev.get(selectedBookingId) !== "COMPLETED" &&
       !next.has(selectedBookingId)
     ) {
-      setFrozenCompletedRow((current) => {
-        if (!current || current.bookingId !== selectedBookingId) return current;
+      if (frozenCompletedRow?.bookingId === selectedBookingId) {
         const frozen = {
-          ...current,
+          ...frozenCompletedRow,
           globalTrackingStatus: "COMPLETED" as const,
           lastEventLabel: "✅ Ended",
           lastEventType: "ended",
@@ -125,12 +126,12 @@ export default function AdminLiveWalksDashboard() {
           distanceMiles: frozen.distanceMiles,
           durationMinutes: frozen.durationMinutes,
         });
-        return frozen;
-      });
+        setFrozenCompletedRow(frozen);
+      }
     }
 
-    prevStatusesRef.current = next;
-  }, [rows, selectedBookingId]);
+    setPreviousStatuses(next);
+  }
 
   const displayRows = useMemo(() => {
     if (

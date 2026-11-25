@@ -60,7 +60,7 @@ export default function ParentWalkTrackingShell({
   const displayPet = petName || initialPetName;
   const isCompleted = trackingState === "ended";
   const [bootstrapped, setBootstrapped] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [liveElapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
   const [walkStartedAt, setWalkStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -68,25 +68,22 @@ export default function ParentWalkTrackingShell({
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (lastEvent?.eventType === "WALK_START") {
-      setWalkStartedAt(Date.now());
-    }
-    if (lastEvent?.eventType === "WALK_END") {
-      setWalkStartedAt(null);
-    }
-  }, [lastEvent?.eventType, lastEvent?.data.timestamp]);
+  const eventStart = lastEvent?.eventType === "WALK_START"
+    ? Date.parse(String(lastEvent.data.timestamp))
+    : null;
+  const [lastWalkEvent, setLastWalkEvent] = useState<typeof lastEvent>(null);
+  if (lastWalkEvent !== lastEvent) {
+    setLastWalkEvent(lastEvent);
+    if (eventStart !== null && Number.isFinite(eventStart)) setWalkStartedAt(eventStart);
+    if (lastEvent?.eventType === "WALK_END") setWalkStartedAt(null);
+  }
+
+  const isTimingWalk = trackingState !== "idle" && trackingState !== "ended";
+  const baselineElapsedSeconds = Math.round(durationMinutes * 60);
+  const elapsedSeconds = isTimingWalk ? liveElapsedSeconds ?? baselineElapsedSeconds : baselineElapsedSeconds;
 
   useEffect(() => {
-    if (trackingState === "idle") {
-      setElapsedSeconds(Math.round(durationMinutes * 60));
-      return;
-    }
-    if (trackingState === "ended") {
-      setElapsedSeconds(Math.round(durationMinutes * 60));
-      return;
-    }
-
+    if (!isTimingWalk) return;
     const started =
       walkStartedAt ??
       Date.now() - Math.max(0, Math.round(durationMinutes * 60) * 1000);
@@ -94,10 +91,9 @@ export default function ParentWalkTrackingShell({
     const tick = () => {
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)));
     };
-    tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [trackingState, durationMinutes, walkStartedAt]);
+  }, [isTimingWalk, walkStartedAt, durationMinutes]);
 
   const elapsedLabel = useMemo(
     () => formatElapsed(elapsedSeconds || Math.round(durationMinutes * 60)),

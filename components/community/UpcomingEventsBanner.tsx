@@ -45,13 +45,8 @@ function BannerCardImage({
   alt: string;
 }) {
   const fallback = fallbackEventCardImage(alt);
-  const [current, setCurrent] = useState(src || fallback);
-  const [failedPrimary, setFailedPrimary] = useState(false);
-
-  useEffect(() => {
-    setCurrent(src || fallback);
-    setFailedPrimary(false);
-  }, [src, fallback]);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const current = src && src !== failedSrc ? src : fallback;
 
   return (
     <Image
@@ -61,10 +56,7 @@ function BannerCardImage({
       className="object-cover transition duration-500 group-hover:scale-[1.03]"
       sizes="300px"
       onError={() => {
-        if (!failedPrimary) {
-          setFailedPrimary(true);
-          setCurrent(fallback);
-        }
+        if (current === src) setFailedSrc(src);
       }}
     />
   );
@@ -344,8 +336,6 @@ export default function UpcomingEventsBanner({
   const [shareEvent, setShareEvent] =
     useState<EventShareDrawerEvent | null>(null);
 
-  if (!events.length) return null;
-
   async function openSitGuruShare(event: CommunityEventWithPartner) {
     const curatedDemo = isHomepageDemoEvent(event.id);
     const payload: EventShareDrawerEvent = {
@@ -407,9 +397,13 @@ export default function UpcomingEventsBanner({
   }
 
   useEffect(() => {
-    refreshScrollState();
+    if (events.length === 0) return;
+    const frame = window.requestAnimationFrame(refreshScrollState);
     window.addEventListener("resize", refreshScrollState);
-    return () => window.removeEventListener("resize", refreshScrollState);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", refreshScrollState);
+    };
   }, [events.length]);
 
   useEffect(() => {
@@ -420,6 +414,8 @@ export default function UpcomingEventsBanner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [captureEvent]);
+
+  if (!events.length) return null;
 
   return (
     <section className="border-y border-slate-100 bg-white py-12 sm:py-16">

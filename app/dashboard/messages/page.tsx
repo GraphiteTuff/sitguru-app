@@ -109,16 +109,12 @@ export default function MessagesPage() {
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const loadData = useCallback(
+  const fetchLoadData = useCallback(
     async (preferredSelectedUser?: string | null) => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const {
+    return supabase.auth.getUser().then(async ({
           data: { user },
           error: authError,
-        } = await supabase.auth.getUser();
+        }) => {
 
         if (authError || !user) {
           router.push("/login");
@@ -178,56 +174,56 @@ export default function MessagesPage() {
         } else {
           setSelectedUser(null);
         }
-      } catch (err: unknown) {
+    }).catch((err: unknown) => {
         setError(getErrorMessage(err) || "Failed to load messages.");
-      } finally {
+      }).finally(() => {
         setLoading(false);
-      }
-    },
+      });
+  },
     [router]
   );
 
+
   const markConversationAsRead = useCallback(
     async (activeUserId: string, partnerId: string) => {
-      const unreadIncoming = messages.filter(
+    const unreadIncoming = messages.filter(
         (m) =>
           m.sender_id === partnerId &&
           m.recipient_id === activeUserId &&
           m.is_read === false
       );
+    if (unreadIncoming.length === 0) return;
+    const unreadIds = unreadIncoming.map((m) => m.id);
+    const readTimestamp = new Date().toISOString();
 
-      if (unreadIncoming.length === 0) return;
-
-      const unreadIds = unreadIncoming.map((m) => m.id);
-      const readTimestamp = new Date().toISOString();
-
-      const { error: updateError } = await supabase
+    return supabase
         .from("messages")
         .update({
           is_read: true,
           read_at: readTimestamp,
         })
-        .in("id", unreadIds);
+        .in("id", unreadIds).then(async ({ error: updateError }) => {
 
-      if (updateError) {
-        console.error("Failed to mark messages as read:", updateError.message);
-        return;
-      }
+        if (updateError) {
+          console.error("Failed to mark messages as read:", updateError.message);
+          return;
+        }
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          unreadIds.includes(m.id)
-            ? { ...m, is_read: true, read_at: readTimestamp }
-            : m
-        )
-      );
-    },
+        setMessages((prev) =>
+          prev.map((m) =>
+            unreadIds.includes(m.id)
+              ? { ...m, is_read: true, read_at: readTimestamp }
+              : m
+          )
+        );
+    });
+  },
     [messages]
   );
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void fetchLoadData();
+  }, [fetchLoadData]);
 
   useEffect(() => {
     if (!userId) return;

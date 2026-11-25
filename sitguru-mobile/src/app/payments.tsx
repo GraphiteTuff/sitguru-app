@@ -1341,41 +1341,24 @@ export default function PaymentsScreen() {
     [bookingCurrency],
   );
 
-  const refresh = useCallback(async () => {
+  const accountId = user?.id;
+  const fetchRefresh = useCallback(async () => {
     if (authLoading) return;
+    if (!isSupabaseConfigured) return;
+    if (!accountId) return;
 
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      setLoadError(
-        'The mobile app is not connected to Supabase in this environment.',
-      );
-      return;
-    }
-
-    if (!user?.id) {
-      setBooking(null);
-      setPayments([]);
-      setLoading(false);
-      setLoadError('');
-      return;
-    }
-
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const nextBooking = await loadLatestBooking(
-        user.id,
+    return loadLatestBooking(
+        accountId,
         effectiveRole,
         requestedBookingId,
-      );
+      ).then(async (nextBooking) => {
 
       setBooking(nextBooking);
 
       const [nextPayments, nextCredits, nextPayout] = await Promise.all([
-        loadPayments(user.id, nextBooking?.id || ''),
+        loadPayments(accountId, nextBooking?.id || ''),
         effectiveRole === 'pet_parent'
-          ? loadCredits(user.id)
+          ? loadCredits(accountId)
           : Promise.resolve({
               availableCents: 0,
               pawPerksCents: 0,
@@ -1383,7 +1366,7 @@ export default function PaymentsScreen() {
               giftCents: 0,
             }),
         effectiveRole === 'guru'
-          ? loadPayoutSummary(user.id)
+          ? loadPayoutSummary(accountId)
           : Promise.resolve({
               connected: false,
               detailsSubmitted: false,
@@ -1400,29 +1383,54 @@ export default function PaymentsScreen() {
       setPayments(nextPayments);
       setCredits(nextCredits);
       setPayout(nextPayout);
-    } catch (error) {
+    }).catch((error) => {
       setLoadError(
         error instanceof Error
           ? error.message
           : 'SitGuru could not load payment information.',
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [
     authLoading,
     effectiveRole,
     requestedBookingId,
-    user?.id,
+    accountId,
   ]);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setLoadError('');
+    return fetchRefresh();
+  }, [fetchRefresh, setLoading, setLoadError]);
+
+  const requestKey = JSON.stringify([authLoading, isSupabaseConfigured, accountId, effectiveRole, requestedBookingId]);
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      setLoadError(
+        'The mobile app is not connected to Supabase in this environment.',
+      );
+    } else if (!accountId) {
+      setBooking(null);
+      setPayments([]);
+      setLoading(false);
+      setLoadError('');
+    } else {
+      setLoading(true);
+    }
+  }
 
   useEffect(() => {
-    if (!checkoutResult) return;
+    void fetchRefresh();
+  }, [fetchRefresh]);
 
+  const [previousCheckoutResult, setPreviousCheckoutResult] = useState<string | null>(null);
+  if (checkoutResult && checkoutResult !== previousCheckoutResult) {
+    setPreviousCheckoutResult(checkoutResult);
     const normalized = normalizeStatus(checkoutResult);
 
     if (['success', 'complete', 'completed'].includes(normalized)) {
@@ -1432,8 +1440,7 @@ export default function PaymentsScreen() {
         message:
           'SitGuru is checking the payment status. The booking will show Paid only after the server receives confirmed payment status.',
       });
-      void refresh();
-      return;
+
     }
 
     if (['cancel', 'canceled', 'cancelled'].includes(normalized)) {
@@ -1444,7 +1451,12 @@ export default function PaymentsScreen() {
           'No payment confirmation was recorded. You can return to SitGuru Checkout when ready.',
       });
     }
-  }, [checkoutResult, refresh]);
+  }
+  useEffect(() => {
+    if (checkoutResult && ['success', 'complete', 'completed'].includes(normalizeStatus(checkoutResult))) {
+      void fetchRefresh();
+    }
+  }, [checkoutResult, fetchRefresh]);
 
   async function openExternalUrl(url: string) {
     if (!Linking.canOpenURL(url)) {

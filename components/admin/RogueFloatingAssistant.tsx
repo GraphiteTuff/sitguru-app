@@ -5,6 +5,7 @@
  * Streams via Vercel AI SDK useChat → /api/admin/rogue-ai.
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -266,7 +267,7 @@ function renderInline(text: string): ReactNode {
 }
 
 export default function RogueFloatingAssistant() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [preset, setPreset] = useState<string>("");
@@ -300,10 +301,6 @@ export default function RogueFloatingAssistant() {
       period,
     },
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;

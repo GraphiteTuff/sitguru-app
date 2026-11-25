@@ -281,42 +281,39 @@ export default function GuruEarningsScreen() {
     return next;
   }, []);
 
-  const loadEarnings = useCallback(
+  const accountId = user?.id;
+  const fetchLoadEarnings = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
-        setData(mapEarningsData([], [], profileRecord));
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
+    return Promise.all([
+          queryRows(PAYOUT_TABLES, OWNER_FIELDS, accountId, 10),
+          queryRows(TRANSACTION_TABLES, OWNER_FIELDS, accountId, 200),
+        ]).then(async ([payoutRows, transactionRows]) => {
 
-      try {
-        const [payoutRows, transactionRows] = await Promise.all([
-          queryRows(PAYOUT_TABLES, OWNER_FIELDS, user.id, 10),
-          queryRows(TRANSACTION_TABLES, OWNER_FIELDS, user.id, 200),
-          refreshPayoutStatus(),
-        ]);
-
-        await refreshLedger();
+        await Promise.all([refreshLedger(), refreshPayoutStatus()]);
 
         setData(
           mapEarningsData(payoutRows, transactionRows, profileRecord),
         );
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Some earnings or payout details could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
-    [profileRecord, refreshLedger, refreshPayoutStatus, user?.id],
+      });
+  },
+    [profileRecord, refreshLedger, refreshPayoutStatus, accountId],
   );
+
+  const loadEarnings = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadEarnings(showRefresh);
+  }, [fetchLoadEarnings, setRefreshing, setLoading]);
 
   const weekNetTotal =
     summary.weekNetTotal > 0 ? summary.weekNetTotal : data.earningsWeek;
@@ -351,9 +348,22 @@ export default function GuruEarningsScreen() {
     [analytics.peakActivityWindows],
   );
 
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setData(mapEarningsData([], [], profileRecord));
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadEarnings(false);
-  }, [loadEarnings]);
+    void fetchLoadEarnings(false);
+  }, [fetchLoadEarnings]);
 
   useEffect(() => {
     if (!focus || displayLoading) return;

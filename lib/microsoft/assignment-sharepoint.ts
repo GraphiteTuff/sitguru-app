@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { internSafeFileName } from "@/lib/internship/portal";
 /**
  * SharePoint storage for SitGuru internship assignments.
  *
@@ -161,11 +163,32 @@ export async function saveInternAssignmentMarkdown(input: {
   description: string;
   notes: string;
   researchLink: string;
-}): Promise<{ ok: true; url: string; id: string; folderUrl: string } | { ok: false; message: string }> {
+  supportingLinks?: string[];
+  submissionId?: string;
+  attachment?: File;
+  priorAttachmentUrl?: string;
+}): Promise<{ ok: true; url: string; id: string; folderUrl: string; attachmentUrl: string } | { ok: false; message: string }> {
   const folder = await ensureInternAssignmentSharePointFolder(input);
   if (folder.status !== "connected") {
     return { ok: false, message: folder.message || "SharePoint is unavailable. The work was not saved." };
   }
+  let attachmentUrl = input.priorAttachmentUrl || "";
+  if (input.attachment) {
+    const attachmentName = `${randomUUID()}-${internSafeFileName(input.attachment.name)}`;
+    const saved = await graphRequest<DriveItem>({
+      method: "PUT",
+      path: `/drives/${encodedPart(folder.driveId)}/items/${encodedPart(folder.id)}:/${encodedPart(attachmentName)}:/content`,
+      rawBody: input.attachment,
+      contentType: "application/octet-stream",
+    });
+    if (!saved.ok || !saved.data.id || !saved.data.webUrl) {
+      return { ok: false, message: "SharePoint could not save the supporting file." };
+    }
+    attachmentUrl = saved.data.webUrl;
+  }
+  const fileName = input.submissionId
+    ? `SitGuru Assignment Submission ${input.submissionId}.md`
+    : "SitGuru Assignment Work.md";
   const markdown = [
     `# ${input.title}`,
     "",
@@ -179,19 +202,19 @@ export async function saveInternAssignmentMarkdown(input: {
     input.notes || "_No notes yet._",
     "",
     "## Supporting work link",
-    input.researchLink || "_No link provided._",
+    [input.researchLink, ...(input.supportingLinks || []), attachmentUrl].filter(Boolean).join("\n") || "_No link provided._",
     "",
     `Last saved from SitGuru: ${new Date().toISOString()}`,
     "",
   ].join("\n");
   const stored = await graphRequest<DriveItem>({
     method: "PUT",
-    path: `/drives/${encodedPart(folder.driveId)}/items/${encodedPart(folder.id)}:/SitGuru%20Assignment%20Work.md:/content`,
+    path: `/drives/${encodedPart(folder.driveId)}/items/${encodedPart(folder.id)}:/${encodedPart(fileName)}:/content`,
     contentType: "text/markdown; charset=utf-8",
     rawBody: markdown,
   });
   if (!stored.ok || !stored.data.id) {
     return { ok: false, message: "SharePoint could not save this file. SitGuru did not mark your work as saved." };
   }
-  return { ok: true, url: String(stored.data.webUrl || `${folder.url}/SitGuru%20Assignment%20Work.md`), id: String(stored.data.id), folderUrl: folder.url };
+  return { ok: true, url: String(stored.data.webUrl || `${folder.url}/${encodedPart(fileName)}`), id: String(stored.data.id), folderUrl: folder.url, attachmentUrl };
 }

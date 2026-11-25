@@ -596,25 +596,20 @@ export default function CustomerBasicInfoPage() {
   const avatarSrc = normalizePhotoUrl(form.avatar_url);
   const showImage = Boolean(avatarSrc && !photoFailed);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
+  const fetchLoadPage = useCallback(async () => {
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
       router.replace(routes.login);
       return;
     }
 
-    try {
-      const [profileData, setupData] = await Promise.all([
+    return Promise.all([
         fetchBasicInfoProfile(user),
         fetchSetupStatus(user.id),
-      ]);
+      ]).then(async ([profileData, setupData]) => {
 
       setProfile(profileData);
       setForm(profileToForm(profileData));
@@ -625,19 +620,20 @@ export default function CustomerBasicInfoPage() {
       );
       setSetupStatus(setupData);
       setPhotoFailed(false);
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not load your Basic Info.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+
   useEffect(() => {
-    void loadPage();
+    void fetchLoadPage();
 
     const {
       data: { subscription },
@@ -650,7 +646,7 @@ export default function CustomerBasicInfoPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadPage, router]);
+  }, [fetchLoadPage, router]);
 
   async function handlePhotoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

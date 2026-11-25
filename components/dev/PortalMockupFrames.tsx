@@ -352,12 +352,7 @@ export function InternMockFrame({
               hourSummary={hourSummary}
               firstName={firstName}
               weeklyDone
-              currentAssignmentTitle="Social Media Campaign"
               preview
-              onOpenWork={() => {}}
-              onOpenCheckIn={() => {}}
-              onOpenHours={() => {}}
-              onOpenMilestones={() => {}}
             />
           </div>
           {mobile ? <MockMobileBar kind="intern" /> : null}
@@ -465,7 +460,7 @@ export function MockupLinks() {
   return (
     <div className="mt-3 flex flex-wrap gap-2 text-sm font-black">
       <a href="?view=manager" className="rounded-full bg-[#0D5C3A] px-3 py-2 !text-white">
-        Manager's Desk
+        Manager&apos;s Desk
       </a>
       <a href="?view=intern" className="rounded-full bg-[#0D5C3A] px-3 py-2 !text-white">
         Intern Portal

@@ -176,11 +176,10 @@ export default function GlobalMessageNotifier() {
   );
 
   const fetchAlerts = useCallback(async () => {
-    try {
-      const response = await fetch("/api/messages/unread-alerts", {
+    return fetch("/api/messages/unread-alerts", {
         method: "GET",
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       if (!response.ok) return;
 
@@ -199,9 +198,9 @@ export default function GlobalMessageNotifier() {
       if (newestAlert.id !== storedLastAlertId) {
         showAlert(newestAlert);
       }
-    } catch {
+    }).catch(() => {
       // Silent fail so the app never crashes if the API is unavailable.
-    }
+    });
   }, [showAlert]);
 
   useEffect(() => {

@@ -760,22 +760,26 @@ export default function RequestBookingScreen() {
     };
   }, [paramPetId, user?.id]);
 
-  useEffect(() => {
+  const [previousServiceParam, setPreviousServiceParam] = useState<typeof paramServiceType | null>(null);
+  if (paramServiceType !== previousServiceParam) {
+    setPreviousServiceParam(paramServiceType);
     const match = findServiceForParam(paramServiceType);
-    if (!match) return;
+    if (match) {
+      setSelectedServiceId(match.id);
+      setEndDateId('');
+      setSelectedTime(match.mode === 'single' ? 'Midday' : 'Flexible handoff');
+    }
+  }
 
-    setSelectedServiceId(match.id);
-    setEndDateId('');
-    setSelectedTime(match.mode === 'single' ? 'Midday' : 'Flexible handoff');
-  }, [paramServiceType]);
-
-  useEffect(() => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(paramDate)) return;
+  const [previousDateParam, setPreviousDateParam] = useState<typeof paramDate | null>(null);
+  if (paramDate !== previousDateParam && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) {
+    setPreviousDateParam(paramDate);
     const date = dateFromId(paramDate);
-    if (Number.isNaN(date.getTime()) || toDateId(date) !== paramDate || date < todayStart()) return;
-    setStartDateId(paramDate);
-    setDisplayMonth(monthStart(date));
-  }, [paramDate]);
+    if (!Number.isNaN(date.getTime()) && toDateId(date) === paramDate && date >= todayStart()) {
+      setStartDateId(paramDate);
+      setDisplayMonth(monthStart(date));
+    }
+  }
 
   const draftKey = bookingDraftKey(guruTargetId, guruTargetSlug);
   const draftHydratedRef = useRef('');

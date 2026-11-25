@@ -29,8 +29,8 @@ const secondaryClass = "inline-flex min-h-12 items-center justify-center gap-2 r
 export default function CommunitySubmissionFlow({ workspace, item, authenticated, preview = false, onClose, onComplete }: CommunitySubmissionFlowProps) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [file, setFile] = useState<File | null>(null);
-  const [localPreview, setLocalPreview] = useState("");
+  const [media, setMedia] = useState<{ file: File; previewUrl: string } | null>(null);
+  const file = media?.file ?? null;
   const [storyOnly, setStoryOnly] = useState(item?.kind === "pack" && !item.imageUrl);
   const [kind, setKind] = useState(item?.kind || "gallery");
   const [petName, setPetName] = useState(item?.petName || "");
@@ -55,22 +55,20 @@ export default function CommunitySubmissionFlow({ workspace, item, authenticated
   const controller = useRef<AbortController | null>(null);
   const canCompose = authenticated || preview;
   const bookings = workspace?.bookings || [];
-  const previewUrl = localPreview || item?.mediaUrl || item?.imageUrl || "";
+  const previewUrl = media?.previewUrl || item?.mediaUrl || item?.imageUrl || "";
   const mime = file?.type || item?.mediaMime || "image/jpeg";
 
   useEffect(() => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setLocalPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    if (!media) return;
+    return () => URL.revokeObjectURL(media.previewUrl);
+  }, [media]);
   useEffect(() => () => controller.current?.abort(), []);
 
   function chooseFile(next: File | undefined) {
     if (!next) return;
     const problem = communityFileError(next);
     if (problem) { setError(problem); return; }
-    setError(""); setFile(next); setMediaPath(""); setStoryOnly(false);
+    setError(""); setMedia({ file: next, previewUrl: URL.createObjectURL(next) }); setMediaPath(""); setStoryOnly(false);
     if (kind === "pack") setKind("gallery");
   }
 
@@ -158,7 +156,7 @@ export default function CommunitySubmissionFlow({ workspace, item, authenticated
           <input ref={library} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" className="sr-only" tabIndex={-1} onChange={event => chooseFile(event.target.files?.[0])} />
           <input ref={camera} type="file" accept="image/*,video/*" capture="environment" className="sr-only" tabIndex={-1} onChange={event => chooseFile(event.target.files?.[0])} />
           <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={!canCompose} onClick={() => library.current?.click()} className={primaryClass}><ImagePlus size={18} />{previewUrl ? "Choose different media" : "Choose from your library"}</button><button type="button" disabled={!canCompose} onClick={() => camera.current?.click()} className={secondaryClass}><Camera size={18} />Take a photo or video</button></div>
-          <button type="button" disabled={!canCompose} onClick={() => { setStoryOnly(true); setKind("pack"); setFile(null); setLocalPreview(""); setMediaPath(""); setStep(1); setError(""); }} className="inline-flex min-h-12 items-center gap-2 text-sm font-bold text-emerald-800 disabled:opacity-50"><FileImage size={17} />Share a short story instead</button>
+          <button type="button" disabled={!canCompose} onClick={() => { setStoryOnly(true); setKind("pack"); setMedia(null); setMediaPath(""); setStep(1); setError(""); }} className="inline-flex min-h-12 items-center gap-2 text-sm font-bold text-emerald-800 disabled:opacity-50"><FileImage size={17} />Share a short story instead</button>
         </div>}
         {step === 1 && <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-[#0F2744]">Pet or Guru name<input name="petName" value={petName} onChange={event => setPetName(event.target.value)} maxLength={100} placeholder="Who should we meet?" className={inputClass} /></label><label className="text-sm font-bold text-[#0F2744]">What are you sharing?<select name="kind" value={storyOnly ? "pack" : kind} onChange={event => setKind(event.target.value as typeof kind)} disabled={storyOnly} className={inputClass}>{storyOnly ? <option value="pack">A pet story</option> : <><option value="gallery">A pet moment</option><option value="guru_spotlight">A Guru introduction</option><option value="pet_of_week">A Pet of the Week nomination</option></>}</select></label></div>

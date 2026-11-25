@@ -1,3 +1,6 @@
+import type { GeoJSONSource, Map as WebMap, Marker as WebMarker, StyleSpecification } from 'maplibre-gl';
+import type ReactNativeMapView from 'react-native-maps';
+import { nativeMaps } from '@/lib/native-maps';
 import { router } from 'expo-router';
 import {
     ChevronLeft,
@@ -27,11 +30,9 @@ import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useAuth } from '@/hooks/useAuth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
-const MapsModule =
-  Platform.OS === 'web' ? null : require('react-native-maps');
-const NativeMapView = MapsModule?.default ?? MapsModule?.MapView;
-const NativeMarker = MapsModule?.Marker;
-const NativeCircle = MapsModule?.Circle;
+const NativeMapView = nativeMaps?.default;
+const NativeMarker = nativeMaps?.Marker;
+const NativeCircle = nativeMaps?.Circle;
 
 type RecordRow = Record<string, unknown>;
 type DistanceFilter = 5 | 10 | 20 | 50;
@@ -90,7 +91,7 @@ const METERS_PER_MILE = 1609.344;
 const WEB_MAPLIBRE_CSS_ID = 'sitguru-guru-care-maplibre-css';
 const WEB_MAPLIBRE_CSS_URL =
   'https://unpkg.com/maplibre-gl@6.17.0/dist/maplibre-gl.css';
-const WEB_MAP_STYLE_LIGHT = {
+const WEB_MAP_STYLE_LIGHT: StyleSpecification = {
   version: 8,
   sources: {
     'sitguru-light-raster': {
@@ -113,9 +114,9 @@ const WEB_MAP_STYLE_LIGHT = {
       maxzoom: 20,
     },
   ],
-} as const;
+};
 
-const WEB_MAP_STYLE_DARK = {
+const WEB_MAP_STYLE_DARK: StyleSpecification = {
   version: 8,
   sources: {
     'sitguru-dark-raster': {
@@ -138,7 +139,7 @@ const WEB_MAP_STYLE_DARK = {
       maxzoom: 20,
     },
   ],
-} as const;
+};
 
 const DEFAULT_SERVICE_COORDINATE: MapCoordinate = {
   latitude: 39.8283,
@@ -356,20 +357,12 @@ export default function GuruCareMapScreen() {
       'is_accepting_bookings',
     ]);
 
-  const loadOpportunities = useCallback(
+  const accountId = user?.id;
+  const fetchLoadOpportunities = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
-        setOpportunities([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const rows = await queryOpportunityRows(user.id);
+    return queryOpportunityRows(accountId).then(async (rows) => {
         setOpportunities(
           rows
             .map((item, index) =>
@@ -379,21 +372,40 @@ export default function GuruCareMapScreen() {
             .sort(compareOpportunities),
         );
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Nearby care demand could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
-    [user?.id],
+      });
+  },
+    [accountId, setLoading, setMessage, setOpportunities, setRefreshing],
   );
 
+  const loadOpportunities = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadOpportunities(showRefresh);
+  }, [fetchLoadOpportunities, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setOpportunities([]);
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadOpportunities(false);
-  }, [loadOpportunities]);
+    void fetchLoadOpportunities(false);
+  }, [fetchLoadOpportunities]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;
@@ -872,7 +884,7 @@ function NativeCareMap({
   radiusMiles: number;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const nativeMapRef = useRef<any>(null);
+  const nativeMapRef = useRef<ReactNativeMapView>(null);
   const previousRadiusRef = useRef(radiusMiles);
   const previousCenterRef = useRef(center);
 
@@ -893,6 +905,8 @@ function NativeCareMap({
     );
   }, [center, radiusMiles]);
 
+  if (!NativeMapView || !NativeCircle || !NativeMarker) return null;
+
   return (
     <View style={styles.nativeMapWrap}>
       <NativeMapView
@@ -904,7 +918,6 @@ function NativeCareMap({
         rotateEnabled={false}
         scrollEnabled
         showsBuildings
-        showsPointsOfInterest
         style={styles.nativeMap}
         zoomEnabled
       >
@@ -972,11 +985,11 @@ function WebCareMap({
   radiusMiles: number;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const containerRef = useRef<any>(null);
-  const mapRef = useRef<any>(null);
-  const mapLibreRef = useRef<any>(null);
-  const requestMarkersRef = useRef<any[]>([]);
-  const guruMarkerRef = useRef<any>(null);
+  const containerRef = useRef<View>(null);
+  const mapRef = useRef<WebMap>(null);
+  const mapLibreRef = useRef<typeof import("maplibre-gl")>(null);
+  const requestMarkersRef = useRef<WebMarker[]>([]);
+  const guruMarkerRef = useRef<WebMarker>(null);
   const mapGenerationRef = useRef(0);
   const cameraRef = useRef<{
     center: [number, number];
@@ -1001,11 +1014,11 @@ function WebCareMap({
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const generation = mapGenerationRef.current + 1;
     mapGenerationRef.current = generation;
-    setMapReadyVersion(0);
+    const container = containerRef.current as unknown as HTMLElement;
 
-    try {
+    void import('maplibre-gl').then((maplibregl) => {
+      if (disposed) return;
       ensureMapLibreCss();
-      const maplibregl = require('maplibre-gl/dist/maplibre-gl.mjs');
       mapLibreRef.current = maplibregl;
 
       const savedCamera = cameraRef.current;
@@ -1019,12 +1032,12 @@ function WebCareMap({
       const map = new maplibregl.Map({
         attributionControl: false,
         center: initialCenter,
-        container: containerRef.current,
+        container,
         dragRotate: false,
         maxZoom: 18,
         minZoom: 3,
         pitchWithRotate: false,
-        style: (isDark ? WEB_MAP_STYLE_DARK : WEB_MAP_STYLE_LIGHT) as any,
+        style: isDark ? WEB_MAP_STYLE_DARK : WEB_MAP_STYLE_LIGHT,
         zoom: initialZoom,
       });
 
@@ -1060,9 +1073,9 @@ function WebCareMap({
 
       // MapLibre owns the camera after its initial load. The current camera is
       // stored in a ref only so a light/dark map rebuild keeps the same view.
-    } catch {
-      setMapInitializationFailed(true);
-    }
+    }).catch(() => {
+      if (!disposed) setMapInitializationFailed(true);
+    });
 
     return () => {
       disposed = true;
@@ -1146,7 +1159,7 @@ function WebCareMap({
 
     try {
       const circleData = buildCircleGeoJson(center, radiusMiles);
-      const existingSource = map.getSource('sitguru-guru-service-area');
+      const existingSource = map.getSource<GeoJSONSource>('sitguru-guru-service-area');
 
       if (existingSource) {
         existingSource.setData(circleData);
@@ -1257,7 +1270,7 @@ function WebCareMap({
 }
 
 function ensureMapLibreCss() {
-  const documentRef = (globalThis as any).document;
+  const documentRef = globalThis.document;
 
   if (
     !documentRef ||
@@ -1274,7 +1287,7 @@ function ensureMapLibreCss() {
 }
 
 function createWebGuruMarker() {
-  const documentRef = (globalThis as any).document;
+  const documentRef = globalThis.document;
   const element = documentRef.createElement('button');
 
   element.type = 'button';
@@ -1300,7 +1313,7 @@ function createWebRequestMarker(
   opportunity: Opportunity,
   palette: ReturnType<typeof getPalette>,
 ) {
-  const documentRef = (globalThis as any).document;
+  const documentRef = globalThis.document;
   const element = documentRef.createElement('button');
 
   element.type = 'button';
@@ -1368,13 +1381,13 @@ function buildCircleGeoJson(
       {
         geometry: {
           coordinates: [coordinates],
-          type: 'Polygon',
+          type: 'Polygon' as const,
         },
         properties: {},
-        type: 'Feature',
+        type: 'Feature' as const,
       },
     ],
-    type: 'FeatureCollection',
+    type: 'FeatureCollection' as const,
   };
 }
 

@@ -20,23 +20,24 @@ export default function CampusLinkShareCard({link,showAtEvent=false,visitsAvaila
   link:CampusLink;showAtEvent?:boolean;visitsAvailable?:boolean;
 }){
   const [open,setOpen]=useState(showAtEvent);
-  const [qrData,setQrData]=useState("");
+  const [qrPreview,setQrPreview]=useState<{ url:string; data:string; error?:string } | null>(null);
   const [copied,setCopied]=useState(false);
-  const [qrError,setQrError]=useState("");
+  const [clipboardError,setClipboardError]=useState("");
   const href=PUBLIC_ORIGIN+campusTrackingPath(link.code);
   const scanUrl=href+"?scan=1";
+  const currentPreview=qrPreview?.url===scanUrl?qrPreview:null;
+  const qrData=currentPreview?.data;
   const filename="sitguru-"+link.code+".png";
   useEffect(()=>{
     if(!open)return;
     let active=true;
-    setQrError("");
     void QRCode.toDataURL(scanUrl,{
       width:360,
       margin:2,
       errorCorrectionLevel:"M",
       color:{dark:"#0F2744",light:"#FFFFFF"},
-    }).then(data=>{if(active)setQrData(data);}).catch(()=>{
-      if(active)setQrError("QR graphic unavailable; the campaign link can still be copied.");
+    }).then(data=>{if(active)setQrPreview({url:scanUrl,data});}).catch(()=>{
+      if(active)setQrPreview({url:scanUrl,data:"",error:"QR graphic unavailable. You can still copy the campaign link."});
     });
     return ()=>{active=false;};
   },[open,scanUrl]);
@@ -44,9 +45,10 @@ export default function CampusLinkShareCard({link,showAtEvent=false,visitsAvaila
     try {
       await navigator.clipboard.writeText(href);
       setCopied(true);
+      setClipboardError("");
     }catch{
       setCopied(false);
-      setQrError("Clipboard permission is unavailable. Select the visible URL to copy it.");
+      setClipboardError("Clipboard permission is unavailable. Select the visible URL to copy it.");
     }
   }
   return (
@@ -85,10 +87,10 @@ export default function CampusLinkShareCard({link,showAtEvent=false,visitsAvaila
                 <p className="mt-2 text-[11px] font-medium text-slate-600">Use only with approved SitGuru branding and university permission.</p>
               </div>
             </div>
-          ):<p className="mt-3 text-sm font-semibold text-slate-600">{qrError||"Creating QR preview…"}</p>}
+          ):<p className="mt-3 text-sm font-semibold text-slate-600">{currentPreview?.error||"Creating QR preview…"}</p>}
         </div>
       ):null}
-      {qrError && !open?<p role="status" className="mt-2 text-xs font-semibold text-amber-900">{qrError}</p>:null}
+      {clipboardError?<p role="status" className="mt-2 text-xs font-semibold text-amber-900">{clipboardError}</p>:null}
     </article>
   );
 }

@@ -121,7 +121,7 @@ export default function GuruLiveWalkScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [message, setMessage] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [visitMood, setVisitMood] = useState<string | null>(null);
   const [visitSummary, setVisitSummary] = useState('');
@@ -134,19 +134,12 @@ export default function GuruLiveWalkScreen() {
     : params.bookingId;
   const walk = useWalkSession(booking?.id || bookingId);
 
-  const loadCare = useCallback(
+  const accountId = user?.id;
+  const fetchLoadCare = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const bookingRow = await findBooking(user.id, bookingId);
+    return findBooking(accountId, bookingId).then(async (bookingRow) => {
         const mappedBooking = bookingRow
           ? mapBooking(bookingRow)
           : null;
@@ -155,7 +148,7 @@ export default function GuruLiveWalkScreen() {
 
         const activeBookingId = mappedBooking?.id || bookingId || '';
         const sessionResult = activeBookingId
-          ? await findSession(user.id, activeBookingId)
+          ? await findSession(accountId, activeBookingId)
           : null;
 
         if (sessionResult) {
@@ -166,7 +159,7 @@ export default function GuruLiveWalkScreen() {
           setSession(mappedSession);
 
           const updateRows = await findUpdates(
-            user.id,
+            accountId,
             activeBookingId,
             mappedSession.id,
           );
@@ -184,21 +177,39 @@ export default function GuruLiveWalkScreen() {
         }
 
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'PawReport activity could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
-    [bookingId, user?.id],
+      });
+  },
+    [bookingId, accountId],
   );
 
+  const loadCare = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadCare(showRefresh);
+  }, [fetchLoadCare, setRefreshing, setLoading]);
+
+  const requestKey = JSON.stringify([isSupabaseConfigured, accountId, bookingId]);
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadCare(false);
-  }, [loadCare]);
+    void fetchLoadCare(false);
+  }, [fetchLoadCare]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);

@@ -113,7 +113,7 @@ describe("internship operating semantics", () => {
     assert.equal(displayVerifiedNumber(row.requiredHours, false), "Pending");
     assert.equal(displayVerifiedNumber(0, true), "0");
     assert.equal(academicStatusLabel(academicStatusKind(row)), "Requirements Not Verified");
-    assert.equal(sitguruEmploymentLabel("accepted"), "Accepted");
+    assert.equal(sitguruEmploymentLabel("accepted"), "Approved");
     assert.equal(sitguruEmploymentLabel("active"), "Active Intern");
   });
 

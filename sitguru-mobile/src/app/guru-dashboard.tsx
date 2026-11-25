@@ -317,7 +317,7 @@ export default function GuruDashboardScreen() {
     useState('');
 
   const [now, setNow] =
-    useState(Date.now());
+    useState(Date.now);
 
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] =
     useState(false);
@@ -381,51 +381,60 @@ export default function GuruDashboardScreen() {
       avatarUrl,
     );
 
-  const refreshDashboard = useCallback(
+  const accountId = user?.id;
+  const fetchRefreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (
-        !user?.id ||
-        !isSupabaseConfigured
-      ) {
-        setData(EMPTY_DATA);
+    if (!accountId ||
+        !isSupabaseConfigured) return;
+
+    return loadDashboard(
+            accountId,
+            profileRecord,
+          ).then(async (loadedData) => {
+      setData(loadedData);
+
+        setLoadMessage('');
+    }).catch(() => {
+        setLoadMessage(
+          'Some Guru activity could not be loaded. Pull down to try again.',
+        );
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-        return;
-      }
+      });
+  },
+    [
+      profileRecord,
+      accountId,
+    ],
+  );
 
-      if (showRefresh) {
+  const refreshDashboard = useCallback((showRefresh = false) => {
+    if (showRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
+    return fetchRefreshDashboard(showRefresh);
+  }, [fetchRefreshDashboard, setRefreshing, setLoading]);
 
-      try {
-        setData(
-          await loadDashboard(
-            user.id,
-            profileRecord,
-          ),
-        );
-
-        setLoadMessage('');
-      } catch {
-        setLoadMessage(
-          'Some Guru activity could not be loaded. Pull down to try again.',
-        );
-      } finally {
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId ||
+        !isSupabaseConfigured) {
+      setData(EMPTY_DATA);
         setLoading(false);
         setRefreshing(false);
-      }
-    },
-    [
-      profileRecord,
-      user?.id,
-    ],
-  );
+    } else {
+      setLoading(true);
+    }
+  }
 
   useEffect(() => {
-    void refreshDashboard(false);
-  }, [refreshDashboard]);
+    void fetchRefreshDashboard(false);
+  }, [fetchRefreshDashboard]);
 
   useEffect(() => {
     const timer = setInterval(

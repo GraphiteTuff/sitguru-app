@@ -315,11 +315,13 @@ function LoginPageContent() {
     [searchParams],
   );
 
-  useEffect(() => {
+  const [previousRequestedMode, setPreviousRequestedMode] = useState(requestedMode);
+  if (previousRequestedMode !== requestedMode) {
+    setPreviousRequestedMode(requestedMode);
     setLoginMethod(requestedMode);
     setTurnstileToken("");
     setTurnstileResetKey((value) => value + 1);
-  }, [requestedMode]);
+  }
 
   async function startSocialLogin(provider: "google" | "apple") {
     try {

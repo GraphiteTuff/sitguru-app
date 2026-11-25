@@ -82,18 +82,15 @@ export default function EventAttendingButtons({
   const [mine, setMine] = useState<AttendanceStatus | null>(null);
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
-  const [guestKey, setGuestKey] = useState("");
+
+
+
 
   useEffect(() => {
-    setGuestKey(getOrCreateEventGuestKey());
-  }, []);
-
-  useEffect(() => {
-    if (!guestKey && typeof window !== "undefined") return;
 
     async function load() {
       try {
-        const key = guestKey || getOrCreateEventGuestKey();
+        const key = getOrCreateEventGuestKey();
         const response = await fetch(
           `/api/community/events/${eventId}/attendance`,
           {
@@ -111,12 +108,11 @@ export default function EventAttendingButtons({
       }
     }
     void load();
-  }, [eventId, guestKey]);
+  }, [eventId]);
 
   function choose(status: AttendanceStatus) {
     startTransition(async () => {
-      const key = guestKey || getOrCreateEventGuestKey();
-      if (!guestKey) setGuestKey(key);
+      const key = getOrCreateEventGuestKey();
 
       const response = await fetch(
         `/api/community/events/${eventId}/attendance`,

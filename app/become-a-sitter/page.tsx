@@ -194,20 +194,18 @@ export default function BecomeGuruPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const normalizedZip = normalizeZipCode(zipCode);
-
-    if (!normalizedZip) {
-      setZipLookupStatus("idle");
-      setZipLookupMessage("");
-      return;
-    }
-
+  const normalizedZip = normalizeZipCode(zipCode);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== normalizedZip) {
+    setPreviousLookupInput(normalizedZip);
     if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setZipLookupMessage("Enter a 5-digit ZIP code to autofill city and state.");
-      return;
+      setZipLookupMessage(normalizedZip ? "Enter a 5-digit ZIP code to autofill city and state." : "");
     }
+  }
+
+  useEffect(() => {
+    if (normalizedZip.length < 5) return;
 
     let isMounted = true;
 
@@ -257,7 +255,7 @@ export default function BecomeGuruPage() {
       isMounted = false;
       window.clearTimeout(timeout);
     };
-  }, [zipCode]);
+  }, [normalizedZip]);
 
   function handleZipChange(value: string) {
     setZipCode(normalizeZipCode(value));

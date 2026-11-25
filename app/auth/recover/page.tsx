@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,8 +24,9 @@ export default function RecoverPasswordPage() {
   const router = useRouter();
   const hasStartedRef = useRef(false);
 
-  const [tokenHash, setTokenHash] = useState("");
-  const [type, setType] = useState("");
+  const params = new URLSearchParams(useBrowserSearch());
+  const tokenHash = params.get("token_hash") || "";
+  const type = params.get("type") || "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -32,12 +34,7 @@ export default function RecoverPasswordPage() {
     return Boolean(tokenHash) && type === "recovery";
   }, [tokenHash, type]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
 
-    setTokenHash(params.get("token_hash") || "");
-    setType(params.get("type") || "");
-  }, []);
 
   useEffect(() => {
     async function verifyAndContinue() {

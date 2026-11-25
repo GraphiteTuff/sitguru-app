@@ -41,11 +41,8 @@ export default function AmbassadorPerformanceDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("earningsPool");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/ambassadors/ledger");
+  const fetchLoad = useCallback(async () => {
+    return fetch("/api/admin/ambassadors/ledger").then(async (res) => {
       const json = (await res.json()) as {
         ok?: boolean;
         error?: string;
@@ -57,16 +54,22 @@ export default function AmbassadorPerformanceDashboard() {
       }
       setKpis(json.kpis || null);
       setRows(json.rows || []);
-    } catch (err) {
+    }).catch((err) => {
       setError(err instanceof Error ? err.message : "Load failed");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, []);
 
+  const load = useCallback(() => {
+    setLoading(true);
+    setError("");
+    return fetchLoad();
+  }, [fetchLoad, setLoading, setError]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchLoad();
+  }, [fetchLoad]);
 
   const sorted = useMemo(() => {
     const copy = [...rows];

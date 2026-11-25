@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -90,7 +91,12 @@ export default function AdminInboxWorkspace({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [pendingBulk, startBulk] = useTransition();
-  const [listWidth, setListWidth] = useState(LIST_WIDTH_DEFAULT);
+  const storedListWidth = useBrowserSnapshot(readStoredListWidth, LIST_WIDTH_DEFAULT);
+  const [listWidthOverride, setListWidthOverride] = useState<number | null>(null);
+  const listWidth = listWidthOverride ?? storedListWidth;
+  function setListWidth(next: number | ((width: number) => number)) {
+    setListWidthOverride(current => typeof next === "function" ? next(current ?? storedListWidth) : next);
+  }
   const [isResizing, setIsResizing] = useState(false);
   const splitRef = useRef<HTMLDivElement>(null);
 
@@ -100,17 +106,17 @@ export default function AdminInboxWorkspace({
     allVisibleIds.length > 0 && selectedCount === allVisibleIds.length;
   const someSelected = selectedCount > 0 && !allSelected;
 
-  useEffect(() => {
-    setListWidth(readStoredListWidth());
-  }, []);
 
-  useEffect(() => {
+
+  const [previousVisibleIds, setPreviousVisibleIds] = useState(allVisibleIds);
+  if (allVisibleIds !== previousVisibleIds) {
+    setPreviousVisibleIds(allVisibleIds);
     setSelectedIds((current) => {
       const visible = new Set(allVisibleIds);
       const next = new Set([...current].filter((id) => visible.has(id)));
       return next.size === current.size ? current : next;
     });
-  }, [allVisibleIds]);
+  }
 
   const clampListWidth = useCallback((next: number) => {
     const shell = splitRef.current;

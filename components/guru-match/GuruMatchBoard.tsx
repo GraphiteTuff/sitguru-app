@@ -23,13 +23,13 @@ const secondary="inline-flex min-h-11 items-center justify-center gap-2 rounded-
 const primary="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 text-sm font-black !text-white hover:bg-[#1D4ED8] disabled:opacity-55";
 function metric(value:number){return value.toLocaleString("en-US");}
 function GuruAvatar({name,photoUrl,size="lg"}:{name:string;photoUrl:string|null;size?:"lg"|"sm"}){
-  const [failed,setFailed]=useState(false);
-  useEffect(()=>setFailed(false),[photoUrl]);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
+  const failed = Boolean(photoUrl && failedImageSrc === photoUrl);
   const dimension=size==="lg"?"h-16 w-16":"h-14 w-14";
   const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0].toUpperCase()).join("")||"SG";
   return <span className={`flex ${dimension} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-emerald-50 text-sm font-black text-[#0D5C3A]`}
     aria-label={photoUrl&&!failed?`${name} profile photo`:`${name} initials avatar`}>
-    {photoUrl&&!failed?<img src={photoUrl} alt="" onError={()=>setFailed(true)}
+    {photoUrl&&!failed?<img src={photoUrl} alt="" onError={()=>setFailedImageSrc(photoUrl ?? null)}
       className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer"/>:
       <span aria-hidden="true">{initials}</span>}
   </span>;
@@ -477,7 +477,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
                     </select>
                   </label>
                 </div>
-                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
+                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru&apos;s approved, trackable share card…</p>}
                 {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
                   <div className="min-w-0 space-y-2">
                     <GuruCardPreview url={ready.cardUrl}

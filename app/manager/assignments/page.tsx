@@ -1,3 +1,4 @@
+import InstructorCenter from "@/components/internship/InstructorCenter";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
 import ManagerAssignmentsHome, {
@@ -20,21 +21,13 @@ function first(value: string | string[] | undefined) {
 
 function statusLabel(status: string) {
   if (status === "draft") return "Draft";
+  if (status === "excused") return "Excused";
   if (status === "in_progress") return "In Progress";
   if (status === "submitted") return "Needs Review";
   if (status === "approved") return "Approved";
   if (status === "revision_requested") return "Changes requested";
   if (status === "todo") return "Not started";
   return status.replaceAll("_", " ");
-}
-
-function progressFor(status: string) {
-  if (status === "approved") return 100;
-  if (status === "submitted") return 80;
-  if (status === "in_progress") return 45;
-  if (status === "revision_requested") return 35;
-  if (status === "todo") return 0;
-  return 0;
 }
 
 function dueLabel(value: string) {
@@ -129,6 +122,11 @@ export default async function ManagerAssignmentsPage({
       avatarUrl: interns.find((intern) => intern.id === String(row.intern_id))?.avatarUrl || "",
       title: String(row.title || ""),
       category: brief.category || String(row.metric_affected || "Other"),
+      primaryGrowthPillar: brief.primaryGrowthPillar,
+      targetAudiences: brief.targetAudiences,
+      learningObjective: brief.learningObjective,
+      estimatedHours: brief.estimatedHours,
+      expectedOutcomes: brief.expectedOutcomes,
       milestoneId: brief.milestoneId || "",
       projectId: String(row.project_id || brief.projectId || ""),
       finalSection: String(row.final_section || brief.finalSection || defaultFinalSectionForCategory(brief.category || String(row.metric_affected || "Other"))),
@@ -143,7 +141,6 @@ export default async function ManagerAssignmentsPage({
       notes: brief.notes || "",
       clientRequestId: brief.clientRequestId || String(row.id),
       statusLabel: statusLabel(status),
-      progress: progressFor(status),
     };
   });
   const integrations = await listAssignmentIntegrations(rows.map((row) => row.id));
@@ -171,14 +168,16 @@ export default async function ManagerAssignmentsPage({
   const error = first(params.error);
 
   return (
+    <div className="space-y-4"><InstructorCenter mode="manager" />
     <ManagerAssignmentsHome
       rows={rows}
+      today={new Date().toLocaleDateString("sv-SE", { timeZone: "America/New_York" })}
       interns={interns}
       milestones={milestones}
       projects={projects}
       initialOpen={first(params.create) === "true"}
       links={links}
       notice={ok ? { kind: "ok", message: ok } : error ? { kind: "error", message: error } : null}
-    />
+    /></div>
   );
 }

@@ -32,7 +32,7 @@ export default async function AdminInternAssignmentsPreviewPage({
           <InternName name={workspace.intern.fullName} src={workspace.intern.avatarUrl} /> · Assignments
         </h1>
         <p className="mt-2 text-sm font-semibold text-slate-600">
-          Browse this intern's assigned work exactly as it appears in SitGuru, without signing in as them.
+          Browse this intern&apos;s assigned work exactly as it appears in SitGuru, without signing in as them.
           This administrator preview is read-only: it cannot edit, save, approve, or submit their work.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">

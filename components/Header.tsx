@@ -452,21 +452,16 @@ function headerModeToSwitchRole(
 export default function Header({ user = null }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [loadedUser, setLoadedUser] = useState<HeaderUser | null>(user);
-  const [loadingUser, setLoadingUser] = useState(!user);
+  const [loadedUser, setLoadedUser] = useState<HeaderUser | null>(null);
+  const [loadingActiveUser, setLoadingUser] = useState(!user);
+  const loadingUser = !user && loadingActiveUser;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    async function loadActiveUser() {
-      try {
-        setLoadingUser(true);
-        const {
-          data: { user: activeUser },
-          error: userError,
-        } = await supabase.auth.getUser();
-
+    function loadActiveUser() {
+      return supabase.auth.getUser().then(async ({ data: { user: activeUser }, error: userError }) => {
         if (!mounted) return;
         if (userError || !activeUser) {
           setLoadedUser(null);
@@ -631,25 +626,25 @@ export default function Header({ user = null }: HeaderProps) {
           guruStatus: getGuruStatus(guru),
           ambassadorStatus: getAmbassadorStatus(ambassador),
         });
-      } catch (error) {
+      }).catch(error => {
         console.error("Header user load failed:", error);
         if (mounted) setLoadedUser(null);
-      } finally {
+      }).finally(() => {
         if (mounted) setLoadingUser(false);
-      }
+      });
     }
 
-    if (user) {
-      setLoadedUser(user);
-      setLoadingUser(false);
-      return;
-    }
+    if (user) return;
 
     loadActiveUser();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      window.setTimeout(() => loadActiveUser(), 0);
+      window.setTimeout(() => {
+        if (!mounted) return;
+        setLoadingUser(true);
+        void loadActiveUser();
+      }, 0);
     });
 
     return () => {
@@ -667,11 +662,13 @@ export default function Header({ user = null }: HeaderProps) {
   }, []);
 
 
-  useEffect(() => {
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
     setMobileOpen(false);
-  }, [pathname]);
+  }
 
-  const activeUser = loadedUser;
+  const activeUser = user ?? loadedUser;
   const isLoggedIn = Boolean(activeUser);
   const storedRole = normalizeStoredRole(activeUser?.role);
   const headerMode = getHeaderMode({ pathname, isLoggedIn, storedRole });

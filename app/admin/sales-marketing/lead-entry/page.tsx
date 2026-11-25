@@ -626,28 +626,28 @@ export default function SalesMarketingLeadEntryPage() {
 
   const cleanZip = useMemo(() => zipCode.replace(/\D/g, "").slice(0, 5), [zipCode]);
 
-  useEffect(() => {
+  const [previousZip, setPreviousZip] = useState<string | null>(null);
+  const zipFallback = zipFallbacks[cleanZip];
+  if (previousZip !== cleanZip) {
+    setPreviousZip(cleanZip);
     if (cleanZip.length !== 5) {
       setZipStatus("");
-      return;
-    }
-
-    const fallback = zipFallbacks[cleanZip];
-
-    if (fallback) {
-      setCity(fallback.city);
-      setStateCode(fallback.state);
-      setMarketArea(`${fallback.city}, ${fallback.state}`);
+    } else if (zipFallback) {
+      setCity(zipFallback.city);
+      setStateCode(zipFallback.state);
+      setMarketArea(`${zipFallback.city}, ${zipFallback.state}`);
       setZipStatus("City/state filled from SitGuru ZIP fallback.");
-      return;
+    } else {
+      setZipStatus("Looking up ZIP code...");
     }
+  }
 
+  useEffect(() => {
+    if (cleanZip.length !== 5 || zipFallback) return;
     let isMounted = true;
 
     async function lookupZip() {
       try {
-        setZipStatus("Looking up ZIP code...");
-
         const response = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
 
         if (!response.ok) {
@@ -675,12 +675,12 @@ export default function SalesMarketingLeadEntryPage() {
       }
     }
 
-    lookupZip();
+    void lookupZip();
 
     return () => {
       isMounted = false;
     };
-  }, [cleanZip]);
+  }, [cleanZip, zipFallback]);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">

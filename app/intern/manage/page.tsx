@@ -48,7 +48,7 @@ export default async function InternManagerPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  let requestedManager = kind === "supervisor" ? first(params.manager) : "";
+  const requestedManager = kind === "supervisor" ? first(params.manager) : "";
   if (founderPersonal && !requestedManager) {
     const { data: avaProfile } = await supabaseAdmin
       .from("profiles")

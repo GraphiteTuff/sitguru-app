@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
@@ -1508,30 +1509,32 @@ function HomepageAssistPopup({
     window.localStorage.removeItem(messengerSessionStorageKey);
   }
 
-  useEffect(() => {
-    window.localStorage.removeItem(messengerSessionStorageKey);
-
-    const savedSession = window.sessionStorage.getItem(
-      messengerSessionStorageKey,
-    );
-
-    if (!savedSession) return;
-
+  const savedSession = useBrowserSnapshot(
+    () => window.sessionStorage.getItem(messengerSessionStorageKey),
+    null,
+  );
+  const [hasRestoredSession, setHasRestoredSession] = useState(false);
+  if (savedSession && !hasRestoredSession) {
+    setHasRestoredSession(true);
     try {
       const parsed = JSON.parse(savedSession) as HomepageMessengerSession;
-      if (!parsed?.conversationId || !parsed?.token) return;
-
-      setSession(parsed);
-      if (parsed.visitorName) {
-        setForm((previous) => ({
-          ...previous,
-          fullName: parsed.visitorName || previous.fullName,
-        }));
+      if (parsed?.conversationId && parsed?.token) {
+        setSession(parsed);
+        if (parsed.visitorName) {
+          setForm(previous => ({ ...previous, fullName: parsed.visitorName || previous.fullName }));
+        }
       }
     } catch {
-      clearStoredMessengerSession();
+      // The browser persistence effect discards an unreadable saved session.
     }
-  }, []);
+  }
+
+  useEffect(() => {
+    window.localStorage.removeItem(messengerSessionStorageKey);
+    if (!savedSession) return;
+    try { JSON.parse(savedSession); }
+    catch { clearStoredMessengerSession(); }
+  }, [savedSession]);
 
   function applyMessengerMessages(
     nextMessages: HomepageMessengerMessage[],
@@ -2032,7 +2035,7 @@ export default function HomePage() {
   const [zipLookupMessage, setZipLookupMessage] = useState("");
   const [guruCards, setGuruCards] = useState<GuruCard[]>([]);
   const [isLoadingGurus, setIsLoadingGurus] = useState(true);
-  const [source, setSource] = useState("direct");
+  const source = useBrowserSnapshot(detectSourceFromUrl, "direct");
   const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
   const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
   const seasonalStage = Boolean(
@@ -2159,7 +2162,6 @@ export default function HomePage() {
 
   useEffect(() => {
     const detectedSource = detectSourceFromUrl();
-    setSource(detectedSource);
 
     trackEvent({
       eventName: "homepage_visit",
@@ -2276,20 +2278,18 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    const normalizedZip = normalizeZipCode(searchForm.zipCode);
-
-    if (!normalizedZip) {
-      setZipLookupStatus("idle");
-      setZipLookupMessage("");
-      return;
-    }
-
+  const normalizedZip = normalizeZipCode(searchForm.zipCode);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== normalizedZip) {
+    setPreviousLookupInput(normalizedZip);
     if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setZipLookupMessage("");
-      return;
+      setZipLookupMessage(normalizedZip ? "" : "");
     }
+  }
+
+  useEffect(() => {
+    if (normalizedZip.length < 5) return;
 
     let isMounted = true;
 
@@ -2343,7 +2343,7 @@ export default function HomePage() {
       isMounted = false;
       window.clearTimeout(timeout);
     };
-  }, [searchForm.zipCode]);
+  }, [normalizedZip]);
 
   function updateSearchField<K extends keyof SearchFormState>(
     key: K,

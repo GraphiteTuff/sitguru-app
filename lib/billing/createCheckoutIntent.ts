@@ -49,7 +49,7 @@ async function safeBookingUpdate(
   bookingId: string,
   payload: Record<string, unknown>,
 ) {
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const { error } = await supabaseAdmin

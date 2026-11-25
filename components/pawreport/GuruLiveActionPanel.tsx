@@ -6,6 +6,7 @@
  * Uses navigator.geolocation.watchPosition with graceful GPS / permission fallbacks.
  */
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   snackbarFromLiveEvent,
@@ -88,15 +89,9 @@ export default function GuruLiveActionPanel({
   }, []);
 
   const startWatch = useCallback(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGpsMessage(
-        "This browser does not support GPS. You can still log breaks and potty updates.",
-      );
-      return;
-    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
 
     clearWatch();
-    setGpsMessage("Acquiring GPS signal…");
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -150,25 +145,29 @@ export default function GuruLiveActionPanel({
     );
   }, [bookingId, clearWatch]);
 
-  // Start watching when walk becomes active; stop on break/end/idle
-  useEffect(() => {
-    if (trackingState === "active") {
-      startWatch();
-      return () => clearWatch();
-    }
-
-    clearWatch();
+  const gpsSupported = useBrowserSnapshot(
+    () => typeof navigator !== "undefined" && Boolean(navigator.geolocation),
+    null,
+  );
+  const trackingKey = [trackingState, bookingId, gpsSupported] as const;
+  const [previousTrackingKey, setPreviousTrackingKey] = useState<typeof trackingKey | null>(null);
+  if (!previousTrackingKey || trackingKey.some((value, index) => value !== previousTrackingKey[index])) {
+    setPreviousTrackingKey(trackingKey);
     if (trackingState === "on_break") {
-      setGpsMessage((current) =>
-        current.includes("denied")
-          ? current
-          : "GPS paused on break (prevents park drift).",
-      );
-    }
-    if (trackingState === "ended") {
+      setGpsMessage(current => current.includes("denied") ? current : "GPS paused on break (prevents park drift).");
+    } else if (trackingState === "ended") {
       setGpsMessage("Walk ended — route locked.");
+    } else if (trackingState === "active" && gpsSupported !== null) {
+      setGpsMessage(gpsSupported ? "Acquiring GPS signal…" :
+        "This browser does not support GPS. You can still log breaks and potty updates.");
     }
-  }, [trackingState, startWatch, clearWatch]);
+  }
+
+  useEffect(() => {
+    if (trackingState !== "active" || !gpsSupported) return;
+    startWatch();
+    return () => clearWatch();
+  }, [trackingState, gpsSupported, startWatch, clearWatch]);
 
   useEffect(() => () => clearWatch(), [clearWatch]);
 

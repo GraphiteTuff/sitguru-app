@@ -510,12 +510,45 @@ export default function NotificationsScreen() {
     ? resolveSupabaseStorageUrl(rawAvatar)
     : null;
 
-  const refresh = useCallback(
+  const accountId = user?.id;
+  const fetchRefresh = useCallback(
     async (showRefresh = false) => {
-      if (authLoading) return;
+    if (authLoading) return;
+    if (!isSupabaseConfigured || !accountId) return;
 
-      if (!isSupabaseConfigured || !user?.id) {
-        setItems([]);
+    return loadNotifications(accountId, activeRole).then(async (nextItems) => {
+
+        setItems(nextItems);
+        setMessage('');
+    }).catch((error) => {
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'SitGuru could not load notifications.',
+        );
+      }).finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  },
+    [activeRole, authLoading, isAuthenticated, accountId],
+  );
+
+  const refresh = useCallback((showRefresh = false) => {
+    if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+    return fetchRefresh(showRefresh);
+  }, [fetchRefresh, setRefreshing, setLoading]);
+
+  const requestKey = JSON.stringify([authLoading, isSupabaseConfigured, accountId, activeRole]);
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!isSupabaseConfigured || !accountId) {
+      setItems([]);
         setLoading(false);
         setRefreshing(false);
         setMessage(
@@ -523,37 +556,14 @@ export default function NotificationsScreen() {
             ? 'Notifications are not connected in this environment.'
             : '',
         );
-        return;
-      }
-
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        const nextItems = await loadNotifications(user.id, activeRole);
-
-        setItems(nextItems);
-        setMessage('');
-      } catch (error) {
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : 'SitGuru could not load notifications.',
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [activeRole, authLoading, isAuthenticated, user?.id],
-  );
+    } else {
+      setLoading(true);
+    }
+  }
 
   useEffect(() => {
-    void refresh(false);
-  }, [refresh]);
+    void fetchRefresh(false);
+  }, [fetchRefresh]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;

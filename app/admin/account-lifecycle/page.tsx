@@ -988,7 +988,7 @@ export default async function AccountLifecyclePage({
   const refreshHref = query
     ? `/admin/account-lifecycle?query=${encodeURIComponent(
         query,
-      )}&refresh=${Date.now()}`
+      )}&refresh=${params.refresh === "1" ? "0" : "1"}`
     : "/admin/account-lifecycle";
 
   const activityItems = profile

@@ -33,11 +33,8 @@ export type PublicEventFilters = {
   offset?: number;
 };
 
-function applyPublicFilters<T extends { eq: Function; gte: Function; lte: Function; ilike: Function; contains: Function; order: Function }>(
-  query: T,
-  filters: PublicEventFilters,
-) {
-  let next = query
+function queryPublicEvents(filters: PublicEventFilters) {
+  let next = supabaseAdmin.from("community_events").select(PUBLIC_EVENT_SELECT)
     .eq("status", "published")
     .is("cancelled_at", null)
     .gte("start_at", filters.from || new Date().toISOString());
@@ -79,10 +76,7 @@ export async function fetchPublicEvents(filters: PublicEventFilters = {}) {
   const limit = filters.limit ?? 24;
   const offset = filters.offset ?? 0;
 
-  const query = applyPublicFilters(
-    supabaseAdmin.from("community_events").select(PUBLIC_EVENT_SELECT),
-    filters,
-  );
+  const query = queryPublicEvents(filters);
 
   const { data, error } = await query.range(offset, offset + limit - 1);
 

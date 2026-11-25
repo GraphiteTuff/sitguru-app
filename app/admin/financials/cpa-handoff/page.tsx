@@ -1019,10 +1019,9 @@ export default function AdminCpaHandoffPage() {
   const [message, setMessage] = useState("Loading CPA handoff data...");
 
   async function loadGrowthReferralFinancials() {
-    try {
-      const response = await fetch("/api/admin/financials/growth-referrals", {
+    return fetch("/api/admin/financials/growth-referrals", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       const json = (await response.json()) as GrowthReferralFinancialsResponse;
 
@@ -1037,7 +1036,7 @@ export default function AdminCpaHandoffPage() {
       }
 
       setGrowthFinancials(json);
-    } catch (error) {
+    }).catch((error) => {
       setGrowthFinancials({
         ...fallbackGrowthReferralFinancials,
         message:
@@ -1045,17 +1044,13 @@ export default function AdminCpaHandoffPage() {
             ? error.message
             : "Unable to load Growth & Referrals financial summary.",
       });
-    }
+    });
   }
 
   async function loadData() {
-    setLoading(true);
-    setMessage("Loading CPA handoff data...");
-
-    try {
-      const response = await fetch("/api/admin/financials/cpa-handoff", {
+    return fetch("/api/admin/financials/cpa-handoff", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       const json = (await response.json()) as CpaHandoffResponse;
 
@@ -1067,16 +1062,22 @@ export default function AdminCpaHandoffPage() {
 
       setData(json);
       setMessage(json.message);
-    } catch (error) {
+    }).catch((error) => {
       setData(fallbackResponse);
       setMessage(
         error instanceof Error
           ? error.message
           : "Unable to load CPA handoff data.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
+  }
+
+  async function refreshData() {
+    setLoading(true);
+    setMessage("Loading CPA handoff data...");
+    await loadData();
   }
 
   useEffect(() => {
@@ -1256,7 +1257,7 @@ export default function AdminCpaHandoffPage() {
               <button
                 type="button"
                 onClick={() => {
-                  void loadData();
+                  void refreshData();
                   void loadGrowthReferralFinancials();
                 }}
                 className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
@@ -1391,7 +1392,7 @@ export default function AdminCpaHandoffPage() {
                 <ItemCard
                   key={`${item.source}-${item.id}`}
                   item={item}
-                  onUpdated={loadData}
+                  onUpdated={refreshData}
                 />
               ))}
             </div>

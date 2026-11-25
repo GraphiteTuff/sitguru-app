@@ -1004,44 +1004,24 @@ export default function ReviewsScreen() {
 
   const isWide = width >= 720;
 
-  const refresh = useCallback(async () => {
-    if (authLoading) return;
-
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      setLoadError(
-        'The mobile app is not connected to Supabase in this environment.',
-      );
-      return;
-    }
-
-    if (!user?.id) {
-      setBooking(null);
-      setReviews([]);
-      setLoading(false);
-      setLoadError('');
-      return;
-    }
-
-    setLoading(true);
-    setLoadError('');
-
-    try {
-      const nextBooking =
-        (bookingId ? await loadBookingById(bookingId) : null) ||
-        (await loadLatestBookingForUser(user.id, effectiveRole));
+  const accountId = user?.id;
+  const fetchReviews = useCallback(() => {
+    if (authLoading || !isSupabaseConfigured || !accountId) return;
+    const explicitBooking = bookingId ? loadBookingById(bookingId) : Promise.resolve(null);
+    return explicitBooking.then(async requestedBooking => {
+      const nextBooking = requestedBooking || await loadLatestBookingForUser(accountId, effectiveRole);
 
       setBooking(nextBooking);
 
       const nextGuruUserId =
         requestedGuruId ||
         nextBooking?.guruUserId ||
-        (effectiveRole === 'guru' ? user.id : '');
+        (effectiveRole === 'guru' ? accountId : '');
 
-      if (nextBooking?.id && user?.id && roleCanReview(effectiveRole)) {
+      if (nextBooking?.id && accountId && roleCanReview(effectiveRole)) {
         const existing = await findExistingReview({
           bookingId: nextBooking.id,
-          reviewerUserId: user.id,
+          reviewerUserId: accountId,
         });
         setAlreadyReviewed(Boolean(existing));
       } else {
@@ -1076,26 +1056,50 @@ export default function ReviewsScreen() {
         ),
       );
       setLoadError(reviewResult.error);
-    } catch (error) {
+    }).catch((error) => {
       setLoadError(
         error instanceof Error
           ? error.message
           : 'SitGuru could not load reviews.',
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [
     authLoading,
     bookingId,
     effectiveRole,
     requestedGuruId,
-    user?.id,
+    accountId,
   ]);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  function refresh() {
+    if (authLoading || !isSupabaseConfigured || !accountId) return;
+    setLoading(true);
+    setLoadError('');
+    return fetchReviews();
+  }
+
+  const reviewAccountKey = authLoading ? 'loading' : accountId || '';
+  const [previousReviewAccount, setPreviousReviewAccount] = useState<string | null>(null);
+  if (previousReviewAccount !== reviewAccountKey) {
+    setPreviousReviewAccount(reviewAccountKey);
+    if (!authLoading) {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      setLoadError(
+        'The mobile app is not connected to Supabase in this environment.',
+      );
+    } else if (!accountId) {
+      setBooking(null);
+      setReviews([]);
+      setLoading(false);
+      setLoadError('');
+    }
+
+    }
+  }
+  useEffect(() => { void fetchReviews(); }, [fetchReviews]);
 
   function togglePraise(chip: string) {
     setSelectedPraise((current) =>

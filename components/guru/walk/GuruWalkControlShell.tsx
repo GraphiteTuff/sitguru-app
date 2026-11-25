@@ -49,7 +49,7 @@ export default function GuruWalkControlShell({
   const [distanceMiles, setDistanceMiles] = useState(0);
   const [durationMinutes, setDurationMinutes] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [liveElapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
   const [rewardOpen, setRewardOpen] = useState(false);
 
   const trackingStateRef = useRef<WalkTrackingState>("idle");
@@ -73,16 +73,12 @@ export default function GuruWalkControlShell({
     });
 
   // Live elapsed clock while walk is active or on break
-  useEffect(() => {
-    if (trackingState === "idle") {
-      setElapsedSeconds(0);
-      return;
-    }
-    if (trackingState === "ended") {
-      setElapsedSeconds(Math.round(durationMinutes * 60));
-      return;
-    }
+  const isTimingWalk = trackingState !== "idle" && trackingState !== "ended";
+  const baselineElapsedSeconds = trackingState === "idle" ? 0 : Math.round(durationMinutes * 60);
+  const elapsedSeconds = isTimingWalk ? liveElapsedSeconds ?? baselineElapsedSeconds : baselineElapsedSeconds;
 
+  useEffect(() => {
+    if (!isTimingWalk) return;
     const origin =
       startedAt ??
       Date.now() - Math.max(0, Math.round(durationMinutes * 60) * 1000);
@@ -90,10 +86,9 @@ export default function GuruWalkControlShell({
     const tick = () => {
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - origin) / 1000)));
     };
-    tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [trackingState, startedAt, durationMinutes]);
+  }, [isTimingWalk, startedAt, durationMinutes]);
 
   const banner = useMemo(() => {
     if (trackingState === "ended") {

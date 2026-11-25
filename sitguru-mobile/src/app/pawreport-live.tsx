@@ -253,7 +253,7 @@ export default function PawReportLiveScreen() {
                 </View>
                 <Text style={styles.emptyRouteTitle}>Walk map</Text>
                 <Text style={styles.emptyRouteText}>
-                  Your Guru's route will appear here when GPS tracking is available for this booking.
+                  Your Guru&apos;s route will appear here when GPS tracking is available for this booking.
                 </Text>
               </View>
             )}

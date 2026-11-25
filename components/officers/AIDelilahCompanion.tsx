@@ -5,6 +5,8 @@
  * Mounts on /events (and legacy /community) public surfaces.
  */
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -82,23 +84,27 @@ export default function AIDelilahCompanion() {
   const pathname = usePathname();
   const routeEnabled = isEventsPath(pathname);
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const benefitsChip = getCompanionBenefitsChip(ACTIVE_COMPANION);
   const viewer = useCompanionViewer();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const companionSearch = useBrowserSearch();
+  const [previousCompanionSearch, setPreviousCompanionSearch] = useState("");
+  if (companionSearch !== previousCompanionSearch) {
+    setPreviousCompanionSearch(companionSearch);
+    if (new URLSearchParams(companionSearch).get("chat")?.trim().toLowerCase() === "delilah") {
+      setIsOpen(true);
+    }
+  }
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const chat = params.get("chat")?.trim().toLowerCase();
       if (chat !== "delilah") return;
-      setIsOpen(true);
       params.delete("chat");
       const next = `${window.location.pathname}${
         params.toString() ? `?${params}` : ""
@@ -107,7 +113,7 @@ export default function AIDelilahCompanion() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [companionSearch]);
 
   useEffect(() => {
     function onOpenCompanionChat(event: Event) {

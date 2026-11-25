@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -225,7 +226,9 @@ function SummaryCard({
 
 export default function AdminPaymentGatewayPage() {
   const [range, setRange] = useState<PaymentGatewayRange>("month");
-  const [gateway, setGateway] = useState<PaymentGatewayFilter>("all");
+  const initialGateway = useBrowserSnapshot(readInitialGateway, null);
+  const [gatewayOverride, setGateway] = useState<PaymentGatewayFilter | null>(null);
+  const gateway = gatewayOverride ?? initialGateway ?? "all";
   const [data, setData] = useState<PaymentGatewaysResponse>(fallback);
   const [stripeLite, setStripeLite] = useState<StripeLiteResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -240,12 +243,10 @@ export default function AdminPaymentGatewayPage() {
     return data.gateways.find((item) => item.id === gateway) || null;
   }, [data.gateways, gateway]);
 
-  useEffect(() => {
-    setGateway(readInitialGateway());
-  }, []);
+
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (initialGateway === null) return;
     const url = new URL(window.location.href);
     if (gateway === "all") {
       url.searchParams.delete("provider");
@@ -255,21 +256,17 @@ export default function AdminPaymentGatewayPage() {
       url.searchParams.delete("gateway");
     }
     window.history.replaceState({}, "", url.toString());
-  }, [gateway]);
+  }, [gateway, initialGateway]);
 
-  async function loadGateways() {
-    setLoading(true);
-    setLoadMessage("Loading payment gateway activity by provider...");
-
-    try {
-      const params = new URLSearchParams({
+  async function fetchLoadGateways() {
+    const params = new URLSearchParams({
         range,
         startDate: rangeDates.startDate,
         endDate: rangeDates.endDate,
         gateway,
       });
 
-      const [gatewayResponse, stripeResponse] = await Promise.all([
+    return Promise.all([
         fetch(`/api/admin/financials/payment-gateways?${params}`, {
           cache: "no-store",
         }),
@@ -277,7 +274,7 @@ export default function AdminPaymentGatewayPage() {
           `/api/admin/financials/stripe?range=${range}&startDate=${rangeDates.startDate}&endDate=${rangeDates.endDate}`,
           { cache: "no-store" },
         ),
-      ]);
+      ]).then(async ([gatewayResponse, stripeResponse]) => {
 
       const json = (await gatewayResponse.json()) as PaymentGatewaysResponse;
       const stripeJson = (await stripeResponse.json()) as StripeLiteResponse;
@@ -309,7 +306,7 @@ export default function AdminPaymentGatewayPage() {
       } else {
         setStripeLite(null);
       }
-    } catch (error) {
+    }).catch((error) => {
       setData({
         ...fallback,
         range,
@@ -325,13 +322,27 @@ export default function AdminPaymentGatewayPage() {
           : "Unable to load payment gateway data.",
       );
       setStripeLite(null);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
+  }
+
+  function loadGateways() {
+    setLoading(true);
+    setLoadMessage("Loading payment gateway activity by provider...");
+    return fetchLoadGateways();
+  }
+
+  const filterKey = range + ":" + gateway;
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    setLoading(true);
+    setLoadMessage("Loading payment gateway activity by provider...");
   }
 
   useEffect(() => {
-    void loadGateways();
+    void fetchLoadGateways();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, gateway]);
 

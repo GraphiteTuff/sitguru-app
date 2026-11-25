@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -296,6 +296,16 @@ export default function GuruVisitTracker({
   const [walkTrackId, setWalkTrackId] = useState("");
   const [walkStartedAt, setWalkStartedAt] = useState<number | null>(null);
   const [walkEndedAt, setWalkEndedAt] = useState<number | null>(null);
+  const [walkClock, setWalkClock] = useState(0);
+  const walkDurationSeconds = walkStartedAt
+    ? Math.max(0, Math.round(((walkEndedAt ?? walkClock) - walkStartedAt) / 1000))
+    : 0;
+
+  useEffect(() => {
+    if (!walkStartedAt || walkEndedAt !== null) return;
+    const timer = window.setInterval(() => setWalkClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [walkStartedAt, walkEndedAt]);
   const [walkDistanceMeters, setWalkDistanceMeters] = useState(0);
   const [walkLastLocation, setWalkLastLocation] = useState<WalkPoint | null>(
     null,
@@ -332,19 +342,12 @@ export default function GuruVisitTracker({
     }
   }
 
-  function getWalkDurationSeconds() {
-    if (!walkStartedAtRef.current) return 0;
-
-    const end = walkEndedAt || Date.now();
-    return Math.max(0, Math.round((end - walkStartedAtRef.current) / 1000));
-  }
-
   async function saveWalkPoint(point: WalkPoint, forceSave = false) {
     const activeWalkTrackId = walkTrackIdRef.current;
 
     if (!activeWalkTrackId) return;
 
-    const now = Date.now();
+    const now = point.recordedAt;
     const secondsSinceLastSave = Math.round(
       (now - walkLastSavedAtRef.current) / 1000,
     );
@@ -360,7 +363,9 @@ export default function GuruVisitTracker({
       lng: point.lng,
       accuracy: point.accuracy,
       totalDistanceMeters: walkDistanceRef.current,
-      totalDurationSeconds: getWalkDurationSeconds(),
+      totalDurationSeconds: walkStartedAtRef.current
+        ? Math.max(0, Math.round((now - walkStartedAtRef.current) / 1000))
+        : 0,
     });
 
     if (!result.success) {
@@ -464,6 +469,7 @@ export default function GuruVisitTracker({
 
       setWalkTrackId(result.walkTrackId);
       setWalkStatus("walking");
+      setWalkClock(now);
       setWalkStartedAt(now);
       setWalkEndedAt(null);
       setWalkDistanceMeters(0);
@@ -1042,7 +1048,7 @@ export default function GuruVisitTracker({
                     Duration
                   </p>
                   <p className="mt-1 text-2xl font-black !text-[#061638]">
-                    {formatWalkDuration(getWalkDurationSeconds())}
+                    {formatWalkDuration(walkDurationSeconds)}
                   </p>
                 </div>
 
@@ -1107,7 +1113,7 @@ export default function GuruVisitTracker({
 
                 <button
                   type="button"
-                  onClick={handleEndWalk}
+                  onClick={() => void handleEndWalk()}
                   disabled={
                     isPending ||
                     (walkStatus !== "walking" && walkStatus !== "paused")

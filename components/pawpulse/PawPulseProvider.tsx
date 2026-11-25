@@ -107,10 +107,14 @@ export function PawPulseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = parsePawPulseHandoff(window.sessionStorage.getItem(PAWPULSE_HANDOFF_KEY));
     if (!stored) return;
-    window.sessionStorage.removeItem(PAWPULSE_HANDOFF_KEY);
+
     const id = `handoff-${pathname}`;
-    if (stored.tone === "error") fail(id, stored.message);
-    else succeed(id, stored.message);
+    const frame = window.requestAnimationFrame(() => {
+      window.sessionStorage.removeItem(PAWPULSE_HANDOFF_KEY);
+      if (stored.tone === "error") fail(id, stored.message);
+      else succeed(id, stored.message);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [fail, pathname, succeed]);
 
   useEffect(() => {

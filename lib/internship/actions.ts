@@ -1,5 +1,7 @@
 "use server";
 
+import { canUseOfficialCheckIns } from "@/lib/internship/program-controls";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -720,6 +722,7 @@ export async function reviewBaselineBrief(formData: FormData) {
 export async function submitInternWork(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
+  if (mode !== "intern") bounce(workspacePath(internId, mode), "error", "Only the assigned intern can submit their work.");
   await assertWorkspaceActor(internId, mode);
   const itemType = text(formData, "itemType") === "content" ? "content" : "task";
   const workUrl = text(formData, "workUrl");
@@ -1008,6 +1011,13 @@ export async function saveWeeklyReview(formData: FormData) {
   const mode = text(formData, "mode") || "intern";
   const returnTo=mode==="intern"?"/intern/check-ins":workspacePath(internId,mode);
   await assertWorkspaceActor(internId, mode);
+  if (mode === "intern") {
+    const { data: intern, error } = await supabaseAdmin.from("internship_interns")
+      .select("cohort_id").eq("id", internId).maybeSingle();
+    if (error || !intern || !await canUseOfficialCheckIns(intern.cohort_id)) {
+      bounce(returnTo, "error", "Official check-ins open after semester activation and verification.");
+    }
+  }
   const weekOf = text(formData, "weekOf");
   const finalSection = text(formData, "finalSection");
   const contributionAdded = text(formData, "contributionAdded");

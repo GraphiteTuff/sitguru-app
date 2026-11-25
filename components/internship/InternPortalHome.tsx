@@ -1,573 +1,207 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import {
-  BarChart3,
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  Clock3,
-  FileText,
-  MessageCircle,
-  PawPrint,
-  Sparkles,
-  Trophy,
+  ArrowRight, BarChart3, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, ClipboardList, FileCheck2,
+  Clock3, Flag, FolderOpen, GraduationCap, Handshake, Megaphone, MessageCircle, PawPrint, PenLine, Users,
 } from "lucide-react";
 import AskAvaForm from "@/components/internship/AskAvaForm";
 import InternWorkSystemsCard from "@/components/internship/InternWorkSystemsCard";
-import { INTERN_PORTAL_BRAND } from "@/lib/internship/intern-portal-nav";
-import { INTERNSHIP_HELP_PATH, INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
-import { taskStatusLabel } from "@/lib/internship/labels";
+import { buildLearningDashboard } from "@/lib/internship/learning-dashboard";
 import { formatHours, type HourSummary } from "@/lib/internship/hours";
-import { internPressClass } from "@/lib/internship/intern-ui";
+import { INTERN_ROUTES } from "@/lib/internship/intern-routes";
+import { taskStatusLabel } from "@/lib/internship/labels";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
-import { INTERN_BANNER, DESK_STAT, DESK_UI, deskInitials } from "@/lib/portal/desk-ui";
-import { deskScriptClass as script } from "@/lib/portal/script-font";
+import { INTERN_BANNER } from "@/lib/portal/desk-ui";
 
-function statusTone(status: string, reviewStage?: string | null) {
-  const label = taskStatusLabel(status, reviewStage).toLowerCase();
-  if (label.includes("complete") || label.includes("approved")) {
-    return "bg-[#DCFCE7] text-[#166534]";
-  }
-  if (label.includes("change") || label.includes("revision")) {
-    return "bg-[#FFEDD5] text-[#9A3412]";
-  }
-  if (label.includes("progress") || label.includes("submitted")) {
-    return "bg-[#DCFCE7] text-[#166534]";
-  }
-  return "bg-[#DBEAFE] text-[#1D4ED8]";
-}
+const learningLinks = [
+  { label: "Syllabus", href: "/intern/milestones#syllabus", icon: BookOpen },
+  { label: "Learning Modules", href: INTERN_ROUTES.training, icon: GraduationCap },
+  { label: "Assignments", href: INTERN_ROUTES.assignments, icon: ClipboardList },
+  { label: "Grades", href: "/intern/grades", icon: FileCheck2 },
+  { label: "Calendar", href: INTERN_ROUTES.calendar, icon: CalendarDays },
+  { label: "Discussions & Messages", href: INTERN_ROUTES.messages, icon: MessageCircle },
+  { label: "Announcements", href: "/intern/announcements", icon: Megaphone },
+  { label: "My Files", href: "/intern/files", icon: FolderOpen },
+  { label: "My Hours", href: INTERN_ROUTES.hours, icon: Clock3 },
+  { label: "Weekly Check-Ins", href: INTERN_ROUTES.checkIns, icon: ClipboardCheck },
+];
 
-function statusDisplay(status: string, reviewStage?: string | null) {
-  const label = taskStatusLabel(status, reviewStage);
-  if (label === "Changes Requested") return "Needs Revision";
-  if (label === "Approved" || label === "Complete") return "Complete";
-  if (label === "Submitted" || label === "In Progress" || status === "in_progress") {
-    return status === "todo" ? "Upcoming" : "In Progress";
-  }
-  if (status === "todo") return "Upcoming";
-  return label;
-}
+const growthLinks = [
+  { label: "Final Business Growth Project", href: "/intern/final-project", icon: Flag },
+  { label: "Growth Results", href: INTERN_ROUTES.results, icon: BarChart3 },
+  { label: "Community Studio", href: INTERN_ROUTES.communityStudio, icon: Users },
+  { label: "Campus Growth", href: INTERN_ROUTES.campusGrowth, icon: GraduationCap },
+  { label: "Content Studio", href: INTERN_ROUTES.content, icon: PenLine },
+  { label: "Referral & Partner Results", href: "/intern/growth/referrals", icon: Handshake },
+];
+
+const card = "min-w-0 rounded-2xl border border-emerald-950/10 bg-white p-4 shadow-sm sm:p-5";
+const row = "flex min-h-12 min-w-0 items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-[#183b31] hover:border-emerald-700 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-700";
+const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export default function InternPortalHome({
   data,
   hourSummary,
   firstName,
   weeklyDone,
-  currentAssignmentTitle,
-  onOpenWork,
-  onOpenCheckIn,
-  onOpenHours,
-  onOpenMilestones,
   preview = false,
 }: {
   data: InternshipWorkspaceData;
   hourSummary: HourSummary;
   firstName: string;
   weeklyDone: boolean;
-  currentAssignmentTitle: string;
-  onOpenWork: () => void;
-  onOpenCheckIn: () => void;
-  onOpenHours: () => void;
-  onOpenMilestones: () => void;
   preview?: boolean;
 }) {
-  const required = hourSummary.requiredHours || 0;
-  const approved = hourSummary.approvedHours || 0;
-  const pct =
-    hourSummary.progressPercent != null
-      ? Math.min(100, Math.round(hourSummary.progressPercent))
-      : required > 0
-        ? Math.min(100, Math.round((approved / required) * 100))
-        : 0;
-  const remaining = hourSummary.remainingHours ?? Math.max(0, required - approved);
-  const planned = hourSummary.plannedWeeklyHours;
-  const assignments = [...(data.tasks || [])]
-    .sort((a, b) => Number(a.weekNumber || 0) - Number(b.weekNumber || 0))
-    .slice(0, 4);
-  const milestones = (data.milestones || []).slice(0, 4);
-  const thisWeekReview = (data.weeklyReviews || [])
-    .slice()
-    .sort((a, b) => String(b.weekOf).localeCompare(String(a.weekOf)))[0];
-  const comments = (data.comments || []).slice(0, 3);
+  const today = new Date().toISOString().slice(0, 10);
+  const { assignments, pillars, unclassified, upcoming } = buildLearningDashboard(data, today);
+  const feedback = data.comments.filter((comment) => comment.authorRole === "supervisor").slice(-3).reverse();
+  const targetHours = hourSummary.pendingRequirement ? null : hourSummary.requiredHours;
 
   return (
-    <div className="space-y-4 pb-28 xl:pb-6">
-      <section className="overflow-hidden rounded-2xl border border-sky-100/80 bg-gradient-to-r from-[#EFF6FF] via-white to-[#F0FDF4] shadow-[0_8px_24px_rgba(15,39,68,0.04)]">
-        <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:items-center">
-          <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 text-sm font-black text-[#0F2744]">
-              <PawPrint size={18} className="text-[#0D5C3A]" />
-              {INTERN_PORTAL_BRAND.title}
-            </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-[#0F2744] sm:text-4xl">
-              Welcome back, {firstName}.
-            </h1>
-            <p className="mt-2 max-w-xl text-sm font-medium leading-6 text-slate-600">
-              Manage your assignments, hours, milestones, and growth work — all in one place.
-            </p>
-          </div>
-          <div className="relative min-h-[140px] overflow-hidden rounded-2xl sm:min-h-[160px]">
-            <Image
-              src={INTERN_BANNER}
-              alt="Golden retriever on a walk"
-              fill
-              className="object-cover object-[center_40%]"
-              sizes="(max-width: 1280px) 100vw, 45vw"
-              priority
-            />
-            <p className={`${script} absolute left-3 top-3 max-w-[16rem] rounded-2xl bg-white/92 px-3 py-2 text-[1.45rem] font-bold leading-tight text-[#0F2744] shadow-sm sm:left-4 sm:text-[1.7rem]`}>
-              Learn. Create.
-              <br />
-              Make an impact.
-              <br />
-              <span className="underline decoration-[#16A34A] decoration-[3px] underline-offset-2">Happier pets.</span>
-              <br />
-              Brighter communities.
-            </p>
-          </div>
+    <div className="space-y-5">
+      <section className="grid overflow-hidden rounded-3xl bg-[#10583f] text-white sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-brand-green>
+        <div className="min-w-0 p-5 sm:p-7 lg:p-9">
+          <p className="flex items-center gap-2 text-sm font-bold !text-white">
+            <PawPrint size={19} aria-hidden="true" className="shrink-0 text-orange-300" />
+            Learning &amp; Growth Center
+          </p>
+          <h1 className="mt-3 break-words text-3xl font-black tracking-tight !text-white sm:text-4xl">
+            Welcome back, {firstName}
+          </h1>
+          {!preview ? (
+            <Link href={INTERN_ROUTES.assignments} className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold !text-[#10583f] hover:bg-emerald-50">
+              Open assignments <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          ) : null}
+        </div>
+        <div className="relative h-32 sm:h-auto">
+          <Image src={INTERN_BANNER} alt="" fill priority sizes="(max-width: 639px) 100vw, 40vw" className="object-cover object-[center_45%]" />
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <article className={`rounded-2xl border p-4 shadow-sm ${DESK_STAT.green.wrap}`}>
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${DESK_STAT.green.iconWrap}`}
-            >
-              <Clock3 size={18} />
-            </span>
-            <div className="min-w-0">
-              <p className={`text-2xl font-black leading-none ${DESK_STAT.green.value}`}>
-                {formatHours(approved)}
-                {required ? (
-                  <span className="text-sm font-bold text-slate-500">
-                    {" "}
-                    of {formatHours(required)}
-                  </span>
-                ) : null}
+      <section aria-labelledby="intern-pillar-heading" className={card}>
+        <h2 id="intern-pillar-heading" className="text-xl font-black text-[#183b31]">Growth pillar progress</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {pillars.map((pillar) => (
+            <article key={pillar.id} className={`min-w-0 rounded-xl border p-4 ${pillar.id === "community" ? "border-emerald-200 bg-emerald-50" : "border-orange-200 bg-orange-50"}`}>
+              <h3 className="break-words text-base font-bold text-[#183b31]">{pillar.label}</h3>
+              <p className="mt-1 text-sm text-slate-700">
+                Planned workload · {pillar.weight}%
+                {targetHours != null ? ` · ${formatHours(targetHours * pillar.weight / 100)} hours` : ""}
               </p>
-              <p className="mt-1 text-xs font-bold text-[#0F2744]">Hours Approved</p>
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/80">
-              <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${pct}%` }} />
-            </div>
-            <span className="text-xs font-bold text-[#166534]">{pct}%</span>
-          </div>
-        </article>
-
-        <button
-          type="button"
-          onClick={onOpenHours}
-          className={`rounded-2xl border p-4 text-left shadow-sm ${DESK_STAT.sky.wrap} ${internPressClass}`}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${DESK_STAT.sky.iconWrap}`}
-            >
-              <BarChart3 size={18} />
-            </span>
-            <div>
-              <p className={`text-2xl font-black leading-none ${DESK_STAT.sky.value}`}>
-                {formatHours(hourSummary.loggedThisWeek)}
-              </p>
-              <p className="mt-1 text-xs font-bold text-[#0F2744]">This Week&apos;s Hours</p>
-            </div>
-          </div>
-          <p className="mt-2 flex items-center justify-between text-sm font-medium text-slate-600">
-            <span>
-              {planned
-                ? `on track for ${formatHours(planned)} hours`
-                : hourSummary.paceLabel}
-            </span>
-            <ChevronRight size={14} className="text-[#2563EB]" />
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenWork}
-          className={`rounded-2xl border p-4 text-left shadow-sm ${DESK_STAT.violet.wrap} ${internPressClass}`}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${DESK_STAT.violet.iconWrap}`}
-            >
-              <FileText size={18} />
-            </span>
-            <div className="min-w-0">
-              <p className={`line-clamp-2 text-base font-black leading-snug ${DESK_STAT.violet.value}`}>
-                {currentAssignmentTitle || "No active assignment"}
-              </p>
-              <p className="mt-1 text-xs font-bold text-[#0F2744]">Current Assignment</p>
-            </div>
-          </div>
-          <p className="mt-2 flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-2.5 py-1 text-[10px] font-bold text-[#166534]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
-              In Progress
-            </span>
-            <ChevronRight size={14} className="text-[#2563EB]" />
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenMilestones}
-          className={`rounded-2xl border p-4 text-left shadow-sm ${DESK_STAT.peach.wrap} ${internPressClass}`}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${DESK_STAT.peach.iconWrap}`}
-            >
-              <Trophy size={18} />
-            </span>
-            <div>
-              <p className={`text-xl font-black leading-none ${DESK_STAT.peach.value}`}>
-                {required ? `${formatHours(required)} hours` : hourSummary.weekLabel}
-              </p>
-              <p className="mt-1 text-xs font-bold text-[#0F2744]">Next Milestone</p>
-            </div>
-          </div>
-          <p className="mt-2 flex items-center justify-between text-sm font-medium text-slate-600">
-            <span>Final Project Proposal</span>
-            <ChevronRight size={14} className="text-[#2563EB]" />
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenCheckIn}
-          className={`rounded-2xl border p-4 text-left shadow-sm sm:col-span-2 xl:col-span-1 ${DESK_STAT.teal.wrap} ${internPressClass}`}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${DESK_STAT.teal.iconWrap}`}
-            >
-              <CheckCircle2 size={18} />
-            </span>
-            <div>
-              <p className={`text-xl font-black leading-none ${DESK_STAT.teal.value}`}>
-                {weeklyDone ? "Submitted" : "Due this week"}
-              </p>
-              <p className="mt-1 text-xs font-bold text-[#0F2744]">Check-In Status</p>
-            </div>
-          </div>
-          <p className="mt-2 flex items-center justify-between text-sm font-medium text-slate-600">
-            <span>This week&apos;s check-in</span>
-            <ChevronRight size={14} className="text-[#2563EB]" />
-          </p>
-        </button>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
-              <ClipboardList size={18} className="text-[#2563EB]" />
-              My Assignments
-            </h2>
-            <button
-              type="button"
-              onClick={onOpenWork}
-              className={`inline-flex items-center gap-1 text-xs font-bold ${DESK_UI.link}`}
-            >
-              View all <ChevronRight size={12} />
-            </button>
-          </div>
-          <ul className="mt-4 space-y-2">
-            {assignments.map((task) => (
-              <li
-                key={task.id}
-                className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-[#0F2744]">
-                    {task.title}
-                  </span>
-                  <span className="text-xs font-medium text-slate-500">
-                    Week {task.weekNumber || "—"}
-                  </span>
-                </span>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone(task.status, task.reviewStage)}`}
-                >
-                  {statusDisplay(task.status, task.reviewStage)}
-                </span>
-              </li>
-            ))}
-            {!assignments.length ? (
-              <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                No assignments yet.
-              </li>
-            ) : null}
-          </ul>
-        </article>
-
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
-              <Clock3 size={18} className="text-[#0D9488]" />
-              Hours Progress
-            </h2>
-            <button
-              type="button"
-              onClick={onOpenHours}
-              className={`inline-flex items-center gap-1 text-xs font-bold ${DESK_UI.link}`}
-            >
-              View details <ChevronRight size={12} />
-            </button>
-          </div>
-          <div className="mt-4 flex flex-col items-center">
-            <div
-              className="relative flex h-36 w-36 items-center justify-center rounded-full"
-              style={{
-                background: `conic-gradient(#0D9488 ${pct * 3.6}deg, #E0F2F1 0deg)`,
-              }}
-            >
-              <div className="flex h-[6.5rem] w-[6.5rem] flex-col items-center justify-center rounded-full bg-white text-center">
-                <p className="text-2xl font-black text-[#0F2744]">{pct}%</p>
-                <p className="text-[11px] font-bold text-slate-500">
-                  {formatHours(approved)} / {required ? formatHours(required) : "—"}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center">
-              <div className="rounded-2xl bg-[#EFF6FF] px-2 py-3">
-                <p className="text-sm font-black text-[#1D4ED8]">
-                  {formatHours(hourSummary.loggedThisWeek)}
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  This week
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[#F0FDF4] px-2 py-3">
-                <p className="text-sm font-black text-[#166534]">{hourSummary.paceLabel}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Pacing
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[#FFF7ED] px-2 py-3">
-                <p className="text-sm font-black text-[#C2410C]">{formatHours(remaining)}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Remaining
-                </p>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
-              <CalendarDays size={18} className="text-[#16A34A]" />
-              Weekly Check-In
-            </h2>
-            <button
-              type="button"
-              onClick={onOpenCheckIn}
-              className={`inline-flex items-center gap-1 text-xs font-bold ${DESK_UI.link}`}
-            >
-              View all <ChevronRight size={12} />
-            </button>
-          </div>
-          {weeklyDone ? (
-            <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#F0FDF4] p-4">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#22C55E] text-white">
-                <CheckCircle2 size={24} />
-              </span>
-              <div>
-                <p className="text-xl font-black text-[#166534]">Submitted!</p>
-                <p className="mt-1 text-sm font-medium text-slate-600">
-                  {thisWeekReview?.weekOf
-                    ? `Week of ${thisWeekReview.weekOf.slice(0, 10)}`
-                    : "This week’s check-in is on file."}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="mt-4 text-2xl font-black text-[#0F2744]">Ready when you are</p>
-              <p className="mt-2 text-sm font-medium text-slate-600">
-                Submit your weekly check-in so Ava can review your progress.
-              </p>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={onOpenCheckIn}
-            className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-bold !text-white"
-          >
-            {weeklyDone ? "View Check-In" : "Submit Check-In"}
-          </button>
-        </article>
-      </section>
-
-      <section className={`${DESK_UI.card} p-4 sm:p-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-black text-[#0F2744]">Milestones / Final Project</h2>
-          <button
-            type="button"
-            onClick={onOpenMilestones}
-            className={`inline-flex items-center gap-1 text-xs font-bold ${DESK_UI.link}`}
-          >
-            View details <ChevronRight size={12} />
-          </button>
+              {pillar.approvedHours > 0 ? (
+                <p className="mt-1 text-sm font-semibold text-slate-700">{formatHours(pillar.approvedHours)} approved hours linked to this pillar</p>
+              ) : null}
+              {pillar.assigned ? (
+                <div className="mt-3">
+                  <progress aria-label={`${pillar.label} assignments completed`} value={pillar.completed} max={pillar.assigned} className={`block h-2 w-full ${pillar.id === "community" ? "accent-emerald-700" : "accent-orange-700"}`} />
+                  <p className="mt-2 text-sm font-semibold text-slate-800">{pillar.completed} of {pillar.assigned} assignments completed</p>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-slate-700">No assignments classified in this pillar yet.</p>
+              )}
+            </article>
+          ))}
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[25, 50, 100, 150].map((mark) => {
-            const done = required > 0 ? approved >= mark : false;
-            const current = required > 0 && approved < mark && approved >= mark - 50;
-            return (
-              <div
-                key={mark}
-                className={`rounded-2xl border px-3 py-4 ${
-                  done
-                    ? "border-emerald-200 bg-[#F0FDF4]"
-                    : current
-                      ? "border-sky-200 bg-[#EFF6FF]"
-                      : "border-slate-100 bg-[#F8FAFC]"
-                }`}
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                  {mark} hours
-                </p>
-                <p className="mt-2 text-sm font-black text-[#0F2744]">
-                  {done ? "Completed" : current ? "In Progress" : "Not started"}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-        {milestones[0] ? (
-          <p className="mt-4 rounded-2xl bg-[#EFF6FF] px-3 py-3 text-sm font-medium text-slate-700">
-            Next up: <span className="font-bold text-[#0F2744]">{milestones[0].title}</span>
-          </p>
+        <p className="mt-3 text-sm text-slate-600">Pillar hours come from approved time entries linked to classified assignments.</p>
+        {unclassified > 0 ? (
+          <p className="mt-3 text-sm text-slate-600">{unclassified} {unclassified === 1 ? "assignment has" : "assignments have"} no clear pillar category yet.</p>
         ) : null}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
-            <MessageCircle size={18} className="text-[#2563EB]" />
-            Messages
-          </h2>
-          <ul className="mt-4 space-y-2">
-            {comments.map((item) => (
-              <li
-                key={item.id}
-                className="flex gap-3 rounded-2xl border border-slate-100 px-3 py-3"
-              >
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#DBEAFE] text-sm font-black text-[#1D4ED8]">
-                  {deskInitials(
-                    item.authorRole === "supervisor" ? "Ava Venezia" : firstName || "You",
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span className="font-bold text-[#0F2744]">
-                    {item.authorRole === "supervisor" ? "Ava Venezia" : "You"}
-                  </span>
-                  <span className="mt-1 block line-clamp-2 text-xs font-medium text-slate-500">
-                    {item.body}
-                  </span>
-                </span>
-              </li>
-            ))}
-            {!comments.length ? (
-              <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                Feedback from Ava will show here.
-              </li>
-            ) : null}
-          </ul>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="min-w-0 space-y-5">
           {!preview ? (
-            <div className="mt-4">
-              <AskAvaForm internId={data.intern.id} />
-            </div>
+            <section className={card} aria-labelledby="intern-learning-heading">
+              <h2 id="intern-learning-heading" className="text-xl font-black text-[#183b31]">Learning workspace</h2>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {learningLinks.map(({ label, href, icon: Icon }) => (
+                  <li key={href} className="min-w-0">
+                    <Link href={href} className={row}>
+                      <Icon size={18} className="shrink-0 text-[#10583f]" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 break-words">{label}</span>
+                      <ChevronRight size={16} className="shrink-0" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
-        </article>
+          <section className={card} aria-labelledby="intern-assignments-heading">
+            <h2 id="intern-assignments-heading" className="text-xl font-black text-[#183b31]">My assignments</h2>
+            {assignments.length ? (
+              <ul className="mt-3 divide-y divide-slate-100">
+                {assignments.slice(0, 4).map((task) => (
+                  <li key={task.id} className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 text-sm">
+                    {preview ? <span className="font-semibold">{task.title}</span> : (
+                      <Link href={`/intern/assignments/${encodeURIComponent(task.id)}`} className="break-words font-semibold text-[#10583f] underline-offset-4 hover:underline">{task.title}</Link>
+                    )}
+                    <span className="text-slate-600">{taskStatusLabel(task.status, task.reviewStage)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-3 text-sm text-slate-600">No assignments yet.</p>}
+          </section>
+        </div>
+        <div className="min-w-0 space-y-5">
+          <section className={card} aria-labelledby="intern-deadlines-heading">
+            <h2 id="intern-deadlines-heading" className="text-xl font-black text-[#183b31]">Upcoming deadlines</h2>
+            {upcoming.length ? (
+              <ul className="mt-3 divide-y divide-slate-100">
+                {upcoming.map((event) => (
+                  <li key={`${event.type}-${event.id}`} className="flex min-h-12 items-start gap-3 py-3 text-sm">
+                    <time dateTime={event.date} className="w-14 shrink-0 font-bold text-emerald-900">
+                      {dateFormatter.format(new Date(`${event.date}T00:00:00Z`))}
+                    </time>
+                    <div className="min-w-0">
+                      {preview ? <p className="break-words font-semibold">{event.title}</p> : (
+                        <Link href={event.href} className="break-words font-semibold text-[#10583f] underline-offset-4 hover:underline">{event.title}</Link>
+                      )}
+                      <p className="text-slate-600">{event.type}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-3 text-sm text-slate-600">No upcoming assignment or milestone dates.</p>}
+          </section>
+          <section className={card} aria-labelledby="intern-hours-heading">
+            <h2 id="intern-hours-heading" className="text-xl font-black text-[#183b31]">Hours &amp; check-ins</h2>
+            <p className="mt-3 text-sm text-slate-700">
+              <strong>{formatHours(hourSummary.approvedHours)} hours approved</strong>
+              {targetHours != null ? ` of ${formatHours(targetHours)} planned` : " · Program hour target pending"}
+            </p>
+            <p className="mt-2 text-sm text-slate-700">{formatHours(hourSummary.loggedThisWeek)} hours logged this week</p>
+            <p className="mt-2 text-sm text-slate-700">{weeklyDone ? "This week’s check-in is on file." : "No check-in on file for this week."}</p>
+          </section>
+        </div>
+      </div>
 
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Quick Actions</h2>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={onOpenHours}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#2563EB] px-3 text-sm font-bold !text-white"
-            >
-              Log Hours
-            </button>
-            <button
-              type="button"
-              onClick={onOpenCheckIn}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#EFF6FF] px-3 text-sm font-bold text-[#1D4ED8]"
-            >
-              Submit Check-In
-            </button>
-            <button
-              type="button"
-              onClick={onOpenWork}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#F5F3FF] px-3 text-sm font-bold text-[#6D28D9]"
-            >
-              <ClipboardList size={16} className="mr-1.5" />
-              View Assignments
-            </button>
-            <Link
-              href={INTERNSHIP_HELP_PATH}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#FFF7ED] px-3 text-sm font-bold text-[#C2410C]"
-            >
-              Open Help
-            </Link>
-          </div>
-          <p className="mt-4 rounded-2xl bg-[#FFF7ED] px-3 py-3 text-xs font-bold text-[#0F2744]">
-            {INTERN_PORTAL_BRAND.quickActionsLine}
-          </p>
-        </article>
-
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="flex items-center gap-2 text-lg font-black text-[#0F2744]">
-            <Sparkles size={18} className="text-[#EA580C]" />
-            Recent Activity
-          </h2>
-          <ul className="mt-4 space-y-2">
-            {(data.weeklyReviews || []).slice(0, 2).map((row) => (
-              <li
-                key={row.id}
-                className="rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3 py-3 text-sm font-medium text-slate-700"
-              >
-                Weekly check-in · {row.weekOf?.slice(0, 10) || "this week"}
-                <span className="mt-1 block text-xs text-slate-500">{row.reviewStatus || "submitted"}</span>
+      {!preview ? (
+        <section className={card} aria-labelledby="intern-growth-heading">
+          <h2 id="intern-growth-heading" className="text-xl font-black text-[#183b31]">Growth workspace</h2>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {growthLinks.map(({ label, href, icon: Icon }) => (
+              <li key={href} className="min-w-0">
+                <Link href={href} className={row}>
+                  <Icon size={18} className="shrink-0 text-[#10583f]" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 break-words">{label}</span>
+                  <ChevronRight size={16} className="shrink-0" aria-hidden="true" />
+                </Link>
               </li>
             ))}
-            {assignments.slice(0, 2).map((task) => (
-              <li
-                key={`act-${task.id}`}
-                className="rounded-2xl border border-slate-100 bg-[#F8FAFC] px-3 py-3 text-sm font-medium text-slate-700"
-              >
-                {task.title}
-                <span className="mt-1 block text-xs text-slate-500">
-                  {statusDisplay(task.status, task.reviewStage)}
-                </span>
-              </li>
-            ))}
-            {!assignments.length && !(data.weeklyReviews || []).length ? (
-              <li className="rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
-                Your recent internship activity will appear here.
-              </li>
-            ) : null}
           </ul>
-          <Link
-            href={INTERNSHIP_GROWTH_PATH}
-            className={`mt-4 inline-flex min-h-11 items-center text-sm font-bold ${DESK_UI.link}`}
-          >
-            Open Growth Workplace →
-          </Link>
-        </article>
-      </section>
+        </section>
+      ) : null}
 
+      <section className={card} aria-labelledby="intern-feedback-heading">
+        <h2 id="intern-feedback-heading" className="text-xl font-black text-[#183b31]">Recent work feedback</h2>
+        {feedback.length ? (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {feedback.map((comment) => <li key={comment.id} className="break-words py-3 text-sm text-slate-700">{comment.body}</li>)}
+          </ul>
+        ) : <p className="mt-3 text-sm text-slate-600">No supervisor feedback yet.</p>}
+        {!preview ? <div className="mt-4"><AskAvaForm internId={data.intern.id} /></div> : null}
+      </section>
       <InternWorkSystemsCard />
     </div>
   );

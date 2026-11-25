@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   clearPendingDiscoveryOpen,
@@ -18,13 +19,15 @@ export default function DiscoveryReturnOpener() {
     eventUrl: string;
   } | null>(null);
 
-  useEffect(() => {
-    const welcome = searchParams.get("welcome") === "1";
-    const saved = readPendingDiscoveryOpen();
-    if (!saved) return;
-    if (!welcome && !saved.eventUrl) return;
-    setPending({ title: saved.title, eventUrl: saved.eventUrl });
-  }, [searchParams]);
+  const pendingSnapshot = useBrowserSnapshot(() => JSON.stringify(readPendingDiscoveryOpen()), null);
+  const [previousPendingSnapshot, setPreviousPendingSnapshot] = useState<string | null>(null);
+  if (pendingSnapshot !== previousPendingSnapshot) {
+    setPreviousPendingSnapshot(pendingSnapshot);
+    const saved = pendingSnapshot ? JSON.parse(pendingSnapshot) as ReturnType<typeof readPendingDiscoveryOpen> : null;
+    if (saved && (searchParams.get("welcome") === "1" || saved.eventUrl)) {
+      setPending({ title: saved.title, eventUrl: saved.eventUrl });
+    }
+  }
 
   if (!pending) return null;
 

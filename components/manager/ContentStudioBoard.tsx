@@ -240,7 +240,7 @@ export function ContentStudioBoard({
                       </button>
                     </form>
                   ) : (
-                    <p className="text-xs text-sky-900">Only SitGuru's founder can check the authenticated TikTok delivery status.</p>
+                    <p className="text-xs text-sky-900">Only SitGuru&apos;s founder can check the authenticated TikTok delivery status.</p>
                   )}
                 </div>
               ) : null}

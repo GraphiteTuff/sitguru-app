@@ -117,6 +117,15 @@ type GuruProfile = {
   experience_years?: number | null;
 };
 
+type GuruLookupRow = GuruProfile & {
+  account_status?: string | null;
+  approval_status?: string | null;
+  guru_user_id?: string | null;
+  radius?: number | null;
+  service_zip?: string | null;
+  years_experience?: number | null;
+};
+
 type GuruServiceRateRow = {
   id?: string | null;
   guru_id?: string | number | null;
@@ -1109,7 +1118,7 @@ function isGuruRole(value?: string | null) {
   return normalizeRole(value) === "guru";
 }
 
-function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfile {
+function buildGuruProfileFromProfileRow(profile: GuruLookupRow): GuruProfile {
   const firstName = String(profile.first_name || "").trim();
   const lastName = String(profile.last_name || "").trim();
   const fullName =
@@ -1123,7 +1132,7 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
 
   return {
     id: profile.id,
-    user_id: profile.user_id || profile.id,
+    user_id: profile.user_id || (profile.id == null ? null : String(profile.id)),
     email: profile.email || null,
     phone: profile.phone || profile.phone_number || profile.mobile_phone || null,
     phone_number: profile.phone_number || profile.phone || null,
@@ -1145,7 +1154,7 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     service_state: profile.service_state || profile.state || null,
     slug: profile.slug || null,
     public_slug: profile.public_slug || profile.slug || null,
-    profile_id: profile.profile_id || profile.id || null,
+    profile_id: profile.profile_id || (profile.id == null ? null : String(profile.id)),
     zip_code: profile.zip_code || profile.service_zip || profile.postal_code || null,
     postal_code: profile.postal_code || profile.zip_code || profile.service_zip || null,
     service_radius_miles:
@@ -1195,7 +1204,7 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
   };
 }
 
-function getImageUrlFromRecord(record: Record<string, any> | null) {
+function getImageUrlFromRecord(record: Record<string, unknown> | null) {
   if (!record) return null;
 
   const candidates = [
@@ -1303,7 +1312,7 @@ async function findGuruUploadedPhotoFromSitGuruRows(
       )
       .map((candidate) => ({
         candidate,
-        imageUrl: getImageUrlFromRecord(candidate as Record<string, any>),
+        imageUrl: getImageUrlFromRecord(candidate),
       }))
       .filter((candidate) => Boolean(candidate.imageUrl));
 
@@ -1360,7 +1369,7 @@ async function findGuruUploadedPhotoFromMediaTables(guruProfile: GuruProfile) {
 
         if (error || !Array.isArray(data)) continue;
 
-        const imageRow = (data as Record<string, any>[]).find((row) => {
+        const imageRow = (data as Record<string, unknown>[]).find((row) => {
           const typeText = String(
             row.media_type || row.type || row.kind || row.category || "",
           ).toLowerCase();
@@ -1412,7 +1421,7 @@ async function listGuruGallery(guruProfile: GuruProfile) {
           .in(column, guruIds)
           .limit(12);
         if (error || !Array.isArray(data)) continue;
-        for (const row of data as Record<string, any>[]) {
+        for (const row of data as Record<string, unknown>[]) {
           const imageUrl = getImageUrlFromRecord(row);
           if (imageUrl) urls.add(imageUrl);
         }
@@ -1427,7 +1436,7 @@ async function listGuruGallery(guruProfile: GuruProfile) {
 
 function mergeAccountProfileLocation(
   guruProfile: GuruProfile,
-  profile: Record<string, any> | null,
+  profile: Record<string, unknown> | null,
 ): GuruProfile {
   if (!profile) return guruProfile;
 
@@ -1535,7 +1544,7 @@ async function findGuruPhotoFromProfiles(guruProfile: GuruProfile) {
       const result = await lookup;
 
       if (!result.error && result.data) {
-        const profile = result.data as Record<string, any>;
+        const profile = result.data as GuruLookupRow;
         const imageUrl = getImageUrlFromRecord(profile);
 
         return {
@@ -1731,7 +1740,7 @@ async function getProfileGuruByIdentifier(identifier: string) {
       const result = await query;
 
       if (!result.error && result.data) {
-        const profile = result.data as Record<string, any>;
+        const profile = result.data as GuruLookupRow;
         const role = normalizeRole(profile.role || profile.account_type);
 
         if (role === "guru") {
@@ -1746,7 +1755,7 @@ async function getProfileGuruByIdentifier(identifier: string) {
   const allProfiles = await supabaseAdmin.from("profiles").select("*");
 
   if (!allProfiles.error && Array.isArray(allProfiles.data)) {
-    const match = (allProfiles.data as Record<string, any>[]).find((profile) => {
+    const match = (allProfiles.data as GuruLookupRow[]).find((profile) => {
       const role = normalizeRole(profile.role || profile.account_type);
       if (role !== "guru") return false;
 
@@ -1773,7 +1782,7 @@ function titleFromPublicSlug(value?: string | null) {
 }
 
 function normalizeGuruProfileFromBookingLookupRow(
-  row: Record<string, any>,
+  row: GuruLookupRow,
 ): GuruProfile | null {
   const id = String(row.id || "").trim();
 
@@ -1939,7 +1948,7 @@ async function getPublicGuruProfileFromBookingLookup(
       if (!result.error && Array.isArray(result.data)) {
         result.data.forEach((row) => {
           const guru = normalizeGuruProfileFromBookingLookupRow(
-            row as Record<string, any>,
+            row as GuruLookupRow,
           );
 
           if (guru && isIdentifierMatchForGuru(guru, cleanedIdentifier)) {
@@ -1965,7 +1974,7 @@ async function getPublicGuruProfileFromBookingLookup(
     if (!allGurusResult.error && Array.isArray(allGurusResult.data)) {
       const matches = allGurusResult.data
         .map((row) =>
-          normalizeGuruProfileFromBookingLookupRow(row as Record<string, any>),
+          normalizeGuruProfileFromBookingLookupRow(row as Record<string, unknown>),
         )
         .filter((guru): guru is GuruProfile =>
           Boolean(guru && isIdentifierMatchForGuru(guru, cleanedIdentifier)),
@@ -2016,7 +2025,7 @@ async function getPublicSearchApiBaseUrl() {
   }
 }
 
-function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProfile {
+function buildGuruProfileFromPublicSearchRow(row: GuruLookupRow): GuruProfile {
   const firstName = String(row.first_name || "").trim();
   const lastName = String(row.last_name || "").trim();
   const fullName = String(
@@ -2110,7 +2119,7 @@ async function getPublicSearchGuruProfileByIdentifier(
 
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as { gurus?: Record<string, any>[] };
+    const payload = (await response.json()) as { gurus?: GuruLookupRow[] };
     const guruRows = Array.isArray(payload.gurus) ? payload.gurus : [];
 
     const match = guruRows
@@ -4070,9 +4079,9 @@ async function GuruDashboardView({
               {upcomingBookings.length ? (
                 upcomingBookings
                   .slice(0, 3)
-                  .map((booking) => (
+                  .map((booking, index) => (
                     <BookingCard
-                      key={String(booking.id || Math.random())}
+                      key={String(booking.id ?? index)}
                       booking={booking}
                     />
                   ))

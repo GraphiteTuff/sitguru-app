@@ -199,27 +199,31 @@ export default function AdminMarketplaceFeesPage() {
   );
 
   async function loadRules() {
-    setLoading(true);
-    setPageError("");
-    setMessage("");
-
-    const { data, error } = await supabase
+    return supabase
       .from("marketplace_fee_rules")
       .select(
         "id,locality_name,description,country,state,city,postal_code,latitude,longitude,radius_miles,fee_percent,priority,is_active,starts_at,ends_at,created_at,updated_at",
       )
       .order("priority", { ascending: true })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }).then(async ({ data, error }) => {
 
-    if (error) {
-      setPageError(error.message || "Unable to load marketplace fee rules.");
-      setRules([]);
+      if (error) {
+        setPageError(error.message || "Unable to load marketplace fee rules.");
+        setRules([]);
+        setLoading(false);
+        return;
+      }
+
+      setRules((data || []) as MarketplaceFeeRule[]);
       setLoading(false);
-      return;
-    }
+    });
+  }
 
-    setRules((data || []) as MarketplaceFeeRule[]);
-    setLoading(false);
+  async function refreshRules() {
+    setLoading(true);
+    setPageError("");
+    setMessage("");
+    await loadRules();
   }
 
   useEffect(() => {
@@ -307,7 +311,7 @@ export default function AdminMarketplaceFeesPage() {
     setMessage(editingRuleId ? "Marketplace fee rule updated." : "Marketplace fee rule created.");
     setSaving(false);
     resetForm();
-    await loadRules();
+    await refreshRules();
   }
 
   async function handleDelete(ruleId: string) {
@@ -331,7 +335,7 @@ export default function AdminMarketplaceFeesPage() {
     }
 
     setMessage("Marketplace fee rule deleted.");
-    await loadRules();
+    await refreshRules();
   }
 
   async function handleToggleActive(rule: MarketplaceFeeRule) {
@@ -352,7 +356,7 @@ export default function AdminMarketplaceFeesPage() {
     }
 
     setMessage(rule.is_active ? "Rule disabled." : "Rule enabled.");
-    await loadRules();
+    await refreshRules();
   }
 
   function handleEdit(rule: MarketplaceFeeRule) {
@@ -376,7 +380,7 @@ export default function AdminMarketplaceFeesPage() {
 
           <button
             type="button"
-            onClick={loadRules}
+            onClick={refreshRules}
             className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
           >
             <RefreshCw className="h-4 w-4" />

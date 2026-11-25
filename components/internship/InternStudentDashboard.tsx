@@ -82,7 +82,6 @@ import {
 } from "@/lib/admin/growth/teams-access";
 import InternPortalHome from "@/components/internship/InternPortalHome";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
-import { useRouter } from "next/navigation";
 
 const TABS = [
   { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
@@ -193,7 +192,6 @@ export default function InternStudentDashboard({
   initialDate?: string;
   initialProfileOpen?: boolean;
 }) {
-  const router = useRouter();
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
   const firstName = internPortalFirstName(data.intern);
@@ -282,7 +280,7 @@ export default function InternStudentDashboard({
   const showTasks = workFilter === "all" || workFilter === "tasks";
   const showContent = workFilter === "all" || workFilter === "content";
   const showCampaigns = workFilter === "all" || workFilter === "campaigns";
-  const thisWeekReview = data.weeklyReviews.find((row) => row.weekOf >= weekOf);
+  const thisWeekReview = data.weeklyReviews.find((row) => row.weekOf >= weekOf && row.weekOf <= todayKey);
   const school = internSchoolEmphasis({
     university: data.university,
     campus: data.campus,
@@ -407,16 +405,8 @@ export default function InternStudentDashboard({
           data={data}
           hourSummary={hourSummary}
           firstName={firstName}
-          weeklyDone={Boolean(process.weeklyThisWeek)}
-          currentAssignmentTitle={
-            data.tasks.find((task) => task.status === "in_progress" || task.status === "submitted")?.title ||
-            process.deliverable.title
-          }
+          weeklyDone={Boolean(thisWeekReview?.submittedAt || thisWeekReview?.reviewStatus?.match(/submit|approv|complete/))}
           preview={preview}
-          onOpenWork={() => router.push("/intern/work")}
-          onOpenCheckIn={() => router.push("/intern/check-ins")}
-          onOpenHours={() => router.push("/intern/time")}
-          onOpenMilestones={() => router.push("/intern/milestones")}
         />
       ) : null}
 

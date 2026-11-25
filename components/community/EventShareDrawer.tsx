@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   Check,
   Link2,
@@ -23,6 +23,8 @@ import {
   shareEventNatively,
 } from "@/lib/community/share-client";
 import { getPublicEventPath, getPublicEventUrl } from "@/lib/community/slug";
+
+const subscribeShareCapability = () => () => {};
 
 export type EventShareDrawerEvent = {
   id?: string;
@@ -95,7 +97,7 @@ export default function EventShareDrawer({
   source = "community_event_share_drawer",
 }: EventShareDrawerProps) {
   const [copied, setCopied] = useState(false);
-  const [canNativeShare, setCanNativeShare] = useState(false);
+  const canNativeShare = useSyncExternalStore(subscribeShareCapability, canUseNativeShare, () => false);
 
   const url = useMemo(() => {
     if (!event) return "";
@@ -148,15 +150,14 @@ export default function EventShareDrawer({
     );
   }, [event]);
 
-  useEffect(() => {
-    setCanNativeShare(canUseNativeShare());
-  }, []);
+  const [previousOpen, setPreviousOpen] = useState(open);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
+    if (!open) setCopied(false);
+  }
 
   useEffect(() => {
-    if (!open) {
-      setCopied(false);
-      return;
-    }
+    if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {

@@ -576,23 +576,17 @@ export default function AmbassadorPayoutsScreen() {
     [isWebPreview, token],
   );
 
-  const loadSetup = useCallback(
+  const fetchLoadSetup = useCallback(
     async (quiet = false) => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+    if (!token) return;
 
-      quiet ? setRefreshing(true) : setLoading(true);
-
-      try {
-        const response = await apiFetch(
+    return apiFetch(
           '/api/payouts/setup?role=ambassador',
           {
             method: 'GET',
             cache: 'no-store',
           },
-        );
+        ).then(async (response) => {
 
         const payload = await readPayoutResponse(response);
 
@@ -619,7 +613,7 @@ export default function AmbassadorPayoutsScreen() {
             message: warnings.join(' '),
           });
         }
-      } catch (error) {
+    }).catch((error) => {
         setFeedback({
           tone: 'error',
           message:
@@ -627,19 +621,35 @@ export default function AmbassadorPayoutsScreen() {
               ? error.message
               : 'SitGuru could not load your payout setup.',
         });
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [apiFetch, token],
   );
 
+  const loadSetup = useCallback((quiet = false) => {
+    quiet ? setRefreshing(true) : setLoading(true);
+    return fetchLoadSetup(quiet);
+  }, [fetchLoadSetup, setRefreshing, setLoading]);
+
+  const requestKey = token || "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!token) {
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
     if (!authLoading) {
-      void loadSetup();
+      void fetchLoadSetup();
     }
-  }, [authLoading, loadSetup]);
+  }, [authLoading, fetchLoadSetup]);
 
   const providerChoices = useMemo<ProviderChoice[]>(
     () => [

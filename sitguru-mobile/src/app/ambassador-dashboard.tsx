@@ -306,39 +306,52 @@ export default function AmbassadorDashboardScreen() {
 
   const rank = getRank(points);
 
-  const refreshDashboard = useCallback(
+  const accountId = user?.id;
+  const accountEmail = user?.email;
+  const fetchRefreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
-        setData(EMPTY_DATA);
+    if (!accountId || !isSupabaseConfigured) return;
+
+    return loadAmbassadorDashboard(accountId, accountEmail).then(async (loadedData) => {
+      setData(loadedData);
+        setLoadMessage('');
+    }).catch(() => {
+        setLoadMessage(
+          'Some updates didn’t load. Pull down to retry.',
+        );
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-        return;
-      }
+      });
+  },
+    [accountEmail, accountId],
+  );
 
-      if (showRefresh) {
+  const refreshDashboard = useCallback((showRefresh = false) => {
+    if (showRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
+    return fetchRefreshDashboard(showRefresh);
+  }, [fetchRefreshDashboard, setRefreshing, setLoading]);
 
-      try {
-        setData(await loadAmbassadorDashboard(user.id, user.email));
-        setLoadMessage('');
-      } catch {
-        setLoadMessage(
-          'Some updates didn’t load. Pull down to retry.',
-        );
-      } finally {
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setData(EMPTY_DATA);
         setLoading(false);
         setRefreshing(false);
-      }
-    },
-    [user?.email, user?.id],
-  );
+    } else {
+      setLoading(true);
+    }
+  }
 
   useEffect(() => {
-    void refreshDashboard(false);
-  }, [refreshDashboard]);
+    void fetchRefreshDashboard(false);
+  }, [fetchRefreshDashboard]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) {

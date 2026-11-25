@@ -1,3 +1,4 @@
+import GrowthPlaybookPanel from "@/components/admin/growth/GrowthPlaybookPanel";
 import Link from "next/link";
 import CommunityStudioBoard from "@/components/community-studio/CommunityStudioBoard";
 import CommunityWorkLinks from "@/components/community-studio/CommunityWorkLinks";
@@ -14,6 +15,7 @@ export default async function ManagerCommunityStudioPage() {
   const workspace = await loadCommunityWorkspace("manager");
   const spotlight = await getHomepagePartnerSpotlight(true);
   return <div className="space-y-5">
+    <GrowthPlaybookPanel mode="manager" />
     <Link href="/manager/community-studio/guru-match"
       className="flex min-h-20 flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D1EADD] bg-gradient-to-r from-[#EFF6FF] via-[#F0FDF4] to-white p-5 shadow-sm hover:border-[#0D5C3A]">
       <span><span className="block text-lg font-black text-[#0F2744]">🐾 Guru Match &amp; Share</span>
