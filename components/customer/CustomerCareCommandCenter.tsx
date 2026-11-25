@@ -394,12 +394,11 @@ export default function CustomerCareCommandCenter({
           </Link>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Your SitGuru Pet Parent Home</p>
-            <h1 id="parent-home-welcome" className="mt-1 text-[clamp(1.75rem,4.6vw,2.8rem)] font-black leading-[1.13] tracking-tight text-[#102339]">
+            <h1 id="parent-home-welcome" className="mt-1 text-[clamp(1.5rem,4.6vw,2.8rem)] font-black leading-[1.13] tracking-tight text-[#102339]">
               {"Welcome Back" + (greetingName ? ", " + greetingName : "") + "!"} <span aria-hidden="true" className="text-orange-500">🐾</span>
             </h1>
             <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">Your pets, your care, all in one place.</p>
           </div>
-
         </div>
 
         <form onSubmit={findCare} className="relative isolate overflow-hidden bg-gradient-to-br from-[#004c34] via-[#00673e] to-[#007c47] p-4 text-white sm:p-7" aria-label="Find pet care">
