@@ -921,23 +921,25 @@ export default function Header({ user = null }: HeaderProps) {
             </Link>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => setMobileOpen((value) => !value)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 lg:hidden"
-            aria-label="Toggle menu"
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </button>
+          {!(isLoggedIn && isCustomer) ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen((value) => !value)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 lg:hidden"
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {mobileOpen ? (
+      {mobileOpen && !(isLoggedIn && isCustomer) ? (
         <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
           <div className="mx-auto grid max-w-[1440px] gap-2">
             {isLoggedIn ? (
