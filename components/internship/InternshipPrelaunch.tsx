@@ -1,0 +1,13 @@
+import Link from "next/link";
+
+export default function InternshipPrelaunch({mode}:{mode:"intern"|"manager"|"admin"}) {
+  const links = mode === "intern" ? [["Assignments","/intern/assignments"],["Modules & milestones","/intern/milestones"],["Community Studio","/intern/community-studio"],["Campus Growth","/intern/campus-growth"],["Content Studio","/intern/content"],["My hours","/intern/time"]] : mode === "manager" ? [["Assignments & review","/manager/assignments"],["Milestones","/manager/milestones"],["Community Studio","/manager/community-studio"],["Campus Growth","/manager/campus-growth"],["Content Studio","/manager/campaigns-content"],["Intern team","/manager/team"]] : [["Syllabus","/admin/internship/playbook"],["Internship program","/admin/internship"],["Student preview","/admin/internship/portal"]];
+  return <section className="mx-auto my-3 w-full max-w-7xl space-y-4 rounded-2xl border border-emerald-200 bg-white p-4 sm:p-6" aria-label="Spring 2027 internship orientation">
+    <header className="rounded-xl bg-[#10583F] p-5 !text-white"><p className="text-sm font-bold !text-white">SitGuru · Spring 2027 orientation</p><h2 className="mt-1 text-2xl font-black !text-white">{mode==="intern"?"Learning & Growth Center":"Instructor & Supervisor Center"}</h2><p className="mt-2 !text-white">Pre-launch interface preview. Existing operational work continues.</p></header>
+    <div className="grid gap-3 sm:grid-cols-2">{[["Community Growth","Campus, partnerships and outreach","bg-emerald-50"],["Social Media Growth","Content, campaigns and analytics","bg-orange-50"]].map(([title,detail,color])=><article key={title} className={`rounded-xl p-4 ${color} text-slate-950`}><p className="text-3xl font-black">50%</p><h3 className="font-bold">{title}</h3><p className="text-sm">{detail}</p></article>)}</div>
+    <p className="text-sm text-slate-700">Planned workload, not measured progress. Both pillars serve Gurus, Pet Parents and Ambassadors.</p>
+    <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{links.map(([label,href])=><Link key={href} href={href} className="flex min-h-12 items-center rounded-xl border border-emerald-200 px-4 py-3 font-semibold text-emerald-950">{label}</Link>)}</nav>
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{["Semester gradebook","Speed Review","Program activation controls","Final semester reporting"].map(label=><div key={label} className="rounded-xl border border-slate-200 p-3 text-slate-700"><p className="font-semibold">{label}</p><p className="text-xs">Not available in this release</p></div>)}</div>
+    <p className="text-sm text-slate-700">This orientation panel does not activate a semester or change deadlines, grades, hours or existing records.</p>
+  </section>;
+}
