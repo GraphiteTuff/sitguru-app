@@ -1,3 +1,4 @@
+import SyllabusGrowthOverview from "@/components/internship/SyllabusGrowthOverview";
 import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
@@ -36,10 +37,10 @@ export default async function ManagerMilestonesPage() {
     today,
   });
   return (
-    <ManagerMilestonesHome
+    <div className="space-y-4"><SyllabusGrowthOverview mode="manager" /><ManagerMilestonesHome
       summary={summary}
       cohortLabel={cohort?.name || "Current internship cohort"}
       canManageProgram={access.actor.isSuperUser}
-    />
+    /></div>
   );
 }
