@@ -126,7 +126,7 @@ const toolkit = [
   {
     title: "Earnings & payouts",
     description:
-      "Review booking earnings and complete required Stripe or PayPal payout setup.",
+      "Review your earnings and connect a payout account when you’re ready to accept paid work.",
     icon: <Banknote size={20} />,
   },
   {
@@ -159,7 +159,7 @@ const steps = [
     step: "03",
     title: "Complete trust steps",
     description:
-      "Finish required identity, safety, account, and payout setup.",
+      "Complete the identity and safety steps for your Guru profile.",
   },
   {
     step: "04",
@@ -250,7 +250,7 @@ const faqs = [
   {
     question: "What happens after I apply?",
     answer:
-      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you. Guru Academy is optional and unlocks a Certified Guru badge.",
+      "You can join and open your dashboard before setting up payouts. Add your services, pricing, and availability there, and complete the trust requirements for your profile. Your profile must be approved and active before Pet Parents can fully book you. Guru Academy is optional and unlocks a Certified Guru badge.",
   },
 ];
 
@@ -385,7 +385,7 @@ export function BecomeAGuruPageContent({
             href={guruLoginLink}
             className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-3 text-base font-black text-emerald-900 transition hover:bg-emerald-50"
           >
-            Guru Login
+            Go to my dashboard
           </Link>
         </div>
       </div>
@@ -434,7 +434,7 @@ export function BecomeAGuruPageContent({
                 href={guruLoginLink}
                 className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 py-4 text-base font-black !text-white backdrop-blur transition hover:bg-white/15 sm:w-auto"
               >
-                Guru Login
+                Go to my dashboard
               </Link>
             </div>
 
@@ -846,7 +846,7 @@ export function BecomeAGuruPageContent({
               href={guruLoginLink}
               className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-7 py-4 text-base font-black !text-white backdrop-blur transition hover:bg-white/15"
             >
-              Guru Login
+              Go to my dashboard
             </Link>
           </div>
         </section>

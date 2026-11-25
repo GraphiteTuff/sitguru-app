@@ -1794,6 +1794,9 @@ export default async function GuruDashboardEarningsPage({
             See your care earnings, check whether payouts are ready, and find booking-level details in one place.
           </p>
           <nav aria-label="Earnings shortcuts" className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+            <Link href="/guru/dashboard" className="col-span-2 inline-flex min-h-[58px] items-center justify-center rounded-2xl bg-white px-4 font-black !text-[#06462F] hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300">
+              Go to Guru Dashboard
+            </Link>
             <Link href="#guru-earnings-history" className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-center text-sm font-black !text-[#06462F] shadow-sm transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-lime-300 sm:px-6">
               Earnings history <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
@@ -1829,7 +1832,7 @@ export default async function GuruDashboardEarningsPage({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">PAYOUT ACCOUNT STATUS</p>
-              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">{payoutReady ? "Payout account ready" : payoutSetupError ? "Payout status needs a refresh" : "Finish payout setup"}</h2>
+              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">{payoutReady ? "Payout account ready" : payoutSetupError ? "Payout status needs a refresh" : "Set up payouts when you’re ready"}</h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
                 {payoutReady ? "Payouts are enabled through " + payoutProvider + ". Individual transfers still depend on eligible bookings and provider processing." : payoutSetupError ? "We couldn't confirm the latest payout account status. Open payout settings to check again." : "Connect Stripe or PayPal to receive payouts from eligible care bookings. Your bookings and earnings remain visible here."}
               </p>
@@ -1856,7 +1859,7 @@ export default async function GuruDashboardEarningsPage({
           A Pet Parent paying for a booking does not by itself mean a Guru payout was sent.
         </p>
 
-        <details id="guru-payout-methods" open={!payoutReady || showPayoutPanel || Boolean(payoutSaveStatus || paypalStatus || stripeReturnStatus || payoutSetupError)} className="group scroll-mt-28 overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm">
+        <details id="guru-payout-methods" open={showPayoutPanel || Boolean(payoutSaveStatus || paypalStatus || stripeReturnStatus || payoutSetupError)} className="group scroll-mt-28 overflow-hidden rounded-[1.7rem] border border-emerald-100 bg-white shadow-sm">
           <summary className="flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">SECURE PAYOUT METHODS</p>
@@ -1866,6 +1869,9 @@ export default async function GuruDashboardEarningsPage({
             <ChevronDown className="h-6 w-6 shrink-0 text-emerald-800 transition-transform group-open:rotate-180" aria-hidden="true" />
           </summary>
           <div className="border-t border-emerald-100 p-3 sm:p-4">
+            <Link href="/guru/dashboard" className="mb-3 inline-flex min-h-12 items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 font-bold text-emerald-900 hover:bg-emerald-50">
+              Back to Guru Dashboard
+            </Link>
             <PaymentSetupCard
               setup={payoutSetup}
               loadError={payoutSetupError}
