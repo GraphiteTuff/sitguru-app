@@ -448,19 +448,11 @@ export default function GuruPricingScreen() {
   );
 
   const accountId = user?.id;
-  const loadPricing = useCallback(
+  const fetchLoadPricing = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const stored = await findPricingSettings(accountId);
+    return findPricingSettings(accountId).then(async (stored) => {
 
         if (stored) {
           applyPricingPayload(stored, {
@@ -498,21 +490,39 @@ export default function GuruPricingScreen() {
         }
 
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Some pricing settings could not be loaded. Pull down to try again.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [profileRecord, accountId],
   );
 
+  const loadPricing = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadPricing(showRefresh);
+  }, [fetchLoadPricing, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadPricing(false);
-  }, [loadPricing]);
+    void fetchLoadPricing(false);
+  }, [fetchLoadPricing]);
 
   function updateSelectedRate(updates: Partial<ServiceRate>) {
     setServiceRates((currentRates) => ({

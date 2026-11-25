@@ -68,10 +68,8 @@ export function useAdminWalkMapData(
   const refresh = useCallback(async () => {
     if (!bookingId || inFlightRef.current) return;
     inFlightRef.current = true;
-    setIsLoading(true);
 
-    try {
-      const token = await getAccessToken();
+    return getAccessToken().then(async (token) => {
       const response = await fetch(
         `/api/admin/reports/${encodeURIComponent(bookingId)}/live-map`,
         {
@@ -101,19 +99,24 @@ export function useAdminWalkMapData(
         lastPoint: payload.lastPoint || null,
       });
       setError("");
-    } catch (err) {
+    }).catch(err => {
       setError(err instanceof Error ? err.message : "Map load failed.");
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
       inFlightRef.current = false;
-    }
+    });
   }, [bookingId]);
 
+  const [previousBookingId, setPreviousBookingId] = useState(bookingId);
+  if (previousBookingId !== bookingId) {
+    setPreviousBookingId(bookingId);
+    setData(null);
+    setError("");
+    setIsLoading(Boolean(bookingId));
+  }
+
   useEffect(() => {
-    if (!bookingId) {
-      setData(null);
-      return;
-    }
+    if (!bookingId) return;
 
     void refresh();
     const timer = window.setInterval(() => {

@@ -14,14 +14,20 @@ function Studio(){
   const [data,setData]=useState<Result|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
-  const load=useCallback(async()=>{
-    setLoading(true);setError('');
-    const r=await sitguruApiFetch<Result>('/api/content-studio/snapshot',{cache:'no-store'});
-    if(r.error||!r.data)setError(r.error||'Content Studio data unavailable.');
-    else setData(r.data);
-    setLoading(false);
+  const fetchLoad=useCallback(async()=>{
+    return sitguruApiFetch<Result>('/api/content-studio/snapshot',{cache:'no-store'}).then(async (r) => {
+      if(r.error||!r.data)setError(r.error||'Content Studio data unavailable.');
+      else setData(r.data);
+      setLoading(false);
+    });
   },[]);
-  useEffect(()=>{void load();},[load]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError('');
+    return fetchLoad();
+  }, [fetchLoad, setLoading, setError]);
+  useEffect(()=>{void fetchLoad();},[fetchLoad]);
   const rows=data?.summary;
   return <MobileScreen refreshing={loading} onRefresh={()=>{void load();}}>
     <View style={styles.root}>

@@ -297,9 +297,9 @@ export default function GuruQuickBookingForm({
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedPet) return;
-
+  const [previousBookingPet, setPreviousBookingPet] = useState<typeof selectedPet | null>(null);
+  if (selectedPet !== previousBookingPet && selectedPet) {
+    setPreviousBookingPet(selectedPet);
     setPetName(selectedPet.name || "");
 
     const nextPetType = getPetType(selectedPet);
@@ -309,7 +309,7 @@ export default function GuruQuickBookingForm({
     setCareNotes(notes);
 
     setSavePetToDashboard(false);
-  }, [selectedPet]);
+  }
 
   function toggleCompliance(key: ComplianceKey) {
     setCompliance((current) => {

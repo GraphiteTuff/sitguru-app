@@ -8,6 +8,7 @@
  * - Graceful permission / signal-loss messaging
  */
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type GuruGeoFix = {
@@ -156,27 +157,29 @@ export function useGuruWalkGeolocation(
     return dispatchPing(fix);
   }, [dispatchPing, readCurrentFix]);
 
-  useEffect(() => {
+  const gpsSupported = useBrowserSnapshot(
+    () => typeof navigator !== "undefined" && Boolean(navigator.geolocation),
+    null,
+  );
+  const trackingKey = [options.shouldTrack, options.bookingId, gpsSupported] as const;
+  const [previousTrackingKey, setPreviousTrackingKey] = useState<typeof trackingKey | null>(null);
+  if (!previousTrackingKey || trackingKey.some((value, index) => value !== previousTrackingKey[index])) {
+    setPreviousTrackingKey(trackingKey);
     if (!options.shouldTrack) {
-      clearWatch();
       setConnectionLabel("paused");
-      setGpsMessage((current) =>
-        current.toLowerCase().includes("denied")
-          ? current
-          : "GPS paused — coordinate collection suspended.",
-      );
-      return;
-    }
-
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGpsMessage("This browser does not support GPS.");
+      setGpsMessage(current => current.toLowerCase().includes("denied") ? current : "GPS paused — coordinate collection suspended.");
+    } else if (gpsSupported === false) {
       setConnectionLabel("reconnecting");
-      return;
+      setGpsMessage("This browser does not support GPS.");
+    } else if (gpsSupported) {
+      setConnectionLabel("tracking");
+      setGpsMessage("Acquiring high-accuracy GPS…");
     }
+  }
 
+  useEffect(() => {
     clearWatch();
-    setGpsMessage("Acquiring high-accuracy GPS…");
-    setConnectionLabel("tracking");
+    if (!options.shouldTrack || !gpsSupported) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -209,13 +212,7 @@ export function useGuruWalkGeolocation(
     );
 
     return () => clearWatch();
-  }, [
-    options.shouldTrack,
-    options.bookingId,
-    pingIntervalMs,
-    clearWatch,
-    dispatchPing,
-  ]);
+  }, [options.shouldTrack, options.bookingId, gpsSupported, pingIntervalMs, clearWatch, dispatchPing]);
 
   useEffect(() => () => clearWatch(), [clearWatch]);
 

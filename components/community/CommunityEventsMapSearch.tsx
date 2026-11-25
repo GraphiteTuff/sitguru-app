@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useEffect, useMemo, useState } from "react";
 import {useRouter} from "next/navigation";
 import Link from "next/link";
@@ -360,9 +361,8 @@ export default function CommunityEventsMapSearch({
   initialEventCategory?: string;
 }) {
   const router=useRouter();
-  const [clock,setClock]=useState(0);
+  const [clock,setClock]=useState(Date.now);
   useEffect(()=>{
-    setClock(Date.now());
     const timer=setInterval(()=>setClock(Date.now()),60000);
     const refresh=setInterval(()=>{if(!document.hidden)router.refresh();},3600000);
     return ()=>{clearInterval(timer);clearInterval(refresh);};
@@ -441,8 +441,9 @@ export default function CommunityEventsMapSearch({
     }
   }
 
-  useEffect(() => {
-    const preference = readCommunityLocationPreference();
+  const locationSnapshot = useBrowserSnapshot(() => JSON.stringify(readCommunityLocationPreference()), null);
+  if (!locationReady && locationSnapshot !== null) {
+    const preference = JSON.parse(locationSnapshot) as ReturnType<typeof readCommunityLocationPreference>;
 
     if (
       Number.isFinite(preference.latitude) &&
@@ -455,21 +456,27 @@ export default function CommunityEventsMapSearch({
     }
 
     setLocationReady(true);
-  }, []);
+  }
 
   const hasPlaceAnchor = Boolean(
     filters.county || filters.city || filters.state || deviceCenter,
   );
 
-  useEffect(() => {
-    if (view !== "places" || !locationReady) return;
-    if (!hasPlaceAnchor) {
-      setPlaces([]);
-      setPlacesLoading(false);
+  const placesRequest = [view,lane,placeCategory,highlyFriendly,dogsIndoors,outdoorPatio,openNow,filters.q,filters.county,filters.city,filters.state,locationReady,hasPlaceAnchor,deviceCenter?.latitude,deviceCenter?.longitude] as const;
+  const [previousPlacesRequest, setPreviousPlacesRequest] = useState<typeof placesRequest | null>(null);
+  if (!previousPlacesRequest || placesRequest.some((value, i) => value !== previousPlacesRequest[i])) {
+    setPreviousPlacesRequest(placesRequest);
+    if (view === "places" && locationReady) {
+      if (!hasPlaceAnchor) setPlaces([]);
+      setPlacesLoading(hasPlaceAnchor);
       setPlacesError(null);
       setPlacesErrorCode(null);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (view !== "places" || !locationReady) return;
+    if (!hasPlaceAnchor) return;
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (filters.q) params.set("q", filters.q);
@@ -486,10 +493,6 @@ export default function CommunityEventsMapSearch({
     if (dogsIndoors) params.set("dogsIndoors", "true");
     if (outdoorPatio) params.set("outdoor", "true");
     if (openNow) params.set("openNow", "true");
-
-    setPlacesLoading(true);
-    setPlacesError(null);
-    setPlacesErrorCode(null);
 
     fetch(`/api/community/places?${params.toString()}`, {
       signal: controller.signal,

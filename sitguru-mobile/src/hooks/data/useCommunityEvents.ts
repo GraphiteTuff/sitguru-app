@@ -55,19 +55,15 @@ export function useCommunityEvents(filters?: {
   const filterCity = filters?.city;
   const filterQuery = filters?.q;
   const filterState = filters?.state;
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchReload = useCallback(async () => {
+    const params = new URLSearchParams();
+    if (filterCity) params.set("city", filterCity);
+    if (filterState) params.set("state", filterState);
+    if (filterQuery) params.set("q", filterQuery);
 
-    try {
-      const params = new URLSearchParams();
-      if (filterCity) params.set("city", filterCity);
-      if (filterState) params.set("state", filterState);
-      if (filterQuery) params.set("q", filterQuery);
-
-      const response = await fetch(
+    return fetch(
         `${getApiBaseUrl()}/api/community/events?${params.toString()}`,
-      );
+      ).then(async (response) => {
       const payload = (await response.json()) as {
         events?: MobileCommunityEvent[];
         error?: string;
@@ -78,19 +74,33 @@ export function useCommunityEvents(filters?: {
       }
 
       setEvents(payload.events || []);
-    } catch (loadError) {
+    }).catch((loadError) => {
       setError(
         loadError instanceof Error ? loadError.message : "Unable to load events.",
       );
       setEvents([]);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [filterCity, filterQuery, filterState]);
 
+  const reload = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return fetchReload();
+  }, [fetchReload, setLoading, setError]);
+
+  const filterKey = JSON.stringify([filterCity, filterState, filterQuery]);
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    setLoading(true);
+    setError(null);
+  }
+
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void fetchReload();
+  }, [fetchReload]);
 
   return { events, loading, error, reload };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -54,15 +55,21 @@ export default function GrowthWorkstreamSwitcher({role}:{role:Role}) {
   const path = usePathname();
   const [previous,setPrevious] = useState<string>("");
   const visible = inWorkstream(path,role);
-  useEffect(()=>{
-    if(!visible)return;
-    const key="sitguru:workflow:last:"+role;
-    try{
-      const last=sessionStorage.getItem(key)||"";
-      setPrevious(last!==path && inWorkstream(last,role)?last:"");
-      if(last!==path)sessionStorage.setItem(key,path);
-    }catch{setPrevious("");}
-  },[path,role,visible]);
+  const lastPath = useBrowserSnapshot(() => {
+    try { return sessionStorage.getItem("sitguru:workflow:last:" + role) || ""; }
+    catch { return ""; }
+  }, null);
+  const routeKey = role + ":" + path;
+  const [previousRouteKey, setPreviousRouteKey] = useState("");
+  if (visible && lastPath !== null && previousRouteKey !== routeKey) {
+    setPreviousRouteKey(routeKey);
+    setPrevious(lastPath !== path && inWorkstream(lastPath, role) ? lastPath : "");
+  }
+  useEffect(() => {
+    if (!visible || lastPath === null) return;
+    try { sessionStorage.setItem("sitguru:workflow:last:" + role, path); }
+    catch { /* storage unavailable */ }
+  }, [path, role, visible, lastPath]);
 
   if(!visible)return null;
   const tabs=NAV[role];

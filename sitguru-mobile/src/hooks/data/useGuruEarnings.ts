@@ -436,23 +436,15 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
   const [error, setError] = useState<string | null>(null);
 
   const accountId = user?.id;
-  const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !accountId || !isSupabaseConfigured) {
-      setItems([]);
-      setPayoutSetup(EMPTY_PAYOUT);
-      setError(null);
-      return;
-    }
+  const fetchRefresh = useCallback(async () => {
+    if (!enabled || !isAuthenticated || !accountId || !isSupabaseConfigured) return;
 
-    setLoading(true);
-
-    try {
-      const [payments, bookings, payouts, setup] = await Promise.all([
+    return Promise.all([
         queryPaymentLedger(accountId),
         queryCompletedBookings(accountId),
         queryGuruPayouts(accountId),
         loadPayoutSetup(),
-      ]);
+      ]).then(async ([payments, bookings, payouts, setup]) => {
 
       const paymentItems = payments
         .map((row, index) => itemFromPayment(row, index))
@@ -484,16 +476,34 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
       setItems(merged);
       setPayoutSetup(setup);
       setError(null);
-    } catch (err) {
+    }).catch((err) => {
       setError(getErrorMessage(err, 'Earnings could not be loaded.'));
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [enabled, isAuthenticated, accountId]);
 
+  const refresh = useCallback(() => {
+    setLoading(true);
+    return fetchRefresh();
+  }, [fetchRefresh, setLoading]);
+
+  const requestKey = JSON.stringify([enabled, isAuthenticated, isSupabaseConfigured, accountId]);
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!enabled || !isAuthenticated || !accountId || !isSupabaseConfigured) {
+      setItems([]);
+      setPayoutSetup(EMPTY_PAYOUT);
+      setError(null);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void fetchRefresh();
+  }, [fetchRefresh]);
 
   const summary = useMemo(() => {
     const base = summarize(items);

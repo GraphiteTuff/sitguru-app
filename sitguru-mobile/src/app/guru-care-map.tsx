@@ -358,20 +358,11 @@ export default function GuruCareMapScreen() {
     ]);
 
   const accountId = user?.id;
-  const loadOpportunities = useCallback(
+  const fetchLoadOpportunities = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
-        setOpportunities([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const rows = await queryOpportunityRows(accountId);
+    return queryOpportunityRows(accountId).then(async (rows) => {
         setOpportunities(
           rows
             .map((item, index) =>
@@ -381,21 +372,40 @@ export default function GuruCareMapScreen() {
             .sort(compareOpportunities),
         );
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Nearby care demand could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [accountId, setLoading, setMessage, setOpportunities, setRefreshing],
   );
 
+  const loadOpportunities = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadOpportunities(showRefresh);
+  }, [fetchLoadOpportunities, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setOpportunities([]);
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadOpportunities(false);
-  }, [loadOpportunities]);
+    void fetchLoadOpportunities(false);
+  }, [fetchLoadOpportunities]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;

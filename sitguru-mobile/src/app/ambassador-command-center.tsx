@@ -1298,20 +1298,13 @@ export default function AmbassadorCommandCenterScreen() {
     [token],
   );
 
-  const loadData = useCallback(
+  const fetchLoadData = useCallback(
     async (quiet = false) => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+    if (!token) return;
+    const start = addDays(todayValue(), -45);
+    const end = addDays(todayValue(), 120);
 
-      quiet ? setRefreshing(true) : setLoading(true);
-
-      try {
-        const start = addDays(todayValue(), -45);
-        const end = addDays(todayValue(), 120);
-
-        const [commandResponse, payoutResponse] = await Promise.all([
+    return Promise.all([
           apiFetch(
             `/api/ambassador/command-center?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
             { method: 'GET', cache: 'no-store' },
@@ -1320,7 +1313,7 @@ export default function AmbassadorCommandCenterScreen() {
             method: 'GET',
             cache: 'no-store',
           }).catch(() => null),
-        ]);
+        ]).then(async ([commandResponse, payoutResponse]) => {
 
         const commandPayload = await readCommandResponse(commandResponse);
 
@@ -1356,21 +1349,37 @@ export default function AmbassadorCommandCenterScreen() {
             'Your payout setup could not be loaded right now.',
           );
         }
-      } catch {
+    }).catch(() => {
         // Keep the Portal usable in Expo preview when the local Next.js API
         // is not running. Save failures still show a clear message.
         setFeedback(null);
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [apiFetch, token],
   );
 
+  const loadData = useCallback((quiet = false) => {
+    quiet ? setRefreshing(true) : setLoading(true);
+    return fetchLoadData(quiet);
+  }, [fetchLoadData, setRefreshing, setLoading]);
+
+  const requestKey = token || "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!token) {
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    if (!authLoading) void loadData();
-  }, [authLoading, loadData]);
+    if (!authLoading) void fetchLoadData();
+  }, [authLoading, fetchLoadData]);
 
   const summary = data?.summary || emptySummary;
   const activities = data?.activities || [];

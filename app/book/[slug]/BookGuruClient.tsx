@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -1832,28 +1833,10 @@ export default function BookGuruClient({
 
   const allAcknowledgementsAccepted = bookingAgreementAccepted;
 
-  useEffect(() => {
-    if (
-      expressAdvanced ||
-      !expressMode ||
-      !authChecked ||
-      petsLoading ||
-      step !== 1 ||
-      !canContinueStep1
-    ) {
-      return;
-    }
-
+  if (!expressAdvanced && expressMode && authChecked && !petsLoading && step === 1 && canContinueStep1) {
     setStep(2);
     setExpressAdvanced(true);
-  }, [
-    authChecked,
-    canContinueStep1,
-    expressAdvanced,
-    expressMode,
-    petsLoading,
-    step,
-  ]);
+  }
 
   const isPetParentLoggedIn = Boolean(customerUserId);
   const bookingReturnPath = bookingReturnPathWithParams(
@@ -1887,40 +1870,41 @@ export default function BookGuruClient({
     });
   }
 
-  useEffect(() => {
-    if (draftRestored) return;
-    const draft = loadPetParentBookingDraft(guruSlug);
-    if (!draft) {
-      setDraftRestored(true);
-      return;
-    }
-
-    if (draft.petId) setSelectedPetId(draft.petId);
-    if (draft.petName) setPetName(draft.petName);
-    if (draft.careZipCode) setCareZipCode(draft.careZipCode);
-    if (draft.careCity) setCareCity(draft.careCity);
-    if (draft.careState) setCareState(draft.careState);
-    if (draft.selectedService) {
-      const service = draft.selectedService as ServiceKey;
-      if (
-        ["drop_in_visit", "house_sitting", "doggy_day_care", "dog_walking"].includes(
-          service,
-        )
-      ) {
-        setSelectedService(service);
+  const bookingDraftSnapshot = useBrowserSnapshot(
+    () => JSON.stringify(loadPetParentBookingDraft(guruSlug)),
+    null,
+  );
+  if (!draftRestored && bookingDraftSnapshot !== null) {
+    const draft = JSON.parse(bookingDraftSnapshot) as ReturnType<typeof loadPetParentBookingDraft>;
+    if (draft) {
+      if (draft.petId) setSelectedPetId(draft.petId);
+      if (draft.petName) setPetName(draft.petName);
+      if (draft.careZipCode) setCareZipCode(draft.careZipCode);
+      if (draft.careCity) setCareCity(draft.careCity);
+      if (draft.careState) setCareState(draft.careState);
+      if (draft.selectedService) {
+        const service = draft.selectedService as ServiceKey;
+        if (
+          ["drop_in_visit", "house_sitting", "doggy_day_care", "dog_walking"].includes(
+            service,
+          )
+        ) {
+          setSelectedService(service);
+        }
       }
+      if (draft.bookingDate) setBookingDate(draft.bookingDate);
+      if (draft.bookingEndDate) setBookingEndDate(draft.bookingEndDate);
+      if (draft.timeWindow) setTimeWindow(draft.timeWindow);
+      if (draft.visitLength) setVisitLength(draft.visitLength);
+      if (draft.bookingType) setBookingType(draft.bookingType);
+      if (draft.notes) setNotes(draft.notes);
     }
-    if (draft.bookingDate) setBookingDate(draft.bookingDate);
-    if (draft.bookingEndDate) setBookingEndDate(draft.bookingEndDate);
-    if (draft.timeWindow) setTimeWindow(draft.timeWindow);
-    if (draft.visitLength) setVisitLength(draft.visitLength);
-    if (draft.bookingType) setBookingType(draft.bookingType);
-    if (draft.notes) setNotes(draft.notes);
     setDraftRestored(true);
-  }, [draftRestored, guruSlug]);
+  }
 
-  useEffect(() => {
-    if (!queryService) return;
+  const [previousServiceQuery, setPreviousServiceQuery] = useState<typeof queryService | null>(null);
+  if (queryService !== previousServiceQuery && queryService) {
+    setPreviousServiceQuery(queryService);
     const normalized = queryService as ServiceKey;
     if (
       ["drop_in_visit", "house_sitting", "doggy_day_care", "dog_walking"].includes(
@@ -1928,16 +1912,13 @@ export default function BookGuruClient({
       )
     ) {
       setSelectedService(normalized);
-      return;
-    }
-
-    if (queryService.includes("walk")) setSelectedService("dog_walking");
+    } else if (queryService.includes("walk")) setSelectedService("dog_walking");
     else if (queryService.includes("sit")) setSelectedService("house_sitting");
     else if (queryService.includes("day")) setSelectedService("doggy_day_care");
     else if (queryService.includes("drop") || queryService.includes("visit")) {
       setSelectedService("drop_in_visit");
     }
-  }, [queryService]);
+  }
 
   useEffect(() => {
     async function loadPetsAndCustomer() {
@@ -2144,19 +2125,10 @@ export default function BookGuruClient({
     initialGuruResponseRate,
   ]);
 
-  useEffect(() => {
-    const cleanedZip = cleanZip(careZipCode);
-
-    if (!cleanedZip) {
-      setZipLookupStatus("idle");
-      setCareCity("");
-      setCareState("");
-      setCareLatitude(null);
-      setCareLongitude(null);
-      setCareLocalityName("");
-      return;
-    }
-
+  const cleanedZip = cleanZip(careZipCode);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== cleanedZip) {
+    setPreviousLookupInput(cleanedZip);
     if (cleanedZip.length !== 5) {
       setZipLookupStatus("idle");
       setCareCity("");
@@ -2164,8 +2136,11 @@ export default function BookGuruClient({
       setCareLatitude(null);
       setCareLongitude(null);
       setCareLocalityName("");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (cleanedZip.length !== 5) return;
 
     let cancelled = false;
 
@@ -2228,11 +2203,11 @@ export default function BookGuruClient({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [careZipCode]);
+  }, [cleanedZip]);
 
-  useEffect(() => {
-    if (!selectedPet) return;
-
+  const [previousBookingPet, setPreviousBookingPet] = useState<typeof selectedPet | null>(null);
+  if (selectedPet !== previousBookingPet && selectedPet) {
+    setPreviousBookingPet(selectedPet);
     setPetName(selectedPet.name || "");
 
     const autoNotes = [
@@ -2251,11 +2226,9 @@ export default function BookGuruClient({
       if (current.trim().length > 0) return current;
       return autoNotes;
     });
-  }, [selectedPet]);
+  }
 
-  useEffect(() => {
-    if (!bookingDate) return;
-
+  if (bookingDate) {
     const currentCell = calendarCells.find((cell) => cell.iso === bookingDate);
     const currentEndCell = bookingEndDate
       ? calendarCells.find((cell) => cell.iso === bookingEndDate)
@@ -2274,13 +2247,7 @@ export default function BookGuruClient({
       setBookingEndDate("");
       setHoverDate("");
     }
-  }, [
-    selectedService,
-    calendarCells,
-    bookingDate,
-    bookingEndDate,
-    rangeHasUnavailableDate,
-  ]);
+  }
 
   function moveCalendar(direction: "prev" | "next") {
     setCalendarMonth((current) => {

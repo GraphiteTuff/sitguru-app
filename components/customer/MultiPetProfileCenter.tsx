@@ -185,26 +185,29 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
     [pets, selectedId],
   );
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const rows = await loadPetsForUser(parent.userId);
+  const fetchRefresh = useCallback(async () => {
+    return loadPetsForUser(parent.userId).then(async (rows) => {
       setPets(rows);
       onPetsChange?.(rows);
       if (!selectedId && rows[0]) setSelectedId(rows[0].id);
       if (selectedId && !rows.some((p) => p.id === selectedId)) {
         setSelectedId(rows[0]?.id || null);
       }
-    } catch (err) {
+    }).catch((err) => {
       setError(err instanceof Error ? err.message : "Unable to load pets.");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [parent.userId, onPetsChange, selectedId]);
 
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setError("");
+    return fetchRefresh();
+  }, [fetchRefresh, setLoading, setError]);
+
   useEffect(() => {
-    void refresh();
+    void fetchRefresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent.userId]);
 

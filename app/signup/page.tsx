@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -268,11 +269,11 @@ function isValidReferralCodeFormat(value: string) {
   return /^[A-Z0-9_-]{2,64}$/.test(value);
 }
 
-function getCookieValue(name: string) {
+function getCookieValue(name: string, cookieSnapshot?: string) {
   if (typeof document === "undefined") return "";
 
   const prefix = `${encodeURIComponent(name)}=`;
-  const cookie = document.cookie
+  const cookie = (cookieSnapshot ?? document.cookie)
     .split(";")
     .map((item) => item.trim())
     .find((item) => item.startsWith(prefix));
@@ -570,7 +571,7 @@ function SignupPageContent() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [showReferralField, setShowReferralField] = useState(
+  const [manuallyOpenedReferralField, setShowReferralField] = useState(
     Boolean(
       normalizeReferralCode(
         searchParams.get("referral_code") ||
@@ -583,7 +584,17 @@ function SignupPageContent() {
     ),
   );
 
-  useEffect(() => {
+  const cookieSnapshot = useBrowserSnapshot(() => document.cookie, "");
+  const storedReferral = useBrowserSnapshot(() => {
+    try {
+      return localStorage.getItem("sitguru_referral_code") || localStorage.getItem("sitguru_ambassador_code") || "";
+    } catch { return ""; }
+  }, "");
+  const referralInputs = [searchParams.toString(), cookieSnapshot, storedReferral] as const;
+  const [previousReferralInputs, setPreviousReferralInputs] = useState<typeof referralInputs | null>(null);
+  if (!previousReferralInputs || referralInputs.some((value, index) => value !== previousReferralInputs[index])) {
+    setPreviousReferralInputs(referralInputs);
+    const readCookie = (name: string) => getCookieValue(name, cookieSnapshot);
     const urlReferralCode = normalizeReferralCode(
       searchParams.get("referral_code") ||
         searchParams.get("ambassador_referral_code") ||
@@ -594,18 +605,12 @@ function SignupPageContent() {
     );
 
     const cookieReferralCode = normalizeReferralCode(
-      getCookieValue("sitguru_referral_code") ||
-        getCookieValue("sitguru_ambassador_code"),
+      readCookie("sitguru_referral_code") ||
+        readCookie("sitguru_ambassador_code"),
     );
 
-    const storedReferralCode =
-      typeof window !== "undefined"
-        ? normalizeReferralCode(
-            window.localStorage.getItem("sitguru_referral_code") ||
-              window.localStorage.getItem("sitguru_ambassador_code") ||
-              "",
-          )
-        : "";
+    const storedReferralCode = normalizeReferralCode(storedReferral);
+
 
     const resolvedReferralCode =
       urlReferralCode || cookieReferralCode || storedReferralCode;
@@ -613,49 +618,42 @@ function SignupPageContent() {
     if (resolvedReferralCode) {
       setReferralCode((current) => current || resolvedReferralCode);
 
-      try {
-        window.localStorage.setItem(
-          "sitguru_referral_code",
-          resolvedReferralCode,
-        );
-      } catch {
-        // Local storage may be unavailable in private browsing.
-      }
+
     }
 
     setSignupTracking((current) => ({
       program:
         current.program ||
-        normalizeTrackingValue(getCookieValue("sitguru_referral_program")),
+        normalizeTrackingValue(readCookie("sitguru_referral_program")),
       source:
         current.source ||
-        normalizeTrackingValue(getCookieValue("sitguru_referral_source")),
+        normalizeTrackingValue(readCookie("sitguru_referral_source")),
       platform:
         current.platform ||
-        normalizeTrackingValue(getCookieValue("sitguru_referral_platform")),
+        normalizeTrackingValue(readCookie("sitguru_referral_platform")),
       medium:
         current.medium ||
-        normalizeTrackingValue(getCookieValue("sitguru_referral_medium")),
+        normalizeTrackingValue(readCookie("sitguru_referral_medium")),
       campaign:
         current.campaign ||
-        normalizeTrackingValue(getCookieValue("sitguru_referral_campaign")),
+        normalizeTrackingValue(readCookie("sitguru_referral_campaign")),
       utmSource:
         current.utmSource ||
-        normalizeTrackingValue(getCookieValue("sitguru_utm_source")),
+        normalizeTrackingValue(readCookie("sitguru_utm_source")),
       utmMedium:
         current.utmMedium ||
         normalizeTrackingValue(
-          getCookieValue("sitguru_utm_medium") ||
-            getCookieValue("sitguru_referral_medium"),
+          readCookie("sitguru_utm_medium") ||
+            readCookie("sitguru_referral_medium"),
         ),
       utmCampaign:
         current.utmCampaign ||
-        normalizeTrackingValue(getCookieValue("sitguru_utm_campaign")),
+        normalizeTrackingValue(readCookie("sitguru_utm_campaign")),
       utmContent:
         current.utmContent ||
-        normalizeTrackingValue(getCookieValue("sitguru_utm_content")),
+        normalizeTrackingValue(readCookie("sitguru_utm_content")),
     }));
-  }, [searchParams]);
+  }
 
   useEffect(() => {
     if (!referralCode || typeof window === "undefined") return;
@@ -714,21 +712,23 @@ function SignupPageContent() {
             : "pet_parent"
       }`;
 
-  useEffect(() => {
-    if (referralCode && !showReferralField) {
-      setShowReferralField(true);
-    }
-  }, [referralCode, showReferralField]);
 
-  useEffect(() => {
+
+  const showReferralField = manuallyOpenedReferralField || Boolean(referralCode);
+
+  const [previousStartingMode, setPreviousStartingMode] = useState(startingMode);
+  if (startingMode !== previousStartingMode) {
+    setPreviousStartingMode(startingMode);
     setMode(startingMode);
-  }, [startingMode]);
+  }
 
-  useEffect(() => {
+  const [previousAuthQuery, setPreviousAuthQuery] = useState(searchParams);
+  if (searchParams !== previousAuthQuery) {
+    setPreviousAuthQuery(searchParams);
     const incoming =
       searchParams.get("auth_error") || searchParams.get("error") || "";
     if (incoming) setError(incoming);
-  }, [searchParams]);
+  }
 
   useEffect(() => {
     if (!awaitingEmailConfirm) return;

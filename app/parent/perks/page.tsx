@@ -48,11 +48,8 @@ export default function ParentPerksPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PerksApiResponse | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/parent/perks");
+  const fetchLoad = useCallback(async () => {
+    return fetch("/api/parent/perks").then(async (res) => {
       const json = (await res.json()) as PerksApiResponse;
       if (res.status === 401) {
         router.push(`/login?next=${encodeURIComponent("/parent/perks")}`);
@@ -62,16 +59,22 @@ export default function ParentPerksPage() {
         throw new Error(json.error || "Unable to load PawPerks.");
       }
       setData(json);
-    } catch (err) {
+    }).catch((err) => {
       setError(err instanceof Error ? err.message : "Load failed.");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return fetchLoad();
+  }, [fetchLoad, setLoading, setError]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchLoad();
+  }, [fetchLoad]);
 
   const milestoneBars = useMemo(() => {
     const lifetime = data?.balance?.lifetimeEarned || 0;

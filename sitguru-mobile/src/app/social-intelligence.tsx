@@ -92,23 +92,37 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (refresh = false) => {
+  const fetchLoad = useCallback(async (refresh = false) => {
+    const query = new URLSearchParams({ preset, platform });
+
+    return sitguruApiFetch<Snapshot>('/api/social-intelligence/snapshot?' + query.toString(), {
+      method: 'GET', cache: 'no-store',
+    }).then(async (result) => {
+      if (result.error || !result.data) {
+        setError(result.error || 'Unable to load Social Intelligence.');
+        setSnapshot(null);
+      } else setSnapshot(result.data);
+      setLoading(false);
+      setRefreshing(false);
+    });
+  }, [platform, preset]);
+
+  const load = useCallback((refresh = false) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');
-    const query = new URLSearchParams({ preset, platform });
-    const result = await sitguruApiFetch<Snapshot>('/api/social-intelligence/snapshot?' + query.toString(), {
-      method: 'GET', cache: 'no-store',
-    });
-    if (result.error || !result.data) {
-      setError(result.error || 'Unable to load Social Intelligence.');
-      setSnapshot(null);
-    } else setSnapshot(result.data);
-    setLoading(false);
-    setRefreshing(false);
-  }, [platform, preset]);
+    return fetchLoad(refresh);
+  }, [fetchLoad, setRefreshing, setLoading, setError]);
 
-  useEffect(() => { void load(); }, [load]);
+  const filterKey = preset + ":" + platform;
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    setLoading(true);
+    setError('');
+  }
+
+  useEffect(() => { void fetchLoad(); }, [fetchLoad]);
 
   const posts = useMemo(() =>
     [...(snapshot?.posts || [])].sort((a, b) =>

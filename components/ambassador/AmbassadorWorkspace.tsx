@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
 import Link from "next/link";
 import {
   FormEvent,
@@ -1264,9 +1265,12 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
     useState<LeadFormState>(newLeadForm());
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const workspaceSearch = useBrowserSearch();
+  const [previousWorkspaceSearch, setPreviousWorkspaceSearch] = useState("");
+  if (workspaceSearch !== previousWorkspaceSearch) {
+    setPreviousWorkspaceSearch(workspaceSearch);
     // Follow direct links from the mobile Ambassador home into the right tool.
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(workspaceSearch);
     const requestedView = params.get("view");
     if (
       requestedView === "today" ||
@@ -1291,7 +1295,7 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
       setMarketingForm(newMarketingForm());
       setComposer("marketing_effort");
     }
-  }, []);
+  }
 
   useEffect(() => {
     function handleWorkspaceJump(event: Event) {
@@ -1327,14 +1331,11 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
     return () => window.removeEventListener("sitguru:ambassador-workspace", handleWorkspaceJump);
   }, []);
 
-  const loadData = useCallback(async (quiet = false) => {
-    quiet ? setRefreshing(true) : setLoading(true);
-
+  const fetchLoadData = useCallback(async (quiet = false) => {
     const start = addDays(todayInputValue(), -45);
     const end = addDays(todayInputValue(), 120);
 
-    try {
-      const response = await fetch(
+    return fetch(
         `/api/ambassador/command-center?start=${encodeURIComponent(
           start,
         )}&end=${encodeURIComponent(end)}`,
@@ -1342,7 +1343,7 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
           credentials: "include",
           cache: "no-store",
         },
-      );
+      ).then(async (response) => {
 
       const payload =
         (await response.json()) as CommandCenterResponse;
@@ -1355,7 +1356,7 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
 
       setData(payload.commandCenter);
       setAmbassador(payload.ambassador || null);
-    } catch (error) {
+    }).catch((error) => {
       setFeedback({
         tone: "error",
         message:
@@ -1363,15 +1364,20 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
             ? error.message
             : "Unable to load the Ambassador Portal.",
       });
-    } finally {
+    }).finally(() => {
       setLoading(false);
       setRefreshing(false);
-    }
+    });
   }, []);
 
+  const loadData = useCallback((quiet = false) => {
+    quiet ? setRefreshing(true) : setLoading(true);
+    return fetchLoadData(quiet);
+  }, [fetchLoadData, setRefreshing, setLoading]);
+
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void fetchLoadData();
+  }, [fetchLoadData]);
 
   const summary = data?.summary || emptySummary;
   const activities = data?.activities || [];

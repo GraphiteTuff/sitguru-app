@@ -16,29 +16,24 @@ export default function LiveWalkFeedCard({
   selected,
   onSelect,
 }: LiveWalkFeedCardProps) {
-  const [elapsed, setElapsed] = useState(() =>
-    row.startedAt
-      ? Math.max(0, Math.floor((Date.now() - new Date(row.startedAt).getTime()) / 1000))
-      : row.durationSeconds,
-  );
+  const [liveElapsed, setLiveElapsed] = useState<{ bookingId: string; seconds: number } | null>(null);
+
+  const startedMs = row.startedAt ? new Date(row.startedAt).getTime() : null;
+  const running = startedMs !== null && row.globalTrackingStatus !== "COMPLETED";
+  const elapsed = running && liveElapsed?.bookingId === row.bookingId
+    ? liveElapsed.seconds
+    : row.durationSeconds;
 
   useEffect(() => {
-    if (!row.startedAt || row.globalTrackingStatus === "COMPLETED") {
-      setElapsed(row.durationSeconds);
-      return;
-    }
-    const tick = () => {
-      setElapsed(
-        Math.max(
-          0,
-          Math.floor((Date.now() - new Date(row.startedAt!).getTime()) / 1000),
-        ),
-      );
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
+    if (!running || startedMs === null) return;
+    const id = window.setInterval(() => {
+      setLiveElapsed({
+        bookingId: row.bookingId,
+        seconds: Math.max(0, Math.floor((Date.now() - startedMs) / 1000)),
+      });
+    }, 1000);
     return () => window.clearInterval(id);
-  }, [row.startedAt, row.durationSeconds, row.bookingId, row.globalTrackingStatus]);
+  }, [running, startedMs, row.bookingId]);
 
   const flagged =
     row.globalTrackingStatus === "FLAGGED_ALERT" || row.isStaleAlert;

@@ -466,15 +466,11 @@ export default function GuruBackgroundCheckPage() {
 
   const canStartCheckr = !isTrustSafetyScreeningBypassed();
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      setErrorMessage("");
-
-      const {
+  async function fetchLoadPage() {
+    return supabase.auth.getUser().then(async ({
         data: { user },
         error: authError,
-      } = await supabase.auth.getUser();
+      }) => {
 
       if (authError || !user) {
         router.replace(routes.login);
@@ -488,17 +484,18 @@ export default function GuruBackgroundCheckPage() {
       const launchWaivedProfile = await applyTrustSafetyLaunchWaiver(guruProfile);
 
       setProfile(launchWaivedProfile);
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         `Could not load Trust & Safety Screening status: ${stringifyError(error)}`,
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }
 
+
   useEffect(() => {
-    loadPage();
+    fetchLoadPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -36,40 +36,47 @@ export default function MarketDensityLeaflet({
   );
 
   useEffect(() => {
-    if (!mapElementRef.current || mapRef.current) return;
+    let disposeMap: (() => void) | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      if (!mapElementRef.current || mapRef.current) return;
 
-    try {
-      const map = L.map(mapElementRef.current, {
-        center: DEFAULT_CENTER,
-        zoom: 8,
-        minZoom: 4,
-        maxZoom: 14,
-        scrollWheelZoom: true,
-      });
+      try {
+        const map = L.map(mapElementRef.current, {
+          center: DEFAULT_CENTER,
+          zoom: 8,
+          minZoom: 4,
+          maxZoom: 14,
+          scrollWheelZoom: true,
+        });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }).addTo(map);
 
-      mapRef.current = map;
+        mapRef.current = map;
 
-      const invalidate = () => map.invalidateSize({ animate: false });
-      const timers = [
-        window.setTimeout(invalidate, 0),
-        window.setTimeout(invalidate, 250),
-      ];
+        const invalidate = () => map.invalidateSize({ animate: false });
+        const timers = [
+          window.setTimeout(invalidate, 0),
+          window.setTimeout(invalidate, 250),
+        ];
 
-      return () => {
-        timers.forEach((timer) => window.clearTimeout(timer));
-        map.remove();
-        mapRef.current = null;
-      };
-    } catch (error) {
-      console.error("Market density map failed:", error);
-      setMapError("Map could not load.");
-    }
+        disposeMap = () => {
+          timers.forEach((timer) => window.clearTimeout(timer));
+          map.remove();
+          mapRef.current = null;
+        };
+      } catch (error) {
+        console.error("Market density map failed:", error);
+        setMapError("Map could not load.");
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      disposeMap?.();
+    };
   }, []);
 
   useEffect(() => {

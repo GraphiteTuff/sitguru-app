@@ -5,7 +5,8 @@
  * Desktop/webapp: sidebar card · Mobile: dismissible banner + swipeable steps.
  */
 
-import { useEffect, useState } from "react";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
+import { useState } from "react";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -85,20 +86,18 @@ export default function UniversityExpress({
   academyHref = "/customer/dashboard/university",
   variant = "auto",
 }: UniversityExpressProps) {
-  const [dismissed, setDismissed] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const storedDismissed = useBrowserSnapshot(() => {
+    try { return window.sessionStorage.getItem(STORAGE_KEY) === "1"; }
+    catch { return false; }
+  }, null);
+  const [dismissedByUser, setDismissed] = useState(false);
+  const mounted = storedDismissed !== null;
+  const dismissed = dismissedByUser || storedDismissed === true;
 
   const flags = { petProfileDone, guruVibeDone, safeBookingDone };
   const hrefs = { petProfileHref, guruVibeHref, safeBookingHref };
 
-  useEffect(() => {
-    setMounted(true);
-    try {
-      setDismissed(sessionStorage.getItem(STORAGE_KEY) === "1");
-    } catch {
-      // ignore
-    }
-  }, []);
+
 
   function dismissBanner() {
     setDismissed(true);

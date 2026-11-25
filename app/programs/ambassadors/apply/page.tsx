@@ -342,20 +342,18 @@ function AmbassadorApplyPageContent() {
   const [applicationId, setApplicationId] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
 
-  useEffect(() => {
-    const normalizedZip = normalizeZipCode(form.zipCode);
-
-    if (!normalizedZip) {
-      setZipLookupStatus("idle");
-      setZipLookupMessage("");
-      return;
-    }
-
+  const normalizedZip = normalizeZipCode(form.zipCode);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== normalizedZip) {
+    setPreviousLookupInput(normalizedZip);
     if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setZipLookupMessage("Enter a 5-digit ZIP code to autofill city and state.");
-      return;
+      setZipLookupMessage(normalizedZip ? "Enter a 5-digit ZIP code to autofill city and state." : "");
     }
+  }
+
+  useEffect(() => {
+    if (normalizedZip.length < 5) return;
 
     let isMounted = true;
 
@@ -406,7 +404,7 @@ function AmbassadorApplyPageContent() {
       isMounted = false;
       window.clearTimeout(timeout);
     };
-  }, [form.zipCode]);
+  }, [normalizedZip]);
 
   useEffect(() => {
     if (!showConfetti) return;

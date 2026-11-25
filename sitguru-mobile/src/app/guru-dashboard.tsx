@@ -382,51 +382,59 @@ export default function GuruDashboardScreen() {
     );
 
   const accountId = user?.id;
-  const refreshDashboard = useCallback(
+  const fetchRefreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (
-        !accountId ||
-        !isSupabaseConfigured
-      ) {
-        setData(EMPTY_DATA);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId ||
+        !isSupabaseConfigured) return;
 
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        setData(
-          await loadDashboard(
+    return loadDashboard(
             accountId,
             profileRecord,
-          ),
-        );
+          ).then(async (loadedData) => {
+      setData(loadedData);
 
         setLoadMessage('');
-      } catch {
+    }).catch(() => {
         setLoadMessage(
           'Some Guru activity could not be loaded. Pull down to try again.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [
       profileRecord,
       accountId,
     ],
   );
 
+  const refreshDashboard = useCallback((showRefresh = false) => {
+    if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+    return fetchRefreshDashboard(showRefresh);
+  }, [fetchRefreshDashboard, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId ||
+        !isSupabaseConfigured) {
+      setData(EMPTY_DATA);
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void refreshDashboard(false);
-  }, [refreshDashboard]);
+    void fetchRefreshDashboard(false);
+  }, [fetchRefreshDashboard]);
 
   useEffect(() => {
     const timer = setInterval(

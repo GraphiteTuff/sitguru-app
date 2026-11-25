@@ -28,12 +28,18 @@ export default function CommunityCountySuggestInput({
   const [results, setResults] = useState<CommunityGeographySuggestHit[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const q = value.trim();
+  const q = value.trim();
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== q) {
+    setPreviousLookupInput(q);
     if (q.length < 2) {
       setResults([]);
-      return;
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    if (q.length < 2) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -69,7 +75,7 @@ export default function CommunityCountySuggestInput({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [value, stateValue]);
+  }, [q, stateValue]);
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {

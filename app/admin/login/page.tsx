@@ -1,8 +1,9 @@
 "use client";
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -92,8 +93,12 @@ export default function AdminLoginPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
+  const search = useBrowserSearch();
+  const messages = new URLSearchParams(search);
+  const [errorOverride, setErrorMessage] = useState<string | null>(null);
+  const [statusOverride, setStatusMessage] = useState<string | null>(null);
+  const errorMessage = errorOverride ?? decodeMessage(messages.get("error"));
+  const statusMessage = statusOverride ?? decodeMessage(messages.get("status"));
 
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -108,12 +113,7 @@ export default function AdminLoginPage() {
     [],
   );
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
 
-    setErrorMessage(decodeMessage(params.get("error")));
-    setStatusMessage(decodeMessage(params.get("status")));
-  }, []);
 
   function clearMessages() {
     setErrorMessage("");

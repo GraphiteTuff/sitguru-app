@@ -124,37 +124,47 @@ export default function MessagesScreen() {
   });
 
   const accountId = user?.id;
-  const loadMessages = useCallback(
+  const fetchLoadMessages = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
-        setConversations([]);
-        setIsLoading(false);
-        setIsRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
-
-      try {
-        const rows = await loadConversationPreviews(accountId);
+    return loadConversationPreviews(accountId).then(async (rows) => {
         setConversations(rows);
         setLoadMessage('');
-      } catch {
+    }).catch(() => {
         setLoadMessage(
           'Some conversations could not be loaded. Pull down to try again.',
         );
-      } finally {
+      }).finally(() => {
         setIsLoading(false);
         setIsRefreshing(false);
-      }
-    },
+      });
+  },
     [accountId],
   );
 
+  const loadMessages = useCallback((showRefresh = false) => {
+    if (showRefresh) setIsRefreshing(true);
+      else setIsLoading(true);
+    return fetchLoadMessages(showRefresh);
+  }, [fetchLoadMessages, setIsRefreshing, setIsLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setConversations([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+    } else {
+      setIsLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadMessages(false);
-  }, [loadMessages]);
+    void fetchLoadMessages(false);
+  }, [fetchLoadMessages]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;

@@ -35,7 +35,7 @@ export function usePawReportLive(
   const enabled = options.enabled ?? true;
 
   const [report, setReport] = useState<PawReportLivePayload | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(bookingId));
+  const [isLoading, setIsLoading] = useState(Boolean(bookingId && enabled));
   const [error, setError] = useState("");
   const mountedRef = useRef(true);
 
@@ -43,12 +43,11 @@ export function usePawReportLive(
     const id = String(bookingId || "").trim();
     if (!id || !enabled) return;
 
-    try {
-      const response = await fetch(`/api/pawreports/${encodeURIComponent(id)}`, {
+    return fetch(`/api/pawreports/${encodeURIComponent(id)}`, {
         method: "GET",
         cache: "no-store",
         credentials: "include",
-      });
+      }).then(async response => {
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
@@ -62,12 +61,12 @@ export function usePawReportLive(
       if (!mountedRef.current) return;
       setReport(payload?.report || null);
       setError("");
-    } catch (err) {
+    }).catch(err => {
       if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : "Unable to load PawReport.");
-    } finally {
+    }).finally(() => {
       if (mountedRef.current) setIsLoading(false);
-    }
+    });
   }, [bookingId, enabled]);
 
   useEffect(() => {
@@ -77,13 +76,17 @@ export function usePawReportLive(
     };
   }, []);
 
-  useEffect(() => {
-    if (!bookingId || !enabled) {
-      setIsLoading(false);
-      return;
-    }
+  const requestBookingId = enabled ? bookingId : null;
+  const [previousRequestBookingId, setPreviousRequestBookingId] = useState(requestBookingId);
+  if (requestBookingId !== previousRequestBookingId) {
+    setPreviousRequestBookingId(requestBookingId);
+    setIsLoading(Boolean(requestBookingId));
+    setReport(null);
+    setError("");
+  }
 
-    setIsLoading(true);
+  useEffect(() => {
+    if (!bookingId || !enabled) return;
     void refresh();
 
     if (pollIntervalMs <= 0) return;

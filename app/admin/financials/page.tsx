@@ -2268,13 +2268,10 @@ function RecentExportActivity() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Loading recent export activity...");
 
-  async function loadHistory() {
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/admin/financials/export-history", {
+  async function fetchLoadHistory() {
+    return fetch("/api/admin/financials/export-history", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       const json = (await response.json()) as ExportHistoryResponse;
 
@@ -2292,7 +2289,7 @@ function RecentExportActivity() {
           ? "Live export history connected."
           : json.message || "Export activity is unavailable.",
       );
-    } catch (error) {
+    }).catch((error) => {
       setHistory([]);
       setIsLive(false);
       setMessage(
@@ -2300,13 +2297,18 @@ function RecentExportActivity() {
           ? error.message
           : "Unable to load recent export activity.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
+  }
+
+  function loadHistory() {
+    setLoading(true);
+    return fetchLoadHistory();
   }
 
   useEffect(() => {
-    loadHistory();
+    fetchLoadHistory();
   }, []);
 
   return (
@@ -2618,10 +2620,9 @@ export default function AdminFinancialsPage() {
   ]);
 
   async function loadTrustSafetyFinancials() {
-    try {
-      const response = await fetch("/api/admin/financials/trust-safety", {
+    return fetch("/api/admin/financials/trust-safety", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       const json = (await response.json()) as TrustSafetyFinancialsResponse;
 
@@ -2634,7 +2635,7 @@ export default function AdminFinancialsPage() {
       }
 
       setTrustSafetyFinancials(json);
-    } catch (error) {
+    }).catch((error) => {
       setTrustSafetyFinancials({
         ...fallbackTrustSafetyFinancials,
         message:
@@ -2642,14 +2643,13 @@ export default function AdminFinancialsPage() {
             ? error.message
             : "Unable to load Trust & Safety financials.",
       });
-    }
+    });
   }
 
   async function loadGrowthReferralFinancials() {
-    try {
-      const response = await fetch("/api/admin/financials/growth-referrals", {
+    return fetch("/api/admin/financials/growth-referrals", {
         cache: "no-store",
-      });
+      }).then(async (response) => {
 
       const json = (await response.json()) as GrowthReferralFinancialsResponse;
 
@@ -2664,7 +2664,7 @@ export default function AdminFinancialsPage() {
       }
 
       setGrowthReferralFinancials(json);
-    } catch (error) {
+    }).catch((error) => {
       setGrowthReferralFinancials({
         ...fallbackGrowthReferralFinancials,
         message:
@@ -2672,27 +2672,23 @@ export default function AdminFinancialsPage() {
             ? error.message
             : "Unable to load Growth & Referrals financial summary.",
       });
-    }
+    });
   }
 
-  async function loadOverview() {
-    setLoading(true);
-    setLoadMessage("Loading live financial overview...");
-
-    try {
-      const searchParams = new URLSearchParams({
+  async function fetchLoadOverview() {
+    const searchParams = new URLSearchParams({
         range,
         segment,
         startDate: rangeDates.startDate,
         endDate: rangeDates.endDate,
       });
 
-      const response = await fetch(
+    return fetch(
         `/api/admin/financials/overview?${searchParams.toString()}`,
         {
           cache: "no-store",
         },
-      );
+      ).then(async (response) => {
 
       const json = (await response.json()) as FinancialOverviewResponse;
 
@@ -2708,20 +2704,29 @@ export default function AdminFinancialsPage() {
           ? "Live Supabase financial overview connected."
           : "Live overview API returned unavailable data. Showing zero-only placeholders — no fallback financial numbers.",
       );
-    } catch (error) {
+    }).catch((error) => {
       setOverview(fallbackOverview);
       setLoadMessage(
         error instanceof Error
           ? error.message
           : "Unable to load live financial overview.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
+  }
+
+
+  const filterKey = range + ":" + segment;
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    setLoading(true);
+    setLoadMessage("Loading live financial overview...");
   }
 
   useEffect(() => {
-    void loadOverview();
+    void fetchLoadOverview();
     void loadTrustSafetyFinancials();
     void loadGrowthReferralFinancials();
     // eslint-disable-next-line react-hooks/exhaustive-deps

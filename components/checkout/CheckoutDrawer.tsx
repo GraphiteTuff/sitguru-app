@@ -222,23 +222,27 @@ export default function CheckoutDrawer({
     [createIntent],
   );
 
-  useEffect(() => {
-    if (!open) {
-      setClientSecret(null);
-      setServerPricing(null);
-      setError(null);
-      setLoadingIntent(false);
-      setPaid(false);
-      setCostExpanded(true);
-      setSaveCard(false);
-      setRedeemEnabled(false);
-      setPointsToRedeem(0);
-      setAvailablePoints(0);
-      setContext(fallbackContext);
-      return;
-    }
-
+  const [previousOpen, setPreviousOpen] = useState(open);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
     setContext(fallbackContext);
+      if (!open) {
+        setClientSecret(null);
+        setServerPricing(null);
+        setError(null);
+        setLoadingIntent(false);
+        setPaid(false);
+        setCostExpanded(true);
+        setSaveCard(false);
+        setRedeemEnabled(false);
+        setPointsToRedeem(0);
+        setAvailablePoints(0);
+
+      }
+  }
+
+  useEffect(() => {
+    if (!open) return;
 
     // Load vault, then create PaymentIntent
     void (async () => {

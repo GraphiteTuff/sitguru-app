@@ -2058,24 +2058,20 @@ function SearchPageContent() {
     loadGurus();
   }, [initialService, initialZip, initialCity, initialState, quickPetId]);
 
-  useEffect(() => {
-    const cleanedZip = cleanZip(zipFilter);
-
-    if (!cleanedZip) {
-      setZipLookup(null);
-      setZipLookupStatus("idle");
-      setCityFilter("");
-      setStateFilter("");
-      return;
-    }
-
+  const cleanedZip = cleanZip(zipFilter);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== cleanedZip) {
+    setPreviousLookupInput(cleanedZip);
     if (cleanedZip.length !== 5) {
       setZipLookup(null);
       setZipLookupStatus("idle");
       setCityFilter("");
       setStateFilter("");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (cleanedZip.length !== 5) return;
 
     let cancelled = false;
 
@@ -2140,15 +2136,14 @@ function SearchPageContent() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [zipFilter]);
+  }, [cleanedZip]);
+
+  if (!gurus.length && Object.keys(guruZipLookupsByZip).length) {
+    setGuruZipLookupsByZip({});
+  }
 
   useEffect(() => {
-    if (!gurus.length) {
-      setGuruZipLookupsByZip((currentLookups) =>
-        Object.keys(currentLookups).length ? {} : currentLookups,
-      );
-      return;
-    }
+    if (!gurus.length) return;
 
     const uniqueGuruZips = Array.from(
       new Set(

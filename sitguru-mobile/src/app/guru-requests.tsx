@@ -93,20 +93,11 @@ export default function GuruRequestsScreen() {
   );
 
   const accountId = user?.id;
-  const loadRequests = useCallback(
+  const fetchLoadRequests = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
-        setRequests([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const rows = await queryGuruRows(accountId);
+    return queryGuruRows(accountId).then(async (rows) => {
         const mapped = rows
           .map((item, index) => mapRequest(item.row, item.table, index))
           .filter((item): item is CareRequest => Boolean(item))
@@ -114,21 +105,40 @@ export default function GuruRequestsScreen() {
 
         setRequests(mapped);
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Some requests could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [accountId],
   );
 
+  const loadRequests = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadRequests(showRefresh);
+  }, [fetchLoadRequests, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setRequests([]);
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadRequests(false);
-  }, [loadRequests]);
+    void fetchLoadRequests(false);
+  }, [fetchLoadRequests]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;

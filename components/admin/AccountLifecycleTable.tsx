@@ -234,12 +234,8 @@ export default function AccountLifecycleTable({
     return session.access_token;
   }
 
-  async function loadAccounts() {
-    setIsLoading(true);
-    setMessage("");
-
-    try {
-      const accessToken = await getAccessToken();
+  async function fetchLoadAccounts() {
+    return getAccessToken().then(async (accessToken) => {
 
       const params = new URLSearchParams({
         status,
@@ -260,13 +256,19 @@ export default function AccountLifecycleTable({
       }
 
       setAccounts(result.accounts || []);
-    } catch (error) {
+    }).catch((error) => {
       setMessage(
         error instanceof Error ? error.message : "Unable to load accounts.",
       );
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
-    }
+    });
+  }
+
+  function loadAccounts() {
+    setIsLoading(true);
+    setMessage("");
+    return fetchLoadAccounts();
   }
 
   async function updateAccountStatus(payload: {
@@ -318,8 +320,16 @@ export default function AccountLifecycleTable({
     setRole(defaultFilterRole);
   }
 
+  const filterKey = [status, role, lockedRole].join(":");
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    setIsLoading(true);
+    setMessage("");
+  }
+
   useEffect(() => {
-    void loadAccounts();
+    void fetchLoadAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, role, lockedRole]);
 

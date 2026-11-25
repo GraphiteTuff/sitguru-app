@@ -4,6 +4,7 @@
  * Express wallet checkout (Apple Pay / Google Pay / Link) + frictionless card fallback.
  */
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import {
   FormEvent,
   useEffect,
@@ -79,7 +80,12 @@ export default function CheckoutPaymentForm({
   const [walletAvailable, setWalletAvailable] = useState(false);
   const [expressMounted, setExpressMounted] = useState(false);
   const [cardBrand, setCardBrand] = useState(normalizeCardBrand(undefined));
-  const [postalCode, setPostalCode] = useState("");
+  const savedPostalCode = useBrowserSnapshot(() => {
+    try { return window.localStorage.getItem(ZIP_STORAGE_KEY) || ""; }
+    catch { return ""; }
+  }, "");
+  const [editedPostalCode, setPostalCode] = useState<string | null>(null);
+  const postalCode = editedPostalCode ?? savedPostalCode;
   const [postalTouched, setPostalTouched] = useState(false);
   const [cardComplete, setCardComplete] = useState({
     number: false,
@@ -87,14 +93,7 @@ export default function CheckoutPaymentForm({
     cvc: false,
   });
 
-  useEffect(() => {
-    try {
-      const remembered = window.localStorage.getItem(ZIP_STORAGE_KEY) || "";
-      if (remembered) setPostalCode(remembered);
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
+
 
   useEffect(() => {
     if (walletAvailable) return;

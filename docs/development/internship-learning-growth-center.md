@@ -19,7 +19,7 @@
 | 5. Private gradebooks | Partial | Versioned assignment rubrics, private notes, release, individual gradebooks, pillar grades and employer evaluation exports are wired. Existing program evaluation records serve midpoint and final reviews. Hosted Supabase verified draft visibility, release and cross-intern isolation. Authenticated browser acceptance remains outstanding. |
 | 6. Partnerships and sponsorships | Partial | Proposed pilot records, scoped prospect and activity screens, evidence verification, financial approval records and scoped marketing ZIPs are implemented. Payment approval requires a supervisor, an accepted paid agreement and verified evidence. The workspace links to existing referrals and does not create payouts. Hosted integration and partner attribution acceptance checks remain outstanding. |
 | 7. Native and responsive verification | Partial | Expo has an intern learning screen and a scoped instructor queue. The web and mobile assignment forms now use the same server workflow for drafts, supporting documents and submission. Mobile instructor actions and partnership edits open the web portal. Expo exported iOS and Android bundles. Signed builds, device checks and live role tests are pending. |
-| 8. Release | Blocked | The desk regression passes and the four migrations are applied in staging. Repository-wide lint, authenticated staging and production verification, and signed native builds remain outstanding. |
+| 8. Release | Blocked | Repository-wide lint and the desk regression pass. The four migrations are applied in staging. Authenticated staging and production verification and signed native builds remain outstanding. |
 
 ## Enrollment records
 
@@ -32,7 +32,7 @@ The production read-only audit returned Ryan at 150 hours and Lola at 150 hours,
 | Internship, Community Studio, Microsoft Graph, Teams, SharePoint and regression suite | `npm run test:sitguru3` passed 73 tests, including 6 preview policy tests. Integration calls use fixtures. |
 | Targeted internship, access, rubric and Microsoft tests | 36 passed, including manager scope, cross-intern access decisions, revision transitions and rubric validation. |
 | Desk regression | `npm run test:desks` passed all 20 tests. The preservation test now asserts Content Studio, Reads & Media, and Community Studio in their existing order and covers the full intern sidebar. |
-| Repository-wide lint | The production baseline reported 398 source errors. The initial follow-up brought the feature branch to 303, and the next pass reduced that to 138 across 104 source files. All 138 remaining errors are `react-hooks/set-state-in-effect` findings. The branch introduced no new lint errors by file and keeps all source rules enabled. |
+| Repository-wide lint | ESLint reports zero errors. The last pass resolved all 138 remaining `react-hooks/set-state-in-effect` findings by deriving state from inputs, handling browser persistence as external state, and moving request updates to asynchronous completions. All source rules remain enabled. |
 | Web TypeScript and build | Web TypeScript and the isolated production-mode Next.js build passed with fixture credentials. Production credential and authenticated portal tests are pending. |
 | Desktop/mobile browser | The dashboard fixture passed at 320, 390, 768 and 1440 CSS pixels. The document matched each viewport width, and the floating chat control cleared the mobile navigation. |
 | Anonymous authorization | New Intern and Admin pages redirected to login. Manager pages rendered the default access denial. Native learning/work and protected exports denied unauthenticated access. The local smoke suite passed, including the exact Pack submit redirect in HTTP or streamed HTML. |
@@ -82,11 +82,10 @@ The `www.sitguru.com` alias resolved to Vercel deployment `dpl_5RX2XtrwoyQvG1nRW
 
 ## Resume and release
 
-1. Start from the local feature branch and resolve the remaining lint findings. Preserve the desk navigation verified by the regression suite.
-2. Use isolated staging intern accounts and assigned manager and Super Admin accounts for browser and API acceptance tests. Check live SharePoint document permissions, staging referral attribution, and partner financial approval without creating a payout. Check the staging migration ledger before any CLI migration push.
-3. Close the remaining product gaps before release. These include module authoring, verified business-outcome attribution by pillar, inline document previews, partner-specific reporting and full native instructor and partner editing. Confirm the approved Spring 2027 enrollment records and Lola’s agreement.
-4. When all gates pass, update PR #308, merge to `sitguru-main`, apply the verified additive migrations to the confirmed production project, then verify the Vercel deployment SHA, authenticated portals, and runtime logs.
-5. Prepare signed native artifacts through the existing Expo EAS profiles. The current exports verify bundle creation. Store distribution requires separate signed builds and release acceptance.
+1. Use isolated staging intern accounts and assigned manager and Super Admin accounts for browser and API acceptance tests. Check live SharePoint document permissions, staging referral attribution, and partner financial approval without creating a payout. Check the staging migration ledger before any CLI migration push.
+2. Close the remaining product gaps before release. These include module authoring, verified business-outcome attribution by pillar, inline document previews, partner-specific reporting and full native instructor and partner editing. Confirm the approved Spring 2027 enrollment records and Lola’s agreement.
+3. When all gates pass, update PR #308, merge to `sitguru-main`, apply the verified additive migrations to the confirmed production project, then verify the Vercel deployment SHA, authenticated portals, and runtime logs.
+4. Prepare signed native artifacts through the existing Expo EAS profiles. The current exports verify bundle creation. Store distribution requires separate signed builds and release acceptance.
 
 ## Rollback
 

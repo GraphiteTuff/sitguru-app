@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import EventCard from "@/components/community/EventCard";
@@ -44,15 +45,12 @@ export default function CommunityEventsExplorer({
     setCountyDraft(filters.county);
   }
 
-  useEffect(() => {
-    if (hydratedLocation) return;
-    if (initialFilters.county || initialFilters.city || initialFilters.state) {
-      setHydratedLocation(true);
-      return;
-    }
-
-    const preference = readCommunityLocationPreference();
-    if (preference.county || preference.city || preference.state) {
+  const preferenceSnapshot = useBrowserSnapshot(() => JSON.stringify(readCommunityLocationPreference()), null);
+  const hasInitialLocation = Boolean(initialFilters.county || initialFilters.city || initialFilters.state);
+  if (!hydratedLocation && preferenceSnapshot !== null) {
+    setHydratedLocation(true);
+    const preference = JSON.parse(preferenceSnapshot) as ReturnType<typeof readCommunityLocationPreference>;
+    if (!hasInitialLocation && (preference.county || preference.city || preference.state)) {
       const next = {
         ...initialFilters,
         county: preference.county || "",
@@ -61,14 +59,18 @@ export default function CommunityEventsExplorer({
       };
       setFilters(next);
       setCountyDraft(next.county);
-      const params = new URLSearchParams();
-      if (next.county) params.set("county", next.county);
-      if (next.city) params.set("city", next.city);
-      if (next.state) params.set("state", next.state);
-      router.replace(`/events?${params.toString()}`);
     }
-    setHydratedLocation(true);
-  }, [hydratedLocation, initialFilters, router]);
+  }
+
+  useEffect(() => {
+    if (hasInitialLocation || preferenceSnapshot === null) return;
+    const preference = JSON.parse(preferenceSnapshot) as ReturnType<typeof readCommunityLocationPreference>;
+    const params = new URLSearchParams();
+    if (preference.county) params.set("county", preference.county);
+    if (preference.city) params.set("city", preference.city);
+    if (preference.state) params.set("state", preference.state);
+    if (params.size) router.replace(`/events?${params}`);
+  }, [hasInitialLocation, preferenceSnapshot, router]);
 
   const filtered = useMemo(() => {
     const matched = events.filter((event) => {

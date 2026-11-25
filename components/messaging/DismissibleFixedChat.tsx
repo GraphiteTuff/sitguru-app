@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
+import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 type DismissibleFixedChatProps = {
@@ -21,24 +22,15 @@ export default function DismissibleFixedChat({
   closePosition = "left",
 }: DismissibleFixedChatProps) {
   const [open, setOpen] = useState(true);
-  const [ready, setReady] = useState(!storageKey);
+  const storedDismissed = useBrowserSnapshot(() => {
+    try { return Boolean(storageKey && window.sessionStorage.getItem(storageKey) === "1"); }
+    catch { return false; }
+  }, null);
+  const ready = !storageKey || storedDismissed !== null;
 
-  useEffect(() => {
-    if (!storageKey) {
-      setReady(true);
-      return;
-    }
-    try {
-      if (window.sessionStorage.getItem(storageKey) === "1") {
-        setOpen(false);
-      }
-    } catch {
-      // ignore storage failures
-    }
-    setReady(true);
-  }, [storageKey]);
 
-  if (!ready || !open) return null;
+
+  if (!ready || !open || storedDismissed) return null;
 
   const closePositionClass =
     closePosition === "right" ? "right-3 top-3" : "left-3 top-3";

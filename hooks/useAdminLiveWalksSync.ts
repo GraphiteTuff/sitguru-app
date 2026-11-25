@@ -65,8 +65,7 @@ export function useAdminLiveWalksSync(
     if (inFlightRef.current) return;
     inFlightRef.current = true;
 
-    try {
-      const token = await getAccessToken();
+    return getAccessToken().then(async (token) => {
       const params = new URLSearchParams({
         liveOnly: "1",
         scanAlerts: "1",
@@ -93,12 +92,12 @@ export function useAdminLiveWalksSync(
       if (payload.stats) setStats(payload.stats);
       setLastSyncedAt(new Date().toISOString());
       setError("");
-    } catch (err) {
+    }).catch((err) => {
       setError(err instanceof Error ? err.message : "Sync failed.");
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
       inFlightRef.current = false;
-    }
+    });
   }, []);
 
   // Initial load + lightweight polling fallback (5s)

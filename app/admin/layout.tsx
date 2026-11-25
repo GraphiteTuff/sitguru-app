@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
@@ -799,7 +800,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [modules, setModules] = useState<AdminNavAccess | null>(null);
   const [openSection, setOpenSection] = useState<string>("Overview & Work");
-  const [navCollapsed, setNavCollapsed] = useState(false);
+  const storedNavCollapsed = useBrowserSnapshot(() => {
+    try { return window.localStorage.getItem("sitguru-admin-hq-nav-collapsed") === "1"; }
+    catch { return false; }
+  }, null);
+  const [navCollapsedOverride, setNavCollapsed] = useState<boolean | null>(null);
+  const navCollapsed = navCollapsedOverride ?? storedNavCollapsed ?? false;
   const onGrowthPortal = pathname.startsWith("/admin/growth");
   const isMessagesWorkspace = pathname.startsWith("/admin/messages");
   const isGrowthChrome =
@@ -871,17 +877,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("sitguru-admin-hq-nav-collapsed");
-      if (saved === "1") setNavCollapsed(true);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+
 
   useEffect(() => {
     try {
+      if (navCollapsedOverride === null) return;
       window.localStorage.setItem(
         "sitguru-admin-hq-nav-collapsed",
         navCollapsed ? "1" : "0",
@@ -889,7 +889,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [navCollapsed]);
+  }, [navCollapsed, navCollapsedOverride]);
 
   const navigationKey = `${pathname}:${isGrowthChrome}`;
   const [previousNavigationKey, setPreviousNavigationKey] = useState<string | null>(null);
@@ -929,7 +929,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {!isGrowthChrome ? (
                 <button
                   type="button"
-                  onClick={() => setNavCollapsed((value) => !value)}
+                  onClick={() => setNavCollapsed(!navCollapsed)}
                   className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] text-xs font-bold text-[#0F2744] transition hover:bg-[#EEF2F6]"
                   aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
                   title={navCollapsed ? "Expand navigation" : "Collapse navigation"}

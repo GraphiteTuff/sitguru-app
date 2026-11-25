@@ -106,25 +106,23 @@ export default function GuruProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadGurus = useCallback(async () => {
-    try {
-      const rows = await loadPublicGurus();
+  const loadGurus = useCallback(() => {
+    return loadPublicGurus().then((rows) => {
       setGurus(rows);
       setLoadError(null);
-    } catch (error) {
+    }).catch((error) => {
       setGurus([]);
       setLoadError(
         error instanceof Error
           ? `SitGuru could not load this Guru profile: ${error.message}`
           : 'SitGuru could not load this Guru profile.',
       );
-    }
+    });
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    setLoading(true);
     loadGurus()
       .catch(() => undefined)
       .finally(() => {

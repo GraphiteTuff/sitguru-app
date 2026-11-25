@@ -155,11 +155,16 @@ export function useCompanionChat(
   }, []);
 
   // Restore the saved thread whenever the visitor switches companion.
-  useEffect(() => {
-    let active = true;
+  const [previousCompanionId, setPreviousCompanionId] = useState(companion.id);
+  if (previousCompanionId !== companion.id) {
+    setPreviousCompanionId(companion.id);
     setHydrated(false);
     setMessages([]);
     setError(null);
+  }
+
+  useEffect(() => {
+    let active = true;
 
     async function restore() {
       try {

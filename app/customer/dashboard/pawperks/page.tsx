@@ -116,11 +116,7 @@ export default function CustomerPawPerksPage() {
 
   const loadPawPerks = useCallback(async () => {
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
+    return supabase.auth.getUser().then(async ({ data: { user }, error }) => {
     if (error || !user) {
       router.replace(routes.login);
       return;
@@ -141,6 +137,7 @@ export default function CustomerPawPerksPage() {
     setProfile(profileData);
     setStats(referralStats);
     setLoading(false);
+    });
   }, [router]);
 
   useEffect(() => {

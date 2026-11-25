@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MapPin, PawPrint, Search, X } from "lucide-react";
@@ -24,20 +25,14 @@ export default function FirstVisitCoach({
 }: FirstVisitCoachProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const forced = searchParams?.get("coach") === "1";
-      const dismissed = window.localStorage.getItem(STORAGE_KEY) === "1";
-      if (forced || !dismissed) {
-        setOpen(true);
-      }
-    } catch {
-      setOpen(searchParams?.get("coach") === "1");
-    }
-  }, [searchParams]);
+  const coachDismissed = useBrowserSnapshot(() => {
+    try { return window.localStorage.getItem(STORAGE_KEY) === "1"; }
+    catch { return true; }
+  }, null);
+  const [dismissedThisVisit, setDismissedThisVisit] = useState(false);
+  const open = !dismissedThisVisit && coachDismissed !== null &&
+    (searchParams?.get("coach") === "1" || !coachDismissed);
 
   function dismiss() {
     try {
@@ -45,7 +40,7 @@ export default function FirstVisitCoach({
     } catch {
       // ignore
     }
-    setOpen(false);
+    setDismissedThisVisit(true);
   }
 
   function dismissAndClearQuery() {

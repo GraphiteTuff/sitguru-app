@@ -1026,94 +1026,101 @@ export default function MapContent({
   );
 
   useEffect(() => {
-    if (!mapElementRef.current || mapRef.current) return;
+    let disposeMap: (() => void) | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      if (!mapElementRef.current || mapRef.current) return;
 
-    try {
-      const map = L.map(mapElementRef.current, {
-        center: initialMapCenter,
-        zoom: initialMapZoom,
-        minZoom: 3,
-        maxZoom: 18,
-        zoomControl: false,
-        scrollWheelZoom: true,
-        touchZoom: true,
-        doubleClickZoom: true,
-        boxZoom: true,
-        keyboard: true,
-        dragging: true,
-        preferCanvas: true,
-        zoomSnap: 0.25,
-        zoomDelta: 0.5,
-        wheelPxPerZoomLevel: 80,
-      });
+      try {
+        const map = L.map(mapElementRef.current, {
+          center: initialMapCenter,
+          zoom: initialMapZoom,
+          minZoom: 3,
+          maxZoom: 18,
+          zoomControl: false,
+          scrollWheelZoom: true,
+          touchZoom: true,
+          doubleClickZoom: true,
+          boxZoom: true,
+          keyboard: true,
+          dragging: true,
+          preferCanvas: true,
+          zoomSnap: 0.25,
+          zoomDelta: 0.5,
+          wheelPxPerZoomLevel: 80,
+        });
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
+        L.control.zoom({ position: "bottomright" }).addTo(map);
 
-      const tileLayer = L.tileLayer(
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19,
-          tileSize: 256,
-          updateWhenIdle: false,
-          updateWhenZooming: true,
-          crossOrigin: true,
-        },
-      ).addTo(map);
+        const tileLayer = L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+            tileSize: 256,
+            updateWhenIdle: false,
+            updateWhenZooming: true,
+            crossOrigin: true,
+          },
+        ).addTo(map);
 
-      tileLayer.on("tileerror", () => {
+        tileLayer.on("tileerror", () => {
+          setMapError(
+            "Map tiles could not load. Check browser console, ad blockers, or network access to OpenStreetMap tiles.",
+          );
+        });
+
+        const layerGroup = L.layerGroup().addTo(map);
+
+        mapRef.current = map;
+        layerGroupRef.current = layerGroup;
+
+        const invalidate = () => {
+          map.invalidateSize({ animate: false });
+        };
+
+        const timers = [
+          window.setTimeout(invalidate, 0),
+          window.setTimeout(invalidate, 150),
+          window.setTimeout(invalidate, 400),
+          window.setTimeout(invalidate, 900),
+        ];
+
+        window.addEventListener("resize", invalidate);
+
+        const observer =
+          typeof ResizeObserver !== "undefined"
+            ? new ResizeObserver(() => invalidate())
+            : null;
+
+        observer?.observe(mapElementRef.current);
+
+        if (mapElementRef.current.parentElement) {
+          observer?.observe(mapElementRef.current.parentElement);
+        }
+
+        disposeMap = () => {
+          timers.forEach((timer) => window.clearTimeout(timer));
+          window.removeEventListener("resize", invalidate);
+          observer?.disconnect();
+
+          map.remove();
+          mapRef.current = null;
+          layerGroupRef.current = null;
+        };
+      } catch (error) {
+        console.error("SitGuru Leaflet map failed to initialize:", error);
         setMapError(
-          "Map tiles could not load. Check browser console, ad blockers, or network access to OpenStreetMap tiles.",
+          error instanceof Error
+            ? error.message
+            : "The SitGuru map failed to initialize.",
         );
-      });
-
-      const layerGroup = L.layerGroup().addTo(map);
-
-      mapRef.current = map;
-      layerGroupRef.current = layerGroup;
-
-      const invalidate = () => {
-        map.invalidateSize({ animate: false });
-      };
-
-      const timers = [
-        window.setTimeout(invalidate, 0),
-        window.setTimeout(invalidate, 150),
-        window.setTimeout(invalidate, 400),
-        window.setTimeout(invalidate, 900),
-      ];
-
-      window.addEventListener("resize", invalidate);
-
-      const observer =
-        typeof ResizeObserver !== "undefined"
-          ? new ResizeObserver(() => invalidate())
-          : null;
-
-      observer?.observe(mapElementRef.current);
-
-      if (mapElementRef.current.parentElement) {
-        observer?.observe(mapElementRef.current.parentElement);
       }
-
-      return () => {
-        timers.forEach((timer) => window.clearTimeout(timer));
-        window.removeEventListener("resize", invalidate);
-        observer?.disconnect();
-
-        map.remove();
-        mapRef.current = null;
-        layerGroupRef.current = null;
-      };
-    } catch (error) {
-      console.error("SitGuru Leaflet map failed to initialize:", error);
-      setMapError(
-        error instanceof Error
-          ? error.message
-          : "The SitGuru map failed to initialize.",
-      );
-    }
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      disposeMap?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

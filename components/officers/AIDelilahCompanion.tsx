@@ -5,6 +5,7 @@
  * Mounts on /events (and legacy /community) public surfaces.
  */
 
+import { useBrowserSearch } from "@/hooks/useBrowserSnapshot";
 import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
@@ -90,12 +91,20 @@ export default function AIDelilahCompanion() {
   const benefitsChip = getCompanionBenefitsChip(ACTIVE_COMPANION);
   const viewer = useCompanionViewer();
 
+  const companionSearch = useBrowserSearch();
+  const [previousCompanionSearch, setPreviousCompanionSearch] = useState("");
+  if (companionSearch !== previousCompanionSearch) {
+    setPreviousCompanionSearch(companionSearch);
+    if (new URLSearchParams(companionSearch).get("chat")?.trim().toLowerCase() === "delilah") {
+      setIsOpen(true);
+    }
+  }
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const chat = params.get("chat")?.trim().toLowerCase();
       if (chat !== "delilah") return;
-      setIsOpen(true);
       params.delete("chat");
       const next = `${window.location.pathname}${
         params.toString() ? `?${params}` : ""
@@ -104,7 +113,7 @@ export default function AIDelilahCompanion() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [companionSearch]);
 
   useEffect(() => {
     function onOpenCompanionChat(event: Event) {

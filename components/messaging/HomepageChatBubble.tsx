@@ -5,6 +5,7 @@
  * Streams via Vercel AI SDK useChat → /api/chat/send.
  */
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useHasHydrated } from "@/hooks/useHasHydrated";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
@@ -492,9 +493,12 @@ export default function HomepageChatBubble() {
     };
   }
 
-  useEffect(() => {
-    setEventCompanion(readStoredCommunityEventCompanion());
-  }, [pathname]);
+  const companionSnapshot = useBrowserSnapshot(() => JSON.stringify(readStoredCommunityEventCompanion()), null);
+  const [previousCompanionSnapshot, setPreviousCompanionSnapshot] = useState<string | null>(null);
+  if (companionSnapshot !== previousCompanionSnapshot) {
+    setPreviousCompanionSnapshot(companionSnapshot);
+    setEventCompanion(companionSnapshot ? JSON.parse(companionSnapshot) as ReturnType<typeof readStoredCommunityEventCompanion> : null);
+  }
 
   function resetToGuestCompanion() {
     clearCompanionIdentityStorage();
@@ -730,7 +734,7 @@ export default function HomepageChatBubble() {
     [isBusy],
   );
 
-  const [matchingChipsReady, setMatchingChipsReady] = useState(false);
+  const [revealedMatchingChips, setRevealedMatchingChips] = useState<string | null>(null);
 
   const matchingThreadText = useMemo(() => {
     return messages
@@ -745,6 +749,9 @@ export default function HomepageChatBubble() {
     () => getCareMatchingChipsForThread(matchingThreadText),
     [matchingThreadText],
   );
+
+  const latestAssistantContent = [...messages].reverse().find(message => message.role === "assistant")?.content;
+  const matchingChipsReady = Boolean(latestAssistantContent && latestAssistantContent === revealedMatchingChips);
 
   const showMatchingChips = useMemo(() => {
     if (!showIntentChips || !matchingChipsReady) return false;
@@ -790,17 +797,15 @@ export default function HomepageChatBubble() {
       !hasMatchingIntakeMarker(lastAssistant.content) ||
       !matchingStepChips.length
     ) {
-      setMatchingChipsReady(false);
       return;
     }
 
-    setMatchingChipsReady(false);
     const words = String(lastAssistant.content || "")
       .trim()
       .split(/\s+/)
       .filter(Boolean).length;
     const delay = Math.min(2800, Math.max(700, words * 52 + 200));
-    const timer = window.setTimeout(() => setMatchingChipsReady(true), delay);
+    const timer = window.setTimeout(() => setRevealedMatchingChips(lastAssistant.content), delay);
     return () => window.clearTimeout(timer);
   }, [matchingStepChips.length, messages]);
 
@@ -829,22 +834,26 @@ export default function HomepageChatBubble() {
 
     window.addEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
 
+    let animationFrame = 0;
     try {
       const params = new URLSearchParams(window.location.search);
       const chat = params.get("chat")?.trim().toLowerCase();
       if (chat === "rogue") {
-        openPanel();
-        params.delete("chat");
-        const next = `${window.location.pathname}${
-          params.toString() ? `?${params}` : ""
-        }${window.location.hash || ""}`;
-        window.history.replaceState({}, "", next);
+        animationFrame = window.requestAnimationFrame(() => {
+          openPanel();
+          params.delete("chat");
+          const next = `${window.location.pathname}${
+            params.toString() ? `?${params}` : ""
+          }${window.location.hash || ""}`;
+          window.history.replaceState({}, "", next);
+        });
       }
     } catch {
       // ignore
     }
 
     return () => {
+      window.cancelAnimationFrame(animationFrame);
       window.removeEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once on mount / event

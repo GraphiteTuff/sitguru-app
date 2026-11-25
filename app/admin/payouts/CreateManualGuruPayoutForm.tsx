@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 export const MANUAL_PAYOUT_TYPES = [
@@ -87,19 +87,15 @@ export default function CreateManualGuruPayoutForm({
     [recipientsForType, recipientId],
   );
 
-  useEffect(() => {
-    if (recipientsForType.some((recipient) => recipient.id === recipientId)) {
-      return;
-    }
-
+  if (!recipientsForType.some((recipient) => recipient.id === recipientId)) {
     const preferred =
       (payoutType === "guru" &&
         recipientsForType.find((recipient) => recipient.id === defaultGuruId)) ||
       recipientsForType[0] ||
       null;
 
-    setRecipientId(preferred?.id || "");
-  }, [payoutType, recipientsForType, recipientId, defaultGuruId]);
+    if ((preferred?.id || "") !== recipientId) setRecipientId(preferred?.id || "");
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

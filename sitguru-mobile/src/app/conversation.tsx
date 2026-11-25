@@ -943,40 +943,15 @@ export default function ConversationScreen() {
   ]);
 
   const loadThread = useCallback(async () => {
-    if (authLoading) return;
+    if (authLoading || !isSupabaseConfigured || !currentUserId) return;
 
-    if (!isSupabaseConfigured || !currentUserId) {
-      setPreviewMode(true);
-      setMessages([]);
-      setBookingContext(EMPTY_BOOKING_CONTEXT);
-      setRealtimeState('preview');
-      setLoadingThread(false);
-      setNotice({
-        tone: 'warning',
-        text: currentUserId
-          ? 'Messaging is not configured in this build. Messages on this screen are preview-only and are not saved.'
-          : 'Sign in to open a real SitGuru conversation. Messages shown here are preview-only and are not saved.',
-      });
-      return;
-    }
-
-    setLoadingThread(true);
-    setNotice(null);
-    setPreviewMode(false);
-    setRealtimeState('connecting');
-
-    try {
-      let nextConversation: ConversationRow | null = null;
-
-      if (requestedConversationId) {
-        const result = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('id', requestedConversationId)
-          .maybeSingle();
-
-        if (!result.error && result.data) nextConversation = result.data as ConversationRow;
-      }
+    const requestedThread = requestedConversationId
+      ? supabase.from('conversations').select('*').eq('id', requestedConversationId).maybeSingle()
+      : null;
+    return Promise.resolve(requestedThread).then(async (result) => {
+      let nextConversation = result && !result.error && result.data
+        ? result.data as ConversationRow
+        : null;
 
       if (!nextConversation && requestedBookingId) {
         const ensured = await sitguruApiFetch<{
@@ -1098,7 +1073,7 @@ export default function ConversationScreen() {
         userId: currentUserId,
       });
       setBookingContext(nextBookingContext);
-    } catch (error) {
+    }).catch((error) => {
       setBookingContext(EMPTY_BOOKING_CONTEXT);
       setRealtimeState('offline');
       setNotice({
@@ -1108,9 +1083,9 @@ export default function ConversationScreen() {
             ? `SitGuru could not load this conversation: ${error.message}`
             : 'SitGuru could not load this conversation.',
       });
-    } finally {
+    }).finally(() => {
       setLoadingThread(false);
-    }
+    });
   }, [
     authLoading,
     currentRole,
@@ -1124,6 +1099,34 @@ export default function ConversationScreen() {
     requestedPetName,
     requestedSubject,
   ]);
+
+  const threadRequestKey = [authLoading, currentRole, currentUserId, requestedBookingId, requestedConversationId, requestedGuruId, requestedGuruSlug, requestedOtherUserId, requestedPetId, requestedPetName, requestedSubject] as const;
+  const [previousThreadRequest, setPreviousThreadRequest] = useState<typeof threadRequestKey | null>(null);
+  if (!previousThreadRequest || threadRequestKey.some((value, index) => value !== previousThreadRequest[index])) {
+    setPreviousThreadRequest(threadRequestKey);
+    if (!authLoading) {
+
+    if (!isSupabaseConfigured || !currentUserId) {
+      setPreviewMode(true);
+      setMessages([]);
+      setBookingContext(EMPTY_BOOKING_CONTEXT);
+      setRealtimeState('preview');
+      setLoadingThread(false);
+      setNotice({
+        tone: 'warning',
+        text: currentUserId
+          ? 'Messaging is not configured in this build. Messages on this screen are preview-only and are not saved.'
+          : 'Sign in to open a real SitGuru conversation. Messages shown here are preview-only and are not saved.',
+      });
+    } else {
+
+    setLoadingThread(true);
+    setNotice(null);
+    setPreviewMode(false);
+    setRealtimeState('connecting');
+    }
+    }
+  }
 
   useEffect(() => {
     void loadThread();

@@ -1117,13 +1117,18 @@ function GuruDashboardProfilePageContent() {
     };
   }, [router]);
 
-  useEffect(() => {
-    const cleanZip = zipCode.replace(/\D/g, "").slice(0, 5);
-
-    if (loading || cleanZip.length !== 5) {
-      if (cleanZip.length < 5) setZipLookupMessage("");
-      return;
+  const cleanZip = zipCode.replace(/\D/g, "").slice(0, 5);
+  const [previousLookupInput, setPreviousLookupInput] = useState<string | null>(null);
+  if (previousLookupInput !== cleanZip) {
+    setPreviousLookupInput(cleanZip);
+    if (cleanZip.length < 5) {
+      setZipLookupMessage("");
+      setZipLookupLoading(false);
     }
+  }
+
+  useEffect(() => {
+    if (loading || cleanZip.length !== 5) return;
 
     let cancelled = false;
     const timer = window.setTimeout(async () => {
@@ -1179,7 +1184,7 @@ function GuruDashboardProfilePageContent() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [loading, zipCode]);
+  }, [loading, cleanZip]);
 
   function handleZipCodeChange(value: string) {
     const cleanZip = value.replace(/\D/g, "").slice(0, 5);

@@ -99,43 +99,43 @@ export default function ChatWindow({
 
   const isSheet = mode === "sheet";
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    const { data, error: qError } = await supabase
+  const fetchLoadMessages = useCallback(async () => {
+    return supabase
       .from("messages")
       .select(
         "id,conversation_id,sender_id,recipient_id,content,body,created_at,is_ai,channel,media_urls,media_mime_types,sender_name_snapshot,status",
       )
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
-      .limit(200);
+      .limit(200).then(async ({ data, error: qError }) => {
 
-    if (qError) {
-      // Schema-tolerant select
-      const retry = await supabase
-        .from("messages")
-        .select(
-          "id,conversation_id,sender_id,recipient_id,content,body,created_at,status",
-        )
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true })
-        .limit(200);
-      if (retry.error) {
-        setError(retry.error.message);
-        setLoading(false);
-        return;
+      if (qError) {
+        // Schema-tolerant select
+        const retry = await supabase
+          .from("messages")
+          .select(
+            "id,conversation_id,sender_id,recipient_id,content,body,created_at,status",
+          )
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: true })
+          .limit(200);
+        if (retry.error) {
+          setError(retry.error.message);
+          setLoading(false);
+          return;
+        }
+        setMessages((retry.data || []).map((r) => normalizeRow(r as Record<string, unknown>)));
+      } else {
+        setMessages((data || []).map((r) => normalizeRow(r as Record<string, unknown>)));
       }
-      setMessages((retry.data || []).map((r) => normalizeRow(r as Record<string, unknown>)));
-    } else {
-      setMessages((data || []).map((r) => normalizeRow(r as Record<string, unknown>)));
-    }
-    setLoading(false);
+      setLoading(false);
+    });
   }, [conversationId]);
 
+
   useEffect(() => {
-    void loadMessages();
-  }, [loadMessages]);
+    void fetchLoadMessages();
+  }, [fetchLoadMessages]);
 
   const [previousAiAssistSetting, setPreviousAiAssistSetting] = useState(aiAssistEnabled);
   if (previousAiAssistSetting !== aiAssistEnabled) {

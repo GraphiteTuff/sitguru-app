@@ -20,13 +20,20 @@ export default function EventMatchBoard({role}:{role:Role}){
  const [activeFilters,setActiveFilters]=useState<Filter>(blankFilters),[selected,setSelected]=useState(""),[channel,setChannel]=useState<EventShareChannel>("facebook");
  const [group,setGroup]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [lastRefreshed,setLastRefreshed]=useState("");
- const load=useCallback(async (f:Filter)=>{
-  setBusy(true);setError("");
-  try{const params=new URLSearchParams();Object.entries(f).forEach(([k,v])=>{if(v.trim())params.set(k,v.trim());});
-   const result=await call<EventShareDashboard>("GET","/api/event-match?"+params.toString());setData(result);setLastRefreshed(new Date().toLocaleTimeString());
-  }catch(e){setError(e instanceof Error?e.message:"Unable to load upcoming events.");}finally{setBusy(false);}
- },[]);
-  useEffect(()=>{void load(blankFilters);},[load]);
+ const fetchLoad=useCallback(async (f:Filter)=>{
+    const params=new URLSearchParams();
+    Object.entries(f).forEach(([k,v])=>{if(v.trim())params.set(k,v.trim());});
+
+    return call<EventShareDashboard>("GET","/api/event-match?"+params.toString()).then(async (result) => {setData(result);setLastRefreshed(new Date().toLocaleTimeString());
+    }).catch((e) => {setError(e instanceof Error?e.message:"Unable to load upcoming events.");}).finally(() => {setBusy(false);});
+  },[]);
+
+  const load = useCallback((f:Filter) => {
+    setBusy(true);
+    setError("");
+    return fetchLoad(f);
+  }, [fetchLoad, setBusy, setError]);
+  useEffect(()=>{void fetchLoad(blankFilters);},[fetchLoad]);
  useEffect(()=>{
   const timer=setInterval(()=>{if(!document.hidden)void load(activeFilters);},300000);
   return ()=>clearInterval(timer);

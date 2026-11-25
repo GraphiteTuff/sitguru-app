@@ -107,37 +107,47 @@ export default function GuruReferralsScreen() {
     ]) || `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`;
 
   const accountId = user?.id;
-  const loadReferrals = useCallback(
+  const fetchLoadReferrals = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
-        setData(EMPTY_DATA);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!accountId || !isSupabaseConfigured) return;
 
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const rows = await queryRows(accountId);
+    return queryRows(accountId).then(async (rows) => {
         setData(mapReferralData(rows));
         setMessage('');
-      } catch {
+    }).catch(() => {
         setMessage(
           'Referral activity could not be loaded. Pull down to refresh.',
         );
-      } finally {
+      }).finally(() => {
         setLoading(false);
         setRefreshing(false);
-      }
-    },
+      });
+  },
     [accountId],
   );
 
+  const loadReferrals = useCallback((showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+    return fetchLoadReferrals(showRefresh);
+  }, [fetchLoadReferrals, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setData(EMPTY_DATA);
+        setLoading(false);
+        setRefreshing(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
   useEffect(() => {
-    void loadReferrals(false);
-  }, [loadReferrals]);
+    void fetchLoadReferrals(false);
+  }, [fetchLoadReferrals]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;

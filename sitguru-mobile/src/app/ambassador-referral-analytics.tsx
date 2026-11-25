@@ -879,42 +879,52 @@ export default function AmbassadorReferralAnalyticsScreen() {
 
   const accountId = user?.id;
   const accountEmail = user?.email;
-  const refreshAnalytics = useCallback(
+  const fetchRefreshAnalytics = useCallback(
     async (showRefresh = false) => {
-      if (!accountId || !isSupabaseConfigured) {
+    if (!accountId || !isSupabaseConfigured) return;
+
+    return loadAnalytics(accountId, accountEmail).then(async (nextData) => {
+        setData(nextData);
+        setLoadError('');
+    }).catch(() => {
+        setLoadError(
+          'Referral analytics could not be loaded. Pull down to try again.',
+        );
+      }).finally(() => {
         setLoading(false);
+        setRefreshing(false);
+      });
+  },
+    [accountEmail, accountId],
+  );
+
+  const refreshAnalytics = useCallback((showRefresh = false) => {
+    showRefresh ? setRefreshing(true) : setLoading(true);
+    return fetchRefreshAnalytics(showRefresh);
+  }, [fetchRefreshAnalytics, setRefreshing, setLoading]);
+
+  const requestKey = accountId ?? "";
+  const [previousRequestKey, setPreviousRequestKey] = useState<string | null>(null);
+  if (previousRequestKey !== requestKey) {
+    setPreviousRequestKey(requestKey);
+    if (!accountId || !isSupabaseConfigured) {
+      setLoading(false);
         setRefreshing(false);
         setLoadError(
           isSupabaseConfigured
             ? ''
             : 'SitGuru data is not configured on this device.',
         );
-        return;
-      }
-
-      showRefresh ? setRefreshing(true) : setLoading(true);
-
-      try {
-        const nextData = await loadAnalytics(accountId, accountEmail);
-        setData(nextData);
-        setLoadError('');
-      } catch {
-        setLoadError(
-          'Referral analytics could not be loaded. Pull down to try again.',
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [accountEmail, accountId],
-  );
+    } else {
+      setLoading(true);
+    }
+  }
 
   useEffect(() => {
     if (!authLoading) {
-      void refreshAnalytics(false);
+      void fetchRefreshAnalytics(false);
     }
-  }, [authLoading, refreshAnalytics]);
+  }, [authLoading, fetchRefreshAnalytics]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured || authLoading) {

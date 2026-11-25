@@ -2,7 +2,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminInterventionsMenu from "@/components/admin/live-walks/AdminInterventionsMenu";
 import type {
   AdminLiveWalkRow,
@@ -96,32 +96,25 @@ function SelectedWorkspace({
 }) {
   const bookingId = selected?.bookingId || completedBanner?.bookingId || null;
   const { data, isLoading, error } = useAdminWalkMapData(bookingId);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [frozen, setFrozen] = useState<{
+  const [completion, setCompletion] = useState<{
+    bookingId: string;
     distanceMiles: number;
     durationMinutes: number;
   } | null>(null);
+  const [successDismissed, setSuccessDismissed] = useState(false);
 
   const isCompleted =
     Boolean(completedBanner) ||
     Boolean(data?.isCompleted) ||
     selected?.globalTrackingStatus === "COMPLETED";
 
-  useEffect(() => {
-    if (isCompleted && data) {
-      setShowSuccess(true);
-      setFrozen({
-        distanceMiles: data.distanceMiles,
-        durationMinutes: data.durationMinutes,
-      });
-    }
-  }, [isCompleted, data?.bookingId, data?.isCompleted]);
+  if (isCompleted && data && data.bookingId === bookingId && completion?.bookingId !== bookingId) {
+    setCompletion({ bookingId, distanceMiles: data.distanceMiles, durationMinutes: data.durationMinutes });
+    setSuccessDismissed(false);
+  }
 
-  useEffect(() => {
-    // Reset success chrome when switching bookings
-    setShowSuccess(false);
-    setFrozen(null);
-  }, [bookingId]);
+  const frozen = completion?.bookingId === bookingId ? completion : null;
+  const showSuccess = Boolean(frozen && !successDismissed);
 
   const petName =
     data?.petName || selected?.petName || completedBanner?.petName || "Scout";
@@ -167,7 +160,7 @@ function SelectedWorkspace({
                 type="button"
                 className="pointer-events-auto mt-2 text-xs font-black uppercase tracking-wide text-emerald-50 underline"
                 onClick={() => {
-                  setShowSuccess(false);
+                  setSuccessDismissed(true);
                   onDismissCompletedBanner();
                 }}
               >

@@ -89,12 +89,10 @@ export default function TurnstileWidget({
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
-  const [isConfigured, setIsConfigured] = useState(Boolean(siteKey));
+  const isConfigured = Boolean(siteKey);
   const [isLoading, setIsLoading] = useState(Boolean(siteKey));
 
-  useEffect(() => {
-    setIsConfigured(Boolean(siteKey));
-  }, [siteKey]);
+
 
   useEffect(() => {
     let isMounted = true;

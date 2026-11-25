@@ -538,47 +538,43 @@ export default function CustomerProfileSetupPage() {
   const [pets, setPets] = useState<ProfilePet[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
+  const fetchLoadPage = useCallback(async () => {
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
       router.replace(routes.login);
       return;
     }
 
-    try {
-      const [profileData, petsTotal, household, roleRows, bookingsTotal] = await Promise.all([
+    return Promise.all([
         fetchCustomerProfile(user),
         fetchPetCount(user.id),
         fetchHouseholdPets(user.id),
         fetchRoleNames(user.id),
         fetchBookingStats(user.id),
-      ]);
+      ]).then(async ([profileData, petsTotal, household, roleRows, bookingsTotal]) => {
 
       setProfile(profileData);
       setPetCount(petsTotal);
       setPets(household);
       setRoles(roleRows);
       setBookingStats(bookingsTotal);
-    } catch (error) {
+    }).catch((error) => {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not load your Pet Parent setup profile.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
 
+
   useEffect(() => {
-    void loadPage();
+    void fetchLoadPage();
 
     const {
       data: { subscription },
@@ -591,7 +587,7 @@ export default function CustomerProfileSetupPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadPage, router]);
+  }, [fetchLoadPage, router]);
 
   const readiness = useMemo(
     () =>

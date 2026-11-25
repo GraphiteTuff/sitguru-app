@@ -2975,17 +2975,18 @@ export default function CustomerDashboardPage() {
 
     if (window.sessionStorage.getItem(celebrationKey)) return;
 
-    window.sessionStorage.setItem(celebrationKey, "shown");
-    setConfettiPieces(createConfettiPieces());
-    setShowBookingCelebration(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-
-    const hideTimer = window.setTimeout(() => {
-      setShowBookingCelebration(false);
-    }, 6500);
+    let hideTimer: number | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      window.sessionStorage.setItem(celebrationKey, "shown");
+      setConfettiPieces(createConfettiPieces());
+      setShowBookingCelebration(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      hideTimer = window.setTimeout(() => setShowBookingCelebration(false), 6500);
+    });
 
     return () => {
-      window.clearTimeout(hideTimer);
+      window.cancelAnimationFrame(frame);
+      if (hideTimer !== undefined) window.clearTimeout(hideTimer);
     };
   }, []);
 

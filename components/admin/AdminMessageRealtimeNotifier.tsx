@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrowserSnapshot } from "@/hooks/useBrowserSnapshot";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -80,7 +81,12 @@ export default function AdminMessageRealtimeNotifier({
   const router = useRouter();
   const [alertMessage, setAlertMessage] = useState<RealtimeMessagePayload | null>(null);
   const [unreadPulseCount, setUnreadPulseCount] = useState(initialUnreadCount);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const browserPermission = useBrowserSnapshot(
+    () => typeof Notification !== "undefined" && Notification.permission === "granted",
+    false,
+  );
+  const [permissionOverride, setNotificationsEnabled] = useState<boolean | null>(null);
+  const notificationsEnabled = permissionOverride ?? browserPermission;
   const seenMessageIdsRef = useRef(new Set<string>(latestMessageId ? [latestMessageId] : []));
   const lastRefreshRef = useRef(0);
 
@@ -149,11 +155,7 @@ export default function AdminMessageRealtimeNotifier({
     setNotificationsEnabled(permission === "granted");
   }
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setNotificationsEnabled(Notification.permission === "granted");
-    }
-  }, []);
+
 
   useEffect(() => {
     const channel = supabase

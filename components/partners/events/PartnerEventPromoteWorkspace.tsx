@@ -129,7 +129,10 @@ export default function PartnerEventPromoteWorkspace({
     if (result === "unavailable") setShareOpen(true);
   }
 
-  useEffect(() => {
+  const currentCaptionInput = [selectedEvent, partner.business_name] as const;
+  const [previousCaptionInput, setPreviousCaptionInput] = useState<null | typeof currentCaptionInput>(null);
+  if (!previousCaptionInput || currentCaptionInput.some((value, index) => value !== previousCaptionInput[index])) {
+    setPreviousCaptionInput(currentCaptionInput);
     setCaption(
       buildEventShareCaptionSocial(
         {
@@ -145,7 +148,7 @@ export default function PartnerEventPromoteWorkspace({
         partner.business_name,
       ),
     );
-  }, [selectedEvent, partner.business_name]);
+  }
 
   useEffect(() => {
     async function loadStats() {
