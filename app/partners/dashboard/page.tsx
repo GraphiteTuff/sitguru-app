@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAdminIdentity } from "@/lib/admin/access";
 import PartnerMarketingKitClient from "@/components/partners/PartnerMarketingKitClient";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, resolveReferralPeriod, type ReferralReportingPeriod } from "@/lib/referrals/reporting-epoch";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ type Row = Record<string, unknown>;
 
 export default async function PartnerDashboardPage({
   searchParams,
-}: { searchParams?: Promise<{ partner?: string }> }) {
+}: { searchParams?: Promise<{ partner?: string; period?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=%2Fpartners%2Fdashboard");
@@ -76,8 +78,13 @@ export default async function PartnerDashboardPage({
     );
   }
 
+  const epoch = await getReferralReportingEpoch();
+  const period: ReferralReportingPeriod = query.period === "history" ? "history" :
+    query.period === "7" ? "7" : query.period === "30" ? "30" :
+    query.period === "90" ? "90" : "since_reset";
+  const start = resolveReferralPeriod(epoch, period);
+  const since = start ? Date.parse(start) : 0;
   const code = String(partner.referral_code || "").trim();
-  const since = Date.now() - 30 * 86_400_000;
   const [registryResult, eventResult, campaignResult, rewardResult, relationshipResult, signupEventResult, bookingResult] = await Promise.all([
     supabaseAdmin.from("referral_codes").select("id,code").eq("partner_id", partner.id).eq("status", "active").limit(10),
     supabaseAdmin.from("partner_tracking_events").select("id,event_type,event_source,event_medium,created_at")
@@ -135,7 +142,7 @@ export default async function PartnerDashboardPage({
     { label: "Signups", value: toNumber(signupKeys.size), icon: Users, subtitle: "Captured signups" },
     { label: "Bookings", value: toNumber(bookings.size), icon: BadgeCheck, subtitle: "Attributed booking events" },
     { label: "Campaigns", value: toNumber(campaigns.filter(c=>c.status==="active").length), icon: TrendingUp, subtitle: "Active partner campaigns" },
-    { label: "Rewards in review", value: "$" + pendingAmount.toFixed(2), icon: Handshake, subtitle: "Subject to approval" },
+    { label: "Rewards in review", value: "$" + pendingAmount.toFixed(2), icon: Handshake, subtitle: "Lifetime obligations · subject to approval" },
   ];
 
   return (
@@ -147,12 +154,33 @@ export default async function PartnerDashboardPage({
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-700">See what your SitGuru website badge, QR code and introductions are generating. The numbers below are actual recorded events, not sample data.</p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white bg-white/90 px-4 py-2 text-xs font-black text-emerald-900">Status: {partner.status}</span>
-            <span className="rounded-full border border-white bg-white/90 px-4 py-2 text-xs font-black text-emerald-900">Last 30 days</span>
+            <span className="rounded-full border border-white bg-white/90 px-4 py-2 text-xs font-black text-emerald-900">{period === "history" ? "All-time activity" : period === "since_reset" ? "Since Reset" : `Last ${period} days · since reset`}</span>
             <Link href="/partners/dashboard/community/events" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-4 text-xs font-black text-white">Pet Event Manager</Link>
           </div>
         </section>
 
-        <section aria-label="Partner metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {period !== "history" ? <ReferralResetBanner epoch={epoch} /> : (
+          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+            Historical partner activity view. Earned rewards and existing financial obligations are always preserved.
+          </p>
+        )}
+        <nav aria-label="Partner referral reporting period" className="flex flex-wrap gap-2 rounded-xl bg-white p-2">
+          {([
+            { key: "since_reset", label: "Since Reset" },
+            { key: "7", label: "7 days" },
+            { key: "30", label: "30 days" },
+            { key: "90", label: "90 days" },
+            { key: "history", label: "History" },
+          ] as const).map(option => (
+            <Link key={option.key}
+              href={`/partners/dashboard?${partnerSlug ? `partner=${encodeURIComponent(partnerSlug)}&` : ""}period=${option.key}#partner-metrics`}
+              aria-current={option.key === period ? "page" : undefined}
+              className={`flex min-h-11 items-center rounded-xl px-4 text-xs font-black ${option.key === period ? "bg-emerald-800 !text-white" : "bg-emerald-50 text-emerald-900"}`}>
+              {option.label}
+            </Link>
+          ))}
+        </nav>
+        <section id="partner-metrics" aria-label="Partner metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {metrics.map(metric=>{const Icon=metric.icon;return(
             <div key={metric.label} className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
               <Icon size={21} className="text-emerald-700" aria-hidden="true"/>

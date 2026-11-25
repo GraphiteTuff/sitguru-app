@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getReferralReportingEpoch, resolveReferralPeriod, isReferralActivitySince, type ReferralReportingPeriod } from "@/lib/referrals/reporting-epoch";
 
 type Row = Record<string, unknown>;
 const str = (value: unknown) => typeof value === "string" ? value.trim() : "";
@@ -17,12 +18,15 @@ export type ReferralGrowthReport = {
   partnerSources: Array<{ name: string; code: string; visits: number; qr: number; signups: number; bookings: number; lastActivity: string | null }>;
   recent: Array<{ date: string; code: string; type: string; channel: string }>;
   warnings: string[];
-  dateWindowDays: number;
+  dateWindowDays: number | null;
+  period: ReferralReportingPeriod;
+  baselineStartedAt: string | null;
+  baselineLabel: string | null;
 };
 
 async function rows(
   table: string, columns: string, limit: number,
-  dateColumn?: string, since?: string,
+  dateColumn?: string, since?: string | null,
 ): Promise<{ data: Row[]; warning: string }> {
   try {
     const all: Row[] = [];
@@ -53,13 +57,11 @@ async function rows(
  * referral_clicks, so they are NOT added to clicks again. No rewards are
  * inferred from clicks; signups/bookings use separate recorded outcomes.
  */
-export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<ReferralGrowthReport> {
-  const threshold = Date.now() - dateWindowDays * 86_400_000;
-  const isoStart = new Date(threshold).toISOString();
-  const since = (date: unknown) => {
-    const parsed = Date.parse(str(date));
-    return Number.isFinite(parsed) && parsed >= threshold;
-  };
+export async function loadReferralGrowthReport(period: ReferralReportingPeriod = "since_reset"): Promise<ReferralGrowthReport> {
+  const epoch = await getReferralReportingEpoch();
+  const isoStart = resolveReferralPeriod(epoch, period);
+  const dateWindowDays = ["7", "30", "90"].includes(period) ? Number(period) : null;
+  const since = (date: unknown) => isReferralActivitySince(date, isoStart);
   const results = await Promise.all([
     rows("referral_codes", "id,code,owner_type,owner_name,partner_id,ambassador_id,status", 4000),
     rows("referral_clicks", "id,referral_code_id,utm_medium,utm_source,created_at", 20000, "created_at", isoStart),
@@ -190,5 +192,6 @@ export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<Ref
   };
   return { generatedAt: new Date().toISOString(), totals, referrers, partnerSources,
     recent: recent.sort((a,b) => b.date.localeCompare(a.date)).slice(0,60),
-    warnings, dateWindowDays };
+    warnings, dateWindowDays, period, baselineStartedAt: epoch?.startedAt ?? null,
+    baselineLabel: epoch?.label ?? null };
 }

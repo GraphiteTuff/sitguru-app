@@ -34,6 +34,8 @@ import {
   purgeTestAmbassadorsAction,
 } from "@/lib/admin/ambassadors/purge-test-ambassadors";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 import { createClient } from "@/lib/supabase/server";
 import { skipNameOnlyDuplicateMatch } from "@/lib/admin/super-users";
 import {
@@ -3554,6 +3556,12 @@ export default async function AdminAmbassadorsPage({
     }
   }
 
+  const referralEpoch = await getReferralReportingEpoch();
+  const periodReferralRows = referralRows.filter(row =>
+    isReferralActivitySince(
+      firstString(row, ["signup_date", "created_at"]), referralEpoch?.startedAt ?? null,
+    ),
+  );
   const ambassadors = appendOpenAmbassadorApplications(
     buildUnifiedAmbassadorRows({
       summaryRows,
@@ -3561,7 +3569,7 @@ export default async function AdminAmbassadorsPage({
       profileRows,
       roleRows,
       authUsers,
-      referralRows,
+      referralRows: periodReferralRows,
       leadRows,
       rewardRows,
       activityRows,
@@ -3637,6 +3645,7 @@ export default async function AdminAmbassadorsPage({
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f8f3] px-3 py-5 text-[#17351f] sm:px-5 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
+        <ReferralResetBanner epoch={referralEpoch} />
         <Link
           href="/admin/ambassadors/ledger"
           className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-emerald-200 bg-gradient-to-r from-emerald-950 to-emerald-800 px-5 py-4 text-white shadow-sm"

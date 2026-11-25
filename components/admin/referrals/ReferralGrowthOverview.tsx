@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, BadgeCheck, CalendarDays, Gift, Handshake, MousePointerClick, QrCode, RefreshCw, UserPlus } from "lucide-react";
 import type { ReferralGrowthReport } from "@/lib/referrals/growth-report";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
 
 const n = (value: number) => new Intl.NumberFormat("en-US").format(value);
 function when(raw: string | null) {
@@ -16,9 +17,9 @@ export default function ReferralGrowthOverview({ report, audience = "admin" }: {
     { title: "QR Scans", value: report.totals.qr, label: "Recorded QR visits", icon: QrCode },
     { title: "Signups", value: report.totals.signups, label: "Attributed signup captures", icon: UserPlus },
     { title: "First Bookings", value: report.totals.bookings, label: "Attributed booking events", icon: BadgeCheck },
-    { title: "Active Codes", value: report.totals.codes, label: "From SitGuru code registry", icon: Activity },
-    { title: "Partner Campaigns", value: report.totals.partnerCampaigns, label: "Active partner campaigns", icon: Handshake },
-    { title: "Reward Reviews", value: report.totals.rewardsPending, label: "Pending or approved, all time", icon: Gift },
+    { title: "Active Codes", value: report.totals.codes, label: "All active codes, preserved", icon: Activity },
+    { title: "Partner Campaigns", value: report.totals.partnerCampaigns, label: "All active campaigns, preserved", icon: Handshake },
+    { title: "Reward Reviews", value: report.totals.rewardsPending, label: "Existing financial obligations — lifetime", icon: Gift },
   ];
   return (
     <section id="referral-growth-center" aria-label="Referral Growth Center" className="space-y-4 rounded-[28px] border border-emerald-100 bg-[linear-gradient(180deg,#f3fcf9_0%,#ffffff_45%)] p-4 shadow-sm sm:p-6">
@@ -32,14 +33,29 @@ export default function ReferralGrowthOverview({ report, audience = "admin" }: {
         </div>
         <nav aria-label="Referral reporting period" className="flex flex-wrap items-center gap-1 rounded-xl border border-emerald-100 bg-white p-1 text-xs font-black text-emerald-900">
           <CalendarDays size={17} className="mx-2" aria-hidden="true" />
-          {[7,30,90].map(days => (
-            <Link key={days} href={`${baseHref}?days=${days}#referral-growth-center`} aria-current={days === report.dateWindowDays ? "page" : undefined}
-              className={`inline-flex min-h-10 items-center justify-center rounded-lg px-3 transition ${days === report.dateWindowDays ? "bg-emerald-800 !text-white" : "text-emerald-900 hover:bg-emerald-50"}`}>
-              {days}d
+          {([
+            { key: "since_reset", label: "Since reset" },
+            { key: "7", label: "7d" },
+            { key: "30", label: "30d" },
+            { key: "90", label: "90d" },
+            ...(audience === "admin" ? [{ key: "history", label: "All history" }] : []),
+          ] as const).map(option => (
+            <Link key={option.key} href={`${baseHref}?period=${option.key}#referral-growth-center`} aria-current={option.key === report.period ? "page" : undefined}
+              className={`inline-flex min-h-10 items-center justify-center rounded-lg px-3 transition ${option.key === report.period ? "bg-emerald-800 !text-white" : "text-emerald-900 hover:bg-emerald-50"}`}>
+              {option.label}
             </Link>
           ))}
         </nav>
       </div>
+      {report.period === "history" ? (
+        <p className="rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700">
+          Historical activity view. This is not the post-reset scorecard; rewards and payouts remain lifetime financial obligations.
+        </p>
+      ) : <ReferralResetBanner epoch={report.baselineStartedAt ? {
+        id: 0, startedAt: report.baselineStartedAt,
+        label: report.baselineLabel || "SitGuru Referral Tracking 2.0",
+        reason: "Non-destructive reporting reset",
+      } : null} compact={false} />}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {data.map(item => {
           const Icon = item.icon;

@@ -23,6 +23,8 @@ import {
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +124,7 @@ type RecentReferral = {
 type AnalyticsData = {
   clicks: ReferralClickRow[];
   referrals: AmbassadorReferralRow[];
+  bookingOutcomes: AmbassadorReferralRow[];
   rewards: RewardRow[];
   warning: string;
 };
@@ -516,9 +519,11 @@ async function getReferralCodeRow({
 async function loadAnalyticsData({
   ambassadorId,
   referralCode,
+  periodStart,
 }: {
   ambassadorId: string;
   referralCode: string;
+  periodStart: string | null;
 }): Promise<AnalyticsData> {
   const warnings: string[] = [];
 
@@ -561,10 +566,12 @@ async function loadAnalyticsData({
   const referralCodeId = asString(referralCodeRow?.id);
 
   if (referralCodeId) {
-    const clicksResult = await supabaseAdmin
+    let clicksQuery = supabaseAdmin
       .from("referral_clicks")
       .select("*")
-      .eq("referral_code_id", referralCodeId)
+      .eq("referral_code_id", referralCodeId);
+    if (periodStart) clicksQuery = clicksQuery.gte("created_at", periodStart);
+    const clicksResult = await clicksQuery
       .order("created_at", { ascending: false })
       .limit(20000);
 
@@ -581,8 +588,11 @@ async function loadAnalyticsData({
 
   return {
     clicks,
-    referrals:
-      (referralsResult.data || []) as AmbassadorReferralRow[],
+    referrals: ((referralsResult.data || []) as AmbassadorReferralRow[]).filter(row =>
+      isReferralActivitySince(asString(row.signup_date) || asString(row.created_at), periodStart)),
+    bookingOutcomes: ((referralsResult.data || []) as AmbassadorReferralRow[]).filter(row =>
+      isCompletedBooking(row) &&
+      isReferralActivitySince(asString(row.completed_booking_at) || asString(row.created_at), periodStart)),
     rewards: (rewardsResult.data || []) as RewardRow[],
     warning: warnings.join(" "),
   };
@@ -988,9 +998,11 @@ export default async function AmbassadorReferralAnalyticsPage() {
     redirect("/ambassador/dashboard?warning=referral_code_missing");
   }
 
+  const epoch = await getReferralReportingEpoch();
   const data = await loadAnalyticsData({
     ambassadorId: ambassador.id,
     referralCode,
+    periodStart: epoch?.startedAt ?? null,
   });
 
   const linkVisits = data.clicks.filter((row) => {
@@ -1015,7 +1027,7 @@ export default async function AmbassadorReferralAnalyticsPage() {
     (row) => normalizeReferralType(row.referral_type) === "business",
   ).length;
 
-  const completedBookings = data.referrals.filter(isCompletedBooking).length;
+  const completedBookings = data.bookingOutcomes.length;
 
   const visitConversion =
     totalVisits > 0 ? (totalSignups / totalVisits) * 100 : 0;
@@ -1041,6 +1053,7 @@ export default async function AmbassadorReferralAnalyticsPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_42%,#edfdf5_100%)] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
+        <ReferralResetBanner epoch={epoch} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/ambassador/dashboard/referrals"
@@ -1145,13 +1158,13 @@ export default async function AmbassadorReferralAnalyticsPage() {
           <SummaryCard
             title="Approved"
             value={money(approvedRewards)}
-            description="Approved or ready, not recorded as paid"
+            description="Lifetime financial approvals (preserved)"
             icon={<BadgeCheck className="h-5 w-5" />}
           />
           <SummaryCard
             title="Paid"
             value={money(paidRewards)}
-            description="Canonical rewards recorded as paid"
+            description="Lifetime rewards recorded as paid"
             icon={<DollarSign className="h-5 w-5" />}
           />
         </section>
