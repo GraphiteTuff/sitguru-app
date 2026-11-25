@@ -379,7 +379,22 @@ async function regenerateReferralCodeAction(formData: FormData) {
   const admin = await getAdminIdentity();
   if (!admin?.canAccessAdmin) return;
 
-  await supabaseAdmin
+  // A new partner QR must exist in the canonical referral code registry before
+  // staff can distribute it. Existing codes stay active for old printed flyers.
+  const { error: registryError } = await supabaseAdmin.from("referral_codes").insert({
+    owner_type: "partner",
+    partner_id: partnerId,
+    code: referralCode,
+    slug,
+    owner_name: businessName,
+    campaign_type: "partner_referral",
+    status: "active",
+  });
+  if (registryError) {
+    console.error("Partner code provisioning failed", registryError.message);
+    return;
+  }
+  const { error: updateError } = await supabaseAdmin
     .from("partners")
     .update({
       referral_code: referralCode,
@@ -387,6 +402,7 @@ async function regenerateReferralCodeAction(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", partnerId);
+  if (updateError) console.error("Partner code record update failed", updateError.message);
 
   revalidatePath("/admin/partners/active");
   revalidatePath("/admin/partners");
@@ -1228,6 +1244,15 @@ export default async function AdminActivePartnersPage({
                             <p className="mt-2 break-words text-sm font-semibold text-slate-700">
                               {referralUrl}
                             </p>
+
+                            {partner.slug ? (
+                              <Link
+                                href={`/partners/dashboard?partner=${encodeURIComponent(partner.slug)}#partner-marketing-kit`}
+                                className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-black text-emerald-900 hover:bg-emerald-100"
+                              >
+                                Open Partner Website Kit & Referral Results
+                              </Link>
+                            ) : null}
 
                             <form
                               action={regenerateReferralCodeAction}
