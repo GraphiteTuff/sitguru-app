@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { DELILAH_AVATAR } from "@/lib/companions/avatar-assets";
 import { companionChatHref } from "@/lib/companions/open-companion-chat";
@@ -69,12 +70,12 @@ export default function DelilahEventCompanionIntro({
             >
               Chat with Delilah
             </a>
-            <a
+            <Link
               href="/events"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-300 bg-white px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
             >
               Browse Pet Events
-            </a>
+            </Link>
           </div>
         </div>
       </div>

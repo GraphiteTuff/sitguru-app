@@ -118,7 +118,7 @@ export default function ManagerHelpExplorer({initialQuery=""}:{initialQuery?:str
         </section>
       ) : (
         <section className={`${DESK_UI.card} p-5 sm:p-6`} role="status">
-          <h3 className="text-lg font-black text-[#0F2744]">We couldn't find an exact guide.</h3>
+          <h3 className="text-lg font-black text-[#0F2744]">We couldn&apos;t find an exact guide.</h3>
           <p className="mt-2 text-sm font-medium text-slate-600">Try the name of the screen or a short phrase such as “approve check-in,” “Lola access,” “Planner sync,” “brand logo,” or “pay hours.” You can also ask the team directly.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={()=>{setQuery("");setCategory("all");setShowAll(false);searchRef.current?.focus();}} className="min-h-11 rounded-xl bg-[#2563EB] px-4 text-xs font-black !text-white">Clear search and browse</button>
@@ -136,7 +136,7 @@ export default function ManagerHelpExplorer({initialQuery=""}:{initialQuery?:str
       <section className={`${DESK_UI.card} flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5`}>
         <div>
           <h2 className="text-base font-black text-[#0F2744]">Still need help?</h2>
-          <p className="mt-1 max-w-2xl text-sm font-medium text-slate-600">Use team messaging to report an issue or ask about a situation the guide doesn't cover. Formal approvals must still happen in SitGuru, not in chat.</p>
+          <p className="mt-1 max-w-2xl text-sm font-medium text-slate-600">Use team messaging to report an issue or ask about a situation the guide doesn&apos;t cover. Formal approvals must still happen in SitGuru, not in chat.</p>
         </div>
         <Link href="/manager/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
           <MessageCircle size={16} aria-hidden="true"/> Ask the team

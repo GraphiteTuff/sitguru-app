@@ -477,7 +477,7 @@ export default function GuruMatchBoard({role}:{role:Role}){
                     </select>
                   </label>
                 </div>
-                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru's approved, trackable share card…</p>}
+                {busy&&!ready&&<p role="status" className="text-sm font-semibold text-blue-700">Preparing this Guru&apos;s approved, trackable share card…</p>}
                 {ready&&<div className="grid items-start gap-4 lg:grid-cols-2">
                   <div className="min-w-0 space-y-2">
                     <GuruCardPreview url={ready.cardUrl}

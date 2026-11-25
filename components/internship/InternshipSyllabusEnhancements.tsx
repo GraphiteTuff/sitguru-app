@@ -264,7 +264,7 @@ export default function InternshipSyllabusEnhancements({
             </div>
             <p className="mt-3 text-xs font-medium text-slate-600">
               Source example: a Spring 2027 Penn State BA 495A student proposal.
-              The student's university must confirm the actual requirements and the format of any faculty-attended presentation.
+              The student&apos;s university must confirm the actual requirements and the format of any faculty-attended presentation.
             </p>
           </article>
           <article className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
@@ -272,7 +272,7 @@ export default function InternshipSyllabusEnhancements({
             <h3 className="mt-3 text-lg font-black text-slate-950">Academic approval stays with the university</h3>
             <p className="mt-2 text-sm font-medium leading-6 text-slate-700">
               A three-credit, 150-hour plan may suit one school; a six-credit, 300-hour
-              plan may suit another. Neither is SitGuru's universal minimum.
+              plan may suit another. Neither is SitGuru&apos;s universal minimum.
               Credit is not guaranteed by SitGuru and employer KPI scores do not replace course grades.
             </p>
             <Link href="/admin/internship/universities" className="mt-4 inline-flex min-h-11 items-center gap-1 text-sm font-black text-[#0D5C3A] underline">

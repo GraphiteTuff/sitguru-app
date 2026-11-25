@@ -78,7 +78,7 @@ export default async function PublicReferralInvitation({ params, searchParams }:
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <Link href={parentUrl} className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-4 py-3 text-base font-black !text-white transition hover:bg-emerald-900">
-                <PawPrint size={21} aria-hidden="true" /> I'm a Pet Parent
+                <PawPrint size={21} aria-hidden="true" /> I&apos;m a Pet Parent
               </Link>
               <Link href={guruUrl} className="flex min-h-16 items-center justify-center gap-2 rounded-2xl border-2 border-emerald-300 bg-white px-4 py-3 text-base font-black text-emerald-950 transition hover:bg-emerald-50">
                 <Users size={21} aria-hidden="true" /> Become a Guru
@@ -106,7 +106,7 @@ export default async function PublicReferralInvitation({ params, searchParams }:
                 <p className="mt-5 text-center text-sm font-black uppercase tracking-wider text-emerald-100">Scan to Connect</p>
               </div>
             )}
-            <p className="flex items-center gap-2 text-center text-xs font-semibold text-slate-600"><QrCode size={17} className="text-emerald-700" aria-hidden="true" /> This QR opens this invitation—not SitGuru's generic homepage.</p>
+            <p className="flex items-center gap-2 text-center text-xs font-semibold text-slate-600"><QrCode size={17} className="text-emerald-700" aria-hidden="true" /> This QR opens this invitation—not SitGuru&apos;s generic homepage.</p>
           </div>
         </div>
         <p className="mx-auto mt-6 flex max-w-4xl items-center justify-center gap-2 text-center text-xs font-semibold text-slate-600">

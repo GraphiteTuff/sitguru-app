@@ -174,7 +174,7 @@ function HelpBody() {
             {!loading&&!error&&results.length===0?(
               <View style={styles.card}>
                 <Text style={styles.heading}>No exact result</Text>
-                <Text style={styles.body}>Try a shorter question such as 'approve check-in', 'Planner sync', or 'Lola access'.</Text>
+                <Text style={styles.body}>Try a shorter question such as &apos;approve check-in&apos;, &apos;Planner sync&apos;, or &apos;Lola access&apos;.</Text>
                 <Pressable onPress={()=>setQuery('')} style={styles.button}><Text style={styles.buttonText}>Clear search</Text></Pressable>
               </View>
             ):null}

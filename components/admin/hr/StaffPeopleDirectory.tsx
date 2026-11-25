@@ -177,7 +177,7 @@ export default function StaffPeopleDirectory({ people, today }: { people: StaffP
       {!people.length ? (
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6">
           <p className="font-black text-[#0F2744]">No active team-member engagements yet</p>
-          <p className="mt-2 text-sm font-medium text-slate-600">An eligible manager's My Time workspace establishes their engagement. This page will display their current records once available.</p>
+          <p className="mt-2 text-sm font-medium text-slate-600">An eligible manager&apos;s My Time workspace establishes their engagement. This page will display their current records once available.</p>
         </div>
       ) : null}
       <p className="px-1 text-xs font-medium text-slate-500">W-9 status only. Tax identifiers, uploaded tax forms and private banking information are never displayed here.</p>

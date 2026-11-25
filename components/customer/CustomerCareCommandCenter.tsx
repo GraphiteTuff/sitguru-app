@@ -274,9 +274,10 @@ export default function CustomerCareCommandCenter({
 }: CommandCenterProps) {
   const router = useRouter();
   const [service, setService] = useState<string>(QUICK_SERVICES[0].id);
-  const [selectedPetId, setSelectedPetId] = useState(pets[0]?.id || "");
-  const [place, setPlace] = useState(careZip);
-  const [placeEdited, setPlaceEdited] = useState(false);
+  const [preferredPetId, setPreferredPetId] = useState("");
+  const selectedPetId = pets.some((pet) => pet.id === preferredPetId) ? preferredPetId : pets[0]?.id || "";
+  const [editedPlace, setEditedPlace] = useState<string | null>(null);
+  const place = editedPlace ?? careZip;
   const [timing, setTiming] = useState<CareTiming>("flexible");
   const [pickedDates, setPickedDates] = useState<string[]>([]);
   const [rangeStart, setRangeStart] = useState("");
@@ -284,19 +285,9 @@ export default function CustomerCareCommandCenter({
   const [unread, setUnread] = useState<number | null>(null);
   const requestedZip = useRef("");
   const onZipReadyRef = useRef(onZipReady);
-  onZipReadyRef.current = onZipReady;
+  useEffect(() => { onZipReadyRef.current = onZipReady; }, [onZipReady]);
   const greetingName = firstName && firstName.toLowerCase() !== "there" ? firstName : "";
   const petNames = pets.slice(0, 2).map((pet) => pet.name).filter(Boolean).join(" & ");
-
-  useEffect(() => {
-    if (!pets.length) { if (selectedPetId) setSelectedPetId(""); return; }
-    if (!pets.some((pet) => pet.id === selectedPetId)) setSelectedPetId(pets[0].id);
-  }, [pets, selectedPetId]);
-
-  useEffect(() => {
-    if (placeEdited || place) return;
-    if (careZip) setPlace(careZip);
-  }, [careZip, place, placeEdited]);
 
   useEffect(() => {
     const zip = place.match(/\b(\d{5})\b/)?.[1] || "";
@@ -416,7 +407,7 @@ export default function CustomerCareCommandCenter({
           <div className="relative mt-6 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
             <label className="flex min-w-0 flex-col rounded-[1.35rem] border border-white/70 bg-white px-4 py-3 text-[#102339] shadow-sm">
               <span className="flex items-center gap-2 text-sm font-black"><PawPrint aria-hidden="true" className="h-5 w-5 text-orange-500" /> Your Pet</span>
-              <select value={selectedPetId} onChange={(event) => setSelectedPetId(event.target.value)} className="mt-1 min-h-[46px] w-full min-w-0 appearance-auto bg-transparent text-base font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" aria-label="Choose your pet">
+              <select value={selectedPetId} onChange={(event) => setPreferredPetId(event.target.value)} className="mt-1 min-h-[46px] w-full min-w-0 appearance-auto bg-transparent text-base font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" aria-label="Choose your pet">
                 {!pets.length ? <option value="">Choose after adding a pet</option> : null}
                 {pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
               </select>
@@ -438,7 +429,7 @@ export default function CustomerCareCommandCenter({
               <span className="flex items-center gap-2 text-sm font-black"><MapPin aria-hidden="true" className="h-5 w-5 text-orange-500" /> Location</span>
               <input
                 value={place}
-                onChange={(event) => { setPlaceEdited(true); setPlace(event.target.value); }}
+                onChange={(event) => setEditedPlace(event.target.value)}
                 placeholder="ZIP code or city"
                 aria-label="Search care ZIP code or city"
                 inputMode="text"

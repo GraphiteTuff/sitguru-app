@@ -205,7 +205,7 @@ function Dashboard() {
                   );
                 })}
               </View>
-              <Text style={styles.muted}>The web portal's Sync Facebook & Instagram button refreshes Meta only. TikTok, X and YouTube posts appear from approved publishing records or authorized imports.</Text>
+              <Text style={styles.muted}>The web portal&apos;s Sync Facebook & Instagram button refreshes Meta only. TikTok, X and YouTube posts appear from approved publishing records or authorized imports.</Text>
               {recentPosts.map((post) => (
                 <View key={post.id} style={styles.recentRow}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{post.channel.toUpperCase()} · {post.title}</Text>

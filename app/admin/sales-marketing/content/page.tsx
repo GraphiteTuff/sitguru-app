@@ -253,7 +253,7 @@ export default async function SalesMarketingContentPage() {
                 Content Hub
               </h1>
               <p className="mt-2 max-w-2xl text-sm font-semibold !text-emerald-50 sm:text-base">
-                One view of content planning, Ava's review workflow, published posts, and measurable growth.
+                One view of content planning, Ava&apos;s review workflow, published posts, and measurable growth.
               </p>
             </div>
             <span className="rounded-full border border-white/25 bg-white/15 px-3 py-2 text-xs font-black !text-white">

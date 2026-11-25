@@ -1601,7 +1601,7 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
     setComposer("lead");
   }
 
-  function useTemplate(template: ActivityTemplate) {
+  function applyTemplate(template: ActivityTemplate) {
     setActivityForm((current) => ({
       ...current,
       template_id: template.id,
@@ -2806,7 +2806,7 @@ export default function AmbassadorWorkspace({ embedded = false }: { embedded?: b
                     <button
                       key={template.id}
                       type="button"
-                      onClick={() => useTemplate(template)}
+                      onClick={() => applyTemplate(template)}
                       className={`min-w-[175px] rounded-xl border p-3 text-left transition ${
                         activityForm.template_id === template.id
                           ? "border-emerald-500 bg-emerald-50"

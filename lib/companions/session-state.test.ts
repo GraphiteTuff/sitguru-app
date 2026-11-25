@@ -24,7 +24,7 @@ describe("companion session state", () => {
   });
 
   it("applies service corrections", () => {
-    let state = mergeSessionStateFromTurn(
+    const state = mergeSessionStateFromTurn(
       emptyCompanionSessionState(),
       "I need walking",
     );
@@ -36,7 +36,7 @@ describe("companion session state", () => {
   });
 
   it("clears state on start over", () => {
-    let state = mergeSessionStateFromTurn(
+    const state = mergeSessionStateFromTurn(
       emptyCompanionSessionState(),
       "My name is Alex and I need care in 17101",
     );

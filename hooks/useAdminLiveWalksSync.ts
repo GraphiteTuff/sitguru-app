@@ -59,7 +59,7 @@ export function useAdminLiveWalksSync(
 
   const inFlightRef = useRef(false);
   const queryRef = useRef(query);
-  queryRef.current = query;
+  useEffect(() => { queryRef.current = query; }, [query]);
 
   const refresh = useCallback(async () => {
     if (inFlightRef.current) return;

@@ -32,7 +32,7 @@ test('isolated submission → parent decision → moderation → scheduling → 
   const form=(values:Record<string,string>)=>{const data=new FormData();Object.entries(values).forEach(([key,value])=>data.set(key,value));return data;};
   const submitted=await saveCommunitySubmissionForActor(form({title:'A very happy care visit',kind:'pack',story:'A joyful afternoon with our favorite walking buddy.',intent:'submit',publicConsent:'on',socialConsent:'on',featuresClientPet:'on',bookingId:booking}),actor(guru));
   assert.equal(submitted.ok,true,submitted.error);
-  let row=tables.community_studio_submissions[0];assert.equal(row.parent_user_id,parent);assert.equal(row.parent_permission_status,'pending');
+  const row=tables.community_studio_submissions[0];assert.equal(row.parent_user_id,parent);assert.equal(row.parent_permission_status,'pending');
   const review=(action:string)=>reviewCommunitySubmissionForActor(form({id,updatedAt:String(row.updated_at),action,publishAt:'2030-01-07T12:00',weekOf:'2030-01-07'}),actor('manager',true));
   assert.equal((await review('approve')).ok,false,'Guru checkbox must not authorize publication');
   await assert.rejects(()=>decideParentPermission(actor('unrelated'),{id,updatedAt:String(row.updated_at),decision:'approve',publicConsent:true,socialConsent:true}));

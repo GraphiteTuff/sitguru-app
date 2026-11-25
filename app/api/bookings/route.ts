@@ -303,7 +303,7 @@ function getPaymentOptionSummary({
 async function insertBookingWithMissingColumnRetry(
   payload: Record<string, unknown>,
 ) {
-  let insertPayload = { ...payload };
+  const insertPayload = { ...payload };
 
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const { data, error } = await supabaseAdmin
@@ -340,7 +340,7 @@ async function safeUpdateBooking(
   bookingId: string | number,
   payload: Record<string, unknown>,
 ) {
-  let updatePayload = { ...payload };
+  const updatePayload = { ...payload };
 
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const { error } = await supabaseAdmin

@@ -13,12 +13,13 @@ export default function LiveSocialAutoRefresh({
   intervalMs?: number;
 }) {
   const router = useRouter();
-  const lastCheckedAt = useRef(Date.now());
+  const lastCheckedAt = useRef<number | null>(null);
 
   useEffect(() => {
+    lastCheckedAt.current ??= Date.now();
     const refreshIfActive = () => {
       const now = Date.now();
-      if (now - lastCheckedAt.current < intervalMs) return;
+      if (lastCheckedAt.current !== null && now - lastCheckedAt.current < intervalMs) return;
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
       lastCheckedAt.current = now;
       router.refresh();

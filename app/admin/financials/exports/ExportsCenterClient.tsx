@@ -1180,7 +1180,7 @@ export default function FinancialExportCenterPage() {
       await loadHistory();
 
       if ((input.openAfterCreate ?? true) && savedHref) {
-        window.location.href = savedHref;
+        window.location.assign(savedHref);
       }
     } catch (error) {
       setCreateMessage(

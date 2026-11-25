@@ -135,7 +135,7 @@ function ReviewBox({opportunity,card}:{opportunity:CampusOpportunity;card:Campus
         {opportunity.sourceUrl?.startsWith("https://")?<a href={opportunity.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-black text-[#2563EB]">Source <ExternalLink size={13}/></a>:null}
       </div>
       {opportunity.rulesNotes?<p className="mt-3 rounded-xl bg-[#FFF7ED] px-3 py-2 text-xs font-semibold leading-5 text-amber-900">Rules or approval notes: {opportunity.rulesNotes}</p>:null}
-      {opportunity.avaReview?<p className="mt-2 text-xs font-medium leading-5 text-slate-600"><strong>Ava's previous feedback:</strong> {opportunity.avaReview}</p>:null}
+      {opportunity.avaReview?<p className="mt-2 text-xs font-medium leading-5 text-slate-600"><strong>Ava&apos;s previous feedback:</strong> {opportunity.avaReview}</p>:null}
       <form action={reviewCampusOpportunity} className="mt-4 space-y-3 border-t border-slate-100 pt-3">
         <HiddenContext card={card} tab="opportunities"/>
         <input type="hidden" name="opportunityId" value={opportunity.id}/>
@@ -180,7 +180,7 @@ function CampusOverview({card,health,opportunities,missions,leads,openTab}:{
           <h3 className="text-lg font-black text-[#0F2744]">Campus-specific rules & market plan</h3>
           <span className="rounded-full bg-[#EFF6FF] px-3 py-1.5 text-xs font-black text-[#1D4ED8]">{card.campusName}</span>
         </div>
-        <p className="mt-2 text-sm font-medium leading-6 text-slate-600">Save permission sources, organization rules, ZIP/market observations and safe outreach options. These notes apply only to this intern's campus workspace.</p>
+        <p className="mt-2 text-sm font-medium leading-6 text-slate-600">Save permission sources, organization rules, ZIP/market observations and safe outreach options. These notes apply only to this intern&apos;s campus workspace.</p>
         <form id="campus-policy-form" action={saveCampusPolicy} className="mt-4 space-y-3">
           <HiddenContext card={card} tab="overview"/>
           <label className="block space-y-1"><Label>University permissions & rules</Label>
@@ -196,7 +196,7 @@ function CampusOverview({card,health,opportunities,missions,leads,openTab}:{
         {!card.policyNotes?<p className="mt-3 rounded-xl border border-amber-200 bg-[#FFF7ED] p-3 text-xs font-bold text-amber-900">Campus rules have not been documented. Research is welcome; posting, tabling or distributing flyers still requires the appropriate permission.</p>:null}
       </section>
       <section className={DESK_UI.card+" p-4 sm:p-5"}>
-        <h3 className="text-lg font-black text-[#0F2744]">This campus's next actions</h3>
+        <h3 className="text-lg font-black text-[#0F2744]">This campus&apos;s next actions</h3>
         <div className="mt-4 space-y-3">
           {reviews.length ? <button type="button" onClick={()=>openTab("opportunities")} className="flex w-full items-start gap-3 rounded-xl bg-[#FFF7ED] p-3 text-left text-sm font-bold text-amber-900">
             <ShieldCheck size={19} className="mt-0.5 shrink-0"/> Review {reviews.length} permission or approval {reviews.length===1?"request":"requests"} <ArrowRight className="ml-auto shrink-0" size={16}/>
@@ -228,7 +228,7 @@ function OpportunitiesTab({card,opportunities}:{card:CampusCard;opportunities:Ca
   return <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
     <section className={DESK_UI.card+" min-w-0 p-4 sm:p-5"}>
       <h3 className="text-lg font-black text-[#0F2744]">Opportunity review queue</h3>
-      <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Research, permission, manager review and outreach status for this university. An approved SitGuru tactic does not waive a campus's external rules.</p>
+      <p className="mt-1 text-xs font-medium leading-5 text-slate-600">Research, permission, manager review and outreach status for this university. An approved SitGuru tactic does not waive a campus&apos;s external rules.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         {([["all","All"],["needs_review","Needs review"],["approved","Approved"],["research","Research / blocked"]] as const).map(([value,label])=>(
           <button type="button" key={value} onClick={()=>setFilter(value)} aria-pressed={filter===value} className={"min-h-10 rounded-xl px-3 text-xs font-black "+(filter===value?"bg-[#2563EB] !text-white":"bg-[#F1F5F9] text-[#0F2744]")}>{label}</button>

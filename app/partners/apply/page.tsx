@@ -247,7 +247,8 @@ function TextArea({
 }
 
 export default function PartnerApplyPage() {
-  const [submitted, setSubmitted] = useState(false);
+  const [inquiryId, setInquiryId] = useState("");
+  const submitted = Boolean(inquiryId);
   const [form, setForm] = useState({
     interestType: "",
     organizationType: "",
@@ -264,10 +265,6 @@ export default function PartnerApplyPage() {
     partnershipIdea: "",
     notes: "",
   });
-
-  const inquiryId = useMemo(() => {
-    return `SG-PARTNER-${Date.now().toString().slice(-6)}`;
-  }, [submitted]);
 
   const update = (key: keyof typeof form, value: string) => {
     setForm((current) => ({
@@ -309,7 +306,7 @@ export default function PartnerApplyPage() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    setInquiryId(`SG-PARTNER-${Date.now().toString().slice(-6)}`);
   }
 
   return (
@@ -738,7 +735,7 @@ export default function PartnerApplyPage() {
 
                   <button
                     type="button"
-                    onClick={() => setSubmitted(false)}
+                    onClick={() => setInquiryId("")}
                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
                   >
                     Edit Inquiry

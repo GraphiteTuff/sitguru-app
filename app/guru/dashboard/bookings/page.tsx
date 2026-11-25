@@ -1502,7 +1502,7 @@ export default async function GuruBookingsPage({
                         Select a booking to start PawReport Live
                       </div>
                       <p className="mt-3 text-base leading-7 !text-slate-600">
-                        The start/stop walk controls live inside each booking's
+                        The start/stop walk controls live inside each booking&apos;s
                         PawReport page. You currently have no bookings showing, so
                         there is not a live walk to start yet.
                       </p>
@@ -1974,7 +1974,7 @@ export default async function GuruBookingsPage({
 
               <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
                 Live walk tracking only appears after you open a specific
-                booking's PawReport. This keeps GPS walk records connected to
+                booking&apos;s PawReport. This keeps GPS walk records connected to
                 the right Pet Parent and service.
               </p>
 

@@ -36,7 +36,7 @@ export default async function PlannerSetupPage({
         <p className="text-xs font-black uppercase tracking-widest text-blue-700">Administrator · Microsoft 365</p>
         <h1 className="mt-2 text-3xl font-black text-slate-950">Microsoft Planner connection</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Verify SitGuru's Microsoft Graph application can write to the shared internship plan.
+          Verify SitGuru&apos;s Microsoft Graph application can write to the shared internship plan.
           This test creates one temporary task in Ready to Start and immediately deletes it.
           It does not modify internship assignments or turn on automatic task creation.
         </p>

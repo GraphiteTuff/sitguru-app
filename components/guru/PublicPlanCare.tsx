@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 type ServiceChoice = {
@@ -24,14 +24,11 @@ export default function PublicPlanCare({
   const choices = services.length ? services : [{ label: "Pet care", price: "" }];
   const selected = choices.find((item) => item.label === service) || choices[0];
 
-  const href = useMemo(() => {
-    const params = new URLSearchParams();
-    if (selected?.label && selected.label !== "Pet care") params.set("service", selected.label);
-    if (stay === "multi") params.set("stay", "multi");
-    if (stay === "overnight") params.set("stay", "overnight");
-    const query = params.toString();
-    return query ? `${bookHref}?${query}` : bookHref;
-  }, [bookHref, selected?.label, stay]);
+  const params = new URLSearchParams();
+  if (selected?.label && selected.label !== "Pet care") params.set("service", selected.label);
+  if (stay !== "one") params.set("stay", stay);
+  const query = params.toString();
+  const href = query ? `${bookHref}?${query}` : bookHref;
 
   return (
     <aside className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">

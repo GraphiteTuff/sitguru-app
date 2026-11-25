@@ -16,10 +16,10 @@
 | 2. Instructor and supervisor | Partial | Shared workspace is wired into Manager Portal and Admin HQ. It uses the existing authorized roster and review queue, review events, hours workflow, and student preview. The instructor can publish recipient-specific announcements. The staff roster links to midpoint and final employer evaluations. Assignment rows display recorded status, and upcoming deadlines use open work with future dates. Dedicated module authoring remains outstanding. |
 | 3. Syllabus and growth pillars | Partial | The current syllabus stays in place. The existing assignment brief now stores one primary pillar, target audiences, syllabus objective, estimated hours and expected outcomes. Approved time logs linked to an owned assignment contribute once to its primary pillar. Verified outcome attribution and enrollment acceptance remain outstanding. |
 | 4. Assignment workspace and Speed Review | Partial | The assigned-intern review queue filters by intern, cohort, assignment, milestone and pillar. Drafts support extra links and a SharePoint upload. New submissions get a separate SharePoint document and a Postgres snapshot. Both assignment detail screens can read the snapshots. Hosted Microsoft upload and authenticated end-to-end verification remain outstanding. |
-| 5. Private gradebooks | Partial | Versioned assignment rubrics, private notes, release, individual gradebooks, pillar grades and employer evaluation exports are wired. Existing program evaluation records serve midpoint and final reviews. Hosted Supabase role tests and end-to-end release acceptance remain outstanding. |
+| 5. Private gradebooks | Partial | Versioned assignment rubrics, private notes, release, individual gradebooks, pillar grades and employer evaluation exports are wired. Existing program evaluation records serve midpoint and final reviews. Hosted Supabase verified draft visibility, release and cross-intern isolation. Authenticated browser acceptance remains outstanding. |
 | 6. Partnerships and sponsorships | Partial | Proposed pilot records, scoped prospect and activity screens, evidence verification, financial approval records and scoped marketing ZIPs are implemented. Payment approval requires a supervisor, an accepted paid agreement and verified evidence. The workspace links to existing referrals and does not create payouts. Hosted integration and partner attribution acceptance checks remain outstanding. |
 | 7. Native and responsive verification | Partial | Expo has an intern learning screen and a scoped instructor queue. The web and mobile assignment forms now use the same server workflow for drafts, supporting documents and submission. Mobile instructor actions and partnership edits open the web portal. Expo exported iOS and Android bundles. Signed builds, device checks and live role tests are pending. |
-| 8. Release | Blocked | Repository-wide lint and desk regression checks are red on the production baseline. Authenticated staging and production verification and signed-native verification are still pending. |
+| 8. Release | Blocked | The desk regression passes and the four migrations are applied in staging. Repository-wide lint, authenticated staging and production verification, and signed native builds remain outstanding. |
 
 ## Enrollment records
 
@@ -29,10 +29,10 @@ The production read-only audit returned Ryan at 150 hours and Lola at 150 hours,
 
 | Check | Result |
 | --- | --- |
-| Internship, Community Studio, Microsoft Graph, Teams, SharePoint and regression suite | `npm run test:sitguru3` passed 67 tests. Integration calls use fixtures. |
+| Internship, Community Studio, Microsoft Graph, Teams, SharePoint and regression suite | `npm run test:sitguru3` passed 73 tests, including 6 preview policy tests. Integration calls use fixtures. |
 | Targeted internship, access, rubric and Microsoft tests | 36 passed, including manager scope, cross-intern access decisions, revision transitions and rubric validation. |
-| Desk regression | `npm run test:desks` passed 19 and failed 1. The same failure reproduced on `ef4bc34`. The test expects Community Studio directly after Content Studio, while the baseline puts Reads & Media between those links. |
-| Repository-wide lint | The production baseline reported 398 errors. Changed-file lint passed using the existing ESLint rules. |
+| Desk regression | `npm run test:desks` passed all 20 tests. The preservation test now asserts Content Studio, Reads & Media, and Community Studio in their existing order and covers the full intern sidebar. |
+| Repository-wide lint | The production baseline reported 398 source errors and the feature branch had 387 before the follow-up. The follow-up reduces this to 303 errors across 146 source files, with no new errors by file and rule. Most remaining errors involve React hooks and TypeScript typing. ESLint skips the Git-ignored generated Next.js fixture output, and all source rules remain enabled. |
 | Web TypeScript and build | Web TypeScript and the isolated production-mode Next.js build passed with fixture credentials. Production credential and authenticated portal tests are pending. |
 | Desktop/mobile browser | The dashboard fixture passed at 320, 390, 768 and 1440 CSS pixels. The document matched each viewport width, and the floating chat control cleared the mobile navigation. |
 | Anonymous authorization | New Intern and Admin pages redirected to login. Manager pages rendered the default access denial. Native learning/work and protected exports denied unauthenticated access. The local smoke suite passed, including the exact Pack submit redirect in HTTP or streamed HTML. |
@@ -41,7 +41,11 @@ The production read-only audit returned Ryan at 150 hours and Lola at 150 hours,
 
 ### Migration verification
 
-Run `node scripts/internship-migration-smoke.mjs` with Docker and Postgres 17. The script creates a disposable fixture database and applies the four migrations in order. Production and staging migration histories contain none of the four new migrations. The connected SitGuru Staging schema lacks the core internship, assignment integration, partner and referral tables, so the migrations cannot be applied there independently of a staging baseline.
+Run `node scripts/internship-migration-smoke.mjs` with Docker and Postgres 17. The script creates a disposable fixture database and applies the four migrations in order.
+
+SitGuru Staging (`ehdvngkqddttcwhjubwu`) received a schema-only baseline at `20261125132156`. The baseline added 64 missing tables from production definitions, including the foreign-key dependencies, indexes, row policies and necessary grants. It left the 21 existing public tables intact. Production data and side-effect triggers and webhooks were excluded. Local Postgres restored this baseline and the four feature migrations, with RLS enabled on all 69 restored or added tables. Hosted staging reported RLS enabled on all 90 public tables after migration.
+
+The Supabase connector assigned staging ledger versions `20261125132239`, `20261125132244`, `20261125132249`, and `20261125132254` respectively. These entries contain the SQL from the repository files below. Account for the ledger version differences before using the Supabase CLI to push migrations to this existing staging project. Rolled-back staging transactions tested submission snapshots, revision and resubmission, draft and private-note visibility, released evaluations, cross-intern isolation, and sponsorship approval requiring verified evidence and supervisor authority. The tests left no approval records and made no payments. Live account provisioning, SharePoint upload permissions, and referral and payment workflow acceptance still need end-to-end verification. Production has received none of the four migrations.
 
 | Migration | Verified behavior |
 | --- | --- |
@@ -78,8 +82,8 @@ The `www.sitguru.com` alias resolved to Vercel deployment `dpl_5RX2XtrwoyQvG1nRW
 
 ## Resume and release
 
-1. Start from the local feature branch. Reconcile the baseline lint and navigation failures. Preserve Reads & Media and Community Studio.
-2. Provision or reconcile a production-compatible staging schema, verify the four migrations there, and confirm rollback readiness. Use isolated intern accounts and assigned manager and Super Admin accounts for browser and API acceptance tests. Check live SharePoint document permissions, staging referral attribution, and partner financial approval without creating a payout.
+1. Start from the local feature branch and resolve the remaining lint findings. Preserve the desk navigation verified by the regression suite.
+2. Use isolated staging intern accounts and assigned manager and Super Admin accounts for browser and API acceptance tests. Check live SharePoint document permissions, staging referral attribution, and partner financial approval without creating a payout. Check the staging migration ledger before any CLI migration push.
 3. Close the remaining product gaps before release. These include module authoring, verified business-outcome attribution by pillar, inline document previews, partner-specific reporting and full native instructor and partner editing. Confirm the approved Spring 2027 enrollment records and Lola’s agreement.
 4. When all gates pass, update PR #308, merge to `sitguru-main`, apply the verified additive migrations to the confirmed production project, then verify the Vercel deployment SHA, authenticated portals, and runtime logs.
 5. Prepare signed native artifacts through the existing Expo EAS profiles. The current exports verify bundle creation. Store distribution requires separate signed builds and release acceptance.

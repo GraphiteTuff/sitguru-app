@@ -98,11 +98,15 @@ function formatCount(result: CountResult, fallback = "Review") {
     : fallback;
 }
 
-async function safeCount(table: string, applyFilter?: (query: any) => any) {
+function countQuery(table: string) {
+  return supabaseAdmin.from(table).select("*", { count: "exact", head: true });
+}
+
+type CountQuery = ReturnType<typeof countQuery>;
+
+async function safeCount(table: string, applyFilter?: (query: CountQuery) => CountQuery) {
   try {
-    let query = supabaseAdmin
-      .from(table)
-      .select("*", { count: "exact", head: true });
+    let query = countQuery(table);
 
     if (applyFilter) query = applyFilter(query);
 

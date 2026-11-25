@@ -46,7 +46,7 @@ export default function AvaLolaConnectionHealth({initial}:{initial:AccountConnec
             <h1 className="mt-1 text-2xl font-black tracking-tight text-[#0F2744] sm:text-3xl">Ava & Lola — Account Readiness</h1>
             <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
               Checks actual SitGuru authentication, staff/intern records, assignments, onboarding and stored roles.
-              It cannot certify a Microsoft or social-network login without that provider's authorization.
+              It cannot certify a Microsoft or social-network login without that provider&apos;s authorization.
             </p>
           </div>
           <div className="rounded-2xl bg-[#EFF6FF] px-4 py-3 text-center">

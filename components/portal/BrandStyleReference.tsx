@@ -67,7 +67,7 @@ export default function BrandStyleReference() {
         <div className="rounded-xl bg-[#EFF6FF] p-4">
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#1D4ED8]"><Type size={17} aria-hidden="true" /> Primary font</p>
           <p className="mt-2 text-xl font-extrabold tracking-tight text-[#0F2744]">Plus Jakarta Sans</p>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Headings, body text, forms, buttons and social layouts. SitGuru's web interface uses this family with sans-serif fallbacks.</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Headings, body text, forms, buttons and social layouts. SitGuru&apos;s web interface uses this family with sans-serif fallbacks.</p>
           <p className="mt-2 text-xs font-semibold text-slate-600">Recommended styles: 700–800 for headings, 600–700 for buttons, 400–600 for body.</p>
         </div>
         <div className="rounded-xl bg-[#F4F7FB] p-4">

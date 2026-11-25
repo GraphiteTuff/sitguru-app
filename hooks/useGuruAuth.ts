@@ -42,7 +42,7 @@ export function useGuruAuth(): GuruAuthState {
   const refresh = useCallback(async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      let session = sessionData?.session ?? null;
+      const session = sessionData?.session ?? null;
       let authUser = session?.user ?? null;
 
       // Fallback for cookie/session races where getSession is briefly empty.

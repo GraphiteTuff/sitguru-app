@@ -386,7 +386,7 @@ export function filterAndSortCases(
 ) {
   const query = filters.q.toLowerCase();
 
-  let filtered = cases.filter((item) => {
+  const filtered = cases.filter((item) => {
     if (!matchesQueueType(item, filters.type)) return false;
     if (!matchesDisplayStatus(item, filters.status)) return false;
     if (filters.priority !== "all") {

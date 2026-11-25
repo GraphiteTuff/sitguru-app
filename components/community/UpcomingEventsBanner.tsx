@@ -344,8 +344,6 @@ export default function UpcomingEventsBanner({
   const [shareEvent, setShareEvent] =
     useState<EventShareDrawerEvent | null>(null);
 
-  if (!events.length) return null;
-
   async function openSitGuruShare(event: CommunityEventWithPartner) {
     const curatedDemo = isHomepageDemoEvent(event.id);
     const payload: EventShareDrawerEvent = {
@@ -407,9 +405,13 @@ export default function UpcomingEventsBanner({
   }
 
   useEffect(() => {
-    refreshScrollState();
+    if (events.length === 0) return;
+    const frame = window.requestAnimationFrame(refreshScrollState);
     window.addEventListener("resize", refreshScrollState);
-    return () => window.removeEventListener("resize", refreshScrollState);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", refreshScrollState);
+    };
   }, [events.length]);
 
   useEffect(() => {
@@ -420,6 +422,8 @@ export default function UpcomingEventsBanner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [captureEvent]);
+
+  if (!events.length) return null;
 
   return (
     <section className="border-y border-slate-100 bg-white py-12 sm:py-16">

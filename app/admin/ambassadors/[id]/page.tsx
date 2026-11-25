@@ -2688,7 +2688,7 @@ export default async function AdminAmbassadorDetailPage({
               <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
                 Create a tracked admin message thread for this Ambassador,
                 follow up about referral credits, or open Messenger to coordinate
-                with Gurus connected to this Ambassador's outreach.
+                with Gurus connected to this Ambassador&apos;s outreach.
               </p>
 
               <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">

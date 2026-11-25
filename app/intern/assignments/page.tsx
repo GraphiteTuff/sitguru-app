@@ -35,5 +35,11 @@ export default async function InternAssignmentsPage() {
     if (item.provider === "canva" && item.externalUrl) current.canva = item.externalUrl;
     links[item.assignmentId] = current;
   }
-  return <div className="space-y-4"><SyllabusGrowthOverview mode="intern" /><InternAssignmentsPageView workspace={data.workspace} links={links} /></div>;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  return (
+    <div className="space-y-4">
+      <SyllabusGrowthOverview mode="intern" />
+      <InternAssignmentsPageView workspace={data.workspace} links={links} today={today} />
+    </div>
+  );
 }
