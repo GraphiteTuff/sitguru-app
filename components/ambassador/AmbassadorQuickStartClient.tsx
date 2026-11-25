@@ -113,7 +113,7 @@ export default function AmbassadorQuickStartClient({
     {
       title: "Log a Lead",
       description: "Record local outreach",
-      href: "/ambassador/dashboard/command-center",
+      href: "/ambassador/dashboard/command-center?view=leads&new=lead",
       icon: <Handshake size={22} aria-hidden="true" />,
     },
     {
