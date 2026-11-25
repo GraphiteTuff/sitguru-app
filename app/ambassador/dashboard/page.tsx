@@ -1700,7 +1700,7 @@ function CompactReferralCard({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
+      <div className="mt-4 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3">
         <a
           href={qrPath}
           aria-label={`Open ${title} referral QR link`}
@@ -1721,7 +1721,7 @@ function CompactReferralCard({
           <div className="mt-2 grid gap-2">
             <Link
               href={shortPath}
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-green-800 px-3 py-2 text-xs font-black text-white hover:bg-green-900"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-800 px-3 py-2 text-xs font-black text-white hover:bg-green-900"
             >
               Open Short Link
               <ExternalLink size={13} />
@@ -1775,7 +1775,7 @@ function SocialPlatformCard({
       <a
         href={qrPath}
         aria-label={`Open tracked ${label} QR link`}
-        className="mx-auto mt-3 block w-[104px] rounded-2xl bg-green-50 p-2 ring-1 ring-green-100"
+        className="mx-auto mt-3 block w-[132px] max-w-full rounded-2xl bg-green-50 p-2 ring-1 ring-green-100"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -1795,7 +1795,7 @@ function SocialPlatformCard({
       <div className="mt-2 grid gap-1">
         <Link
           href={qrPath}
-          className="inline-flex min-h-8 items-center justify-center rounded-xl bg-green-800 px-2 py-1.5 text-[10px] font-black text-white hover:bg-green-900"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-800 px-2 py-2 text-xs font-black text-white hover:bg-green-900"
         >
           Tracked QR Link
         </Link>
@@ -1803,7 +1803,7 @@ function SocialPlatformCard({
           href={destination}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-xl border border-green-100 bg-green-50 px-2 py-1.5 text-[10px] font-black text-green-900 hover:bg-green-100"
+          className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-green-100 bg-green-50 px-2 py-2 text-xs font-black text-green-900 hover:bg-green-100"
         >
           Official Channel
           <ExternalLink size={11} />
