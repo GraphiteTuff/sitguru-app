@@ -13,8 +13,8 @@ export const INTERN_RECORD_TABS = [
   {
     id: "work",
     label: "Work & Reviews",
-    title: "Assignments & growth work",
-    description: "Manage the existing tasks, campaigns, weekly reviews and final project.",
+    title: "Assignments",
+    description: "Assign work, review submissions, and give feedback.",
     hash: "work",
   },
   {

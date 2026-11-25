@@ -6,8 +6,20 @@ import {
   uploadInternAttachment,
 } from "@/lib/internship/actions";
 import { attachmentsForItem } from "@/lib/internship/portal";
+import { groupInternAttachments } from "@/lib/internship/attachment-groups";
 import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkAttachment } from "@/lib/internship/types";
+
+const uploadDate = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+function uploadedAt(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? `${uploadDate.format(date)} UTC` : "Date unavailable";
+}
 
 export default function InternWorkAttachments({
   internId,
@@ -21,6 +33,7 @@ export default function InternWorkAttachments({
   accept,
   emptyCopy,
   hint,
+  compact = false,
 }: {
   internId: string;
   itemType: string;
@@ -33,55 +46,84 @@ export default function InternWorkAttachments({
   accept?: string;
   emptyCopy?: string;
   hint?: string;
+  compact?: boolean;
 }) {
   const files = attachmentsForItem(attachments, itemType, itemId).filter((file) => {
+    if (file.internId !== internId) return false;
     if (!category) return true;
     const kind = String(file.category || file.caption || "").trim().toLowerCase();
     if (kind === category) return true;
     return category === "evidence" && !kind;
   });
   const readOnly = preview;
+  const groups = compact
+    ? groupInternAttachments(files)
+    : files.map((file) => ({ key: file.id, latest: file, previous: [] }));
+
+  function fileRow(file: InternshipWorkAttachment, latest = false) {
+    const savedAt = uploadedAt(file.createdAt);
+    return (
+      <div className="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <a
+            href={file.fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline-offset-4 [overflow-wrap:anywhere] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            {file.fileName}
+          </a>
+          {latest ? (
+            <span className="ml-2 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+              Latest
+            </span>
+          ) : null}
+          <p className="text-xs leading-5 text-slate-600">
+            {Number.isFinite(Date.parse(file.createdAt)) ? (
+              <>Uploaded <time dateTime={file.createdAt}>{savedAt}</time></>
+            ) : "Upload date unavailable"}
+            {file.uploadedByRole === "supervisor" ? " · SitGuru" : " · Intern"}
+            {file.category || file.caption ? ` · ${file.category || file.caption}` : ""}
+          </p>
+        </div>
+        {!readOnly ? (
+          <form action={deleteInternAttachment} className="shrink-0">
+            <input type="hidden" name="internId" value={internId} />
+            <input type="hidden" name="mode" value={mode} />
+            <input type="hidden" name="itemType" value={itemType} />
+            <input type="hidden" name="attachmentId" value={file.id} />
+            <button
+              aria-label={`Remove ${file.fileName}, uploaded ${savedAt}`}
+              className="min-h-11 rounded-lg px-2 text-xs font-bold text-rose-700 hover:text-rose-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              Remove
+            </button>
+          </form>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-        <Paperclip size={12} />
+      <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+        <Paperclip size={16} aria-hidden="true" />
         {label}
       </p>
       {files.length ? (
         <ul className="mt-2 space-y-2">
-          {files.map((file) => (
-            <li
-              key={file.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2"
-            >
-              <div className="min-w-0">
-                <a
-                  href={file.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block min-w-0 truncate text-sm font-black text-emerald-800"
-                >
-                  {file.fileName}
-                </a>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {file.createdAt ? new Date(file.createdAt).toLocaleString() : "Saved"}
-                  {file.uploadedByRole === "supervisor" ? " · SitGuru" : " · Intern"}
-                  {file.category || file.caption
-                    ? ` · ${file.category || file.caption}`
-                    : ""}
-                </p>
-              </div>
-              {!readOnly ? (
-                <form action={deleteInternAttachment}>
-                  <input type="hidden" name="internId" value={internId} />
-                  <input type="hidden" name="mode" value={mode} />
-                  <input type="hidden" name="itemType" value={itemType} />
-                  <input type="hidden" name="attachmentId" value={file.id} />
-                  <button className="text-xs font-black text-rose-700 hover:text-rose-900 hover:underline">
-                    Remove
-                  </button>
-                </form>
+          {groups.map((group) => (
+            <li key={group.key}>
+              {fileRow(group.latest, group.previous.length > 0)}
+              {group.previous.length ? (
+                <details className="mt-1 rounded-xl border border-slate-200 bg-white px-3">
+                  <summary className="min-h-11 cursor-pointer content-center rounded-lg text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                    Previous uploads ({group.previous.length})
+                  </summary>
+                  <ul className="space-y-2 border-t border-slate-100 py-2">
+                    {group.previous.map((file) => <li key={file.id}>{fileRow(file)}</li>)}
+                  </ul>
+                </details>
               ) : null}
             </li>
           ))}
@@ -113,9 +155,10 @@ export default function InternWorkAttachments({
           <input
             name="file"
             type="file"
+            aria-label={`Add ${label.toLowerCase()}`}
             required
             accept={accept}
-            className="min-h-11 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-semibold"
+            className="min-h-11 min-w-0 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-semibold"
           />
           <button className={`${internPrimaryBtnClass} min-h-11 px-4 text-xs`}>
             {itemType === "brand" ? "Upload" : "Attach"}
