@@ -1,3 +1,5 @@
+import { saveOwnAssignmentProgress } from "@/lib/internship/assignment-progress-service";
+import { isPortalUserId } from "@/lib/internship/manager-access";
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRole } from "@/lib/admin/access";
 import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
@@ -18,7 +20,7 @@ import {
 export const dynamic = "force-dynamic";
 
 function json(req: NextRequest, body: Record<string, unknown>, status = 200) {
-  return NextResponse.json(body, { status, headers: mobileCorsHeaders(req) });
+  return NextResponse.json(body, { status, headers: { ...mobileCorsHeaders(req), "Cache-Control": "private, no-store" } });
 }
 
 function text(value: unknown) {
@@ -41,8 +43,18 @@ export function OPTIONS(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const resolved = await resolveRequestUser(req);
   if (!resolved) return json(req, { error: "Sign in required." }, 401);
+  if (!resolved.user.email_confirmed_at) return json(req, { error: "Verify your account email." }, 403);
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const multipart = req.headers.get("content-type")?.includes("multipart/form-data");
+  const formData = multipart ? await req.formData().catch(() => null) : new FormData();
+  if (!formData) return json(req, { error: "Invalid form." }, 400);
+  const body = multipart ? Object.fromEntries(formData.entries())
+    : (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!multipart) {
+    for (const name of ["studentNotes", "workUrl", "supportingLinks"]) {
+      formData.set(name, text(body[name]));
+    }
+  }
   const internId = text(body.internId);
   const action = text(body.action);
   const intern = await findInternByAccount({
@@ -62,7 +74,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (action === "submit") {
+  if (action === "submit" || action === "save") {
+    if (!intern || intern.id !== internId) {
+      return json(req, { error: "Only the assigned intern can submit their work." }, 403);
+    }
+    if (!internOnboardingComplete(await getInternOnboarding(intern.id))) {
+      return json(req, { error: "Complete intern onboarding first.", onboardingRequired: true }, 403);
+    }
+    if (text(body.itemType) !== "content") {
+      const assignmentId = text(body.id);
+      if (!isPortalUserId(assignmentId)) return json(req, { error: "Choose an assignment." }, 400);
+      const progress = await saveOwnAssignmentProgress({
+        intern, userId: resolved.user.id, assignmentId, intent: action, formData,
+      });
+      return progress.ok
+        ? json(req, { ok: true, message: progress.message })
+        : json(req, { error: progress.error }, progress.status);
+    }
+    if (action === "save") return json(req, { error: "Open Content Studio to save a content draft." }, 400);
     const result = await submitInternWorkRecord({
       internId,
       itemType: text(body.itemType) === "content" ? "content" : "task",

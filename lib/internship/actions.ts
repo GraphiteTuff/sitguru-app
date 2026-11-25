@@ -720,6 +720,7 @@ export async function reviewBaselineBrief(formData: FormData) {
 export async function submitInternWork(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
+  if (mode !== "intern") bounce(workspacePath(internId, mode), "error", "Only the assigned intern can submit their work.");
   await assertWorkspaceActor(internId, mode);
   const itemType = text(formData, "itemType") === "content" ? "content" : "task";
   const workUrl = text(formData, "workUrl");
