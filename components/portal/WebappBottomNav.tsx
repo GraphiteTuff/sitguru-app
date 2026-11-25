@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
 
 export type WebappTab = {
   label: string;
@@ -42,7 +43,7 @@ export default function WebappBottomNav({
   return (
     <>
       {moreOpen ? (
-        <div className="fixed inset-x-0 z-[97] px-3 xl:hidden" style={{ bottom: "calc(4.85rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
+        <div className="fixed inset-x-0 z-[97] px-3 xl:hidden" style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
           <div className="max-h-[50vh] overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white p-2 shadow-[0_-8px_28px_rgba(15,23,42,0.08)]">
             {more.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -52,7 +53,7 @@ export default function WebappBottomNav({
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
                   className={`block rounded-xl px-3 py-3 text-sm font-black ${
-                    active ? "bg-[#EFF6FF] text-[#2563EB]" : "text-[#0F2744]"
+                    active ? NAV.active : NAV.idle
                   }`}
                 >
                   {item.label}
@@ -63,15 +64,12 @@ export default function WebappBottomNav({
         </div>
       ) : null}
       <nav
-        className="pointer-events-auto fixed inset-x-0 z-[96] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md xl:hidden"
-        style={{
-          bottom: "var(--sg-chrome-bottom, 0px)",
-          paddingBottom: "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
-        }}
+        className={`${NAV.surface} !z-[96] xl:hidden`}
+        style={SITGURU_MOBILE_NAV_INSET}
         aria-label={label}
         data-webapp-bottom-nav
       >
-        <div className="grid grid-cols-5 gap-0 px-1 pt-1">
+        <div className={NAV.grid}>
           {items.map((item) => {
             const active = item.match(pathname);
             const Icon = item.icon;
@@ -80,12 +78,11 @@ export default function WebappBottomNav({
                 key={item.label}
                 href={item.href}
                 onClick={() => setMoreOpen(false)}
-                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-black leading-tight transition active:scale-[0.97] ${
-                  active ? "text-[#2563EB]" : "text-slate-500 active:bg-slate-50"
-                }`}
+                aria-current={active ? "page" : undefined}
+                className={`${NAV.tab} ${active ? NAV.active : NAV.idle}`}
               >
-                <span className={`grid h-8 w-12 place-items-center rounded-2xl ${active ? "bg-[#EFF6FF]" : ""}`}>
-                  <Icon className={`h-[22px] w-[22px] ${active ? "stroke-[2.35]" : "stroke-[2]"}`} aria-hidden />
+                <span className={`${NAV.icon} ${active ? NAV.iconActive : ""}`}>
+                  <Icon className={`${NAV.iconSize} ${active ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden />
                 </span>
                 <span>{item.label}</span>
               </Link>
@@ -94,12 +91,12 @@ export default function WebappBottomNav({
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-black leading-tight ${
-              moreOpen || moreActive ? "text-[#2563EB]" : "text-slate-500"
-            }`}
+            aria-expanded={moreOpen}
+            aria-label="More portal pages"
+            className={`${NAV.tab} ${moreOpen || moreActive ? NAV.active : NAV.idle}`}
           >
-            <span className={`grid h-8 w-12 place-items-center rounded-2xl ${moreOpen || moreActive ? "bg-[#EFF6FF]" : ""}`}>
-              <MoreHorizontal className="h-[22px] w-[22px]" aria-hidden />
+            <span className={`${NAV.icon} ${moreOpen || moreActive ? NAV.iconActive : ""}`}>
+              <MoreHorizontal className={`${NAV.iconSize} ${moreOpen || moreActive ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden />
             </span>
             <span>More</span>
           </button>

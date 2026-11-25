@@ -778,10 +778,10 @@ body[data-sitguru-more-open] [data-rogue-admin-dock] {
   display: none !important;
 }
 
-/* Admin, Manager and Intern phone: keep chat FAB above the bottom nav + Safari chrome. */
+/* Admin, Manager and Intern phone: keep chat FAB above the taller Guru-style tab bar. */
 .desk-chat-dock[data-desk-chat-above-nav="true"] {
   bottom: calc(
-    5.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+    6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
   ) !important;
   padding-bottom: 0.5rem !important;
 }
@@ -2484,27 +2484,28 @@ div.homepage-chat-panel__header,
   }
 }
 
-/* Ambassador Dashboard and Portal share one phone navigation dock.
-   Keep Taco visible but prevent its tip and avatar from covering quick actions. */
+/* Taco uses Rogue's compact floating-avatar pattern on Ambassador mobile.
+   The launcher sits ABOVE the Guru-style tabs; never show a wide intro tip. */
 @media (max-width: 1023px) {
-  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] {
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] {
     bottom: calc(
-      6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+      6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
     ) !important;
-    right: 0.9rem;
-    max-width: calc(100vw - 1.8rem);
+    right: 0.75rem !important;
+    max-width: calc(100vw - 1.5rem);
   }
 
-  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] > .homepage-chat-tip {
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] > .homepage-chat-tip {
     display: none !important;
   }
 
-  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] > .homepage-chat-launcher {
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] > .homepage-chat-launcher {
     width: 56px;
     height: 56px;
   }
 
-  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] [role="dialog"] {
+  [data-ai-taco-companion="true"][data-taco-mode="workspace"] [role="dialog"] {
     max-height: min(68svh, 640px);
+    max-width: min(94vw, 440px);
   }
 }

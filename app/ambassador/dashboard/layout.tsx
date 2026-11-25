@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,6 +17,9 @@ import {
   WalletCards,
 } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { openCompanionChat } from "@/lib/companions/open-companion-chat";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -99,6 +102,15 @@ export default function AmbassadorDashboardLayout({
   children,
 }: AmbassadorDashboardLayoutProps) {
   const pathname = usePathname();
+  const [activeHash, setActiveHash] = useState("");
+  useBrowserChromeInset();
+
+  useEffect(() => {
+    const syncHash = () => setActiveHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, [pathname]);
 
   return (
     <div className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#effcf5_100%)]">
@@ -155,6 +167,19 @@ export default function AmbassadorDashboardLayout({
                   aria-label="All Ambassador pages"
                   className="absolute right-0 top-full z-[70] mt-2 max-h-[70svh] w-[min(88vw,290px)] overflow-y-auto rounded-2xl border border-green-100 bg-white p-2 shadow-xl"
                 >
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      openCompanionChat("taco");
+                    }}
+                    className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-xl bg-emerald-700 px-3 text-left text-sm font-black text-white transition hover:bg-emerald-800"
+                    aria-label="Chat with Taco, your Ambassador advocate"
+                  >
+                    <MessageCircle size={19} aria-hidden="true" />
+                    Chat with Taco
+                  </button>
+                  <div className="mb-2 border-b border-green-100" />
                   {navItems.map((item) => {
                     const active = item.isActive(pathname);
                     return (
@@ -181,35 +206,48 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      <div className="pb-24 lg:pb-0">{children}</div>
+      <div className="pb-[calc(6rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
         data-ambassador-bottom-nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-green-100 bg-white/95 px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden"
+        className={`${NAV.surface} lg:hidden`}
+        style={SITGURU_MOBILE_NAV_INSET}
       >
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1 py-1.5">
+        <div className={NAV.grid}>
           {[
-            { label: "Home", href: "/ambassador/dashboard", icon: <LayoutDashboard size={21} /> },
-            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: <QrCode size={21} /> },
-            { label: "Social", href: "/ambassador/dashboard/social", icon: <Share2 size={21} /> },
-            { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: <BriefcaseBusiness size={21} /> },
-            { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: <MessageCircle size={21} /> },
+            { label: "Home", href: "/ambassador/dashboard", icon: LayoutDashboard },
+            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: QrCode },
+            { label: "Social", href: "/ambassador/dashboard/social", icon: Share2 },
+            { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: BriefcaseBusiness },
+            { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: MessageCircle },
           ].map((item) => {
             const itemPath = item.href.split("?")[0].split("#")[0];
-            const active = pathname === itemPath ||
-              (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
+            const active =
+              item.label === "Workspace"
+                ? pathname.startsWith("/ambassador/dashboard/command-center") ||
+                  (pathname === "/ambassador/dashboard" && activeHash === "#ambassador-workspace")
+                : item.label === "Home"
+                  ? pathname === "/ambassador/dashboard" && activeHash !== "#ambassador-workspace"
+                  : pathname === itemPath ||
+                    (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
+            const Icon = item.icon;
             return (
               <Link
                 key={item.label}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 ${
-                  active ? "bg-green-800 text-white" : "text-slate-600 hover:bg-green-50 hover:text-green-900"
-                }`}
+                className={`${NAV.tab} ${active ? NAV.active : NAV.idle}`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <span className={`${NAV.icon} ${active ? NAV.iconActive : ""}`}>
+                  <Icon
+                    className={`${NAV.iconSize} ${active ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`}
+                    aria-hidden
+                  />
+                </span>
+                <span>
+                  {item.label}
+                </span>
               </Link>
             );
           })}

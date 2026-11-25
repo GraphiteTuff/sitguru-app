@@ -17,6 +17,8 @@ import {
   Plus,
   Users,
 } from "lucide-react";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
 
 const suffixes = {
   home: "",
@@ -52,6 +54,7 @@ export default function GrowthPhoneBar({
   hideFrom?: "lg" | "xl";
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  useBrowserChromeInset();
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -103,12 +106,21 @@ export default function GrowthPhoneBar({
     return isActive(pathname, basePath, item.suffix);
   }
 
+  const moreActive = moreLinks.some((item) => activeOf(item));
+  const recordUrl = href(basePath, `${suffixes.events}#record-results`);
+  const tabs = [
+    primary[0],
+    primary[1],
+    { suffix: suffixes.events, label: "Record", icon: ClipboardList, href: recordUrl },
+    primary[2],
+  ];
+
   return (
     <div className={rootClass}>
       <div className="h-28" />
       {moreOpen ? (
-        <div className="fixed inset-x-0 bottom-24 z-40 px-3">
-          <div className={`rounded-[1.5rem] border bg-white p-3 shadow-xl ${desk ? "border-sky-100" : "border-emerald-100"}`}>
+        <div className="fixed inset-x-0 z-[97] px-3" style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
+          <div className={`max-h-[min(60dvh,30rem)] overflow-y-auto rounded-[1.5rem] border bg-white p-3 shadow-xl ${desk ? "border-sky-100" : "border-emerald-100"}`}>
             <div className="grid grid-cols-2 gap-2">
               {moreLinks.map((item) => {
                 const Icon = item.icon;
@@ -135,62 +147,45 @@ export default function GrowthPhoneBar({
         </div>
       ) : null}
 
-      <nav className={`fixed inset-x-0 bottom-0 z-50 border-t bg-[#F4F7FB]/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${desk ? "border-sky-100" : "border-emerald-100"}`}>
-        <div className="mx-auto flex max-w-lg items-end justify-between gap-1">
-          {primary.slice(0, 2).map((item) => {
+      <nav
+        aria-label="SitGuru growth navigation"
+        data-growth-phone-nav
+        className={`${NAV.surface} !z-[96]`}
+        style={SITGURU_MOBILE_NAV_INSET}
+      >
+        <div className={NAV.grid}>
+          {tabs.map((item) => {
             const Icon = item.icon;
             const target = targetOf(item);
-            const active = activeOf(item);
+            const active = item.label === "Record"
+              ? pathname === href(basePath, suffixes.events) || pathname.startsWith(href(basePath, suffixes.events) + "/")
+              : activeOf(item);
             return (
               <Link
-                key={target}
+                key={item.label}
                 href={target}
-                className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
-                  active ? (desk ? "text-[#2563EB]" : "text-[#0D5C3A]") : "text-slate-500"
-                }`}
+                aria-current={active ? "page" : undefined}
+                onClick={() => setMoreOpen(false)}
+                className={`${NAV.tab} ${active ? NAV.active : NAV.idle}`}
               >
-                <Icon size={22} />
-                {item.label}
+                <span className={`${NAV.icon} ${active ? NAV.iconActive : ""}`}>
+                  <Icon className={`${NAV.iconSize} ${active ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden="true" />
+                </span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
-
-          <Link
-            href={href(basePath, `${suffixes.events}#record-results`)}
-            aria-label="Record event results"
-            className="mb-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
-            style={{ background: desk ? "#2563EB" : "#0D5C3A" }}
-          >
-            <ClipboardList size={28} />
-          </Link>
-
-          {primary.slice(2).map((item) => {
-            const Icon = item.icon;
-            const target = targetOf(item);
-            const active = activeOf(item);
-            return (
-              <Link
-                key={target}
-                href={target}
-                className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
-                  active ? (desk ? "text-[#2563EB]" : "text-[#0D5C3A]") : "text-slate-500"
-                }`}
-              >
-                <Icon size={22} />
-                {item.label}
-              </Link>
-            );
-          })}
-
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
-              moreOpen ? (desk ? "text-[#2563EB]" : "text-[#0D5C3A]") : "text-slate-500"
-            }`}
+            aria-expanded={moreOpen}
+            aria-label="More growth tools"
+            className={`${NAV.tab} ${moreOpen || moreActive ? NAV.active : NAV.idle}`}
           >
-            <FolderOpen size={22} />
-            More
+            <span className={`${NAV.icon} ${moreOpen || moreActive ? NAV.iconActive : ""}`}>
+              <FolderOpen className={`${NAV.iconSize} ${moreOpen || moreActive ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden="true" />
+            </span>
+            <span>More</span>
           </button>
         </div>
       </nav>
