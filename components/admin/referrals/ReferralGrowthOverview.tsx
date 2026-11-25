@@ -92,7 +92,7 @@ export default function ReferralGrowthOverview({ report, audience = "admin" }: {
             {audience === "admin" ? (
               <Link href="/admin/partners/active" className="inline-flex min-h-11 items-center text-sm font-black text-emerald-800 hover:underline">Manage partner marketing links →</Link>
             ) : (
-              <Link href="/manager/outreach" className="inline-flex min-h-11 items-center text-sm font-black text-emerald-800 hover:underline">Open partner outreach →</Link>
+              <Link href={audience === "intern" ? "/intern/growth" : "/manager/outreach"} className="inline-flex min-h-11 items-center text-sm font-black text-emerald-800 hover:underline">{audience === "intern" ? "Back to Growth Home" : "Open partner outreach"} →</Link>
             )}
           </div>
         </section>
