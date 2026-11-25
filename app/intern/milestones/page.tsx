@@ -1,3 +1,4 @@
+import SyllabusGrowthOverview from "@/components/internship/SyllabusGrowthOverview";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
 import { InternMilestonesPageView } from "@/components/internship/InternSectionPages";
@@ -16,6 +17,6 @@ export default async function InternMilestonesPage() {
     );
   }
   return (
-    <InternMilestonesPageView workspace={data.workspace} hourSummary={data.hourSummary} />
+    <div className="space-y-4"><SyllabusGrowthOverview mode="intern" /><InternMilestonesPageView workspace={data.workspace} hourSummary={data.hourSummary} /></div>
   );
 }
