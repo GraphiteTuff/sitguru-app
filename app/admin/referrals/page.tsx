@@ -24,7 +24,7 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import { getReferralsDashboardData } from "@/lib/admin/referrals/dashboard";
 import { loadReferralAccounting } from "@/lib/admin/referrals/accounting";
 import { loadReferralGrowthReport } from "@/lib/referrals/growth-report";
-import type { ReferralReportingPeriod } from "@/lib/referrals/reporting-epoch";
+import { getReferralReportingEpoch, resolveReferralPeriod, type ReferralReportingPeriod } from "@/lib/referrals/reporting-epoch";
 import ReferralGrowthOverview from "@/components/admin/referrals/ReferralGrowthOverview";
 
 export const dynamic = "force-dynamic";
@@ -97,8 +97,10 @@ export default async function AdminGrowthReferralsHubPage({ searchParams }: { se
     );
   }
 
+  const epoch = await getReferralReportingEpoch();
+  const periodStart = resolveReferralPeriod(epoch, period);
   const [data, accounting, referralGrowth] = await Promise.all([
-    getReferralsDashboardData(),
+    getReferralsDashboardData(periodStart),
     loadReferralAccounting(),
     loadReferralGrowthReport(period),
   ]);
