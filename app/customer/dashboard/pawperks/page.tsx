@@ -81,6 +81,8 @@ export default function CustomerPawPerksPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [newPeriod, setNewPeriod] = useState<{ active: boolean; startedAt: string | null; newSignups: number | null; newQualified: number | null; firstBookings: number | null } | null>(null);
+  const [periodWarning, setPeriodWarning] = useState("");
   const [message, setMessage] = useState("");
   const [copyError, setCopyError] = useState("");
 
@@ -129,6 +131,15 @@ export default function CustomerPawPerksPage() {
 
     const profileData = await fetchCustomerProfile(user.id, user.email ?? null);
     const referralStats = await fetchReferralStats(user.id, profileData);
+    try {
+      const result = await fetch("/api/referrals/me/period", { cache: "no-store" });
+      if (!result.ok) throw new Error("Referral period metrics could not be loaded.");
+      setNewPeriod(await result.json());
+      setPeriodWarning("");
+    } catch {
+      setNewPeriod(null);
+      setPeriodWarning("New referral period metrics are temporarily unavailable. Lifetime credits remain safe.");
+    }
 
     setProfile(profileData);
     setStats(referralStats);
@@ -299,12 +310,37 @@ export default function CustomerPawPerksPage() {
           </div>
         ) : null}
 
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-black text-emerald-950">Referral Tracking 2.0 · New Period</p>
+          <p className="mt-1 text-xs font-semibold text-slate-700">
+            {newPeriod?.active && newPeriod.startedAt
+              ? `Since ${new Date(newPeriod.startedAt).toLocaleString("en-US")}. Only new referral activity is counted below.`
+              : "Reporting baseline pending activation or unavailable."}
+            {" "}Lifetime earned care credits, pending rewards and tier eligibility are preserved.
+          </p>
+          {periodWarning ? <p role="status" className="mt-2 text-xs font-bold text-amber-900">{periodWarning}</p> : null}
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[
+              ["New signups", newPeriod?.newSignups],
+              ["Qualified", newPeriod?.newQualified],
+              ["First bookings", newPeriod?.firstBookings],
+            ].map(([label, count]) => (
+              <div key={String(label)} className="rounded-xl bg-white p-2 text-center">
+                <p className="text-[10px] font-bold text-slate-600">{label}</p>
+                <p className="mt-1 text-xl font-black tabular-nums text-emerald-900">
+                  {typeof count === "number" ? count : "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Progress + share */}
         <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                Next reward
+                Lifetime reward tier
               </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-emerald-950 sm:text-2xl">
                 {remainingToFirstReward === 0
@@ -331,7 +367,7 @@ export default function CustomerPawPerksPage() {
             />
           </div>
           <p className="mt-2 text-xs font-bold text-slate-500">
-            {stats?.completed_referrals || 0} of 2 qualified referrals
+            {stats?.completed_referrals || 0} of 2 lifetime qualified referrals
           </p>
 
           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -384,8 +420,8 @@ export default function CustomerPawPerksPage() {
             {
               icon: <Users size={18} />,
               value: `${stats?.invited_count || 0}`,
-              label: "Invited",
-              helper: "Friends & family",
+              label: "Lifetime invited",
+              helper: "Historical invitations preserved",
             },
             {
               icon: <Link2 size={18} />,
@@ -402,8 +438,8 @@ export default function CustomerPawPerksPage() {
             {
               icon: <CheckCircle2 size={18} />,
               value: `${pawPerksState.completedReferrals}`,
-              label: "Qualified",
-              helper: "Completed care",
+              label: "Lifetime qualified",
+              helper: "Historical milestones preserved",
             },
           ].map((stat) => (
             <div
