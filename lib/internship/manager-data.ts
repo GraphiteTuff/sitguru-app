@@ -165,6 +165,8 @@ function mapTask(row: Record<string, unknown>): InternshipTask {
     finalSection: String(row.final_section || ""),
     weekNumber: row.week_number == null ? null : Number(row.week_number),
     reviewStage: String(row.review_stage || ""),
+    briefPayload: row.brief_payload && typeof row.brief_payload === "object"
+      ? row.brief_payload as Record<string, unknown> : undefined,
   };
 }
 

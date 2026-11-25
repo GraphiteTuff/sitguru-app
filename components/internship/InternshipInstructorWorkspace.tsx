@@ -1,3 +1,6 @@
+import { GROWTH_PILLARS } from "@/lib/internship/university-syllabus";
+import { listCohortMilestones } from "@/lib/internship/queries";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { publishInternAnnouncement } from "@/lib/internship/announcement-actions";
@@ -44,9 +47,10 @@ function ReviewControls({ item, returnTo, canCeo }: {
   );
 }
 
-export default async function InternshipInstructorWorkspace({ mode, searchParams }: {
+export default async function InternshipInstructorWorkspace({ mode, searchParams, speedReview = false }: {
   mode: "manager" | "admin";
-  searchParams?: Promise<{ ok?: string; error?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  speedReview?: boolean;
 }) {
   const actor = await getAdminIdentity();
   const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
@@ -58,10 +62,37 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
   const data = await loadManagerDashboard({ actorKind: kind, actorUserId: actor.id });
   const flash = searchParams ? await searchParams : {};
   const canCeo = canGiveCeoReview(kind);
-  const returnTo = mode === "admin" ? "/admin/internship/instructor" : "/manager/instructor";
+  const returnTo = speedReview ? "/manager/speed-review" : mode === "admin" ? "/admin/internship/instructor" : "/manager/instructor";
+  const parameter = (name: string) => {
+    const value = flash[name];
+    return (Array.isArray(value) ? value[0] : value) || "";
+  };
+  const pendingAssignments = data.reviews.filter((item) => item.targetType === "task");
+  const cohortForIntern = new Map(data.interns.map((intern) => [intern.id, intern.cohortId]));
+  const cohortIds = [...new Set(data.interns.map((intern) => intern.cohortId).filter(Boolean))];
+  const [cohorts, milestones] = speedReview && cohortIds.length
+    ? await Promise.all([
+      supabaseAdmin.from("internship_cohorts").select("id,name").in("id", cohortIds),
+      Promise.all(cohortIds.map((id) => listCohortMilestones(id))),
+    ])
+    : [{ data: [] }, []];
+  const activeMilestones = new Set(pendingAssignments.map((item) => item.milestoneId).filter(Boolean));
+  const filters = [
+    { key: "intern", label: "Intern", options: data.cards.map(({ id, name }) => ({ id, name })) },
+    { key: "cohort", label: "Cohort", options: cohorts.data || [] },
+    { key: "assignment", label: "Assignment", options: pendingAssignments.map(({ id, title }) => ({ id, name: title })) },
+    { key: "milestone", label: "Milestone", options: milestones.flat().filter((item) => activeMilestones.has(item.id)).map(({ id, title }) => ({ id, name: title })) },
+    { key: "pillar", label: "Growth pillar", options: GROWTH_PILLARS.map(({ id, label }) => ({ id, name: label })) },
+  ];
+  const matches = (name: string, value?: string | null) => !parameter(name) || parameter(name) === value;
+  const queue = speedReview ? pendingAssignments.filter((item) =>
+    matches("intern", item.internId) && matches("cohort", cohortForIntern.get(item.internId)) &&
+    matches("assignment", item.id) && matches("milestone", item.milestoneId) && matches("pillar", item.pillarId),
+  ) : data.reviews;
   const destinations = [
     ["/manager/assignments?create=true", "Create assignment"],
     ["/manager/assignments", "Manage assignments"],
+    ["/manager/speed-review", "SitGuru Speed Review"],
     ["/manager/milestones", "Modules & milestones"],
     ["/manager/calendar", "Calendar & deadlines"],
     ["/manager/check-ins", "Weekly check-ins"],
@@ -73,19 +104,37 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 px-3 pb-8 sm:px-5">
       <header className="rounded-3xl bg-[#10583f] p-5 sm:p-7" data-brand-green>
-        <h1 className="text-2xl font-black !text-white sm:text-3xl">Instructor &amp; Supervisor Center</h1>
-        <p className="mt-2 text-sm !text-white">{mode === "admin" ? "Internship oversight and employer review" : "Assigned interns, coursework, and submissions"}</p>
+        <h1 className="text-2xl font-black !text-white sm:text-3xl">{speedReview ? "SitGuru Speed Review" : "Instructor & Supervisor Center"}</h1>
+        <p className="mt-2 text-sm !text-white">{speedReview ? "Pending assignment submissions" : mode === "admin" ? "Internship oversight and employer review" : "Assigned interns, coursework, and submissions"}</p>
       </header>
-      {flash.error ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{flash.error}</p> : null}
-      {flash.ok ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">{flash.ok}</p> : null}
-      <nav aria-label="Instructor tools" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      {parameter("error") ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{parameter("error")}</p> : null}
+      {parameter("ok") ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">{parameter("ok")}</p> : null}
+      {!speedReview ? <nav aria-label="Instructor tools" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {destinations.map(([href, label]) => <Link key={href} href={href} className={`bg-white ${button}`}>{label}</Link>)}
-      </nav>
+      </nav> : (
+        <form action="/manager/speed-review" className={baseCard}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filters.map((filter) => (
+              <label key={filter.key} className="block min-w-0 text-sm font-semibold text-slate-800">
+                {filter.label}
+                <select name={filter.key} defaultValue={parameter(filter.key)} className="mt-1 block min-h-12 w-full rounded-xl border border-slate-300 px-3 text-base">
+                  <option value="">All</option>
+                  {filter.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className={button}>Filter submissions</button>
+            <Link href="/manager/speed-review" className={button}>Clear filters</Link>
+          </div>
+        </form>
+      )}
       <section aria-labelledby="instructor-review-heading" className={baseCard}>
         <h2 id="instructor-review-heading" className="text-xl font-black text-emerald-950">Pending reviews</h2>
-        {data.reviews.length ? (
+        {queue.length ? (
           <ul className="mt-3 grid gap-3 xl:grid-cols-2">
-            {data.reviews.map((item) => (
+            {queue.map((item) => (
               <li key={`${item.targetType}-${item.id}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
                 <h3 className="break-words font-bold text-slate-950">{item.title}</h3>
                 <p className="mt-1 text-sm text-slate-700">{item.internName} · {item.statusLabel}</p>
@@ -98,7 +147,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
           </ul>
         ) : <p className="mt-2 text-sm text-slate-600">No submissions waiting for review.</p>}
       </section>
-      {data.cards.length ? (
+      {!speedReview && data.cards.length ? (
         <section aria-labelledby="instructor-announcement-heading" className={baseCard}>
           <h2 id="instructor-announcement-heading" className="text-xl font-black text-emerald-950">Publish an announcement</h2>
           <form action={publishInternAnnouncement} className="mt-3 space-y-3">
@@ -125,7 +174,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
           </form>
         </section>
       ) : null}
-      <section aria-labelledby="instructor-roster-heading" className={baseCard}>
+      {!speedReview ? <section aria-labelledby="instructor-roster-heading" className={baseCard}>
         <h2 id="instructor-roster-heading" className="text-xl font-black text-emerald-950">Intern progress</h2>
         {data.cards.length ? (
           <ul className="mt-3 divide-y divide-slate-100">
@@ -143,7 +192,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
             ))}
           </ul>
         ) : <p className="mt-2 text-sm text-slate-600">No active interns assigned to this workspace.</p>}
-      </section>
+      </section> : null}
     </div>
   );
 }

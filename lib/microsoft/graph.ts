@@ -87,7 +87,7 @@ async function accessToken(config: MicrosoftGraphConfig) {
 export async function graphRequest<T>(input: {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   contentType?: string;
-  rawBody?: string;
+  rawBody?: string | Blob;
   path: string;
   body?: unknown;
   etag?: string;

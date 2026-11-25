@@ -89,7 +89,7 @@ async function actorContext(): Promise<{
   };
 }
 
-const REVIEW_DESTINATIONS = new Set(["/manager/check-ins", "/manager/instructor", "/admin/internship/instructor"]);
+const REVIEW_DESTINATIONS = new Set(["/manager/check-ins", "/manager/instructor", "/manager/speed-review", "/admin/internship/instructor"]);
 const STAFF_REVIEW_ACTIONS: ReadonlySet<string> = new Set<ReviewAction>([
   "approve", "request_changes", "escalate", "ceo_approve", "ceo_request_changes",
 ]);

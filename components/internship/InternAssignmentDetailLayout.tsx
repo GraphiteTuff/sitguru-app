@@ -1,3 +1,5 @@
+import AssignmentSubmissionHistory from "@/components/internship/AssignmentSubmissionHistory";
+import type { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import { formatHours } from "@/lib/internship/hours";
 import { approvedHoursByAssignment } from "@/lib/internship/learning-dashboard";
 import { GROWTH_PILLARS, SYLLABUS_CORE_DELIVERABLES } from "@/lib/internship/university-syllabus";
@@ -23,6 +25,7 @@ export default function InternAssignmentDetailLayout({
   adminPreview = false,
   canSaveToSharePoint = false,
   flash,
+  history,
 }: {
   workspace: InternshipWorkspaceData;
   task: InternshipTask;
@@ -31,6 +34,7 @@ export default function InternAssignmentDetailLayout({
   adminPreview?: boolean;
   canSaveToSharePoint?: boolean;
   flash?: { ok?: string; error?: string };
+  history?: Awaited<ReturnType<typeof listAssignmentSubmissionHistory>>;
 }) {
   const brief = readAssignmentBrief(task.briefPayload);
   const pillar = GROWTH_PILLARS.find((row) => row.id === assignmentGrowthPillar(brief));
@@ -79,6 +83,13 @@ export default function InternAssignmentDetailLayout({
           placeholder="https://"
           className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none read-only:bg-slate-50"
         />
+      </label>
+      <label className="block space-y-2">
+        <span className="text-sm font-black text-slate-950">Additional supporting links</span>
+        <span className="block text-sm text-slate-600">One SharePoint, Canva, or research URL per line.</span>
+        <textarea name="supportingLinks" rows={3} readOnly={!canEdit}
+          defaultValue={Array.isArray(work.supportingLinks) ? work.supportingLinks.join("\n") : ""}
+          className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-base read-only:bg-slate-50" />
       </label>
     </>
   );
@@ -221,8 +232,16 @@ export default function InternAssignmentDetailLayout({
             <form action={saveInternAssignmentProgress} className="mt-5 space-y-4">
               <input type="hidden" name="assignmentId" value={task.id} />
               {workFields}
+              {typeof work.attachmentUrl === "string" && isHttpUrl(work.attachmentUrl) ? (
+                <a href={work.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-900 underline">Open supporting file in SharePoint</a>
+              ) : null}
               {canEdit ? (
                 <>
+                <label className="block text-sm font-semibold text-slate-900">
+                  Supporting file
+                  <input name="supportingFile" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg"
+                    className="mt-1 block min-h-11 w-full rounded-xl border border-slate-200 p-2 text-sm" />
+                </label>
                 <p className="text-xs font-medium text-slate-500">Saving keeps your draft editable. Submitting sends it to Ava and pauses editing until review.</p>
                 <div className="flex flex-wrap gap-3">
                   <button type="submit" name="intent" value="save" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
@@ -248,6 +267,8 @@ export default function InternAssignmentDetailLayout({
           </a>
         ) : null}
       </section>
+
+      {history ? <AssignmentSubmissionHistory {...history} /> : null}
 
       <details className={`${DESK_UI.card} p-5`}>
         <summary className="cursor-pointer text-base font-black text-slate-950">Extra resources (SharePoint, Teams, Planner) — optional</summary>
