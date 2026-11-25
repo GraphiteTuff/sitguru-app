@@ -5,10 +5,12 @@ import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 
 export const dynamic = "force-dynamic";
 
-export default async function GrowthReferralsPage() {
+export default async function GrowthReferralsPage({ searchParams }: { searchParams?: Promise<{ days?: string }> }) {
+  const params = searchParams ? await searchParams : {};
+  const dateWindow = params.days === "7" ? 7 : params.days === "90" ? 90 : 30;
   const access = await requireGrowthWorkplace("manager");
   if (!access.ok) return access.ui;
-  const report = await loadReferralGrowthReport(30);
+  const report = await loadReferralGrowthReport(dateWindow);
   return (
     <main className="mx-auto max-w-[1600px] space-y-4 px-3 py-5 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
