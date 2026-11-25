@@ -431,13 +431,13 @@ export function SiteAccountMenu({
           <div
             role="menu"
             aria-label="SitGuru account and role switcher"
-            className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] hidden max-h-[calc(100dvh-7rem)] w-[min(25rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)] sm:block"
+            className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] hidden max-h-[calc(100dvh-7rem)] w-[min(25rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)] xl:block"
           >
             {renderMenuContent()}
           </div>
           {typeof document !== "undefined" ? createPortal(
             <div
-              className="fixed inset-0 z-[10050] flex items-start justify-center bg-slate-950/40 px-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-[2px] sm:hidden"
+              className="fixed inset-0 z-[10050] flex items-start justify-center bg-slate-950/40 px-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-[2px] xl:hidden"
               onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}
             >
               <div
