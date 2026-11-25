@@ -3850,6 +3850,7 @@ function PublicGuruProfilePage({
 
         <GuruProfileShare
           name={name}
+          experienceYears={experienceYears}
           location={location}
           photo={imageUrl}
           services={[...new Set(careOptions.map((option) => option.label))]}
