@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorQuickStartClient from "@/components/ambassador/AmbassadorQuickStartClient";
+import AmbassadorWorkspace from "@/components/ambassador/AmbassadorWorkspace";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import { buildAmbassadorReferralLink } from "@/lib/ambassador/ledger";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
@@ -1160,9 +1161,9 @@ export default async function AmbassadorDashboardPage() {
     socialMilestones[socialMilestones.length - 1];
 
   return (
-    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
+    <main className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#effcf5_100%)] px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <div className="space-y-4 lg:hidden">
+        <div className="space-y-4">
           <AmbassadorQuickStartClient
             firstName={firstName}
             avatarUrl={ambassadorAvatarUrl}
@@ -1206,7 +1207,27 @@ export default async function AmbassadorDashboardPage() {
           </details>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
+        <div id="ambassador-workspace" className="scroll-mt-24">
+          <AmbassadorWorkspace embedded />
+        </div>
+
+        <details className="group rounded-[28px] border border-emerald-100 bg-white shadow-sm">
+          <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 p-4 sm:p-5">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                Referral Insights & Rewards
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight !text-slate-950">
+                View detailed analytics and program tools
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-600">
+                Advanced statistics, QR channels, commissions, training and payout readiness.
+              </p>
+            </div>
+            <ArrowRight size={22} className="shrink-0 text-emerald-800 transition group-open:rotate-90" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-emerald-100 p-3 sm:p-4">
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
           <div className="min-w-0 space-y-4">
         <div className="hidden lg:block">
           <UniversalRoleDashboard
@@ -1642,7 +1663,9 @@ export default async function AmbassadorDashboardPage() {
               />
             </div>
           </aside>
-        </div>
+            </div>
+          </div>
+        </details>
       </div>
     </main>
   );
