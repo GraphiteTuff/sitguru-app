@@ -173,7 +173,7 @@ export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<Ref
     const code = row.referral_code || row.partner_code || row.ambassador_code;
     const type = str(row.event_type);
     if (type === "signup") countOutcome(code, row.user_id, "signup", row.created_at);
-    if (type === "booking") countOutcome(code, row.booking_id || row.user_id, "booking", row.created_at);
+    if (type === "booking") countOutcome(code, row.user_id || row.booking_id, "booking", row.created_at);
   });
   const referrers = [...byCode.values()].filter(r => r.code).sort((a,b) => b.signups-a.signups || b.bookings-a.bookings || (b.visits+b.qr)-(a.visits+a.qr));
   const partnerSources = referrers.filter(r => r.type === "partner" || r.partnerId).map(r => ({
