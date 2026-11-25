@@ -4,7 +4,6 @@ import {
   CalendarDays,
   GraduationCap,
   HelpCircle,
-  Lock,
   Megaphone,
   Palette,
   Play,
@@ -17,14 +16,14 @@ import { sitguruTeamsHref } from "@/lib/admin/growth/teams-access";
 import { DESK_UI } from "@/lib/portal/desk-ui";
 
 const MODULES = [
-  { n: 1, title: "Welcome to SitGuru", detail: "Mission, portal overview, roles, and how we make an impact.", pct: 0, tone: "bg-[#DCFCE7] text-[#166534]" },
-  { n: 2, title: "Brand & Visual Guidelines", detail: "Logo, colors, voice, templates, and content examples.", pct: 0, tone: "bg-[#FFE4E6] text-[#BE123C]" },
-  { n: 3, title: "Social Media Content Creation", detail: "Platforms, best practices, content ideas, and scheduling.", pct: 0, tone: "bg-[#EDE9FE] text-[#6D28D9]" },
-  { n: 4, title: "Events & Community Engagement", detail: "Event promotion, on-site support, and follow-up.", pct: 0, tone: "bg-[#FFEDD5] text-[#C2410C]" },
-  { n: 5, title: "Tracking Links & Analytics", detail: "Create tracking links, measure results, and write reports.", pct: 0, tone: "bg-[#DBEAFE] text-[#1D4ED8]" },
-  { n: 6, title: "Ambassador & Referral Program", detail: "How to share, track referrals, and grow SitGuru.", pct: 0, tone: "bg-[#FCE7F3] text-[#BE185D]" },
-  { n: 7, title: "Reporting & Communication", detail: "Weekly check-ins, updates, and what to include.", pct: 0, tone: "bg-[#FEF3C7] text-[#B45309]" },
-  { n: 8, title: "Tools & Resources", detail: "Canva, Teams, Planner, and the rest of the desk.", pct: 0, tone: "bg-[#E0F2FE] text-[#0369A1]" },
+  { n: 1, title: "Welcome to SitGuru", detail: "Mission, portal overview, roles, and how we make an impact.", tone: "bg-[#DCFCE7] text-[#166534]" },
+  { n: 2, title: "Brand & Visual Guidelines", detail: "Logo, colors, voice, templates, and content examples.", tone: "bg-[#FFE4E6] text-[#BE123C]" },
+  { n: 3, title: "Social Media Content Creation", detail: "Platforms, best practices, content ideas, and scheduling.", tone: "bg-[#EDE9FE] text-[#6D28D9]" },
+  { n: 4, title: "Events & Community Engagement", detail: "Event promotion, on-site support, and follow-up.", tone: "bg-[#FFEDD5] text-[#C2410C]" },
+  { n: 5, title: "Tracking Links & Analytics", detail: "Create tracking links, measure results, and write reports.", tone: "bg-[#DBEAFE] text-[#1D4ED8]" },
+  { n: 6, title: "Ambassador & Referral Program", detail: "How to share, track referrals, and grow SitGuru.", tone: "bg-[#FCE7F3] text-[#BE185D]" },
+  { n: 7, title: "Reporting & Communication", detail: "Weekly check-ins, updates, and what to include.", tone: "bg-[#FEF3C7] text-[#B45309]" },
+  { n: 8, title: "Tools & Resources", detail: "Canva, Teams, Planner, and the rest of the desk.", tone: "bg-[#E0F2FE] text-[#0369A1]" },
 ] as const;
 
 export default function TrainingBoard({ audience }: { audience: "manager" | "intern" }) {
@@ -33,11 +32,6 @@ export default function TrainingBoard({ audience }: { audience: "manager" | "int
   const opens = manager
     ? ["/manager/onboarding", "/manager/toolkit", "/manager/content", "/manager/events", "/manager/metrics", "/manager/partners", "/manager/check-ins", "/manager/resources"]
     : ["/intern", "/intern/toolkit", "/intern/work", "/intern/calendar", "/intern/metrics", "/intern/growth", "/intern/check-ins", "/intern/resources"];
-  const done = MODULES.filter((item) => item.pct >= 100).length;
-  const started = MODULES.filter((item) => item.pct > 0 && item.pct < 100).length;
-  const fresh = MODULES.length - done - started;
-  const average = Math.round(MODULES.reduce((sum, item) => sum + item.pct, 0) / MODULES.length);
-
   return (
     <div className="space-y-4 pb-28 lg:pb-8">
       <DeskPageHero
@@ -77,23 +71,17 @@ export default function TrainingBoard({ audience }: { audience: "manager" | "int
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-lg font-black text-[#0F2744]">Training Modules</h2>
-              <p className="text-sm font-medium text-slate-500">Complete the modules at your own pace. Each module opens the matching desk page.</p>
+              <p className="text-sm font-medium text-slate-500">Each module opens its resources in the SitGuru workspace.</p>
             </div>
             <Link href={`${base}/resources`} className="text-xs font-bold text-[#2563EB]">View All →</Link>
           </div>
           <ol className="mt-4 space-y-3">
             {MODULES.map((item, index) => (
-              <li key={item.n} className="grid items-center gap-3 sm:grid-cols-[auto_minmax(0,1fr)_140px_auto]">
+              <li key={item.n} className="grid items-center gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${item.tone}`}>{item.n}</span>
                 <span>
                   <span className="block text-sm font-bold text-[#0F2744]">{item.title}</span>
                   <span className="block text-xs font-medium text-slate-500">{item.detail}</span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <span className="block h-full rounded-full bg-[#3B82F6]" style={{ width: `${item.pct}%` }} />
-                  </span>
-                  <span className="w-9 text-xs font-bold text-slate-500">{item.pct}%</span>
                 </span>
                 <Link href={opens[index]} className="inline-flex min-h-9 items-center justify-center rounded-xl bg-[#2563EB] px-4 text-xs font-bold !text-white">
                   Open
@@ -129,53 +117,10 @@ export default function TrainingBoard({ audience }: { audience: "manager" | "int
             </div>
           </article>
 
-          <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-            <h2 className="text-lg font-black text-[#0F2744]">Training Progress</h2>
-            <div className="mt-4 flex items-center gap-4">
-              <div
-                className="grid h-28 w-28 place-items-center rounded-full"
-                style={{ background: `conic-gradient(#2563EB ${average}%, #E2E8F0 0)` }}
-              >
-                <div className="grid h-20 w-20 place-items-center rounded-full bg-white text-center">
-                  <span>
-                    <span className="block text-xl font-black text-[#0F2744]">{average}%</span>
-                    <span className="text-[10px] font-bold text-slate-500">Complete</span>
-                  </span>
-                </div>
-              </div>
-              <ul className="space-y-1 text-sm font-semibold text-slate-600">
-                <li className="text-[#166534]">Completed {done} / {MODULES.length}</li>
-                <li className="text-[#1D4ED8]">In Progress {started} / {MODULES.length}</li>
-                <li>Not Started {fresh} / {MODULES.length}</li>
-              </ul>
-            </div>
-            <Link href={manager ? "/manager" : "/intern"} className="mt-4 inline-flex text-sm font-bold text-[#2563EB]">
-              View My Progress →
-            </Link>
-          </article>
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Recommended Next</h2>
-          <ol className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
-            {MODULES.filter((item) => item.pct < 100).slice(0, 4).map((item, index) => (
-              <li key={item.n}>{index + 1}. {item.title}</li>
-            ))}
-          </ol>
-        </article>
-        <article className={`${DESK_UI.card} p-4 sm:p-5`}>
-          <h2 className="text-lg font-black text-[#0F2744]">Certifications & Badges</h2>
-          <p className="mt-1 text-xs font-medium text-slate-500">Earn badges as you complete each training area.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {["Onboarding", "Brand", "Social Media", "Analytics", "Events"].map((badge) => (
-              <span key={badge} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-                <Lock size={12} /> {badge}
-              </span>
-            ))}
-          </div>
-        </article>
+      <section>
         <article className={`${DESK_UI.card} p-4 sm:p-5`}>
           <h2 className="text-lg font-black text-[#0F2744]">Need Help?</h2>
           <div className="mt-3 grid gap-2">

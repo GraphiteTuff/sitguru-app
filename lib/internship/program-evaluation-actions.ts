@@ -23,7 +23,7 @@ export async function saveProgramEvaluation(form: FormData) {
       !["draft", "released"].includes(intent) || !summary || summary.length > 4000 || nextSteps.length > 4000) {
     return go("error", "Choose an evaluation period and add a summary.");
   }
-  if (kind === "final" && intent === "released" && access.kind !== "supervisor") {
+  if (kind === "final" && intent === "released" && !access.user.isSuperUser) {
     return go("error", "The supervisor releases the final employer evaluation.");
   }
 

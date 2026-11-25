@@ -27,18 +27,22 @@ export default function InternLearningScreen() {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const result = await sitguruApiFetch<LearningWorkspace>(
       mode === 'instructor' ? '/api/internship/learning?mode=instructor' : '/api/internship/learning',
       { cache: 'no-store' },
     );
+    if (!isCurrent()) return;
     setWorkspace(result.data);
     setError(result.error || '');
     setRefreshing(false);
   }, [mode]);
 
   useEffect(() => {
-    if (session) void load();
+    if (!session) return;
+    let current = true;
+    void Promise.resolve().then(() => current ? load(() => current) : undefined);
+    return () => { current = false; };
   }, [session, load]);
 
   return (
@@ -52,7 +56,7 @@ export default function InternLearningScreen() {
       {session && error ? (
         <View style={styles.card}>
           <Text accessibilityLiveRegion="polite" style={styles.body}>{error}</Text>
-          <TouchTarget onPress={load} style={styles.button}><Text style={styles.buttonText}>Try again</Text></TouchTarget>
+          <TouchTarget onPress={() => void load()} style={styles.button}><Text style={styles.buttonText}>Try again</Text></TouchTarget>
         </View>
       ) : null}
       {session && workspace?.mode === 'instructor' ? (

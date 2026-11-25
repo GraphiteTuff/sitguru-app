@@ -62,11 +62,12 @@ function GrowthInsightsBody() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const result = await sitguruApiFetch<Snapshot>(
       '/api/growth-center/v2/snapshot?preset=last_7',
       { method: 'GET', cache: 'no-store' },
     );
+    if (!isCurrent()) return;
     if (result.error || !result.data) {
       setError(result.error || 'Could not load Growth Center Insights.');
       setSnapshot(null);
@@ -79,7 +80,9 @@ function GrowthInsightsBody() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let current = true;
+    void Promise.resolve().then(() => current ? load(() => current) : undefined);
+    return () => { current = false; };
   }, [load]);
 
   return (

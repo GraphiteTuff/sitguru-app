@@ -182,13 +182,9 @@ export default function InternPortalShell({
           {showFullChrome ? (
             <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
               <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-                <Link href="/intern" className="min-w-0 xl:hidden">
-                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#10583f]">
-                    SitGuru Internship
-                  </p>
-                  <p className="truncate text-sm font-black text-[#0F2744]">
-                    {INTERN_PORTAL_BRAND.title}
-                  </p>
+                <Link href="/intern" className="flex min-h-11 min-w-0 items-center gap-2 xl:hidden">
+                  <Image src="/images/brand/intern/sitguru-logo-mark.png" alt="SitGuru" width={32} height={32} className="h-8 w-8 shrink-0 object-contain" />
+                  <span className="truncate text-sm font-black text-[#0F2744]">{INTERN_PORTAL_BRAND.title}</span>
                 </Link>
 
                 <DeskSearch
@@ -205,7 +201,7 @@ export default function InternPortalShell({
             </header>
           ) : null}
 
-          <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8">{children}</main>
+          <main className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 lg:px-6 lg:py-6 xl:pb-8 xl:pr-22">{children}</main>
           {showFullChrome ? <DeskChatDock mode="intern" aboveBottomNav /> : null}
 
           {showFullChrome ? (
