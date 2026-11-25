@@ -112,10 +112,11 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 px-3 pb-8 sm:px-5">
-      <header className="rounded-3xl bg-[#10583f] p-5 sm:p-7" data-brand-green>
+      {/* Keep the content hero independent of Admin HQ's white shell-header styles. */}
+      <div className="rounded-3xl bg-[#10583f] p-5 sm:p-7" data-brand-green>
         <h1 className="text-2xl font-black !text-white sm:text-3xl">{speedReview ? "SitGuru Speed Review" : "Instructor & Supervisor Center"}</h1>
         <p className="mt-2 text-sm !text-white">{speedReview ? "Pending assignment submissions" : mode === "admin" ? "Internship oversight and employer review" : "Assigned interns, coursework, and submissions"}</p>
-      </header>
+      </div>
       {programCohort ? <ProgramStatusBanner status={programStatus} /> : null}
       {parameter("error") ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{parameter("error")}</p> : null}
       {parameter("ok") ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">{parameter("ok")}</p> : null}
