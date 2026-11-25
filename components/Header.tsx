@@ -4,7 +4,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
+import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import {
   accessFlagsFromAuthorizedRoles,
   mergeApprovedAdminSwitchRole,
@@ -454,8 +455,6 @@ export default function Header({ user = null }: HeaderProps) {
   const [loadedUser, setLoadedUser] = useState<HeaderUser | null>(user);
   const [loadingUser, setLoadingUser] = useState(!user);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [avatarOpen, setAvatarOpen] = useState(false);
-  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -660,31 +659,16 @@ export default function Header({ user = null }: HeaderProps) {
   }, [user, pathname]);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        avatarMenuRef.current &&
-        !avatarMenuRef.current.contains(event.target as Node)
-      ) {
-        setAvatarOpen(false);
-      }
-    }
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setAvatarOpen(false);
-        setMobileOpen(false);
-      }
+      if (event.key === "Escape") setMobileOpen(false);
     }
-    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
+    return () => document.removeEventListener("keydown", handleEscape);
   }, []);
+
 
   useEffect(() => {
     setMobileOpen(false);
-    setAvatarOpen(false);
   }, [pathname]);
 
   const activeUser = loadedUser;
@@ -799,7 +783,6 @@ export default function Header({ user = null }: HeaderProps) {
 
   async function handleLogout() {
     setLoadedUser(null);
-    setAvatarOpen(false);
     setMobileOpen(false);
     clearSitGuruAuthStorage();
     try {
@@ -818,22 +801,6 @@ export default function Header({ user = null }: HeaderProps) {
   }
 
   function renderAvatar(sizeClass = "h-11 w-11") {
-    if (isAdmin) {
-      return (
-        <span
-          className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-sm ring-1 ring-emerald-100`}
-        >
-          <Image
-            src="/images/sitguru-admin-avatar.jpg"
-            alt="SitGuru Admin Avatar"
-            fill
-            priority
-            sizes="96px"
-            className="sg-face-photo"
-          />
-        </span>
-      );
-    }
     return (
       <span
         className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
@@ -917,84 +884,7 @@ export default function Header({ user = null }: HeaderProps) {
                 </Link>
               ) : null}
 
-              <div ref={avatarMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAvatarOpen((current) => !current)}
-                  className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-                  aria-haspopup="menu"
-                  aria-expanded={avatarOpen}
-                  aria-label="Open account menu"
-                >
-                  {renderAvatar()}
-                  <span className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 xl:block">
-                    {userName}
-                  </span>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
-                    {avatarOpen ? (
-                      <ChevronUp className="h-5 w-5" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5" />
-                    )}
-                  </span>
-                </button>
-
-                {avatarOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
-                  >
-                    <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
-                      <div className="flex items-center gap-4">
-                        {renderAvatar("h-16 w-16")}
-                        <div className="min-w-0">
-                          <p className="truncate text-xl font-semibold leading-tight tracking-[-0.025em] text-slate-950">
-                            {userName}
-                          </p>
-                          {userEmail ? (
-                            <p className="mt-1 truncate text-sm font-medium text-slate-500">
-                              {userEmail}
-                            </p>
-                          ) : null}
-                          <p className="mt-1 text-sm font-semibold tracking-[-0.01em] text-emerald-700">
-                            {displayRole}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-1 p-3">
-                      <AccountRoleSwitcher
-                        currentRole={currentSwitchRole}
-                        authorizedRoles={authorizedRoles}
-                        onNavigate={() => setAvatarOpen(false)}
-                        className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
-                      />
-                      {accountMenuLinks.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          role="menuitem"
-                          onClick={() => setAvatarOpen(false)}
-                          className="rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={handleLogout}
-                        className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
-                      >
-                        <LogOut className="h-5 w-5" />
-                        Log Out
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <SiteAccountMenu variant="desk" />
 
               <NotificationBell />
             </>
@@ -1017,17 +907,10 @@ export default function Header({ user = null }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {isLoggedIn && isCustomer && pathname === "/customer/dashboard" ? (
-            <button
-              type="button"
-              aria-label="Open your profile and switch SitGuru workspace"
-              aria-expanded={mobileOpen}
-              onClick={() => setMobileOpen((value) => !value)}
-              className="inline-flex min-h-11 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 text-emerald-900 shadow-sm lg:hidden"
-            >
-              {renderAvatar("h-9 w-9")}
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            </button>
+          {isLoggedIn ? (
+            <div className="lg:hidden">
+              <SiteAccountMenu variant="desk" compact />
+            </div>
           ) : null}
           {!loadingUser && !isLoggedIn ? (
             <Link
