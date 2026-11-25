@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   const png = await QRCode.toBuffer(url, {
     errorCorrectionLevel: "H",
-    margin: 2,
+    margin: 4,
     width: 640,
     color: { dark: "#07132F", light: "#FFFFFF" },
   });

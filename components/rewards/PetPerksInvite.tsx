@@ -78,7 +78,8 @@ export default function PetPerksInvite({ portal }: { portal: "Guru" | "Pet Paren
           <img src={qr} width={512} height={512} alt="Scan this personal SitGuru referral code" className="mx-auto w-full max-w-80" />
           <h2 className="text-center text-xl font-black">{name ? name + "’s SitGuru invite" : "My SitGuru invite"}</h2>
           <p className="text-center">Scan with your phone camera to open the invite.</p>
-          <button onClick={share} className={secondary}><Share2 aria-hidden /> Share link instead</button>
+          <button onClick={share} className={primary}><Share2 aria-hidden /> Share invite link</button>
+          <a href={qr} download="sitguru-petperks-invite-qr.png" className={secondary}>Download invite QR</a>
         </>
       ) : (
         <>

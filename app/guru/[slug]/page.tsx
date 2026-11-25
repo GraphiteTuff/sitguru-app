@@ -1,3 +1,4 @@
+import GuruProfileShare from "@/components/guru/GuruProfileShare";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -3756,7 +3757,7 @@ function PublicGuruProfilePage({
                   ) : (
                     <Link href={messageHref} className="inline-flex min-h-12 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black !text-white">Message {firstName}</Link>
                   )}
-                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center rounded-full border border-emerald-200 px-5 text-sm font-black text-[#0D5C3A]">Share profile</a>
+                  <a href="#share-guru-profile" className="inline-flex min-h-12 items-center rounded-full border border-emerald-200 px-5 text-sm font-black text-[#0D5C3A]">Share profile</a>
                 </div>
               </div>
             </div>
@@ -3847,16 +3848,15 @@ function PublicGuruProfilePage({
           )}
         </section>
 
-        <section className="mt-4 flex flex-col gap-4 rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-black text-slate-950">Share {firstName}&apos;s profile</h2>
-            <p className="mt-1 break-all text-sm font-semibold text-slate-600">{profileUrl}</p>
-          </div>
-          {publicSlug ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={`/api/guru/profile-qr?slug=${encodeURIComponent(publicSlug)}`} alt={`QR code for ${name}'s SitGuru profile`} className="h-24 w-24 rounded-2xl border border-emerald-100 bg-white" />
-          ) : null}
-        </section>
+        <GuruProfileShare
+          name={name}
+          location={location}
+          photo={imageUrl}
+          services={[...new Set(careOptions.map((option) => option.label))]}
+          url={publicSlug ? `https://www.sitguru.com/guru/${encodeURIComponent(publicSlug)}` : profileUrl}
+          qrHref={publicSlug ? `/api/guru/profile-qr?slug=${encodeURIComponent(publicSlug)}` : undefined}
+          perksHref="/petperks"
+        />
       </section>
     </main>
   );
