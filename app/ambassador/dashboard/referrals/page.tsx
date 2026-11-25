@@ -956,8 +956,8 @@ export default async function AmbassadorDashboardReferralsPage() {
                 Share, scan, track, and follow up.
               </h1>
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Use the mobile referral card at events, open full-screen Vendor
-                Mode, share short links, and monitor canonical referral
+                Use the personalized Ambassador card at events, enlarge or download the PNG,
+                share short links, and monitor canonical referral
                 activity without creating duplicate records.
               </p>
 
@@ -1037,13 +1037,13 @@ export default async function AmbassadorDashboardReferralsPage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(360px,0.72fr)_minmax(0,1.28fr)]">
-          <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm">
+          <div id="ambassador-card" className="scroll-mt-24 rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
                 Mobile Referral Card
               </p>
               <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Event-ready Pet Parent card
+                Your personalized Ambassador card
               </h2>
             </div>
 
