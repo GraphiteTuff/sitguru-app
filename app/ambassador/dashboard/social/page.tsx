@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import {
   ThemeStatCard,
@@ -733,9 +735,11 @@ async function getReferralCodeRow({
 async function getCanonicalSocialData({
   ambassadorId,
   referralCode,
+  periodStart,
 }: {
   ambassadorId: string;
   referralCode: string;
+  periodStart: string | null;
 }): Promise<PageDataResult> {
   const [referralResult, rewardResult, referralCodeRow] = await Promise.all([
     supabaseAdmin
@@ -778,10 +782,12 @@ async function getCanonicalSocialData({
   const referralCodeId = asString(referralCodeRow?.id);
 
   if (referralCodeId) {
-    const clickResult = await supabaseAdmin
+    let clickQuery = supabaseAdmin
       .from("referral_clicks")
       .select("*")
-      .eq("referral_code_id", referralCodeId)
+      .eq("referral_code_id", referralCodeId);
+    if (periodStart) clickQuery = clickQuery.gte("created_at", periodStart);
+    const clickResult = await clickQuery
       .order("created_at", { ascending: false })
       .limit(10000);
 
@@ -797,7 +803,8 @@ async function getCanonicalSocialData({
   }
 
   return {
-    referrals: (referralResult.data || []) as AmbassadorReferralRow[],
+    referrals: ((referralResult.data || []) as AmbassadorReferralRow[]).filter(row =>
+      isReferralActivitySince(asString(row.signup_date) || asString(row.created_at), periodStart)),
     rewards: (rewardResult.data || []) as RewardRow[],
     clicks,
     referralSlug:
@@ -1155,9 +1162,11 @@ export default async function AmbassadorSocialPage() {
     redirect("/ambassador/dashboard?warning=referral_code_missing");
   }
 
+  const epoch = await getReferralReportingEpoch();
   const data = await getCanonicalSocialData({
     ambassadorId: ambassador.id,
     referralCode,
+    periodStart: epoch?.startedAt ?? null,
   });
   const socialReferrals = data.referrals.filter(isSocialReferral);
   const socialRewards = getSocialRewardSummaries(data.rewards);
@@ -1195,6 +1204,7 @@ export default async function AmbassadorSocialPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-3 py-4 text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1600px] space-y-4">
+        <ReferralResetBanner epoch={epoch} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/ambassador/dashboard"
@@ -1303,14 +1313,14 @@ export default async function AmbassadorSocialPage() {
           <StatCard
             title="Approved"
             value={money(approvedSocialAmount)}
-            description="Approved, not paid"
+            description="Lifetime approved rewards, not paid"
             icon={<BadgeCheck className="h-5 w-5" />}
             tone="rose"
           />
           <StatCard
             title="Paid"
             value={money(paidSocialAmount)}
-            description="Recorded as paid"
+            description="Lifetime paid rewards"
             icon={<CheckCircle2 className="h-5 w-5" />}
             tone="slate"
           />
