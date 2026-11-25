@@ -95,9 +95,25 @@ export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<Ref
     byId.set(str(row.id), item);
   });
   partners.forEach(row => {
-    const item = byCode.get(codeKey(row.referral_code));
-    if (item) { item.name = str(row.business_name) || item.name; item.type = "partner"; item.partnerId = str(row.id); }
+    const code = codeKey(row.referral_code);
+    if (!code) return;
+    const item = ensure(code, "partner");
+    item.name = str(row.business_name) || item.name;
+    item.type = "partner";
+    item.partnerId = str(row.id) || null;
   });
+  const missingPartnerRegistry = partners.filter(row =>
+    codeKey(row.referral_code) && !codes.some(c => codeKey(c.code) === codeKey(row.referral_code))
+  ).length;
+  if (missingPartnerRegistry) warnings.push(
+    `${missingPartnerRegistry} Partner profile(s) have codes not yet linked to the referral registry`
+  );
+  const unlinkedAmbassadorCodes = codes.filter(row =>
+    str(row.owner_type) === "ambassador" && str(row.status) === "active" && !str(row.ambassador_id)
+  ).length;
+  if (unlinkedAmbassadorCodes) warnings.push(
+    `${unlinkedAmbassadorCodes} active Ambassador codes need an owner link audit`
+  );
   const touch = (item: GrowthReferrer, date: unknown) => {
     const value = str(date);
     if (value && (!item.lastActivity || item.lastActivity < value)) item.lastActivity = value;
