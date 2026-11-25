@@ -35,7 +35,7 @@ async function rows(
       if (dateColumn) query = query.order(dateColumn, { ascending: false });
       const { data, error } = await query.range(offset, offset + pageSize - 1);
       if (error) return { data: all, warning: `${table}: ${error.message}` };
-      const page = (data || []) as Row[];
+      const page = (data || []) as unknown as Row[];
       all.push(...page);
       if (page.length < pageSize) break;
     }
