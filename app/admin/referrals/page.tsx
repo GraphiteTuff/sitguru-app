@@ -23,6 +23,8 @@ import {
 import { getAdminIdentity } from "@/lib/admin/access";
 import { getReferralsDashboardData } from "@/lib/admin/referrals/dashboard";
 import { loadReferralAccounting } from "@/lib/admin/referrals/accounting";
+import { loadReferralGrowthReport } from "@/lib/referrals/growth-report";
+import ReferralGrowthOverview from "@/components/admin/referrals/ReferralGrowthOverview";
 
 export const dynamic = "force-dynamic";
 
@@ -88,9 +90,10 @@ export default async function AdminGrowthReferralsHubPage() {
     );
   }
 
-  const [data, accounting] = await Promise.all([
+  const [data, accounting, referralGrowth] = await Promise.all([
     getReferralsDashboardData(),
     loadReferralAccounting(),
+    loadReferralGrowthReport(30),
   ]);
   const today = new Date().toISOString().slice(0, 10);
   const todayBucket = data.weekDays.find((day) => day.day === today);
@@ -260,6 +263,7 @@ export default async function AdminGrowthReferralsHubPage() {
         </Link>
       }
     >
+      <ReferralGrowthOverview report={referralGrowth} audience="admin" />
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((tile) => (
           <AdminThemeCard
