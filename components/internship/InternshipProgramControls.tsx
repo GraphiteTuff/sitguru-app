@@ -39,10 +39,11 @@ export default async function InternshipProgramControls({ mode, searchParams }: 
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4 px-3 pb-8 sm:px-5">
-      <header data-brand-green className="rounded-3xl bg-[#10583f] p-5 sm:p-7">
+      {/* Keep the content hero independent of Admin HQ's white shell-header styles. */}
+      <div data-brand-green className="rounded-3xl bg-[#10583f] p-5 sm:p-7">
         <h1 className="text-2xl font-black !text-white sm:text-3xl">Program Controls</h1>
         <p className="mt-2 text-sm !text-white">Internship semester status and activation history</p>
-      </header>
+      </div>
       {params.result === "saved" && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-emerald-950">Semester status updated.</p>}
       {params.result === "error" && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-rose-950">The status could not be updated. Review the current status, readiness, and confirmation before trying again.</p>}
       {cohorts?.length ? (
