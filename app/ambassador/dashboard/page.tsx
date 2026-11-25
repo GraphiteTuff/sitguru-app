@@ -28,6 +28,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
+import AmbassadorQuickStartClient from "@/components/ambassador/AmbassadorQuickStartClient";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import { buildAmbassadorReferralLink } from "@/lib/ambassador/ledger";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
@@ -1159,17 +1160,56 @@ export default async function AmbassadorDashboardPage() {
     socialMilestones[socialMilestones.length - 1];
 
   return (
-    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
+    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <div className="lg:hidden">
-          <AmbassadorSelfServicePortal
+        <div className="space-y-4 lg:hidden">
+          <AmbassadorQuickStartClient
+            firstName={firstName}
+            avatarUrl={ambassadorAvatarUrl}
             referralCode={referralCode}
-            referralLink={buildAmbassadorReferralLink(referralCode)}
+            siteUrl={getSiteUrl()}
+            petParentPath={petParentShortPath}
+            guruPath={guruShortPath}
+            petParentSignups={stats.petParentSignups}
+            guruSignups={stats.guruSignups}
+            socialSignups={stats.socialSignups}
+            approvedRewards={money(approvedAndReady)}
           />
+
+          <details className="group overflow-hidden rounded-[24px] border border-green-100 bg-white shadow-sm">
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 p-4 text-base font-black text-green-950">
+              <span className="inline-flex items-center gap-2">
+                <BadgeCheck size={20} aria-hidden="true" />
+                Detailed tracking & payout receipts
+              </span>
+              <ArrowRight size={20} className="shrink-0 text-green-800 transition group-open:rotate-90" aria-hidden="true" />
+            </summary>
+            <div className="border-t border-green-100 p-3">
+              <AmbassadorSelfServicePortal
+                referralCode={referralCode}
+                referralLink={buildAmbassadorReferralLink(referralCode)}
+              />
+            </div>
+          </details>
+
+          <details className="group rounded-[24px] border border-green-100 bg-white shadow-sm">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-2 p-4 text-sm font-black text-green-950">
+              <span className="inline-flex items-center gap-2"><UserRound size={18} aria-hidden="true" /> Switch your SitGuru profile</span>
+              <ArrowRight size={18} className="shrink-0 transition group-open:rotate-90" aria-hidden="true" />
+            </summary>
+            <div className="border-t border-green-100 p-3">
+              <AccountRoleSwitcher
+                currentRole="ambassador"
+                authorizedRoles={dashboardAccess.authorizedRoles}
+              />
+            </div>
+          </details>
         </div>
-        <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
+
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
           <div className="min-w-0 space-y-4">
-        <UniversalRoleDashboard
+        <div className="hidden lg:block">
+          <UniversalRoleDashboard
           role="ambassador"
           userName={firstName}
           avatarUrl={ambassadorAvatarUrl}
@@ -1212,8 +1252,9 @@ export default async function AmbassadorDashboardPage() {
             </div>
           }
         />
+        </div>
 
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <section className="hidden grid-cols-2 gap-3 sm:grid-cols-3 lg:grid xl:grid-cols-6">
           <StatCard
             icon={<PawPrint size={19} />}
             label="Pet Parents"
@@ -1258,7 +1299,7 @@ export default async function AmbassadorDashboardPage() {
           />
         </section>
 
-        <section className="rounded-[28px] border border-green-100 bg-white p-4 shadow-sm sm:p-5">
+        <section className="hidden rounded-[28px] border border-green-100 bg-white p-4 shadow-sm lg:block sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <SectionHeader
               icon={<LayoutDashboard size={22} />}
@@ -1440,7 +1481,7 @@ export default async function AmbassadorDashboardPage() {
           </DashboardCard>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SetupActionCard
             icon={<ClipboardCheck size={21} />}
             title="Onboarding"
