@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, LogOut, Settings, UserRound } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, ChevronUp, LogOut, Settings, UserRound, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
@@ -52,6 +53,7 @@ export function SiteAccountMenu({
   const pathname = usePathname();
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [account, setAccount] = useState<LoadedAccount | null>(null);
 
@@ -131,7 +133,7 @@ export function SiteAccountMenu({
           "My Account",
         email,
         avatarUrl: normalizePetParentAvatarUrl(
-          resolvePetParentAvatarUrl(profile),
+          resolvePetParentAvatarUrl(profile, { ...(user.user_metadata || {}), ...(user.app_metadata || {}) }),
         ),
         authorizedRoles,
       });
@@ -157,7 +159,8 @@ export function SiteAccountMenu({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && !mobileMenuRef.current?.contains(target)) {
         setOpen(false);
       }
     }
@@ -172,12 +175,22 @@ export function SiteAccountMenu({
     };
   }, []);
 
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [open]);
+
   if (!account) return null;
 
   const loadedAccount = account;
   const initials = getInitials(loadedAccount.name, loadedAccount.email);
   const currentRole = resolveDashboardRoleFromPath(pathname);
-  const roleLabel =
+  const isPartnerWorkspace = pathname.startsWith("/partners/dashboard");
+  const roleLabel = isPartnerWorkspace ? "SitGuru Partner" :
     currentRole === "guru"
       ? "SitGuru Guru"
       : currentRole === "ambassador"
@@ -194,6 +207,7 @@ export function SiteAccountMenu({
               ? "SitGuru Admin"
               : "SitGuru";
   const dashboardHref =
+    isPartnerWorkspace ? "/partners/dashboard" :
     currentRole === "guru"
       ? "/guru/dashboard"
       : currentRole === "ambassador"
@@ -211,9 +225,13 @@ export function SiteAccountMenu({
     ? "/intern/settings"
     : pathname.startsWith("/manager") || currentRole === "growth" || currentRole === "manager"
       ? "/manager/settings"
-      : currentRole === "intern"
-        ? "/intern/settings"
-        : null;
+      : currentRole === "admin"
+        ? "/admin/settings"
+        : currentRole === "guru"
+          ? "/guru/dashboard/settings"
+          : currentRole === "parent"
+            ? "/customer/dashboard/profile"
+            : "/account/settings";
 
   async function handleLogout() {
     setOpen(false);
@@ -274,6 +292,68 @@ export function SiteAccountMenu({
         includeAdmin: switchPortalRoles(loadedAccount.authorizedRoles).includes("admin"),
       }).filter((target) => target.id !== "intern" && target.id !== "guru")
     : [];
+
+  function renderMenuContent() {
+    return (
+      <>
+          <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
+            <div className="flex items-center gap-4">
+              <Avatar sizeClass="h-16 w-16" />
+              <div className="min-w-0">
+                <p className="truncate text-xl font-semibold leading-tight text-slate-950">
+                  {loadedAccount.name}
+                </p>
+                {loadedAccount.email ? (
+                  <p className="mt-1 truncate text-sm font-medium text-slate-500">
+                    {loadedAccount.email}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
+                  {roleLabel}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-1 p-3">
+            <AccountRoleSwitcher
+              currentRole={currentRole}
+              authorizedRoles={loadedAccount.authorizedRoles}
+              onNavigate={() => setOpen(false)}
+              className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+            />
+            <Link
+              href={dashboardHref}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              Dashboard
+            </Link>
+            {settingsHref ? (
+              <Link
+                href={settingsHref}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="mt-1 flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                <Settings className="h-5 w-5" />
+                Settings
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleLogout}
+              className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold text-white transition hover:bg-emerald-700"
+            >
+              <LogOut className="h-5 w-5" />
+              Log Out
+            </button>
+          </div>
+      </>
+    );
+  }
 
   return (
     <div ref={menuRef} className="relative flex shrink-0 items-center gap-2">
@@ -345,67 +425,47 @@ export function SiteAccountMenu({
         )}
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
-        >
-          <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
-            <div className="flex items-center gap-4">
-              <Avatar sizeClass="h-16 w-16" />
-              <div className="min-w-0">
-                <p className="truncate text-xl font-semibold leading-tight text-slate-950">
-                  {loadedAccount.name}
-                </p>
-                {loadedAccount.email ? (
-                  <p className="mt-1 truncate text-sm font-medium text-slate-500">
-                    {loadedAccount.email}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
-                  {roleLabel}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div className="grid gap-1 p-3">
-            <AccountRoleSwitcher
-              currentRole={currentRole}
-              authorizedRoles={loadedAccount.authorizedRoles}
-              onNavigate={() => setOpen(false)}
-              className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
-            />
-            <Link
-              href={dashboardHref}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              Dashboard
-            </Link>
-            {settingsHref ? (
-              <Link
-                href={settingsHref}
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="mt-1 flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-              >
-                <Settings className="h-5 w-5" />
-                Settings
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={handleLogout}
-              className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold text-white transition hover:bg-emerald-700"
-            >
-              <LogOut className="h-5 w-5" />
-              Log Out
-            </button>
+      {open ? (
+        <>
+          <div
+            role="menu"
+            aria-label="SitGuru account and role switcher"
+            className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] hidden max-h-[calc(100dvh-7rem)] w-[min(25rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)] sm:block"
+          >
+            {renderMenuContent()}
           </div>
-        </div>
+          {typeof document !== "undefined" ? createPortal(
+            <div
+              className="fixed inset-0 z-[10050] flex items-start justify-center bg-slate-950/40 px-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-[2px] sm:hidden"
+              onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}
+            >
+              <div
+                ref={mobileMenuRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="SitGuru profile and role switcher"
+                className="flex max-h-full w-full max-w-[26rem] flex-col overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_22px_55px_rgba(15,23,42,0.25)]"
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-emerald-100 bg-white px-4 py-3">
+                  <p className="text-sm font-bold text-emerald-900">My SitGuru Account</p>
+                  <button
+                    type="button"
+                    aria-label="Close account menu"
+                    onClick={() => setOpen(false)}
+                    className="grid h-11 w-11 place-items-center rounded-full bg-emerald-50 text-emerald-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  {renderMenuContent()}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          ) : null}
+        </>
       ) : null}
     </div>
   );
