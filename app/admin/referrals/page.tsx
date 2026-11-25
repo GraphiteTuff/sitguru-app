@@ -72,7 +72,9 @@ function eventLabel(value: string) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-export default async function AdminGrowthReferralsHubPage() {
+export default async function AdminGrowthReferralsHubPage({ searchParams }: { searchParams?: Promise<{ days?: string }> }) {
+  const params = searchParams ? await searchParams : {};
+  const dateWindow = params.days === "7" ? 7 : params.days === "90" ? 90 : 30;
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessAdmin) {
@@ -93,7 +95,7 @@ export default async function AdminGrowthReferralsHubPage() {
   const [data, accounting, referralGrowth] = await Promise.all([
     getReferralsDashboardData(),
     loadReferralAccounting(),
-    loadReferralGrowthReport(30),
+    loadReferralGrowthReport(dateWindow),
   ]);
   const today = new Date().toISOString().slice(0, 10);
   const todayBucket = data.weekDays.find((day) => day.day === today);
