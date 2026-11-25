@@ -8,6 +8,8 @@ import { canReadPrivateInternRecord, internshipActorKind, isPortalUserId } from 
 import { findInternById } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+function officialReleaseBlocked(intent: string): boolean { return intent === "release"; }
+
 export async function saveAssignmentEvaluation(form: FormData) {
   const read = (key: string) => String(form.get(key) ?? "").trim();
   const taskId = read("taskId");
@@ -40,7 +42,7 @@ export async function saveAssignmentEvaluation(form: FormData) {
   if (read("evaluatedSubmissionAt") !== String(task.submitted_at || "")) {
     return fail("This assignment changed. Review the latest submission before saving an evaluation.");
   }
-  if (intent === "release") return fail("Official semester evaluation release is disabled during pre-launch.");
+  if (officialReleaseBlocked(intent)) return fail("Official semester evaluation release is disabled during pre-launch.");
   if (intent === "release" && kind !== "supervisor" &&
       ["submitted_to_jason", "ceo_review_required"].includes(String(task.review_stage))) {
     return fail("This assignment is waiting for supervisor review.");
