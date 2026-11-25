@@ -203,6 +203,23 @@ async function createApprovedPartnerRecord({
     .maybeSingle();
 
   if (existingPartner) {
+    // Legacy approved partners may have a code and slug but no canonical
+    // referral_codes row. Repair that mapping without changing their link.
+    const { data: mappedCode } = await supabase.from("referral_codes")
+      .select("id").eq("partner_id", existingPartner.id).eq("status", "active").limit(1).maybeSingle();
+    if (!mappedCode && existingPartner.referral_code && existingPartner.slug) {
+      const { error: mappingError } = await supabase.from("referral_codes").insert({
+        owner_user_id: application.applicant_user_id,
+        owner_type: referralOwnerType(application),
+        partner_id: existingPartner.id,
+        code: existingPartner.referral_code,
+        slug: existingPartner.slug,
+        owner_name: buildBaseName(application),
+        campaign_type: referralCampaignType(application),
+        status: "active",
+      });
+      if (mappingError) console.warn("Partner referral registry backfill skipped:", mappingError.message);
+    }
     return {
       partnerId: existingPartner.id as string,
       referralCode: existingPartner.referral_code as string,
