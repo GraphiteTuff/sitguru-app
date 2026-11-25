@@ -1,3 +1,4 @@
+import InstructorCenter from "@/components/internship/InstructorCenter";
 import SyllabusGrowthOverview from "@/components/internship/SyllabusGrowthOverview";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -73,6 +74,7 @@ export default async function InternshipPlaybookPage() {
         </Link>
       </div>
 
+      <InstructorCenter mode="admin" />
       <SyllabusGrowthOverview mode="admin" />
       <InternshipSyllabusEnhancements
         academicRows={academicRows}
