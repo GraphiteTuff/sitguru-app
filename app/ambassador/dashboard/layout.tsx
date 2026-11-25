@@ -17,6 +17,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import NotificationBell from "@/components/NotificationBell";
 import { openCompanionChat } from "@/lib/companions/open-companion-chat";
 import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
 import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
@@ -200,6 +201,7 @@ export default function AmbassadorDashboardLayout({
                   })}
                 </nav>
               </details>
+              <NotificationBell compact />
               <SiteAccountMenu variant="desk" compact />
             </div>
           </div>
