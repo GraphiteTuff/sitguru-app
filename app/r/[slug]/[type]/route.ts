@@ -248,18 +248,28 @@ export async function GET(
     );
   }
 
-  const ambassador = await findAmbassador(referralCode);
-
-  if (!ambassador || !isActiveAmbassador(ambassador)) {
+  // Canonical active codes stay usable even when an old Ambassador profile
+  // was archived; enrollment and reward eligibility remain separate checks.
+  // Do not turn Partner codes into Ambassador codes.
+  const { data: canonicalCode } = await supabaseAdmin
+    .from("referral_codes")
+    .select("id, owner_user_id, owner_type, ambassador_id, partner_id, code, slug, campaign_type, status")
+    .ilike("code", referralCode).eq("status", "active").limit(1).maybeSingle();
+  if (canonicalCode?.partner_id || canonicalCode?.owner_type === "partner") {
     return NextResponse.redirect(
-      new URL("/programs/ambassadors", request.url),
+      new URL(`/r/${encodeURIComponent(referralCode)}?via=${request.nextUrl.searchParams.get("via") === "qr" ? "qr" : "link"}`, request.url),
     );
   }
-
-  const referralCodeRow = await ensureReferralCode(
-    ambassador,
-    referralCode,
-  );
+  const ambassador = await findAmbassador(referralCode);
+  const referralCodeRow =
+    (canonicalCode && (canonicalCode.ambassador_id || ["ambassador", "ambassador_lead"].includes(String(canonicalCode.owner_type)))
+      ? canonicalCode
+      : ambassador && isActiveAmbassador(ambassador)
+        ? await ensureReferralCode(ambassador, referralCode)
+        : null) as ReferralCodeRow | null;
+  if (!referralCodeRow) {
+    return NextResponse.redirect(new URL("/programs/ambassadors", request.url));
+  }
 
   const viaValue = request.nextUrl.searchParams.get("via");
   const via = viaValue === "qr" ? "qr" : "link";
@@ -272,8 +282,9 @@ export async function GET(
     request.cookies.get(cookieName)?.value === "1";
 
   if (referralCodeRow && !alreadyTracked) {
+    let canonicalRecorded = false;
     try {
-      await trackReferralClick({
+      const tracked = await trackReferralClick({
         referralCodeId: referralCodeRow.id,
         landingPage: `/r/${encodeURIComponent(
           referralCode,
@@ -285,6 +296,7 @@ export async function GET(
             ? "ambassador_pet_parent_referral"
             : "ambassador_guru_referral",
       });
+      canonicalRecorded = tracked.recorded;
     } catch (error) {
       console.error(
         "Ambassador short-link click tracking failed:",
@@ -292,8 +304,8 @@ export async function GET(
       );
     }
 
-    // Keep performance ledger in sync with short-link traffic
-    try {
+    // Keep performance ledger in sync only for new canonical clicks.
+    if (canonicalRecorded) try {
       const { recordAmbassadorClick } = await import(
         "@/lib/ambassador/ledger"
       );
