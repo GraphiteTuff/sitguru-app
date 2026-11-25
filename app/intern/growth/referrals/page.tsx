@@ -1,16 +1,21 @@
 import Link from "next/link";
 import ReferralGrowthOverview from "@/components/admin/referrals/ReferralGrowthOverview";
 import { loadReferralGrowthReport } from "@/lib/referrals/growth-report";
+import type { ReferralReportingPeriod } from "@/lib/referrals/reporting-epoch";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 
 export const dynamic = "force-dynamic";
 
-export default async function GrowthReferralsPage({ searchParams }: { searchParams?: Promise<{ days?: string }> }) {
+export default async function GrowthReferralsPage({ searchParams }: { searchParams?: Promise<{ days?: string; period?: string }> }) {
   const params = searchParams ? await searchParams : {};
-  const dateWindow = params.days === "7" ? 7 : params.days === "90" ? 90 : 30;
+  const period: ReferralReportingPeriod =
+    
+    params.period === "7" || params.days === "7" ? "7" :
+    params.period === "30" || params.days === "30" ? "30" :
+    params.period === "90" || params.days === "90" ? "90" : "since_reset";
   const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
-  const report = await loadReferralGrowthReport(dateWindow);
+  const report = await loadReferralGrowthReport(period);
   return (
     <main className="mx-auto max-w-[1600px] space-y-4 px-3 py-5 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
