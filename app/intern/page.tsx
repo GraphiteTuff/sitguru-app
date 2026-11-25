@@ -1,3 +1,4 @@
+import InternshipPrelaunch from "@/components/internship/InternshipPrelaunch";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -226,6 +227,7 @@ export default async function InternPortalPage({
           </div>
         </section>
       ) : null}
+      {!preview ? <InternshipPrelaunch mode="intern" /> : null}
       <InternStudentDashboard
         data={workspace}
         events={promoteEvents}
