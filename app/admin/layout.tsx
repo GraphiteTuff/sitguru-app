@@ -1043,7 +1043,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               />
 
               <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-                <NotificationBell />
+                <NotificationBell compact />
                 <div className="hidden h-8 w-px bg-slate-200 sm:block" />
                 <SiteAccountMenu variant="desk" />
               </div>
