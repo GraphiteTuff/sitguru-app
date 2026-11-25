@@ -293,7 +293,7 @@ export default function DeskChatDock({
   const dockStyle = aboveBottomNav
     ? ({
         bottom:
-          "calc(5.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))",
+          "calc(6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))",
         paddingBottom: "0.5rem",
       } as const)
     : ({
