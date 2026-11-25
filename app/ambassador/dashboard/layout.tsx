@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { openCompanionChat } from "@/lib/companions/open-companion-chat";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -101,6 +102,7 @@ export default function AmbassadorDashboardLayout({
 }: AmbassadorDashboardLayoutProps) {
   const pathname = usePathname();
   const [activeHash, setActiveHash] = useState("");
+  useBrowserChromeInset();
 
   useEffect(() => {
     const syncHash = () => setActiveHash(window.location.hash);
@@ -203,20 +205,25 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      <div className="pb-24 lg:pb-0">{children}</div>
+      <div className="pb-[calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
         data-ambassador-bottom-nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-green-100 bg-white/95 px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden"
+        className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden"
+        style={{
+          bottom: "var(--sg-chrome-bottom, 0px)",
+          paddingBottom:
+            "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
+        }}
       >
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1 py-1.5">
+        <div className="grid grid-cols-5 gap-0 px-1 pt-1">
           {[
-            { label: "Home", href: "/ambassador/dashboard", icon: <LayoutDashboard size={21} /> },
-            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: <QrCode size={21} /> },
-            { label: "Social", href: "/ambassador/dashboard/social", icon: <Share2 size={21} /> },
-            { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: <BriefcaseBusiness size={21} /> },
-            { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: <MessageCircle size={21} /> },
+            { label: "Home", href: "/ambassador/dashboard", icon: LayoutDashboard },
+            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: QrCode },
+            { label: "Social", href: "/ambassador/dashboard/social", icon: Share2 },
+            { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: BriefcaseBusiness },
+            { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: MessageCircle },
           ].map((item) => {
             const itemPath = item.href.split("?")[0].split("#")[0];
             const active =
@@ -227,17 +234,27 @@ export default function AmbassadorDashboardLayout({
                   ? pathname === "/ambassador/dashboard" && activeHash !== "#ambassador-workspace"
                   : pathname === itemPath ||
                     (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
+            const Icon = item.icon;
             return (
               <Link
                 key={item.label}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 ${
-                  active ? "bg-green-800 text-white" : "text-slate-600 hover:bg-green-50 hover:text-green-900"
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-black leading-tight transition active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
+                  active ? "text-[#0D5C3A]" : "text-slate-500 active:bg-slate-50"
                 }`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <span className={`grid h-8 w-12 place-items-center rounded-2xl transition ${
+                  active ? "bg-emerald-50" : "bg-transparent"
+                }`}>
+                  <Icon
+                    className={`h-[22px] w-[22px] ${active ? "stroke-[2.35]" : "stroke-[2]"}`}
+                    aria-hidden
+                  />
+                </span>
+                <span className={active ? "text-[#0D5C3A]" : undefined}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
