@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { openCompanionChat } from "@/lib/companions/open-companion-chat";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -99,6 +100,14 @@ export default function AmbassadorDashboardLayout({
   children,
 }: AmbassadorDashboardLayoutProps) {
   const pathname = usePathname();
+  const [activeHash, setActiveHash] = useState("");
+
+  useEffect(() => {
+    const syncHash = () => setActiveHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, [pathname]);
 
   return (
     <div className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#effcf5_100%)]">
@@ -155,6 +164,19 @@ export default function AmbassadorDashboardLayout({
                   aria-label="All Ambassador pages"
                   className="absolute right-0 top-full z-[70] mt-2 max-h-[70svh] w-[min(88vw,290px)] overflow-y-auto rounded-2xl border border-green-100 bg-white p-2 shadow-xl"
                 >
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      openCompanionChat("taco");
+                    }}
+                    className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-xl bg-emerald-700 px-3 text-left text-sm font-black text-white transition hover:bg-emerald-800"
+                    aria-label="Chat with Taco, your Ambassador advocate"
+                  >
+                    <MessageCircle size={19} aria-hidden="true" />
+                    Chat with Taco
+                  </button>
+                  <div className="mb-2 border-b border-green-100" />
                   {navItems.map((item) => {
                     const active = item.isActive(pathname);
                     return (
@@ -197,8 +219,14 @@ export default function AmbassadorDashboardLayout({
             { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: <MessageCircle size={21} /> },
           ].map((item) => {
             const itemPath = item.href.split("?")[0].split("#")[0];
-            const active = pathname === itemPath ||
-              (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
+            const active =
+              item.label === "Workspace"
+                ? pathname.startsWith("/ambassador/dashboard/command-center") ||
+                  (pathname === "/ambassador/dashboard" && activeHash === "#ambassador-workspace")
+                : item.label === "Home"
+                  ? pathname === "/ambassador/dashboard" && activeHash !== "#ambassador-workspace"
+                  : pathname === itemPath ||
+                    (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
             return (
               <Link
                 key={item.label}
