@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import GrowthWorkstreamSwitcher from "@/components/portal/GrowthWorkstreamSwitcher";
-import AdminAccountMenu from "@/components/AdminAccountMenu";
+import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import AdminDeskSearch from "@/components/admin/AdminDeskSearch";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
 import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
@@ -1045,7 +1045,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
                 <NotificationBell />
                 <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-                <AdminAccountMenu variant="desk" />
+                <SiteAccountMenu variant="desk" />
               </div>
             </div>
           </header>
