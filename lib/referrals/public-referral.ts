@@ -80,7 +80,7 @@ export async function resolvePublicReferral(raw: string): Promise<PublicReferral
     id: row.id, code: row.code, slug: row.slug,
     ownerType: row.owner_type || (row.partner_id ? "partner" : row.ambassador_id ? "ambassador" : "general"),
     partnerId: row.partner_id, ambassadorId: row.ambassador_id,
-    displayName: displayName || (row.ambassador_id ? "SitGuru Ambassador" : "SitGuru Community"),
+    displayName: displayName || (row.ambassador_id ? (row.code.length <= 18 && !/[0-9]/.test(row.code) ? row.code.charAt(0).toUpperCase() + row.code.slice(1).toLowerCase() : "SitGuru Ambassador") : "SitGuru Community"),
     portraitUrl, partnerStatus, partnerSlug, region, isPublicAmbassador,
   };
 }
