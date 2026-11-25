@@ -540,6 +540,10 @@ export default function CustomerCareCommandCenter({
             <span className="text-lg font-black text-[#102339]">PawReport Live</span>
             <span className="text-xs font-semibold text-slate-600">{visit ? "Care photos & visit updates" : "Your booking history"}</span>
           </Link>
+          <Link href="/customer/dashboard/petperks" className="col-span-2 flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-[#0D5C3A] px-5 py-3 font-black !text-white hover:bg-emerald-800">
+            <span className="flex items-center gap-3"><Gift aria-hidden /> PetPerks · Share my invite</span>
+            <ArrowRight aria-hidden />
+          </Link>
         </section>
       </div>
 

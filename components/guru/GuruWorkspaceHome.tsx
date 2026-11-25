@@ -13,6 +13,7 @@ import {
   Megaphone,
   MessageCircle,
   PawPrint,
+  QrCode,
   ShieldCheck,
   Star,
   UserRound,
@@ -360,6 +361,10 @@ export default function GuruWorkspaceHome({
           <p className="text-xs font-black uppercase tracking-[0.15em] text-[#0D5C3A]">PROMOTE &amp; GROW</p>
           <h2 className="mt-1 text-xl font-black text-emerald-950 sm:text-2xl">Build your Guru business</h2>
         </div>
+        <Link href="/guru/dashboard/petperks" className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-[#0D5C3A] px-5 py-3 font-black !text-white hover:bg-emerald-800">
+          <span className="flex items-center gap-3"><QrCode aria-hidden /> PetPerks · Share my invite</span>
+          <ChevronRight aria-hidden />
+        </Link>
         <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[1.9rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">GROW YOUR BUSINESS</p>
