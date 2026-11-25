@@ -337,6 +337,7 @@ export default function GuruDashboardReferralsPage() {
   const [referralUrl, setReferralUrl] = useState("");
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
+  const [baselineStartedAt, setBaselineStartedAt] = useState<string | null>(null);
   const [rewards, setRewards] = useState<RewardRow[]>([]);
   const [programSettings, setProgramSettings] =
     useState<ProgramSettingsRow | null>(null);
@@ -363,6 +364,11 @@ export default function GuruDashboardReferralsPage() {
           setLoading(false);
           return;
         }
+
+        const epochResponse = await fetch("/api/referrals/baseline", { cache: "no-store" });
+        if (!epochResponse.ok) throw new Error("Referral reporting baseline is temporarily unavailable.");
+        const epoch = await epochResponse.json() as { startedAt?: string | null };
+        if (mounted) setBaselineStartedAt(epoch.startedAt || null);
 
         const guruResponse = await supabase
           .from("gurus")
@@ -513,11 +519,17 @@ export default function GuruDashboardReferralsPage() {
   const firstName = getFirstName(guruName);
   const rewardLabel = `Earn ${currency(baseReward)} when a Guru you refer completes ${requiredBookings} bookings.`;
 
-  const pendingApprovalCount = referrals.filter(
+  const periodReferrals = referrals.filter((referral) => {
+    if (!baselineStartedAt) return true;
+    const created = Date.parse(firstText(referral.signup_completed_at, referral.created_at));
+    return Number.isFinite(created) && created >= Date.parse(baselineStartedAt);
+  });
+
+  const pendingApprovalCount = periodReferrals.filter(
     (referral) => getPipelineColumn(referral) === "verifying",
   ).length;
 
-  const approvedGurusCount = referrals.filter((referral) =>
+  const approvedGurusCount = periodReferrals.filter((referral) =>
     isQualifiedStatus(referral.status),
   ).length;
 
@@ -549,13 +561,13 @@ export default function GuruDashboardReferralsPage() {
         0,
       );
 
-  const invited = referrals.filter(
+  const invited = periodReferrals.filter(
     (referral) => getPipelineColumn(referral) === "invited",
   );
-  const verifying = referrals.filter(
+  const verifying = periodReferrals.filter(
     (referral) => getPipelineColumn(referral) === "verifying",
   );
-  const paid = referrals.filter(
+  const paid = periodReferrals.filter(
     (referral) => getPipelineColumn(referral) === "paid",
   );
 
@@ -639,6 +651,13 @@ export default function GuruDashboardReferralsPage() {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-950">
+          Referral Tracking 2.0 · {baselineStartedAt
+            ? "New Guru referrals since " + new Date(baselineStartedAt).toLocaleString("en-US")
+            : "Baseline pending activation"}.
+          Existing referral codes and lifetime payout obligations are preserved.
+        </section>
+
         {pageNotice ? (
           <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">
             {pageNotice}
@@ -700,7 +719,7 @@ export default function GuruDashboardReferralsPage() {
               <StatCard
                 label="Pending approval"
                 value={String(pendingApprovalCount)}
-                helper={`${currency(pendingRewardAmount)} awaiting payout review`}
+                helper={`${currency(pendingRewardAmount)} lifetime outstanding review`}
                 icon={<Clock3 className="h-4 w-4" />}
                 tone="amber"
               />
@@ -714,7 +733,7 @@ export default function GuruDashboardReferralsPage() {
               <StatCard
                 label="Total cash payouts"
                 value={currency(paidRewardAmount)}
-                helper="Stripe-linked paid rewards"
+                helper="Lifetime paid rewards · preserved"
                 icon={<Wallet className="h-4 w-4" />}
                 tone="sky"
               />
@@ -726,10 +745,10 @@ export default function GuruDashboardReferralsPage() {
                   Tracking feed
                 </h2>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black tabular-nums text-slate-700">
-                  {referrals.length}
+                  {periodReferrals.length}
                 </span>
               </div>
-              {referrals.length === 0 ? (
+              {periodReferrals.length === 0 ? (
                 <div className="rounded-[1.75rem] border border-dashed border-emerald-200 bg-white px-5 py-10 text-center shadow-sm">
                   <UsersRound className="mx-auto h-8 w-8 text-emerald-600" />
                   <p className="mt-3 text-base font-black text-slate-900">
@@ -740,7 +759,7 @@ export default function GuruDashboardReferralsPage() {
                   </p>
                 </div>
               ) : (
-                referrals.map((referral) => (
+                periodReferrals.map((referral) => (
                   <ReferralFeedCard key={referral.id} referral={referral} />
                 ))
               )}
@@ -769,7 +788,7 @@ export default function GuruDashboardReferralsPage() {
               />
               <PipelineColumnPanel
                 title="Paid out"
-                helper="Reward completed"
+                helper="New-period referrals (historical payouts remain in Earnings)"
                 count={paid.length}
                 icon={<Wallet className="h-4 w-4" />}
                 tone="border-emerald-100"
