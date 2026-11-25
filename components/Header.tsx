@@ -884,9 +884,8 @@ export default function Header({ user = null }: HeaderProps) {
                 </Link>
               ) : null}
 
+              <NotificationBell compact />
               <SiteAccountMenu variant="desk" />
-
-              <NotificationBell />
             </>
           ) : (
             <>
@@ -908,7 +907,8 @@ export default function Header({ user = null }: HeaderProps) {
 
         <div className="flex items-center gap-2 sm:gap-3">
           {isLoggedIn ? (
-            <div className="lg:hidden">
+            <div className="flex items-center gap-1 lg:hidden">
+              <NotificationBell compact />
               <SiteAccountMenu variant="desk" compact />
             </div>
           ) : null}
