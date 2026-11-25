@@ -8,14 +8,14 @@
 
 /** Rogue FAB sits just above the flush tab bar. */
 export const CUSTOMER_FLOAT_STACK_BOTTOM =
-  "calc(4.35rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
+  "calc(6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
 export const CUSTOMER_FLOAT_STACK_BOTTOM_SOLO =
   "calc(1rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
 /** Content spacer so lists/forms scroll clear of the tab bar. */
 export const CUSTOMER_BOTTOM_NAV_CONTENT_PAD =
-  "calc(5.25rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
+  "calc(6rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))";
 
 export function isPetParentBottomNavPath(
   pathname: string | null | undefined,
