@@ -13,6 +13,8 @@ import {
   Star,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
 
 type Partner = {
   id: string;
@@ -163,17 +165,33 @@ function getTrackingCampaign(searchParams: Awaited<PageProps["searchParams"]>) {
 async function recordPartnerReferralClick({
   partner,
   referralCode,
+  referralCodeId,
   slug,
   searchParams,
 }: {
   partner: Partner;
   referralCode: string;
+  referralCodeId?: string | null;
   slug: string;
   searchParams: Awaited<PageProps["searchParams"]>;
 }) {
-  const supabase = await createClient();
+  // Canonical referral click is authoritative. Avoid double counts when a
+  // visitor reloads the partner page or the same link is prefetched.
+  const effectiveId = referralCodeId ||
+    (await supabaseAdmin.from("referral_codes").select("id").eq("partner_id", partner.id).eq("status", "active").limit(1).maybeSingle()).data?.id ||
+    null;
+  if (effectiveId) {
+    const tracked = await trackReferralClick({
+      referralCodeId: effectiveId,
+      landingPage: `/p/${encodeURIComponent(slug)}`,
+      utmSource: getTrackingSource(searchParams),
+      utmMedium: getTrackingMedium(searchParams),
+      utmCampaign: getTrackingCampaign(searchParams),
+    });
+    if (tracked.reason === "deduped" || tracked.reason === "prefetch") return;
+  }
 
-  await supabase.from("partner_tracking_events").insert({
+  const { error } = await supabaseAdmin.from("partner_tracking_events").insert({
     partner_id: partner.id,
     referral_code: referralCode || partner.referral_code || slug,
     event_type: "click",
@@ -192,6 +210,7 @@ async function recordPartnerReferralClick({
       partner_type: partner.partner_type,
     },
   });
+  if (error) console.warn("[partner-referral] event write failed", error.message);
 }
 
 async function findPartnerByReferralSlug(slug: string) {
@@ -302,12 +321,13 @@ export default async function PublicPartnerReferralPage({
   await recordPartnerReferralClick({
     partner,
     referralCode: code,
+    referralCodeId: referralCode?.id || null,
     slug,
     searchParams: resolvedSearchParams,
   });
 
   const findGuruHref = `/find-a-guru?ref=${encodeURIComponent(code || slug)}`;
-  const becomeGuruHref = `/guru/apply?ref=${encodeURIComponent(code || slug)}`;
+  const becomeGuruHref = `/signup?role=guru&ref=${encodeURIComponent(code || slug)}&source=partner_website&utm_source=partner_website&utm_campaign=partner_referral`;
   const partnerApplyHref = `/partners?ref=${encodeURIComponent(code || slug)}`;
 
   return (

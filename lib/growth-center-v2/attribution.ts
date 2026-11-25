@@ -10,6 +10,7 @@ type Tracking = {
   medium?: string | null;
   campaign?: string | null;
   referralCode?: string | null;
+  referralOwnerType?: string | null;
 };
 
 function text(value: unknown) {
@@ -34,6 +35,7 @@ export async function recordGrowthSignupAttribution(input: {
   const source = text(tracking.utmSource) || text(tracking.source) || "";
   const medium = text(tracking.utmMedium) || text(tracking.medium) || "";
   const referralCode = text(tracking.referralCode);
+  const ownerType = text(tracking.referralOwnerType).toLowerCase();
 
   if (!campaignSlug && !referralCode && !source) {
     // Still publish refresh for first-party registration KPIs.
@@ -88,11 +90,14 @@ export async function recordGrowthSignupAttribution(input: {
     profile_id: input.profileId || null,
     guru_id: input.guruId || null,
     referral_code: referralCode || null,
+    partner_code: ownerType === "partner" || ownerType === "business" ? referralCode || null : null,
+    ambassador_code: ownerType === "ambassador" ? referralCode || null : null,
     metadata: {
       idempotency_key: idempotencyKey,
       role: input.role,
       utm_content: text(tracking.utmContent) || null,
       attribution: "last_touch_registration",
+      referral_owner_type: ownerType || null,
     },
   };
 

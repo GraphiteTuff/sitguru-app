@@ -38,5 +38,10 @@ export default async function InternGrowthHomePage() {
     preview:conversation.messages[conversation.messages.length-1]?.body || "",
   }));
   const summary=buildInternGrowthSummary({workspace,recentMessages});
-  return <InternGrowthWorkspaceHome {...summary}/>;
+  return <div className="space-y-4">
+    <div className="px-3 pt-3 sm:px-5">
+      <a href="/intern/growth/referrals" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-950 hover:bg-emerald-100">Referral & Partner Results →</a>
+    </div>
+    <InternGrowthWorkspaceHome {...summary}/>
+  </div>;
 }

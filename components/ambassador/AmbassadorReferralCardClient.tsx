@@ -1,356 +1,118 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Check,
-  Copy,
-  Download,
-  ExternalLink,
-  Maximize2,
-  PawPrint,
-  Share2,
-  X,
-} from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Maximize2, Share2, X } from "lucide-react";
 
-type AmbassadorReferralCardClientProps = {
-  ambassadorName: string;
-  referralCode: string;
-  referralUrl: string;
-  avatarUrl?: string | null;
-};
+type Props = { ambassadorName: string; referralCode: string; referralUrl: string; avatarUrl?: string | null };
 
-function getInitials(name: string) {
-  return (
-    name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "SG"
-  );
-}
-
-function getQrCodeUrl(value: string, size = 760) {
-  const params = new URLSearchParams({
-    size: `${size}x${size}`,
-    data: value,
-    margin: "18",
-    format: "svg",
-  });
-
-  return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
-}
-
-function escapeXml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-export default function AmbassadorReferralCardClient({
-  ambassadorName,
-  referralCode,
-  referralUrl,
-  avatarUrl,
-}: AmbassadorReferralCardClientProps) {
-  const [copiedField, setCopiedField] = useState<"code" | "link" | null>(null);
-  const [isVendorModeOpen, setIsVendorModeOpen] = useState(false);
+export default function AmbassadorReferralCardClient({ ambassadorName, referralCode, referralUrl }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const [message, setMessage] = useState("");
+  const [posterFailed, setPosterFailed] = useState(false);
+  const { publicUrl, posterUrl } = useMemo(() => {
+    let origin = "https://www.sitguru.com";
+    try { origin = new URL(referralUrl).origin; } catch { /* canonical fallback */ }
+    return {
+      publicUrl: `${origin}/r/${encodeURIComponent(referralCode)}?utm_source=sitguru_ambassador&utm_campaign=ambassador_card`,
+      posterUrl: `/api/ambassador/card/${encodeURIComponent(referralCode)}`,
+    };
+  }, [referralCode, referralUrl]);
+  const qrCode = "https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&data=" +
+    encodeURIComponent(publicUrl + "&via=qr");
 
-  const qrCodeUrl = useMemo(
-    () => getQrCodeUrl(`${referralUrl}${referralUrl.includes("?") ? "&" : "?"}via=qr`),
-    [referralUrl],
-  );
-
-  const compactUrl = useMemo(() => {
+  async function copyLink() {
     try {
-      const parsed = new URL(referralUrl);
-      return `${parsed.host}${parsed.pathname}`;
+      await navigator.clipboard.writeText(publicUrl);
+      setMessage("Personal Ambassador invitation link copied.");
     } catch {
-      return referralUrl.replace(/^https?:\/\//, "");
-    }
-  }, [referralUrl]);
-
-  async function copyValue(value: string, field: "code" | "link") {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(field);
-      setMessage(field === "code" ? "Referral code copied." : "Referral link copied.");
-
-      window.setTimeout(() => {
-        setCopiedField(null);
-        setMessage("");
-      }, 2200);
-    } catch {
-      setMessage("Unable to copy automatically. Press and hold the text to copy it.");
+      setMessage("Select the invitation link to copy it manually.");
     }
   }
 
-  async function shareReferralCard() {
-    const shareText = `Join SitGuru for trusted local pet care using Ambassador code ${referralCode}.`;
-
+  async function sharePoster() {
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: "Join SitGuru",
-          text: shareText,
-          url: referralUrl,
-        });
-
-        setMessage("Referral card shared.");
-        window.setTimeout(() => setMessage(""), 2200);
+        const response = await fetch(posterUrl, { cache: "no-store" });
+        if (response.ok && typeof File !== "undefined") {
+          const file = new File([await response.blob()], `sitguru-${referralCode.toLowerCase()}-ambassador.png`, { type: "image/png" });
+          if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({
+              title: "SitGuru Ambassador invitation",
+              text: `Join SitGuru with Ambassador ${ambassadorName}. Scan the card or visit ${publicUrl}`,
+              files: [file],
+            });
+            return;
+          }
+        }
+        await navigator.share({ title: "SitGuru Ambassador invitation", text: `${ambassadorName} invites you to SitGuru`, url: publicUrl });
         return;
       }
-
-      await copyValue(referralUrl, "link");
+      await copyLink();
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
-      setMessage("Sharing was not completed. The referral link is still available below.");
+      if (error instanceof Error && error.name === "AbortError") return;
+      setMessage("Could not open the share menu. Try copying the invitation link.");
     }
   }
 
-  function downloadReferralCard() {
-    const safeName = escapeXml(ambassadorName);
-    const safeCode = escapeXml(referralCode);
-    const safeUrl = escapeXml(compactUrl);
-    const safeQrUrl = escapeXml(qrCodeUrl);
-
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
-        <defs>
-          <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#14532d" />
-            <stop offset="55%" stop-color="#166534" />
-            <stop offset="100%" stop-color="#052e16" />
-          </linearGradient>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#022c22" flood-opacity="0.35" />
-          </filter>
-        </defs>
-
-        <rect width="1080" height="1350" rx="64" fill="url(#background)" />
-
-        <g transform="translate(90 70)">
-          <circle cx="44" cy="44" r="44" fill="#dcfce7" />
-          <text x="44" y="59" text-anchor="middle" font-size="42" font-family="Arial, sans-serif">🐾</text>
-          <text x="108" y="58" fill="#ffffff" font-size="50" font-weight="800" font-family="Arial, sans-serif">SitGuru</text>
-        </g>
-
-        <text x="540" y="235" fill="#ffffff" text-anchor="middle" font-size="58" font-weight="800" font-family="Arial, sans-serif">
-          Find trusted local pet care
-        </text>
-        <text x="540" y="292" fill="#bbf7d0" text-anchor="middle" font-size="30" font-weight="600" font-family="Arial, sans-serif">
-          Referred by ${safeName}
-        </text>
-
-        <g filter="url(#shadow)">
-          <rect x="210" y="355" width="660" height="660" rx="54" fill="#ffffff" />
-          <image href="${safeQrUrl}" x="255" y="400" width="570" height="570" />
-        </g>
-
-        <text x="540" y="1095" fill="#dcfce7" text-anchor="middle" font-size="30" font-weight="700" font-family="Arial, sans-serif">
-          Scan to join SitGuru
-        </text>
-
-        <rect x="275" y="1135" width="530" height="92" rx="30" fill="#15803d" stroke="#86efac" stroke-width="3" />
-        <text x="540" y="1195" fill="#ffffff" text-anchor="middle" font-size="48" font-weight="900" letter-spacing="2" font-family="Arial, sans-serif">
-          ${safeCode}
-        </text>
-
-        <text x="540" y="1285" fill="#ffffff" text-anchor="middle" font-size="27" font-weight="700" font-family="Arial, sans-serif">
-          ${safeUrl}
-        </text>
-      </svg>
-    `.trim();
-
-    const blob = new Blob([svg], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-
-    anchor.href = objectUrl;
-    anchor.download = `sitguru-referral-${referralCode.toLowerCase()}.svg`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(objectUrl);
-
-    setMessage("Referral card downloaded.");
-    window.setTimeout(() => setMessage(""), 2200);
-  }
+  const poster = posterFailed ? (
+    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center">
+      <span className="text-lg font-black text-emerald-950">{ambassadorName}</span>
+      <span className="mt-2 text-sm font-semibold text-slate-700">SitGuru Ambassador · {referralCode}</span>
+      <img src={qrCode} alt="QR code to your SitGuru Ambassador invitation" className="mt-4 aspect-square w-full max-w-[230px] bg-white p-3" />
+    </div>
+  ) : (
+    <img
+      src={posterUrl}
+      alt={`Downloadable SitGuru Ambassador referral card for ${ambassadorName}`}
+      className="w-full rounded-[22px] border border-emerald-100 shadow-md"
+      onError={() => setPosterFailed(true)}
+    />
+  );
 
   return (
     <>
-      <section className="mx-auto w-full max-w-md rounded-[2rem] border border-green-100 bg-white p-4 shadow-[0_20px_70px_rgba(20,83,45,0.12)] sm:p-5">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-100 text-lg font-black text-green-900 ring-2 ring-green-200">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt={`${ambassadorName} profile`}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              getInitials(ambassadorName)
-            )}
+      <section className="mx-auto w-full max-w-lg rounded-[26px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Official Ambassador Card</p>
+            <h3 className="mt-1 text-xl font-black !text-slate-950">{ambassadorName}</h3>
+            <p className="mt-1 text-sm font-bold text-emerald-900">Referral code: {referralCode}</p>
           </div>
-
-          <div className="min-w-0">
-            <p className="truncate text-base font-black text-green-950">
-              {ambassadorName}
-            </p>
-            <p className="text-xs font-bold text-slate-600">
-              SitGuru Ambassador
-            </p>
-            <span className="mt-1 inline-flex rounded-full bg-green-100 px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-green-800">
-              Active
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[1.75rem] border border-green-100 bg-[#fbfdf9] p-4">
-          <button
-            type="button"
-            onClick={() => setIsVendorModeOpen(true)}
-            className="group block w-full rounded-[1.4rem] bg-white p-3 shadow-sm ring-1 ring-green-100 transition hover:ring-green-300"
-            aria-label="Open full-screen Vendor Mode QR code"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={qrCodeUrl}
-              alt="SitGuru Ambassador referral QR code"
-              className="mx-auto aspect-square w-full max-w-[300px] object-contain"
-            />
-            <span className="mt-2 inline-flex items-center gap-2 text-xs font-black text-green-800">
-              Tap for Full-Screen Vendor Mode
-              <Maximize2 className="h-4 w-4 transition group-hover:scale-110" />
-            </span>
-          </button>
-
-          <div className="mt-4 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
-              Your Referral Code
-            </p>
-            <p className="mt-2 break-all text-3xl font-black tracking-tight text-green-950">
-              {referralCode}
-            </p>
-            <p className="mt-2 break-all rounded-xl bg-green-50 px-3 py-2 text-xs font-black leading-5 text-green-900">
-              {compactUrl}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => copyValue(referralCode, "code")}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-800 px-3 py-2 text-xs font-black text-white transition hover:bg-green-900"
-          >
-            {copiedField === "code" ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-            Copy Code
-          </button>
-
-          <button
-            type="button"
-            onClick={() => copyValue(referralUrl, "link")}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-200 bg-white px-3 py-2 text-xs font-black text-green-900 transition hover:bg-green-50"
-          >
-            {copiedField === "link" ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <ExternalLink className="h-4 w-4" />
-            )}
-            Copy Link
-          </button>
-
-          <button
-            type="button"
-            onClick={shareReferralCard}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-black text-green-900 transition hover:bg-green-100"
-          >
-            <Share2 className="h-4 w-4" />
-            Share Card
-          </button>
-
-          <button
-            type="button"
-            onClick={downloadReferralCard}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-black text-green-900 transition hover:bg-green-100"
-          >
-            <Download className="h-4 w-4" />
-            Download Card
+          <button type="button" onClick={() => setExpanded(true)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-black text-emerald-900 hover:bg-emerald-100">
+            <Maximize2 size={19} aria-hidden="true" /> Enlarge
           </button>
         </div>
-
-        {message ? (
-          <div
-            role="status"
-            className="mt-3 rounded-xl border border-green-100 bg-green-50 px-3 py-2 text-center text-xs font-black text-green-900"
-          >
-            {message}
-          </div>
-        ) : null}
+        <button type="button" onClick={() => setExpanded(true)} className="block w-full cursor-zoom-in" aria-label="Show enlarged Ambassador promotional card">
+          {poster}
+        </button>
+        <p className="mt-4 text-sm font-semibold text-slate-600">
+          Scan the card to open your personalized SitGuru invitation, where visitors can choose Pet Parent or Guru.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <button type="button" onClick={() => void sharePoster()} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-3 text-sm font-black !text-white hover:bg-emerald-900">
+            <Share2 size={18} aria-hidden="true" /> Share
+          </button>
+          <a href={posterUrl + "?download=1"} download={`sitguru-${referralCode.toLowerCase()}-ambassador.png`} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-black text-emerald-950 hover:bg-emerald-100">
+            <Download size={18} aria-hidden="true" /> PNG
+          </a>
+          <button type="button" onClick={() => void copyLink()} className="col-span-2 inline-flex min-h-13 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 text-sm font-black text-emerald-950 hover:bg-emerald-50 sm:col-span-1">
+            <Copy size={18} aria-hidden="true" /> Copy link
+          </button>
+        </div>
+        <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 break-all text-xs font-black text-emerald-800 hover:underline">
+          <ExternalLink size={15} className="shrink-0" aria-hidden="true" /> View tracked public invitation
+        </a>
+        {message ? <p role="status" className="mt-2 flex items-center gap-2 text-sm font-semibold text-emerald-900"><Check size={16} aria-hidden="true" />{message}</p> : null}
       </section>
-
-      {isVendorModeOpen ? (
-        <div className="fixed inset-0 z-[100] flex min-h-[100svh] items-center justify-center bg-green-950 p-4">
-          <button
-            type="button"
-            onClick={() => setIsVendorModeOpen(false)}
-            className="absolute right-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20"
-            aria-label="Close Vendor Mode"
-          >
-            <X className="h-6 w-6" />
-          </button>
-
-          <div className="w-full max-w-2xl text-center">
-            <div className="mx-auto flex w-fit items-center gap-3 text-white">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-green-800">
-                <PawPrint className="h-8 w-8" />
-              </div>
-              <p className="text-4xl font-black">SitGuru</p>
+      {expanded ? (
+        <div role="dialog" aria-modal="true" aria-label="Ambassador card full-screen" className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/90 p-3">
+          <div className="flex max-h-[95svh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white p-3 sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-base font-black text-emerald-950">SitGuru Ambassador • {referralCode}</span>
+              <button autoFocus type="button" onClick={() => setExpanded(false)} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 text-slate-950" aria-label="Close card"><X size={24} /></button>
             </div>
-
-            <h2 className="mt-6 text-3xl font-black text-white sm:text-5xl">
-              Find trusted local pet care
-            </h2>
-
-            <div className="mx-auto mt-7 max-w-xl rounded-[2.5rem] bg-white p-5 shadow-2xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={qrCodeUrl}
-                alt="Full-screen SitGuru Ambassador referral QR code"
-                className="aspect-square w-full object-contain"
-              />
-            </div>
-
-            <p className="mt-6 text-2xl font-black text-white">
-              Scan to join SitGuru
-            </p>
-
-            <p className="mx-auto mt-4 w-fit rounded-2xl bg-green-800 px-6 py-3 text-3xl font-black tracking-wide text-white ring-1 ring-green-400">
-              {referralCode}
-            </p>
-
-            <p className="mt-4 break-all text-base font-bold text-green-100">
-              {compactUrl}
-            </p>
-
-            <p className="mt-6 text-sm font-bold text-green-200">
-              Referred by {ambassadorName}
-            </p>
+            <div className="min-h-0 overflow-y-auto">{poster}</div>
+            <button type="button" onClick={() => void sharePoster()} className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 font-black text-white"><Share2 size={19} /> Share card</button>
           </div>
         </div>
       ) : null}

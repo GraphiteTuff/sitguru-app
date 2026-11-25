@@ -1,268 +1,185 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BadgeDollarSign,
-  BarChart3,
-  ClipboardCheck,
-  Copy,
-  Gift,
-  Handshake,
-  Mail,
-  Megaphone,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from "lucide-react";
-import { ThemeStatCard, type ThemeTone } from "@/components/sitguru/ThemeStatCard";
+import { redirect } from "next/navigation";
+import { BadgeCheck, CalendarDays, Handshake, MousePointerClick, QrCode, TrendingUp, Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
+import PartnerMarketingKitClient from "@/components/partners/PartnerMarketingKitClient";
 
 export const dynamic = "force-dynamic";
 
-const partnerStats: {
-  label: string;
-  value: string;
-  helper: string;
-  icon: typeof ShieldCheck;
-  tone: ThemeTone;
-}[] = [
-  {
-    label: "Partner Status",
-    value: "Active",
-    helper: "Your SitGuru Network profile is ready",
-    icon: ShieldCheck,
-    tone: "emerald",
-  },
-  {
-    label: "Referrals",
-    value: "0",
-    helper: "Tracked partner referrals",
-    icon: Users,
-    tone: "sky",
-  },
-  {
-    label: "Pending Rewards",
-    value: "$0",
-    helper: "Rewards awaiting approval",
-    icon: Gift,
-    tone: "amber",
-  },
-  {
-    label: "Campaigns",
-    value: "0",
-    helper: "Active partner campaigns",
-    icon: Megaphone,
-    tone: "violet",
-  },
-];
+type Partner = {
+  id: string; owner_user_id: string | null; business_name: string | null;
+  referral_code: string | null; slug: string | null; status: string | null;
+  website: string | null; city: string | null; state: string | null;
+};
+const toNumber = (value: number) => new Intl.NumberFormat("en-US").format(value);
+const matchDate = (value: unknown, start: number) => {
+  const timestamp = typeof value === "string" ? Date.parse(value) : NaN;
+  return Number.isFinite(timestamp) && timestamp >= start;
+};
+type Row = Record<string, unknown>;
 
-const actionCards = [
-  {
-    title: "Pet Event Manager",
-    description:
-      "Command center for Pet Event Planners & Managers — create, update, promote, and measure SitGuru Partner Events.",
-    href: "/partners/dashboard/community/events",
-    icon: Megaphone,
-    cta: "Open Event Manager",
-  },
-  {
-    title: "Share your partner link",
-    description:
-      "Use your SitGuru Network link to invite Gurus, pet parents, partners, and local pet-care communities.",
-    href: "/partners/dashboard/referrals",
-    icon: Copy,
-    cta: "Open referrals",
-  },
-  {
-    title: "Track rewards",
-    description:
-      "Review earned rewards, pending rewards, payout progress, and campaign performance.",
-    href: "/partners/dashboard/rewards",
-    icon: BadgeDollarSign,
-    cta: "View rewards",
-  },
-  {
-    title: "Review campaigns",
-    description:
-      "See partner campaigns, ambassador programs, affiliate activity, and network growth opportunities.",
-    href: "/partners/dashboard/campaigns",
-    icon: BarChart3,
-    cta: "View campaigns",
-  },
-];
+export default async function PartnerDashboardPage({
+  searchParams,
+}: { searchParams?: Promise<{ partner?: string }> }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=%2Fpartners%2Fdashboard");
 
-const quickLinks = [
-  {
-    label: "Partner Application",
-    href: "/partners/apply",
-    icon: ClipboardCheck,
-  },
-  {
-    label: "Referrals",
-    href: "/partners/dashboard/referrals",
-    icon: Users,
-  },
-  {
-    label: "Rewards",
-    href: "/partners/dashboard/rewards",
-    icon: Gift,
-  },
-  {
-    label: "Contact SitGuru",
-    href: "/contact",
-    icon: Mail,
-  },
-];
+  const admin = await getAdminIdentity();
+  const isAdmin = Boolean(admin?.canAccessAdmin);
+  const query = searchParams ? await searchParams : {};
+  const partnerSlug = String(query.partner || "").trim().slice(0, 100);
 
-export default function PartnerDashboardPage() {
+  let partner: Partner | null = null;
+  if (isAdmin && partnerSlug) {
+    const { data } = await supabaseAdmin.from("partners")
+      .select("id,owner_user_id,business_name,referral_code,slug,status,website,city,state")
+      .eq("slug", partnerSlug).limit(1).maybeSingle();
+    partner = (data || null) as Partner | null;
+  }
+  if (!partner) {
+    const { data } = await supabaseAdmin.from("partners")
+      .select("id,owner_user_id,business_name,referral_code,slug,status,website,city,state")
+      .eq("owner_user_id", user.id).eq("status", "active")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    partner = (data || null) as Partner | null;
+  }
+
+  if (!partner) {
+    const { data: adminPartners } = isAdmin
+      ? await supabaseAdmin.from("partners").select("id,business_name,slug,status").eq("status", "active").limit(50)
+      : { data: null };
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-12 text-slate-950">
+        <h1 className="text-3xl font-black">SitGuru Partner Dashboard</h1>
+        {isAdmin ? (
+          <section className="mt-6 rounded-2xl border border-emerald-100 bg-white p-6">
+            <h2 className="text-xl font-black">View a partner as Admin</h2>
+            <div className="mt-4 space-y-2">
+              {(adminPartners || []).map(row => (
+                <Link key={row.id} href={`/partners/dashboard?partner=${encodeURIComponent(row.slug || "")}`} className="block min-h-11 rounded-xl border border-emerald-100 p-3 text-sm font-black text-emerald-900 hover:bg-emerald-50">
+                  {row.business_name || "Partner"} — View performance
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <p className="text-base font-black text-amber-950">No active SitGuru Partner profile is linked to this account.</p>
+            <p className="mt-2 text-sm font-semibold text-slate-700">Ask SitGuru to connect your partner account to your approved business before viewing private referral data.</p>
+            <Link href="/partners" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-4 text-sm font-black text-white">Partner Network</Link>
+          </section>
+        )}
+      </main>
+    );
+  }
+
+  const code = String(partner.referral_code || "").trim();
+  const since = Date.now() - 30 * 86_400_000;
+  const [registryResult, eventResult, campaignResult, rewardResult, relationshipResult, signupEventResult, bookingResult] = await Promise.all([
+    supabaseAdmin.from("referral_codes").select("id,code").eq("partner_id", partner.id).eq("status", "active").limit(10),
+    supabaseAdmin.from("partner_tracking_events").select("id,event_type,event_source,event_medium,created_at")
+      .eq("partner_id", partner.id).order("created_at", { ascending: false }).limit(4000),
+    supabaseAdmin.from("partner_campaigns").select("id,status").eq("partner_id", partner.id).limit(200),
+    supabaseAdmin.from("partner_rewards").select("id,reward_amount,status").eq("partner_id", partner.id).limit(1000),
+    code ? supabaseAdmin.from("pawperks_referral_relationships").select("id,signup_at,first_booking_at,referred_user_id")
+      .ilike("referral_code", code).limit(1000) : Promise.resolve({ data: [], error: null }),
+    code ? supabaseAdmin.from("pawperks_referral_events").select("id,event_type,occurred_at,referred_user_id")
+      .ilike("submitted_code", code).eq("event_type", "signup_capture").limit(1000) : Promise.resolve({ data: [], error: null }),
+    code ? supabaseAdmin.from("growth_campaign_events").select("id,event_type,created_at,booking_id,user_id,partner_code,referral_code")
+      .ilike("partner_code", code).in("event_type", ["booking","signup"]).limit(1000) : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const registry = (registryResult.data || []) as Row[];
+  const codeIds = registry.map(row => String(row.id || "")).filter(Boolean);
+  const clickResult = codeIds.length
+    ? await supabaseAdmin.from("referral_clicks").select("id,utm_medium,utm_source,created_at")
+      .in("referral_code_id", codeIds).order("created_at", { ascending: false }).limit(4000)
+    : { data: [], error: null };
+  const clicks = (clickResult.data || []) as Row[];
+  const events = (eventResult.data || []) as Row[];
+  const linkVisits = clicks.length
+    ? clicks.filter(row => matchDate(row.created_at,since) && row.utm_medium !== "qr").length
+    : events.filter(row => matchDate(row.created_at,since) && row.event_type === "click" && row.event_medium !== "qr").length;
+  const qrScans = clicks.length
+    ? clicks.filter(row => matchDate(row.created_at,since) && row.utm_medium === "qr").length
+    : events.filter(row => matchDate(row.created_at,since) && row.event_medium === "qr").length;
+
+  const signupKeys = new Set<string>();
+  function captureSignup(id: unknown, date: unknown) {
+    if (!matchDate(date,since) || !id) return;
+    signupKeys.add(String(id));
+  }
+  const relationships = (relationshipResult.data || []) as Row[];
+  relationships.forEach(row => captureSignup(row.referred_user_id || row.id,row.signup_at));
+  ((signupEventResult.data || []) as Row[]).forEach(row => captureSignup(row.referred_user_id || row.id,row.occurred_at));
+  ((bookingResult.data || []) as Row[]).filter(r=>r.event_type==="signup").forEach(row=>captureSignup(row.user_id || row.id,row.created_at));
+
+  const bookings = new Set<string>();
+  relationships.filter(row => matchDate(row.first_booking_at,since)).forEach(row=>bookings.add(String(row.referred_user_id || row.id)));
+  ((bookingResult.data || []) as Row[]).filter(row=>row.event_type==="booking" && matchDate(row.created_at,since))
+    .forEach(row=>bookings.add(String(row.booking_id || row.id)));
+
+  const rewards = (rewardResult.data || []) as Row[];
+  const pendingRewards = rewards.filter(row => ["pending","under_review","approved"].includes(String(row.status || "").toLowerCase()));
+  const pendingAmount = pendingRewards.reduce((sum,row)=>sum+Number(row.reward_amount || 0),0);
+  const campaigns = (campaignResult.data || []) as Row[];
+  const warnings = [registryResult.error, eventResult.error, campaignResult.error, rewardResult.error,
+    relationshipResult.error, signupEventResult.error, bookingResult.error, clickResult.error]
+    .filter(Boolean).map(error => (error as { message: string }).message);
+  const metrics = [
+    { label: "Website visits", value: toNumber(linkVisits), icon: MousePointerClick, subtitle: "Tracked link visits" },
+    { label: "QR scans", value: toNumber(qrScans), icon: QrCode, subtitle: "In-person referrals" },
+    { label: "Signups", value: toNumber(signupKeys.size), icon: Users, subtitle: "Captured signups" },
+    { label: "Bookings", value: toNumber(bookings.size), icon: BadgeCheck, subtitle: "Attributed booking events" },
+    { label: "Campaigns", value: toNumber(campaigns.filter(c=>c.status==="active").length), icon: TrendingUp, subtitle: "Active partner campaigns" },
+    { label: "Rewards in review", value: "$" + pendingAmount.toFixed(2), icon: Handshake, subtitle: "Subject to approval" },
+  ];
+
   return (
-    <main className="min-h-screen bg-[#f7f8f4] px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[2rem] border border-[#dfe7df] bg-white shadow-sm">
-          <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="bg-[radial-gradient(circle_at_top_left,_rgba(52,211,153,0.24),_transparent_34%),linear-gradient(135deg,#064e3b_0%,#047857_55%,#065f46_100%)] p-8 text-white sm:p-10">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black text-white shadow-sm backdrop-blur">
-                <Handshake className="h-4 w-4" />
-                SitGuru Network Program
-              </span>
-
-              <h1 className="mt-8 max-w-2xl text-4xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl">
-                Partner Dashboard
-              </h1>
-
-              <p className="mt-5 max-w-2xl text-base font-bold leading-7 text-white/90">
-                Track your SitGuru partner growth, referrals, rewards, campaigns,
-                and network program activity from one simple dashboard.
-              </p>
-
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/partners/dashboard/community/events"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-emerald-50"
-                >
-                  Open Event Manager
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-
-                <Link
-                  href="/partners/dashboard/referrals"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white shadow-sm backdrop-blur transition hover:bg-white/15"
-                >
-                  Share referral link
-                </Link>
-              </div>
-            </div>
-
-            <div className="p-8 sm:p-10">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-green-700">
-                Network Overview
-              </p>
-
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-green-950">
-                Partner growth center
-              </h2>
-
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-                Use this dashboard to manage the relationship between SitGuru,
-                ambassadors, affiliates, referral partners, local businesses, and
-                community growth programs.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {quickLinks.map((link) => {
-                  const Icon = link.icon;
-
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="flex items-center gap-3 rounded-2xl border border-[#dfe7df] bg-[#f7f8f4] p-4 text-sm font-black text-green-950 transition hover:border-green-300 hover:bg-green-50"
-                    >
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-green-800 shadow-sm">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      {link.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f2fcf8_0%,#ffffff_55%)] px-3 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <section className="rounded-[28px] border border-emerald-100 bg-[linear-gradient(125deg,#c6f4df_0%,#e4fbf5_50%,#e5f2ff_100%)] p-5 sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">SitGuru Partner Network · Private Dashboard</p>
+          <h1 className="mt-2 text-3xl font-black !text-slate-950 sm:text-5xl">Welcome, {partner.business_name || "Partner"}!</h1>
+          <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-700">See what your SitGuru website badge, QR code and introductions are generating. The numbers below are actual recorded events, not sample data.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white bg-white/90 px-4 py-2 text-xs font-black text-emerald-900">Status: {partner.status}</span>
+            <span className="rounded-full border border-white bg-white/90 px-4 py-2 text-xs font-black text-emerald-900">Last 30 days</span>
+            <Link href="/partners/dashboard/community/events" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-800 px-4 text-xs font-black text-white">Pet Event Manager</Link>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {partnerStats.map((stat) => {
-            const Icon = stat.icon;
-
-            return (
-              <ThemeStatCard
-                key={stat.label}
-                label={stat.label}
-                value={stat.value}
-                helper={stat.helper}
-                tone={stat.tone}
-                icon={<Icon className="h-5 w-5" />}
-              />
-            );
-          })}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-3">
-          {actionCards.map((card) => {
-            const Icon = card.icon;
-
-            return (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="group rounded-[2rem] border border-[#dfe7df] bg-white p-6 shadow-sm transition hover:border-green-300 hover:bg-green-50"
-              >
-                <span className="flex h-13 w-13 items-center justify-center rounded-2xl bg-green-800 text-white shadow-sm">
-                  <Icon className="h-6 w-6" />
-                </span>
-
-                <h3 className="mt-5 text-2xl font-black tracking-tight text-green-950">
-                  {card.title}
-                </h3>
-
-                <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-                  {card.description}
-                </p>
-
-                <span className="mt-6 inline-flex items-center gap-2 text-sm font-black text-green-800">
-                  {card.cta}
-                  <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-                </span>
-              </Link>
-            );
-          })}
-        </section>
-
-        <section className="rounded-[2rem] border border-[#dfe7df] bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-green-700">
-                Program Notes
-              </p>
-
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950">
-                SitGuru Network Program
-              </h2>
-
-              <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                Partner dashboards can be wired into admin tracking for referrals,
-                ambassadors, affiliates, rewards, campaign clicks, partner payouts,
-                and approval workflows.
-              </p>
+        <section aria-label="Partner metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {metrics.map(metric=>{const Icon=metric.icon;return(
+            <div key={metric.label} className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+              <Icon size={21} className="text-emerald-700" aria-hidden="true"/>
+              <p className="mt-2 text-xs font-black text-slate-600">{metric.label}</p>
+              <p className="mt-2 text-3xl font-black tabular-nums text-emerald-950">{metric.value}</p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">{metric.subtitle}</p>
             </div>
+          )})}
+        </section>
 
-            <Link
-              href="/partners/apply"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
-            >
-              <Sparkles className="h-4 w-4" />
-              Apply or update profile
-            </Link>
+        {code && partner.slug ? (
+          <PartnerMarketingKitClient partnerName={partner.business_name || "SitGuru Partner"} referralCode={code} slug={partner.slug}/>
+        ) : (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-950">
+            Your partner profile needs a referral code and link before promotion. Contact SitGuru Admin to complete setup.
+          </section>
+        )}
+        <section id="partner-rewards" className="rounded-[26px] border border-emerald-100 bg-white p-5">
+          <h2 className="text-2xl font-black text-emerald-950">Your referral activity</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">Link visits, QR scans, signups and booking events are measured separately. Rewards are subject to the agreed partner program and review.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl bg-emerald-50 p-4"><p className="text-xs font-bold text-slate-600">Code status</p><p className="mt-2 text-lg font-black text-emerald-950">{registry.length ? "Connected" : "Registry link pending"}</p></div>
+            <div className="rounded-xl bg-emerald-50 p-4"><p className="text-xs font-bold text-slate-600">Open reward reviews</p><p className="mt-2 text-lg font-black text-emerald-950">{pendingRewards.length}</p></div>
+            <div className="rounded-xl bg-emerald-50 p-4"><p className="text-xs font-bold text-slate-600">Most recent visit</p><p className="mt-2 text-lg font-black text-emerald-950">{clicks[0]?.created_at || events[0]?.created_at ? new Date(String(clicks[0]?.created_at || events[0]?.created_at)).toLocaleDateString("en-US") : "Not yet"}</p></div>
           </div>
         </section>
+        {warnings.length ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-950">Tracking sources require attention: {warnings.join(" · ")}</p> : null}
       </div>
     </main>
   );
