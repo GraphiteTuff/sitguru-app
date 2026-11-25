@@ -67,6 +67,8 @@ import {
   type HqNavIcon,
 } from "@/lib/admin/hq-nav";
 import { DESK_BANNER, DESK_LOGO, DESK_UI } from "@/lib/portal/desk-ui";
+import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
 
 const HQ_ICON_MAP: Record<
   HqNavIcon,
@@ -453,127 +455,133 @@ function MobileNav({
   growthOnly?: boolean;
   modules?: AdminNavAccess | null;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  useBrowserChromeInset();
+
   const allow = (href: string) =>
     !modules || href === "/" || isAdminPathAllowedForModules(href, modules);
 
-  const primaryLinks = growthOnly
-    ? (growthNavSections[0]?.items || []).slice(0, 6)
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    document.body.setAttribute("data-sitguru-more-open", "1");
+    return () => document.body.removeAttribute("data-sitguru-more-open");
+  }, [moreOpen]);
+
+  const primary = growthOnly
+    ? growthNavSections[0]?.items.slice(0, 4) ?? []
     : [
-        ...mobileQuickLinks.filter((item) => item.featured && allow(item.href)),
-        ...topHeaderLinks
-          .filter((item) => allow(item.href))
-          .filter(
-            (item) =>
-              !mobileQuickLinks.some((quick) => quick.href === item.href) &&
-              item.href !== "/admin/messages",
-          )
-          .slice(0, 4)
-          .map((item) => ({
-            label: item.label,
-            href: item.href,
-            icon: Home,
-            description: "",
-            featured: false,
-          })),
+        { label: "Home", href: adminRoutes.dashboard, icon: Home },
+        { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
+        { label: "Pet Parents", href: adminRoutes.petParents, icon: Users },
+        { label: "Messages", href: adminRoutes.messages, icon: MessageCircle },
+        { label: "Growth", href: adminRoutes.growth, icon: Megaphone },
+        { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
+        { label: "HR", href: adminRoutes.hr, icon: HeartHandshake },
       ];
+  const tabs = primary.filter((item) => allow(item.href)).slice(0, 4);
+  const moreSections = [
+    {
+      title: "Quick Access",
+      links: mobileQuickLinks
+        .filter((item) => allow(item.href))
+        .map((item) => ({ label: item.label, href: item.href, icon: item.icon })),
+    },
+    {
+      title: "Growth, HR & University",
+      links: mobileGrowthLinks.filter((item) => allow(item.href)),
+    },
+    ...navSections
+      .filter((section) => !modules || isNavSectionOn(section.title, modules))
+      .map((section) => ({
+        title: section.title,
+        links: section.items.filter((item) => allow(item.href)),
+      })),
+  ].filter((section) => section.links.length > 0);
+  const moreActive = !tabs.some((item) => isActivePath(pathname, item.href)) && pathname !== adminRoutes.dashboard;
 
   return (
-    <div className="border-t border-slate-200/80 bg-white px-3 py-2 lg:hidden">
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {primaryLinks.map((item) => {
-          const Icon = item.icon;
-          const active = isActivePath(pathname, item.href);
-          const featured = "featured" in item ? Boolean(item.featured) : false;
-          return (
-            <Link
-              key={`${item.href}-${item.label}`}
-              href={item.href}
-              className={
-                featured || active
-                  ? `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold ${DESK_UI.sidebarActive}`
-                  : "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 py-2 text-[11px] font-bold text-[#0F2744]"
-              }
-            >
-              <Icon size={14} className="shrink-0 opacity-90" />
-              <span className="whitespace-nowrap">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {growthOnly ? null : (
-        <details className={`group mt-2 ${DESK_UI.card}`}>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-black text-[#0F2744] marker:hidden">
-            <span className="flex items-center gap-2">
-              <Gauge size={16} className="text-[#2563EB]" />
-              More HQ
-            </span>
-            <ChevronDown
-              size={16}
-              className="text-[#2563EB] transition group-open:rotate-180"
-            />
-          </summary>
-
-          <div className="grid max-h-[min(58dvh,28rem)] gap-4 overflow-y-auto border-t border-slate-100 p-3">
-            <div>
-              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                HR, University & Growth
-              </p>
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {mobileGrowthLinks.filter((item) => allow(item.href)).map((item) => {
-                  const Icon = item.icon;
-                  const active = isActivePath(pathname, item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={
-                        active
-                          ? `flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${DESK_UI.sidebarActive}`
-                          : "flex items-center gap-2 rounded-2xl bg-[#EEF2F6] px-3 py-2 text-xs font-bold text-[#0F2744]"
-                      }
-                    >
-                      <Icon size={14} />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-
-            {navSections
-              .filter((section) => !modules || isNavSectionOn(section.title, modules))
-              .map((section) => (
-                <div key={section.title}>
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                    {section.title}
-                  </p>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    {section.items.filter((item) => allow(item.href)).map((item) => {
-                      const Icon = item.icon;
-                      const active = isActivePath(pathname, item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={
-                            active
-                              ? `flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${DESK_UI.sidebarActive}`
-                              : "flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] px-3 py-2 text-xs font-bold text-[#0F2744]"
-                          }
-                        >
-                          <Icon size={14} />
-                          <span className="truncate">{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
+    <>
+      {moreOpen ? (
+        <div
+          className="fixed inset-x-0 z-[97] px-3 lg:hidden"
+          style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}
+          data-admin-more-panel
+        >
+          <nav
+            aria-label="More Admin HQ areas"
+            className="max-h-[min(60dvh,30rem)] overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-3 shadow-2xl"
+          >
+            {moreSections.map((section) => (
+              <section key={section.title} className="mb-3 last:mb-0">
+                <h3 className="px-2 pb-2 text-[11px] font-black uppercase tracking-wider text-emerald-800">{section.title}</h3>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {section.links.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActivePath(pathname, item.href);
+                    return (
+                      <Link
+                        key={item.href + item.label}
+                        href={item.href}
+                        onClick={() => setMoreOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-bold ${active ? NAV.active : NAV.idle}`}
+                      >
+                        <Icon size={19} aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
-              ))}
-          </div>
-        </details>
-      )}
-    </div>
+              </section>
+            ))}
+          </nav>
+        </div>
+      ) : null}
+
+      <nav
+        aria-label="SitGuru Admin HQ mobile navigation"
+        data-admin-bottom-nav
+        className={`${NAV.surface} !z-[96] lg:hidden`}
+        style={SITGURU_MOBILE_NAV_INSET}
+      >
+        <div className={NAV.grid}>
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                onClick={() => setMoreOpen(false)}
+                className={`${NAV.tab} ${active ? NAV.active : NAV.idle}`}
+              >
+                <span className={`${NAV.icon} ${active ? NAV.iconActive : ""}`}>
+                  <Icon className={`${NAV.iconSize} ${active ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden="true" />
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-label="More Admin HQ pages"
+            className={`${NAV.tab} ${moreOpen || moreActive ? NAV.active : NAV.idle}`}
+          >
+            <span className={`${NAV.icon} ${moreOpen || moreActive ? NAV.iconActive : ""}`}>
+              <FolderOpen className={`${NAV.iconSize} ${moreOpen || moreActive ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`} aria-hidden="true" />
+            </span>
+            <span>More</span>
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
 
