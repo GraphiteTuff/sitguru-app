@@ -9,6 +9,8 @@ on:
       - "app/manager/**"
       - "components/internship/**"
       - "lib/internship/**"
+      - "lib/microsoft/outlook/**"
+      - "components/microsoft/InternshipOutlook.tsx"
       - "scripts/*preview*"
       - "scripts/internship-migration-smoke.mjs"
       - "supabase/migrations/*internship*"
@@ -47,6 +49,7 @@ jobs:
       - run: npm run test:desks
       - run: node --import tsx --test lib/internship/*.test.ts
       - run: node scripts/internship-migration-smoke.mjs
+      - run: npx --no-install tsx --test lib/microsoft/outlook/outlook.test.ts
       - run: npm run build:isolated
       - run: npm ci --include=dev
         working-directory: sitguru-mobile

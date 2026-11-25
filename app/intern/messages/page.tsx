@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import ManagerMessagesHome from "@/components/manager/ManagerMessagesHome";
 import { loadStaffInbox } from "@/lib/messaging/staff-data";
@@ -18,15 +19,18 @@ export default async function InternMessagesPage({
   const inbox = await loadStaffInbox(access.actor.id, false, "intern");
 
   return (
-    <ManagerMessagesHome
-      me={inbox.me}
-      conversations={inbox.conversations}
-      showAdminRecord={false}
-      returnTo="/intern/messages"
-      notice={error || notice || null}
-      noticeError={Boolean(error)}
-      audience="intern"
-      initialConversationId={initialConversationId}
-    />
+    <div className="space-y-4">
+      <Link prefetch={false} href="/intern/outlook" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-900 bg-white px-3 text-sm font-semibold text-emerald-950">Outlook Inbox</Link>
+      <ManagerMessagesHome
+        me={inbox.me}
+        conversations={inbox.conversations}
+        showAdminRecord={false}
+        returnTo="/intern/messages"
+        notice={error || notice || null}
+        noticeError={Boolean(error)}
+        audience="intern"
+        initialConversationId={initialConversationId}
+      />
+    </div>
   );
 }
