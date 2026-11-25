@@ -1,3 +1,4 @@
+import InternshipPrelaunch from "@/components/internship/InternshipPrelaunch";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadManagerDeskBundle } from "@/lib/admin/growth/manager-desk-data";
 import ManagerDeskHome from "@/components/manager/ManagerDeskHome";
@@ -29,5 +30,5 @@ export default async function ManagerPortalHomePage({
     desk.viewingUserId || access.actor.id,
     desk.viewingUserId ? false : access.actor.isSuperUser,
   );
-  return <ManagerDeskHome desk={desk} pendingContent={pendingContent} />;
+  return <><InternshipPrelaunch mode="manager" /><ManagerDeskHome desk={desk} pendingContent={pendingContent} /></>;
 }

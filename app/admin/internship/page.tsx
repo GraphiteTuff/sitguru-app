@@ -1,3 +1,4 @@
+import InternshipPrelaunch from "@/components/internship/InternshipPrelaunch";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -34,6 +35,7 @@ export default async function InternshipProgramDashboardPage({
           </Link>
         </div>
       ) : null}
+      {actor.isSuperUser ? <InternshipPrelaunch mode="admin" /> : null}
       <InternshipProgramCommandCenter
       canAdminister={canAdministerInternshipOnboarding(actor)}
       cohortName={formatCohortHeadline(cohort || { name: INTERNSHIP_PROGRAM_NAME })}
