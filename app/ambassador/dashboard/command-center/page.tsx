@@ -1264,6 +1264,35 @@ export default function AmbassadorCommandCenterPage() {
     useState<LeadFormState>(newLeadForm());
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  useEffect(() => {
+    // Follow direct links from the mobile Ambassador home into the right tool.
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get("view");
+    if (
+      requestedView === "today" ||
+      requestedView === "calendar" ||
+      requestedView === "activities" ||
+      requestedView === "marketing" ||
+      requestedView === "leads"
+    ) {
+      setView(requestedView);
+    }
+
+    if (params.get("new") === "lead") {
+      setEditingId(null);
+      setLeadForm(newLeadForm());
+      setComposer("lead");
+    } else if (params.get("new") === "activity") {
+      setEditingId(null);
+      setActivityForm(newActivityForm());
+      setComposer("activity");
+    } else if (params.get("new") === "marketing") {
+      setEditingId(null);
+      setMarketingForm(newMarketingForm());
+      setComposer("marketing_effort");
+    }
+  }, []);
+
   const loadData = useCallback(async (quiet = false) => {
     quiet ? setRefreshing(true) : setLoading(true);
 
