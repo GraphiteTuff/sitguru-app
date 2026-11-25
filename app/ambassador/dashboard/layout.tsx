@@ -11,6 +11,7 @@ import {
   Headphones,
   LayoutDashboard,
   LineChart,
+  Menu,
   MessageCircle,
   QrCode,
   Share2,
@@ -122,7 +123,7 @@ export default function AmbassadorDashboardLayout({
 
             <nav
               aria-label="Ambassador dashboard navigation"
-              className="min-w-0 flex-1 overflow-x-auto"
+              className="hidden min-w-0 flex-1 overflow-x-auto lg:block"
             >
               <div className="ml-auto flex w-max items-center gap-1.5 py-1">
                 {navItems.map((item) => {
@@ -147,13 +148,44 @@ export default function AmbassadorDashboardLayout({
               </div>
             </nav>
 
-            <SiteAccountMenu compact />
+            <div className="flex shrink-0 items-center gap-2">
+              <details className="relative lg:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 text-sm font-black text-green-900 marker:content-none">
+                  <Menu size={19} aria-hidden="true" />
+                  Menu
+                </summary>
+                <nav
+                  aria-label="All Ambassador pages"
+                  className="absolute right-0 top-full z-[70] mt-2 max-h-[70svh] w-[min(88vw,290px)] overflow-y-auto rounded-2xl border border-green-100 bg-white p-2 shadow-xl"
+                >
+                  {navItems.map((item) => {
+                    const active = item.isActive(pathname);
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-sm font-black transition ${
+                          active
+                            ? "bg-green-800 text-white"
+                            : "text-slate-700 hover:bg-green-50 hover:text-green-900"
+                        }`}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </details>
+              <SiteAccountMenu compact />
+            </div>
           </div>
         </div>
       </header>
 
       {isDashboardHome ? (
-        <section className="border-b border-sky-100 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_48%,#f0fdf4_100%)]">
+        <section className="hidden border-b border-sky-100 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_48%,#f0fdf4_100%)] lg:block">
           <div className="mx-auto max-w-[1500px] px-3 py-4 sm:px-5 lg:px-6">
             <Link
               href="/ambassador/dashboard/command-center"
@@ -229,6 +261,38 @@ export default function AmbassadorDashboardLayout({
       ) : null}
 
       {children}
+
+      <nav
+        aria-label="Ambassador quick navigation"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-green-100 bg-white/95 px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden"
+      >
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1 py-1.5">
+          {[
+            { label: "Home", href: "/ambassador/dashboard", icon: <LayoutDashboard size={21} /> },
+            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: <QrCode size={21} /> },
+            { label: "Social", href: "/ambassador/dashboard/social", icon: <Share2 size={21} /> },
+            { label: "Portal", href: "/ambassador/dashboard/command-center", icon: <BriefcaseBusiness size={21} /> },
+            { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: <MessageCircle size={21} /> },
+          ].map((item) => {
+            const itemPath = item.href.split("?")[0];
+            const active = pathname === itemPath ||
+              (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 ${
+                  active ? "bg-green-800 text-white" : "text-slate-600 hover:bg-green-50 hover:text-green-900"
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
