@@ -217,7 +217,7 @@ export default function AmbassadorDashboardLayout({
         <div className={NAV.grid}>
           {[
             { label: "Home", href: "/ambassador/dashboard", icon: LayoutDashboard },
-            { label: "My QR", href: "/ambassador/dashboard/referrals", icon: QrCode },
+            { label: "My QR", href: "/ambassador/dashboard/referrals#ambassador-card", icon: QrCode },
             { label: "Social", href: "/ambassador/dashboard/social", icon: Share2 },
             { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: BriefcaseBusiness },
             { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: MessageCircle },
