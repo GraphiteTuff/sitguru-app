@@ -4,9 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowRight,
   BriefcaseBusiness,
-  CalendarDays,
   GraduationCap,
   Headphones,
   LayoutDashboard,
@@ -33,14 +31,14 @@ type AmbassadorNavItem = {
 
 const navItems: AmbassadorNavItem[] = [
   {
-    label: "Dashboard",
+    label: "Home",
     href: "/ambassador/dashboard",
     icon: <LayoutDashboard size={16} />,
     isActive: (pathname) => pathname === "/ambassador/dashboard",
   },
   {
-    label: "Portal",
-    href: "/ambassador/dashboard/command-center",
+    label: "Workspace",
+    href: "/ambassador/dashboard#ambassador-workspace",
     icon: <BriefcaseBusiness size={16} />,
     isActive: (pathname) =>
       pathname.startsWith("/ambassador/dashboard/command-center"),
@@ -101,10 +99,9 @@ export default function AmbassadorDashboardLayout({
   children,
 }: AmbassadorDashboardLayoutProps) {
   const pathname = usePathname();
-  const isDashboardHome = pathname === "/ambassador/dashboard";
 
   return (
-    <div className="min-h-[100svh] bg-[linear-gradient(180deg,#F7FBFD_0%,#F3FAF8_48%,#EEF6FF_100%)]">
+    <div className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#effcf5_100%)]">
       <header className="sticky top-0 z-50 border-b border-sky-100 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto max-w-[1500px] px-3 sm:px-5 lg:px-6">
           <div className="flex min-h-16 items-center justify-between gap-4 py-2">
@@ -117,7 +114,7 @@ export default function AmbassadorDashboardLayout({
                 SitGuru Ambassador
               </p>
               <p className="truncate text-base font-black tracking-tight text-slate-950">
-                Dashboard & Portal
+                My Workspace
               </p>
             </Link>
 
@@ -184,86 +181,11 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      {isDashboardHome ? (
-        <section className="hidden border-b border-sky-100 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_48%,#f0fdf4_100%)] lg:block">
-          <div className="mx-auto max-w-[1500px] px-3 py-4 sm:px-5 lg:px-6">
-            <Link
-              href="/ambassador/dashboard/command-center"
-              className="group flex flex-col gap-4 rounded-[24px] border border-sky-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] text-white shadow-sm">
-                  <BriefcaseBusiness size={23} />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
-                    Your Working Area
-                  </p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                    Open the SitGuru Ambassador Portal
-                  </h2>
-                  <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
-                    Schedule activities, manage your calendar, record events and
-                    marketing, submit leads, track hours and results, and request
-                    help from SitGuru Support.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {[
-                      {
-                        label: "Calendar",
-                        icon: <CalendarDays size={13} />,
-                      },
-                      {
-                        label: "Activities",
-                        icon: <LayoutDashboard size={13} />,
-                      },
-                      {
-                        label: "Marketing",
-                        icon: <Share2 size={13} />,
-                      },
-                      {
-                        label: "Leads",
-                        icon: <Users size={13} />,
-                      },
-                      {
-                        label: "QR & Referrals",
-                        icon: <QrCode size={13} />,
-                      },
-                      {
-                        label: "Support",
-                        icon: <MessageCircle size={13} />,
-                      },
-                    ].map((item) => (
-                      <span
-                        key={item.label}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-green-100 bg-green-50 px-2.5 py-1 text-[10px] font-black text-green-900"
-                      >
-                        {item.icon}
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <span className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-2 text-sm font-black text-white transition group-hover:bg-green-900">
-                Open Portal
-                <ArrowRight
-                  size={16}
-                  className="transition group-hover:translate-x-0.5"
-                />
-              </span>
-            </Link>
-          </div>
-        </section>
-      ) : null}
-
       <div className="pb-24 lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
+        data-ambassador-bottom-nav
         className="fixed inset-x-0 bottom-0 z-50 border-t border-green-100 bg-white/95 px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden"
       >
         <div className="mx-auto grid max-w-lg grid-cols-5 gap-1 py-1.5">
@@ -271,10 +193,10 @@ export default function AmbassadorDashboardLayout({
             { label: "Home", href: "/ambassador/dashboard", icon: <LayoutDashboard size={21} /> },
             { label: "My QR", href: "/ambassador/dashboard/referrals", icon: <QrCode size={21} /> },
             { label: "Social", href: "/ambassador/dashboard/social", icon: <Share2 size={21} /> },
-            { label: "Portal", href: "/ambassador/dashboard/command-center", icon: <BriefcaseBusiness size={21} /> },
+            { label: "Workspace", href: "/ambassador/dashboard#ambassador-workspace", icon: <BriefcaseBusiness size={21} /> },
             { label: "Inbox", href: "/ambassador/dashboard/messages?support=admin&role=ambassador", icon: <MessageCircle size={21} /> },
           ].map((item) => {
-            const itemPath = item.href.split("?")[0];
+            const itemPath = item.href.split("?")[0].split("#")[0];
             const active = pathname === itemPath ||
               (itemPath !== "/ambassador/dashboard" && pathname.startsWith(itemPath + "/"));
             return (
