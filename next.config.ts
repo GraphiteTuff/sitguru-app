@@ -104,6 +104,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/partners/annabel-s-touch-chiropractic",
+        destination: "/partners/spotlight/dr-gracyn-baldwin",
+        permanent: true,
+      },
+      {
         source: "/help-center",
         destination: "/help",
         permanent: true,
