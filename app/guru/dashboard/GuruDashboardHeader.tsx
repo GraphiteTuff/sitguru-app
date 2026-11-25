@@ -21,7 +21,7 @@ type ActiveGuruTab =
   | "earnings";
 
 type GuruDashboardHeaderProps = {
-  guruProfile?: Record<string, unknown> | null;
+  guruProfile?: unknown;
   activeTab?: ActiveGuruTab;
   active?: ActiveGuruTab;
   displayName?: string | null;
