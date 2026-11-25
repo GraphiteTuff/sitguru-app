@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -30,5 +31,5 @@ export default async function InternCalendarPage() {
     internId: data.workspace.intern.id,
     tasks: data.workspace.tasks,
   });
-  return <DeskCalendar audience="intern" events={events} />;
+  return <div className="space-y-4"><Link prefetch={false} href="/intern/outlook?view=calendar" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-900 bg-white px-3 text-sm font-semibold text-emerald-950">Outlook &amp; SitGuru calendars</Link><DeskCalendar audience="intern" events={events} /></div>;
 }

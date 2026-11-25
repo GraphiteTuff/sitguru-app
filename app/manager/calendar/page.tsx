@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import DeskCalendar from "@/components/portal/DeskCalendar";
 import { internshipActorKind } from "@/lib/internship/manager-access";
@@ -16,5 +17,5 @@ export default async function ManagerCalendarPage() {
     actorKind: kind === "supervisor" ? "supervisor" : "manager",
   });
 
-  return <DeskCalendar audience="manager" events={desk.schedule} />;
+  return <div className="space-y-4"><Link prefetch={false} href="/manager/outlook?view=calendar" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-900 bg-white px-3 text-sm font-semibold text-emerald-950">Outlook &amp; SitGuru calendars</Link><DeskCalendar audience="manager" events={desk.schedule} /></div>;
 }
