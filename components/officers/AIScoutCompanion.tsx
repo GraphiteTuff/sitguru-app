@@ -208,9 +208,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     : buildWorkspaceGreeting(firstName);
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
   const chips = isPublic ? PUBLIC_CHIPS : WORKSPACE_CHIPS;
-  const tipText = isPublic
-    ? "Hi! I'm Scout — tap to chat. I'll guide your Guru setup, checks, and earnings path!"
-    : `Hi ${firstName}! I'm Scout — tap to chat about your schedule, trails, and payouts.`;
+
 
   useEffect(() => {
     try {
@@ -581,18 +579,6 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
             </form>
           </div>
         </div>
-      ) : null}
-
-      {!isOpen ? (
-        <button
-          type="button"
-          className="homepage-chat-tip"
-          onClick={() => setIsOpen(true)}
-          aria-label="Open chat with Scout, Guru Matching Officer"
-        >
-          <span className="homepage-chat-tip__pulse" aria-hidden />
-          <span className="homepage-chat-tip__text">{tipText}</span>
-        </button>
       ) : null}
 
       {!isOpen ? (

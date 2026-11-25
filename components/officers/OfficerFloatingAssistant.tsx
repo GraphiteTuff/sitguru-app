@@ -54,6 +54,8 @@ export type OfficerFloatingAssistantProps = {
   avatarSrc: string;
   greetingMarkdown: string;
   tipStatement: string;
+  /** Show the greeting teaser while closed; Scout uses avatar only. */
+  showTip?: boolean;
   composerPlaceholder: string;
   footerLabel: string;
   subtitle: string;
@@ -317,6 +319,7 @@ export default function OfficerFloatingAssistant({
   avatarSrc,
   greetingMarkdown,
   tipStatement,
+  showTip = true,
   composerPlaceholder,
   footerLabel,
   subtitle,
@@ -546,7 +549,7 @@ export default function OfficerFloatingAssistant({
       }
     >
       <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
-        {!open ? (
+        {!open && showTip ? (
           <button
             type="button"
             className="homepage-chat-tip"

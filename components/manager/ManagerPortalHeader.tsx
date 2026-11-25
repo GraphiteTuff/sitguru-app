@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Megaphone, Users } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import NotificationBell from "@/components/NotificationBell";
 import {
   MANAGER_PORTAL_BRAND,
   MANAGER_PORTAL_NAV,
@@ -75,6 +76,7 @@ export default function ManagerPortalHeader() {
           >
             Admin Growth
           </Link>
+          <NotificationBell compact />
           <SiteAccountMenu variant="desk" inlineSwitcher />
         </div>
       </div>

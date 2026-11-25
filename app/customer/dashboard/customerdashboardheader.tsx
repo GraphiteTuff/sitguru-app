@@ -72,7 +72,7 @@ export default function CustomerDashboardHeader(_props: CustomerDashboardHeaderP
           <Link href="/customer/dashboard/bookings" className="hidden min-h-11 items-center rounded-full border border-sky-200 bg-sky-50 px-4 text-sm font-bold text-[#0D5C3A] shadow-sm hover:bg-white md:inline-flex">
             My Care
           </Link>
-          <NotificationBell />
+          <NotificationBell compact />
           <SiteAccountMenu variant="desk" />
         </div>
       </div>

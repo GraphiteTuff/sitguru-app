@@ -131,6 +131,7 @@ export default function ScoutFloatingAssistant({
       displayName={profile.displayName}
       title={isPublic ? "Guru Matching Officer" : profile.title}
       avatarSrc={`${profile.avatarSrc}?v=6`}
+      showTip={false}
       greetingMarkdown={
         isPublic
           ? "**Scout reporting for duty.** I'm here to help you sign up as a Guru and answer onboarding questions — tap a chip or ask away."

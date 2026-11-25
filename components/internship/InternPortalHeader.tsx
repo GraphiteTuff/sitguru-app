@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CircleHelp, GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import NotificationBell from "@/components/NotificationBell";
 import { INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-growth";
 import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
 import {
@@ -82,6 +83,7 @@ export default function InternPortalHeader({
               <span className="hidden sm:inline">Help</span>
             </Link>
           ) : null}
+          <NotificationBell compact />
           <SiteAccountMenu variant="desk" compact />
         </div>
       </div>

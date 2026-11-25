@@ -313,7 +313,7 @@ function createNotificationChannelName(userId: string) {
   return `notifications:${userId}:${randomPart}`;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ compact = false }: { compact?: boolean } = {}) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const previousUnreadCountRef = useRef<number | null>(null);
@@ -692,10 +692,14 @@ export default function NotificationBell() {
             ? `${unreadCount} unread notifications`
             : "Notifications"
         }
-        className={`relative flex h-11 w-11 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-          hasUnreadNotifications
-            ? "border-emerald-200 text-emerald-600"
-            : "border-slate-200 text-slate-700 hover:text-emerald-600"
+        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 ${
+          compact
+            ? hasUnreadNotifications
+              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              : "text-[#0F2744] hover:bg-[#EEF2F6]"
+            : hasUnreadNotifications
+              ? "border border-emerald-200 bg-white text-emerald-600 shadow-sm hover:shadow-md"
+              : "border border-slate-200 bg-white text-slate-700 shadow-sm hover:text-emerald-600 hover:shadow-md"
         }`}
       >
         {hasUnreadNotifications ? (
