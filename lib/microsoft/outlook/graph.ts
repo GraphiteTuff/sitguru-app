@@ -81,12 +81,12 @@ async function graphList<T>(token: string, path: string, query: URLSearchParams,
   let next: URL | null = new URL(`${graph}${path}?${query}`);
   const items: T[] = [];
   for (let page = 0; page < 6 && next; page++) {
-    const response = await fetch(next, {
+    const response: Response = await fetch(next, {
       headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="UTC"' },
       cache: "no-store", redirect: "error", signal,
     });
     if (!response.ok) throw new OutlookGraphError(response.status);
-    const data = await response.json();
+    const data: { value?: T[]; "@odata.nextLink"?: string } = await response.json();
     if (!Array.isArray(data.value)) throw new OutlookGraphError(502);
     items.push(...data.value);
     next = typeof data["@odata.nextLink"] === "string" ? new URL(data["@odata.nextLink"]) : null;
