@@ -29,6 +29,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorQuickStartClient from "@/components/ambassador/AmbassadorQuickStartClient";
+import ReferralResetBanner from "@/components/referrals/ReferralResetBanner";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 import AmbassadorWorkspace from "@/components/ambassador/AmbassadorWorkspace";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import { buildAmbassadorReferralLink } from "@/lib/ambassador/ledger";
@@ -625,11 +627,13 @@ async function safeReferralCount({
   referralCode,
   referralColumns,
   extraFilters = {},
+  periodStart = null,
 }: {
   table: string;
   referralCode: string;
   referralColumns: string[];
   extraFilters?: Record<string, string>;
+  periodStart?: string | null;
 }) {
   const matchingIds = new Set<string>();
 
@@ -640,6 +644,7 @@ async function safeReferralCount({
         .select("id")
         .eq(column, referralCode);
 
+      if (periodStart) query = query.gte("created_at", periodStart);
       Object.entries(extraFilters).forEach(([key, value]) => {
         query = query.eq(key, value);
       });
@@ -662,23 +667,27 @@ async function safeReferralCount({
 
 async function getLegacyReferralStats(
   referralCode: string,
+  periodStart: string | null = null,
 ): Promise<ReferralStats> {
   const [petParentSignups, guruSignups, completedBookings] = await Promise.all([
     safeReferralCount({
       table: "profiles",
       referralCode,
       referralColumns: ["ambassador_referral_code"],
+      periodStart,
     }),
     safeReferralCount({
       table: "guru_applications",
       referralCode,
       referralColumns: ["ambassador_referral_code", "referral_code"],
+      periodStart,
     }),
     safeReferralCount({
       table: "bookings",
       referralCode,
       referralColumns: ["ambassador_referral_code", "referral_code"],
       extraFilters: { status: "completed" },
+      periodStart,
     }),
   ]);
 
@@ -704,12 +713,13 @@ async function getLegacyReferralStats(
 
 async function getCanonicalReferralStats(
   ambassadorId: string,
+  periodStart: string | null = null,
 ): Promise<ReferralStats | null> {
   try {
     const [referralResult, rewardResult] = await Promise.all([
       supabaseAdmin
         .from("ambassador_referrals")
-        .select("id, referral_type, status, booking_status, source, medium, campaign, platform")
+        .select("id, referral_type, status, booking_status, source, medium, campaign, platform, signup_date, created_at, completed_booking_at")
         .eq("ambassador_id", ambassadorId)
         .limit(5000),
       supabaseAdmin
@@ -723,7 +733,9 @@ async function getCanonicalReferralStats(
       return null;
     }
 
-    const referrals = (referralResult.data || []) as AnyRow[];
+    const allReferrals = (referralResult.data || []) as AnyRow[];
+    const referrals = allReferrals.filter(row => isReferralActivitySince(asString(row.signup_date) || asString(row.created_at), periodStart));
+    const periodBookings = allReferrals.filter(row => isReferralActivitySince(row.completed_booking_at, periodStart));
     const rewards = (rewardResult.data || []) as AnyRow[];
     const socialPlatforms: SocialPlatformStats = {
       facebook: 0,
@@ -763,10 +775,10 @@ async function getCanonicalReferralStats(
       businessSignups: referrals.filter(
         (row) => asString(row.referral_type).toLowerCase() === "business",
       ).length,
-      completedBookings: referrals.filter((row) =>
+      completedBookings: (periodStart ? periodBookings : referrals).filter((row) =>
         ["booking_completed", "completed"].includes(
           asString(row.booking_status).toLowerCase(),
-        ),
+        ) || Boolean(row.completed_booking_at),
       ).length,
       socialSignups,
       socialPlatforms,
@@ -783,17 +795,19 @@ async function getCanonicalReferralStats(
 async function getReferralStats({
   ambassadorId,
   referralCode,
+  periodStart = null,
 }: {
   ambassadorId: string;
   referralCode: string;
+  periodStart?: string | null;
 }): Promise<ReferralStats> {
-  const canonical = await getCanonicalReferralStats(ambassadorId);
+  const canonical = await getCanonicalReferralStats(ambassadorId, periodStart);
 
   if (canonical) {
     return canonical;
   }
 
-  return getLegacyReferralStats(referralCode);
+  return getLegacyReferralStats(referralCode, periodStart);
 }
 
 async function getTrainingProgressSummary({
@@ -1100,12 +1114,19 @@ export default async function AmbassadorDashboardPage() {
       process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
       "/videos/sitguru-ambassador-promo.mp4",
   );
+  const epoch = await getReferralReportingEpoch();
   const [
     stats,
+    lifetimeStats,
     onboardingPacket,
     trainingProgress,
     referralLandingSlug,
   ] = await Promise.all([
+    getReferralStats({
+      ambassadorId: ambassadorRecord.id,
+      referralCode,
+      periodStart: epoch?.startedAt ?? null,
+    }),
     getReferralStats({
       ambassadorId: ambassadorRecord.id,
       referralCode,
@@ -1138,22 +1159,22 @@ export default async function AmbassadorDashboardPage() {
     stats.guruSignups +
     stats.businessSignups;
   const approvedAndReady =
-    stats.approvedRewards + stats.readyRewards;
+    lifetimeStats.approvedRewards + lifetimeStats.readyRewards;
   const socialMilestones = [
     {
       verified: 25,
       reward: 25,
-      reached: stats.socialSignups >= 25,
+      reached: lifetimeStats.socialSignups >= 25,
     },
     {
       verified: 50,
       reward: 100,
-      reached: stats.socialSignups >= 50,
+      reached: lifetimeStats.socialSignups >= 50,
     },
     {
       verified: 150,
       reward: 200,
-      reached: stats.socialSignups >= 150,
+      reached: lifetimeStats.socialSignups >= 150,
     },
   ];
   const nextSocialMilestone =
@@ -1163,6 +1184,7 @@ export default async function AmbassadorDashboardPage() {
   return (
     <main className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#effcf5_100%)] px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
+        <ReferralResetBanner epoch={epoch} />
         <div className="space-y-4">
           <AmbassadorQuickStartClient
             firstName={firstName}
