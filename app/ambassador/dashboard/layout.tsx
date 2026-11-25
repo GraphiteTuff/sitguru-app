@@ -160,9 +160,9 @@ export default function AmbassadorDashboardLayout({
 
             <div className="flex shrink-0 items-center gap-2">
               <details key={pathname} className="relative lg:hidden">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 text-sm font-black text-green-900 marker:content-none">
+                <summary aria-label="Ambassador pages menu" className="flex h-11 w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-green-200 bg-green-50 text-sm font-black text-green-900 marker:content-none sm:w-auto sm:rounded-xl sm:px-3">
                   <Menu size={19} aria-hidden="true" />
-                  Menu
+                  <span className="hidden sm:inline">Menu</span>
                 </summary>
                 <nav
                   aria-label="All Ambassador pages"
