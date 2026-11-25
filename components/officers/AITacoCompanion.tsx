@@ -440,8 +440,9 @@ export default function AITacoCompanion({
   return createPortal(
     <div
       className={COMPANION_DOCK_CLASS}
-      data-ai-taco-companion
+      data-ai-taco-companion="true"
       data-taco-mode={resolvedMode}
+      data-taco-open={isOpen ? "true" : "false"}
     >
       {isOpen ? (
         <div
@@ -672,7 +673,7 @@ export default function AITacoCompanion({
         </div>
       ) : null}
 
-      {!isOpen ? (
+      {!isOpen && isOnboarding ? (
         <button
           type="button"
           className="homepage-chat-tip"
@@ -689,6 +690,7 @@ export default function AITacoCompanion({
           type="button"
           onClick={() => setIsOpen(true)}
           aria-label="Open Taco AI Companion"
+          title="Ask Taco"
           aria-expanded={false}
           className="homepage-chat-launcher"
         >
