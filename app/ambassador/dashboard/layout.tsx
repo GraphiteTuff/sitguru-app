@@ -33,13 +33,6 @@ type AmbassadorNavItem = {
 
 const navItems: AmbassadorNavItem[] = [
   {
-    label: "Performance",
-    href: "/ambassador/dashboard/performance",
-    icon: <LineChart size={16} />,
-    isActive: (pathname) =>
-      pathname.startsWith("/ambassador/dashboard/performance"),
-  },
-  {
     label: "Dashboard",
     href: "/ambassador/dashboard",
     icon: <LayoutDashboard size={16} />,
@@ -65,6 +58,13 @@ const navItems: AmbassadorNavItem[] = [
     icon: <Share2 size={16} />,
     isActive: (pathname) =>
       pathname.startsWith("/ambassador/dashboard/social"),
+  },
+  {
+    label: "Performance",
+    href: "/ambassador/dashboard/performance",
+    icon: <LineChart size={16} />,
+    isActive: (pathname) =>
+      pathname.startsWith("/ambassador/dashboard/performance"),
   },
   {
     label: "Training",
@@ -149,7 +149,7 @@ export default function AmbassadorDashboardLayout({
             </nav>
 
             <div className="flex shrink-0 items-center gap-2">
-              <details className="relative lg:hidden">
+              <details key={pathname} className="relative lg:hidden">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 text-sm font-black text-green-900 marker:content-none">
                   <Menu size={19} aria-hidden="true" />
                   Menu
@@ -260,7 +260,7 @@ export default function AmbassadorDashboardLayout({
         </section>
       ) : null}
 
-      {children}
+      <div className="pb-24 lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
