@@ -31,7 +31,7 @@ export const SYLLABUS_CORE_DELIVERABLES = [
     id: "content",
     letter: "C",
     title: "Social media calendar & creative materials",
-    objective: "Create audience-specific content for Pet Parents, Gurus, and community partners.",
+    objective: "Create audience-specific content for Pet Parents, Gurus, Ambassadors, and community partners.",
     evidence: "Dated content calendar, caption and creative drafts, calls to action, and approval records.",
     model: "Example scope: 4-week editorial calendar and 12 proposed posts/assets.",
     phase: "Plan",
@@ -49,8 +49,8 @@ export const SYLLABUS_CORE_DELIVERABLES = [
     id: "community",
     letter: "E",
     title: "Community growth & partnership opportunities",
-    objective: "Identify useful local partners and opportunities for marketplace engagement.",
-    evidence: "Outreach research, relevance assessment, prioritized partner recommendations.",
+    objective: "Develop campus growth, local outreach, business and media partnerships, events and approved sponsorship opportunities for Gurus, Pet Parents and Ambassadors.",
+    evidence: "Outreach research, campus plans, prioritized partner recommendations, approved marketing kits, placement evidence and attributable results.",
     model: "Example scope: assess 10 prospects and prioritize at least 3.",
     phase: "Execute",
   },
@@ -105,31 +105,31 @@ export const SYLLABUS_PHASES = [
   {
     label: "Weeks 1–2",
     title: "Discover & baseline",
-    description: "Onboard; understand SitGuru, its users and market; research audiences and competitors; agree on the initial KPI baseline and SMART goals.",
+    description: "Onboard; understand SitGuru, its users and market; research audiences and competitors; agree on the initial KPI baseline and SMART goals for both growth pillars.",
     output: "Baseline & Growth Brief",
   },
   {
     label: "Weeks 3–5",
     title: "Design & prepare",
-    description: "Build audience strategy, content pillars, editorial calendar, tracking links, campaign briefs, and approval-ready creative.",
+    description: "Build audience strategy, content pillars, editorial calendar, tracking links, campaign briefs, and approval-ready creative, campus outreach plans and partner marketing kits.",
     output: "Campaign & content system",
   },
   {
     label: "Weeks 6–11",
     title: "Execute & learn",
-    description: "Run approved campaigns, partner research, and structured experiments; report measured results and iterate.",
+    description: "Run approved social campaigns, campus outreach, partner initiatives and structured experiments; report measured results and iterate.",
     output: "Verified experiments and midpoint review",
   },
   {
     label: "Weeks 12–14",
     title: "Optimize & hand off",
-    description: "Evaluate what worked, standardize reusable workflows, finalize recommendations, and build a supervisor-approved playbook.",
+    description: "Evaluate what worked, standardize reusable workflows, finalize recommendations for both pillars, document partner handover, and build a supervisor-approved playbook.",
     output: "Market Growth Playbook",
   },
   {
     label: "Week 15",
     title: "Present & close out",
-    description: "Verify hours and source evidence; complete final employer review and any university-specific report or presentation.",
+    description: "Verify hours and source evidence; complete final employer review of both growth pillars and any university-specific report or presentation.",
     output: "Business Growth Report & final presentation",
   },
 ] as const;
@@ -186,3 +186,7 @@ export function syllabusAcademicPlanSummary(input: {
   const weeks = input.weeks != null && input.weeks > 0 ? `${input.weeks} weeks planned` : "Academic schedule pending";
   return [input.courseCode.trim() || "Course pending", credits, hours, weeks];
 }
+
+export const GROWTH_PILLARS = [{id:"community",label:"Community Growth",weight:50},{id:"social",label:"Social Media Growth",weight:50}] as const;
+export const GROWTH_AUDIENCES = ["Gurus","Pet Parents","Ambassadors"] as const;
+export const GROWTH_ALLOCATION_RULE = "Plan 50% of the overall project for each pillar; weekly allocations may vary. Shared activities count once according to their primary purpose. University requirements remain authoritative.";
