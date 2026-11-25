@@ -20,12 +20,29 @@ export type ReferralGrowthReport = {
   dateWindowDays: number;
 };
 
-async function rows(table: string, columns: string, limit: number): Promise<{ data: Row[]; warning: string }> {
+async function rows(
+  table: string, columns: string, limit: number,
+  dateColumn?: string, since?: string,
+): Promise<{ data: Row[]; warning: string }> {
   try {
-    const { data, error } = await supabaseAdmin.from(table).select(columns).limit(limit);
-    if (error) return { data: [], warning: `${table}: ${error.message}` };
-    if ((data || []).length === limit) return { data: data as Row[], warning: `${table}: reporting has reached the ${limit.toLocaleString()}-row window cap` };
-    return { data: (data || []) as Row[], warning: "" };
+    const all: Row[] = [];
+    // PostgREST usually caps responses at 1,000 rows. Explicit pagination
+    // prevents a dashboard from silently reporting only the first page.
+    for (let offset = 0; offset < limit; offset += 900) {
+      const pageSize = Math.min(900, limit - offset);
+      let query = supabaseAdmin.from(table).select(columns);
+      if (dateColumn && since) query = query.gte(dateColumn, since);
+      if (dateColumn) query = query.order(dateColumn, { ascending: false });
+      const { data, error } = await query.range(offset, offset + pageSize - 1);
+      if (error) return { data: all, warning: `${table}: ${error.message}` };
+      const page = (data || []) as Row[];
+      all.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return {
+      data: all,
+      warning: all.length >= limit ? `${table}: ${limit.toLocaleString()}-row reporting cap reached` : "",
+    };
   } catch (error) {
     return { data: [], warning: `${table}: ${error instanceof Error ? error.message : "unavailable"}` };
   }
@@ -38,20 +55,21 @@ async function rows(table: string, columns: string, limit: number): Promise<{ da
  */
 export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<ReferralGrowthReport> {
   const threshold = Date.now() - dateWindowDays * 86_400_000;
+  const isoStart = new Date(threshold).toISOString();
   const since = (date: unknown) => {
     const parsed = Date.parse(str(date));
     return Number.isFinite(parsed) && parsed >= threshold;
   };
   const results = await Promise.all([
     rows("referral_codes", "id,code,owner_type,owner_name,partner_id,ambassador_id,status", 4000),
-    rows("referral_clicks", "id,referral_code_id,utm_medium,utm_source,created_at", 20000),
-    rows("pawperks_referral_events", "id,submitted_code,referred_user_id,referred_email,event_type,occurred_at,source,medium", 20000),
+    rows("referral_clicks", "id,referral_code_id,utm_medium,utm_source,created_at", 20000, "created_at", isoStart),
+    rows("pawperks_referral_events", "id,submitted_code,referred_user_id,referred_email,event_type,occurred_at,source,medium", 20000, "occurred_at", isoStart),
     rows("pawperks_referral_relationships", "id,referral_code,referred_user_id,referred_email,signup_at,first_booking_at,created_at", 6000),
-    rows("partner_tracking_events", "id,partner_id,referral_code,event_type,event_source,event_medium,created_at", 10000),
+    rows("partner_tracking_events", "id,partner_id,referral_code,event_type,event_source,event_medium,created_at", 10000, "created_at", isoStart),
     rows("partners", "id,business_name,referral_code,status", 1000),
     rows("partner_campaigns", "id,partner_id,status", 1000),
     rows("referral_rewards", "id,status,amount", 4000),
-    rows("growth_campaign_events", "id,referral_code,partner_code,ambassador_code,event_type,user_id,booking_id,created_at", 20000),
+    rows("growth_campaign_events", "id,referral_code,partner_code,ambassador_code,event_type,user_id,booking_id,created_at", 20000, "created_at", isoStart),
   ]);
   const [codes, clicks, pawEvents, relationships, partnerEvents, partners, campaigns, rewards, growth] = results.map(r => r.data);
   const warnings = results.map(r => r.warning).filter(Boolean);
@@ -94,7 +112,9 @@ export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<Ref
     recent.push({ date: str(row.created_at), code: item.code, type: str(row.utm_medium) === "qr" ? "QR scan" : "Link visit", channel: str(row.utm_source) || "sitguru" });
   });
   // Only count direct partner_tracking_events when no canonical referral-code ID exists.
-  const partnerById = new Map(partners.map(p => [str(p.id), p]));
+  const partnerById = new Map(partners.map(p => [str(p.id), p] as const));
+  const canonicalActive = new Set<string>();
+  clicks.forEach(row => { if (since(row.created_at)) { const owner = byId.get(str(row.referral_code_id)); if (owner) canonicalActive.add(owner.code); } });
   partnerEvents.forEach(row => {
     if (!since(row.created_at) || !["click","view"].includes(str(row.event_type))) return;
     const partner = partnerById.get(str(row.partner_id));
@@ -105,7 +125,7 @@ export async function loadReferralGrowthReport(dateWindowDays = 30): Promise<Ref
     if (partner) item.name = str(partner.business_name) || item.name;
     // Canonical click storage is authoritative when a referral code has
     // tracked visits. Partner events remain a separate historical source.
-    if (!byCode.has(code) || !codes.some(c => codeKey(c.code) === code)) {
+    if (!canonicalActive.has(code)) {
       if (str(row.event_medium) === "qr") item.qr++;
       else item.visits++;
       touch(item, row.created_at);
