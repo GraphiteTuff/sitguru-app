@@ -381,24 +381,25 @@ export default function CustomerCareCommandCenter({
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_12px_40px_rgba(0,71,43,0.06)]" aria-labelledby="parent-home-welcome">
-        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#f4fff5] via-white to-[#ebf9f0] px-4 py-5 sm:px-7 sm:py-7">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Your SitGuru Pet Parent Home</p>
-            <h1 id="parent-home-welcome" className="mt-1 text-[clamp(1.75rem,4.6vw,2.8rem)] font-black leading-[1.13] tracking-tight text-[#102339]">
-              {"Welcome Back" + (greetingName ? ", " + greetingName : "") + "!"} <span aria-hidden="true" className="text-orange-500">🐾</span>
-            </h1>
-            <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">Your pets, your care, all in one place.</p>
-          </div>
+        <div className="flex items-center gap-3 bg-gradient-to-r from-[#f4fff5] via-white to-[#ebf9f0] px-4 py-5 sm:gap-5 sm:px-7 sm:py-7">
           <Link
             href="/customer/dashboard/profile"
             aria-label="Open your Pet Parent profile"
-            className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-emerald-100 text-xl font-black text-emerald-800 shadow-md sm:h-20 sm:w-20"
+            className="inline-flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-3xl border-4 border-white bg-emerald-100 text-xl font-black text-emerald-800 shadow-md sm:h-24 sm:w-24"
           >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (avatarInitials || "SG")}
           </Link>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Your SitGuru Pet Parent Home</p>
+            <h1 id="parent-home-welcome" className="mt-1 text-[clamp(1.75rem,4.6vw,2.8rem)] font-black leading-[1.13] tracking-tight text-[#102339]">
+              {"Welcome Back" + (greetingName ? ", " + greetingName : "") + "!"} <span aria-hidden="true" className="text-orange-500">🐾</span>
+            </h1>
+            <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">Your pets, your care, all in one place.</p>
+          </div>
+
         </div>
 
         <form onSubmit={findCare} className="relative isolate overflow-hidden bg-gradient-to-br from-[#004c34] via-[#00673e] to-[#007c47] p-4 text-white sm:p-7" aria-label="Find pet care">
