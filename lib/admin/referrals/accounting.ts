@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getReferralReportingEpoch, isReferralActivitySince } from "@/lib/referrals/reporting-epoch";
 
 export type ReferralProgram =
   | "guru"
@@ -124,9 +125,11 @@ function personName(...values: unknown[]) {
   return values.map((value) => text(value)).find(Boolean) || "";
 }
 
-async function safeSelect(table: string, limit = 4000) {
+async function safeSelect(table: string, limit = 4000, since: string | null = null) {
   try {
-    const { data, error } = await supabaseAdmin.from(table).select("*").limit(limit);
+    let query = supabaseAdmin.from(table).select("*").limit(limit);
+    if (since) query = query.gte("occurred_at", since).order("occurred_at", { ascending: false });
+    const { data, error } = await query;
     if (error) {
       return { rows: [] as AnyRow[], warning: `${table}: ${error.message}` };
     }
@@ -178,7 +181,10 @@ export function filterAccounting(
   };
 }
 
-export async function loadReferralAccounting(): Promise<ReferralAccounting> {
+export async function loadReferralAccounting(periodStart?: string | null): Promise<ReferralAccounting> {
+  const resolvedStart = periodStart === undefined
+    ? (await getReferralReportingEpoch())?.startedAt ?? null
+    : periodStart;
   const [
     codesResult,
     canonicalResult,
@@ -189,7 +195,7 @@ export async function loadReferralAccounting(): Promise<ReferralAccounting> {
   ] = await Promise.all([
     safeSelect("referral_codes", 2500),
     safeSelect("pawperks_account_referral_codes", 5000),
-    safeSelect("pawperks_referral_events", 8000),
+    safeSelect("pawperks_referral_events", 8000, resolvedStart),
     safeSelect("ambassadors", 800),
     safeSelect("gurus", 3000),
     safeSelect("partners", 500),
@@ -331,7 +337,11 @@ export async function loadReferralAccounting(): Promise<ReferralAccounting> {
     });
   }
 
-  const events: ReferralEventRow[] = eventsResult.rows.map((row, index) => {
+  const events: ReferralEventRow[] = eventsResult.rows
+    .filter(row => isReferralActivitySince(
+      text(row.occurred_at) || text(row.created_at), resolvedStart,
+    ))
+    .map((row, index) => {
     const code = normalizeReferralCode(row.submitted_code || row.referral_code);
     const eventType = text(row.event_type) || "event";
     const occurredAt = text(row.occurred_at) || text(row.created_at) || null;
