@@ -82,7 +82,7 @@ export default function InternPortalHeader({
               <span className="hidden sm:inline">Help</span>
             </Link>
           ) : null}
-          <SiteAccountMenu compact />
+          <SiteAccountMenu variant="desk" compact />
         </div>
       </div>
     </header>

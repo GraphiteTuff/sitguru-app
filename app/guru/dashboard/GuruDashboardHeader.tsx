@@ -1,59 +1,16 @@
-// app/guru/dashboard/GuruDashboardHeader.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { clearCompanionSessionOnLogout } from "@/lib/chat/clear-companion-session";
-import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
-import {
-  resolveAuthorizedRolesFromProfile,
-  type DashboardSwitchRole,
-} from "@/lib/dashboard/role-switch";
-import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
-import {
-  Bell,
-  BookOpen,
-  CalendarDays,
-  ChevronDown,
-  ChevronUp,
-  LayoutDashboard,
-  LogOut,
-  MessageCircle,
-  Wallet,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Bell, BookOpen, CalendarDays, LayoutDashboard, MessageCircle, Wallet } from "lucide-react";
+import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 
-type GuruProfileForHeader = {
-  display_name?: string | null;
-  full_name?: string | null;
-  name?: string | null;
-  email?: string | null;
-  photo_url?: string | null;
-  profile_photo_url?: string | null;
-  avatar_url?: string | null;
-  image_url?: string | null;
-  role?: string | null;
-  account_type?: string | null;
-  signup_role?: string | null;
-  account_intent?: string | null;
-  is_pet_parent?: boolean | null;
-  is_customer?: boolean | null;
-  is_guru?: boolean | null;
-  is_guru_interested?: boolean | null;
-  is_ambassador?: boolean | null;
-  authorizedRoles?: unknown;
-  authorized_roles?: unknown;
-};
-
-type LoadedHeaderProfile = {
-  name: string;
-  email: string;
-  photoUrl: string;
-  authorizedRoles: DashboardSwitchRole[];
-};
-
+/**
+ * The Guru header uses the same account/avatar/role-switch menu as the
+ * Manager, Intern, Ambassador and Admin workspaces. The public Guru
+ * promotional photo remains independent of the personal account avatar.
+ */
 type ActiveGuruTab =
   | "dashboard"
   | "bookings"
@@ -64,22 +21,9 @@ type ActiveGuruTab =
   | "earnings";
 
 type GuruDashboardHeaderProps = {
-  guruProfile?: GuruProfileForHeader | null;
-
-  /**
-   * Preferred prop going forward.
-   */
+  guruProfile?: unknown;
   activeTab?: ActiveGuruTab;
-
-  /**
-   * Backward-compatible prop because some dashboard pages already pass active.
-   */
   active?: ActiveGuruTab;
-
-  /**
-   * Backward-compatible props because app/guru/dashboard/page.tsx is currently
-   * passing these into the header.
-   */
   displayName?: string | null;
   imageUrl?: string | null;
   tierLabel?: string | null;
@@ -94,367 +38,21 @@ const navItems = [
   { label: "Earnings", href: "/guru/dashboard/earnings", tab: "earnings", icon: Wallet },
 ] as const;
 
-const guruAccountMenuLinks = [
-  { label: "Dashboard", href: "/guru/dashboard" },
-  { label: "Update Profile", href: "/guru/dashboard/profile" },
-  { label: "Bookings", href: "/guru/dashboard/bookings" },
-  { label: "Referrals", href: "/guru/dashboard/referrals" },
-  { label: "Messages", href: "/guru/dashboard/messages" },
-  { label: "Availability", href: "/guru/dashboard/availability" },
-  { label: "Earnings", href: "/guru/dashboard/earnings" },
-  { label: "Guru Success Center", href: "/guru/success-center" },
-];
-
-function asText(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+function isSelected(pathname: string, href: string, active?: ActiveGuruTab) {
+  if (href === "/guru/dashboard") return pathname === href || active === "dashboard";
+  return pathname === href || pathname.startsWith(href + "/") ||
+    (active !== undefined && navItems.some(item => item.href === href && item.tab === active));
 }
 
-function firstText(...values: unknown[]) {
-  for (const value of values) {
-    const text = asText(value);
-
-    if (text) {
-      return text;
-    }
-  }
-
-  return "";
-}
-
-function getInitials(name: string, email?: string) {
-  const value = (name || email || "Guru").replace(/@.*/, "");
-  const parts = value.split(/[\s._-]+/).filter(Boolean);
-
-  const first = parts[0]?.charAt(0) || "G";
-  const second = parts[1]?.charAt(0) || "";
-
-  return `${first}${second}`.toUpperCase();
-}
-
-function getNameFromProfile(profile?: GuruProfileForHeader | null) {
-  return firstText(
-    profile?.display_name,
-    profile?.full_name,
-    profile?.name,
-    profile?.email,
-    "Guru",
-  );
-}
-
-function getPhotoFromProfile(profile?: GuruProfileForHeader | null) {
-  return firstText(
-    profile?.profile_photo_url,
-    profile?.photo_url,
-    profile?.avatar_url,
-    profile?.image_url,
-  );
-}
-
-function isOAuthProviderAvatarUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-
-    return (
-      hostname.includes("googleusercontent.com") ||
-      hostname.includes("ggpht.com") ||
-      hostname.includes("google.com") ||
-      hostname.includes("googleapis.com") ||
-      hostname.includes("facebook.com") ||
-      hostname.includes("fbcdn.net") ||
-      hostname.includes("apple.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
-function normalizePhotoUrl(value?: string | null) {
-  const cleanValue = asText(value);
-
-  if (!cleanValue) return "";
-  if (isOAuthProviderAvatarUrl(cleanValue)) return "";
-
-  return cleanValue;
-}
-
-function isPathActive(pathname: string, href: string) {
-  if (href === "/guru/dashboard") {
-    return pathname === "/guru/dashboard";
-  }
-
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function getTabFromPathname(pathname: string): ActiveGuruTab {
-  if (pathname.startsWith("/guru/dashboard/bookings")) return "bookings";
-  if (pathname.startsWith("/guru/dashboard/referrals")) return "referrals";
-  if (pathname.startsWith("/guru/dashboard/messages")) return "messages";
-  if (pathname.startsWith("/guru/dashboard/profile")) return "profile";
-  if (pathname.startsWith("/guru/dashboard/availability")) return "availability";
-  if (pathname.startsWith("/guru/dashboard/earnings")) return "earnings";
-
-  return "dashboard";
-}
-
-export default function GuruDashboardHeader({
-  guruProfile,
-  activeTab,
-  active,
-  displayName,
-  imageUrl,
-  tierLabel,
-  profileCompletion,
-}: GuruDashboardHeaderProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const resolvedActiveTab = activeTab || active || getTabFromPathname(pathname);
-
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [photoFailed, setPhotoFailed] = useState(false);
-  const [loadedProfile, setLoadedProfile] = useState<LoadedHeaderProfile>({
-    name: firstText(displayName, getNameFromProfile(guruProfile), "Guru"),
-    email: asText(guruProfile?.email),
-    photoUrl: normalizePhotoUrl(
-      firstText(imageUrl, getPhotoFromProfile(guruProfile)),
-    ),
-    authorizedRoles: ["guru"],
-  });
-
-  const accountMenuRef = useRef<HTMLDivElement | null>(null);
-  const mobileTriggerRef = useRef<HTMLDivElement | null>(null);
-  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setLoadedProfile((current) => ({
-      name:
-        firstText(displayName, getNameFromProfile(guruProfile)) ||
-        current.name ||
-        "Guru",
-      email: asText(guruProfile?.email) || current.email,
-      photoUrl:
-        normalizePhotoUrl(firstText(imageUrl, getPhotoFromProfile(guruProfile))) ||
-        current.photoUrl,
-      authorizedRoles: current.authorizedRoles,
-    }));
-  }, [displayName, imageUrl, guruProfile]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadGuruHeaderProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!mounted || !user) return;
-
-      let profileName = firstText(displayName);
-      let profileEmail = user.email || "";
-      let profilePhoto = normalizePhotoUrl(imageUrl);
-
-      const { data: guruData } = await supabase
-        .from("gurus")
-        .select(
-          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url",
-        )
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (guruData) {
-        const guru = guruData as GuruProfileForHeader;
-
-        profileName = firstText(
-          profileName,
-          guru.display_name,
-          guru.full_name,
-          guru.name,
-          guru.email,
-        );
-
-        profileEmail = firstText(guru.email, profileEmail);
-
-        profilePhoto = normalizePhotoUrl(
-          firstText(
-            profilePhoto,
-            guru.profile_photo_url,
-            guru.photo_url,
-            guru.avatar_url,
-            guru.image_url,
-          ),
-        );
-      }
-
-      const [{ data: profileData }, { data: roleRows }, { data: ambassadorRow }, hasInternRecord] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .maybeSingle(),
-          supabase.from("user_roles").select("role").eq("user_id", user.id),
-          supabase
-            .from("ambassadors")
-            .select("id")
-            .eq("user_id", user.id)
-            .limit(1)
-            .maybeSingle(),
-          fetchInternPortalAccess(),
-        ]);
-
-      if (profileData) {
-        const profile = profileData as GuruProfileForHeader;
-
-        profileName = firstText(
-          profileName,
-          profile.display_name,
-          profile.full_name,
-          profile.name,
-          profile.email,
-        );
-
-        profileEmail = firstText(profileEmail, profile.email);
-
-        profilePhoto = normalizePhotoUrl(
-          firstText(
-            profilePhoto,
-            profile.profile_photo_url,
-            profile.photo_url,
-            profile.avatar_url,
-            profile.image_url,
-          ),
-        );
-      }
-
-      const metadataPayload = {
-        ...(user.app_metadata || {}),
-        ...(user.user_metadata || {}),
-      } as Record<string, unknown>;
-
-      const authorizedRoles = resolveAuthorizedRolesFromProfile({
-        profile: (profileData as Record<string, unknown> | null) || null,
-        roleRows: (roleRows || []).map(
-          (row: { role?: string | null }) => row.role,
-        ),
-        metadata: metadataPayload,
-        email: profileEmail || user.email,
-        hasGuruRecord: Boolean(guruData),
-        hasAmbassadorRecord: Boolean(ambassadorRow?.id),
-        hasInternRecord,
-      });
-
-      // Guru header viewers always retain the guru track in their session mask.
-      const withGuruTrack = authorizedRoles.includes("guru")
-        ? authorizedRoles
-        : (["guru", ...authorizedRoles] as DashboardSwitchRole[]);
-
-      if (!mounted) return;
-
-      setLoadedProfile({
-        name: profileName || profileEmail || "Guru",
-        email: profileEmail,
-        photoUrl: profilePhoto,
-        authorizedRoles: withGuruTrack,
-      });
-    }
-
-    loadGuruHeaderProfile();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadGuruHeaderProfile();
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [displayName, imageUrl]);
-
-  useEffect(() => {
-    setPhotoFailed(false);
-  }, [loadedProfile.photoUrl]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      const insideDesktop = accountMenuRef.current?.contains(target);
-      const insideMobileTrigger = mobileTriggerRef.current?.contains(target);
-      const insideMobilePanel = mobileMenuRef.current?.contains(target);
-      if (!insideDesktop && !insideMobileTrigger && !insideMobilePanel) {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  useEffect(() => {
-    setAccountMenuOpen(false);
-  }, [pathname]);
-
-  const guruName = loadedProfile.name || "Guru";
-  const guruEmail = loadedProfile.email || "";
-  const guruPhoto = loadedProfile.photoUrl || "";
-  const guruInitials = useMemo(
-    () => getInitials(guruName, guruEmail),
-    [guruName, guruEmail],
-  );
-
-  const profileCompletionLabel =
-    typeof profileCompletion === "number"
-      ? `${Math.max(0, Math.min(100, Math.round(profileCompletion)))}% complete`
-      : "";
-
-  async function handleSignOut() {
-    setAccountMenuOpen(false);
-    clearCompanionSessionOnLogout();
-    await supabase.auth.signOut();
-    router.replace("/guru/login");
-    router.refresh();
-  }
-
-  function renderGuruAvatar(sizeClass = "h-12 w-12") {
-    return (
-      <span
-        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold shadow-sm ring-1 ring-emerald-100`}
-        style={{ color: "#047857" }}
-      >
-        {guruPhoto && !photoFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={guruPhoto}
-            alt={`${guruName} profile photo`}
-            onError={() => setPhotoFailed(true)}
-            className="sg-face-photo h-full w-full"
-          />
-        ) : (
-          guruInitials
-        )}
-      </span>
-    );
-  }
-
+export default function GuruDashboardHeader({ activeTab, active }: GuruDashboardHeaderProps) {
+  const pathname = usePathname() || "";
+  const activeSelection = activeTab || active;
   return (
     <header className="sg-guru-header sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
       <div className="mx-auto flex h-[76px] w-full max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-[84px] sm:px-6 lg:px-8">
         <Link
           href="/guru/dashboard"
-          className="inline-flex h-14 shrink-0 items-center justify-start bg-transparent transition hover:opacity-90 lg:h-16"
+          className="inline-flex h-14 shrink-0 items-center justify-start transition hover:opacity-90 lg:h-16"
           aria-label="SitGuru Guru Dashboard"
         >
           <Image
@@ -463,319 +61,45 @@ export default function GuruDashboardHeader({
             width={190}
             height={68}
             priority
-            className="h-auto max-h-11 w-auto bg-transparent object-contain lg:max-h-12"
-            style={{ background: "transparent" }}
+            className="h-auto max-h-11 w-auto object-contain lg:max-h-12"
           />
         </Link>
 
         <nav aria-label="Guru desktop navigation" className="hidden flex-1 items-center justify-center gap-4 xl:flex 2xl:gap-6">
           {navItems.map((item) => {
-            const isActive =
-              resolvedActiveTab === item.tab ||
-              isPathActive(pathname, item.href);
-
+            const selected = isSelected(pathname, item.href, activeSelection);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="sg-guru-nav-link relative inline-flex h-[84px] items-center whitespace-nowrap text-[14px] font-bold tracking-[-0.015em] transition-colors hover:text-emerald-700 2xl:text-[15px]"
-                style={{ color: isActive ? "#020617" : "#334155" }}
+                aria-current={selected ? "page" : undefined}
+                className={`relative inline-flex h-[84px] items-center whitespace-nowrap text-[14px] font-bold tracking-tight transition hover:text-emerald-700 2xl:text-[15px] ${selected ? "text-slate-950" : "text-slate-700"}`}
               >
-                <span style={{ color: isActive ? "#020617" : "#334155" }}>
-                  {item.label}
-                </span>
-
-                <span
-                  className={[
-                    "absolute left-0 right-0 rounded-full bg-emerald-500 transition-all duration-200",
-                    isActive ? "opacity-100" : "opacity-0",
-                  ].join(" ")}
-                  style={{
-                    bottom: "14px",
-                    height: "3px",
-                    width: isActive ? "100%" : "0%",
-                  }}
-                />
+                {item.label}
+                {selected ? <span className="absolute inset-x-0 bottom-[14px] h-[3px] rounded-full bg-emerald-500" /> : null}
               </Link>
             );
           })}
         </nav>
 
-        <div className="hidden items-center gap-3 xl:flex">
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           <Link
             href="/guru/success-center"
-            className="sg-guru-success-link hidden h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 2xl:inline-flex"
-            style={{ color: "#0f172a" }}
+            className="hidden min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 2xl:inline-flex"
           >
-            <BookOpen
-              className="h-4 w-4 shrink-0"
-              style={{ color: "#0ea5e9" }}
-            />
-            <span
-              className="whitespace-nowrap text-sm font-semibold leading-none"
-              style={{ color: "#0f172a" }}
-            >
-              Guru Success Center
-            </span>
+            <BookOpen className="h-4 w-4 text-sky-600" />
+            Guru Success Center
           </Link>
-
-          <div ref={accountMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setAccountMenuOpen((value) => !value)}
-              className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-              aria-haspopup="menu"
-              aria-expanded={accountMenuOpen}
-              aria-label="Open Guru account menu"
-            >
-              {renderGuruAvatar("h-10 w-10")}
-
-              <span
-                className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] xl:block"
-                style={{ color: "#0f172a" }}
-              >
-                {guruName}
-              </span>
-
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
-                {accountMenuOpen ? (
-                  <ChevronUp className="h-5 w-5" />
-                ) : (
-                  <ChevronDown className="h-5 w-5" />
-                )}
-              </span>
-            </button>
-
-            {accountMenuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
-                style={{ color: "#0f172a" }}
-              >
-                <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
-                  <div className="flex items-center gap-4">
-                    {renderGuruAvatar("h-16 w-16")}
-
-                    <div className="min-w-0">
-                      <p
-                        className="truncate text-xl font-semibold leading-tight tracking-[-0.025em]"
-                        style={{ color: "#0f172a" }}
-                      >
-                        {guruName}
-                      </p>
-
-                      {guruEmail ? (
-                        <p
-                          className="mt-1 truncate text-sm font-medium"
-                          style={{ color: "#475569" }}
-                        >
-                          {guruEmail}
-                        </p>
-                      ) : null}
-
-                      <p
-                        className="mt-1 text-base font-semibold tracking-[-0.01em]"
-                        style={{ color: "#047857" }}
-                      >
-                        {tierLabel || "SitGuru Guru"}
-                      </p>
-
-                      {profileCompletionLabel ? (
-                        <p
-                          className="mt-1 text-xs font-medium"
-                          style={{ color: "#475569" }}
-                        >
-                          {profileCompletionLabel}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-1 bg-white p-3">
-                  <AccountRoleSwitcher
-                    currentRole="guru"
-                    authorizedRoles={loadedProfile.authorizedRoles}
-                    onNavigate={() => setAccountMenuOpen(false)}
-                    className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
-                  />
-
-                  {guruAccountMenuLinks.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      role="menuitem"
-                      onClick={() => setAccountMenuOpen(false)}
-                      style={{ color: "#0f172a" }}
-                      className="block rounded-2xl bg-white px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] opacity-100 transition hover:bg-emerald-50"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={handleSignOut}
-                    className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    Log Out
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
           <Link
             href="/guru/dashboard/messages"
-            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
-            aria-label="Notifications"
+            aria-label="Guru notifications and messages"
+            className="grid h-11 w-11 place-items-center rounded-full text-slate-900 hover:bg-emerald-50"
           >
-            <Bell className="h-5 w-5" style={{ color: "#0f172a" }} />
-            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+            <Bell className="h-5 w-5" />
           </Link>
-        </div>
-
-        <div ref={mobileTriggerRef} className="flex items-center gap-2 xl:hidden">
-          <button
-            type="button"
-            onClick={() => setAccountMenuOpen((value) => !value)}
-            className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 shadow-sm transition hover:bg-emerald-100 focus-visible:outline focus-visible:outline-4 focus-visible:outline-emerald-300"
-            aria-haspopup="menu"
-            aria-expanded={accountMenuOpen}
-            aria-label="Open Guru profile and switch workspace"
-          >
-            {renderGuruAvatar("h-11 w-11")}
-            <span className="hidden max-w-[105px] truncate text-sm font-bold text-emerald-950 min-[420px]:inline">{guruName.split(" ")[0]}</span>
-            <ChevronDown className={"h-5 w-5 text-emerald-900 transition-transform " + (accountMenuOpen ? "rotate-180" : "")} aria-hidden="true" />
-          </button>
+          <SiteAccountMenu variant="desk" />
         </div>
       </div>
-
-            {accountMenuOpen ? (
-        <div
-          ref={mobileMenuRef}
-          role="navigation"
-          aria-label="Guru account and workspaces"
-          className="absolute right-3 top-[calc(100%+0.5rem)] z-[70] max-h-[calc(100dvh-8rem)] w-[calc(100vw-1.5rem)] max-w-[420px] overflow-y-auto overscroll-contain rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.20)] xl:hidden"
-          style={{ color: "#0f172a" }}
-        >
-          <div className="mx-auto grid max-w-[1500px] gap-2">
-            <div className="mb-2 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-              <div className="flex items-center gap-3">
-                {renderGuruAvatar("h-12 w-12")}
-
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-base font-semibold tracking-[-0.01em]"
-                    style={{ color: "#0f172a" }}
-                  >
-                    {guruName}
-                  </p>
-
-                  {guruEmail ? (
-                    <p
-                      className="truncate text-xs font-medium"
-                      style={{ color: "#475569" }}
-                    >
-                      {guruEmail}
-                    </p>
-                  ) : null}
-
-                  <p
-                    className="text-sm font-semibold tracking-[-0.01em]"
-                    style={{ color: "#047857" }}
-                  >
-                    {tierLabel || "SitGuru Guru"}
-                  </p>
-
-                  {profileCompletionLabel ? (
-                    <p
-                      className="mt-1 text-xs font-medium"
-                      style={{ color: "#475569" }}
-                    >
-                      {profileCompletionLabel}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <AccountRoleSwitcher
-                currentRole="guru"
-                authorizedRoles={loadedProfile.authorizedRoles}
-                onNavigate={() => setAccountMenuOpen(false)}
-                className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2"
-              />
-            </div>
-
-            {guruAccountMenuLinks.map((item) => (
-              <Link
-                key={`mobile-${item.href}`}
-                href={item.href}
-                onClick={() => setAccountMenuOpen(false)}
-                style={{ color: "#0f172a" }}
-                className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] opacity-100 transition hover:bg-slate-50"
-              >
-                {item.label}
-              </Link>
-            ))}
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
-            >
-              <LogOut className="h-4 w-4" />
-              Log Out
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <style jsx global>{`
-        .sg-guru-header {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-        }
-
-        .sg-guru-header *,
-        .sg-guru-header a,
-        .sg-guru-header button,
-        .sg-guru-header span,
-        .sg-guru-header p {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-          text-rendering: geometricPrecision;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-
-        .sg-guru-nav-link {
-          letter-spacing: -0.015em;
-        }
-
-        .sg-guru-nav-link:hover span {
-          color: #047857 !important;
-        }
-
-        .sg-guru-success-link:hover span,
-        .sg-guru-switch-link:hover span {
-          color: #047857 !important;
-        }
-      `}</style>
     </header>
   );
 }

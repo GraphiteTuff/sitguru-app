@@ -200,7 +200,7 @@ export default function AmbassadorDashboardLayout({
                   })}
                 </nav>
               </details>
-              <SiteAccountMenu compact />
+              <SiteAccountMenu variant="desk" compact />
             </div>
           </div>
         </div>
