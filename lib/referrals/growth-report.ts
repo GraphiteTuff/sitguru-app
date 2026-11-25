@@ -26,7 +26,7 @@ export type ReferralGrowthReport = {
 
 async function rows(
   table: string, columns: string, limit: number,
-  dateColumn?: string, since?: string,
+  dateColumn?: string, since?: string | null,
 ): Promise<{ data: Row[]; warning: string }> {
   try {
     const all: Row[] = [];
