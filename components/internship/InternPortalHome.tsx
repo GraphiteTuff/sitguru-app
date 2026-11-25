@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowRight, BarChart3, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, ClipboardList,
+  ArrowRight, BarChart3, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, ClipboardList, FileCheck2,
   Clock3, Flag, FolderOpen, GraduationCap, Handshake, Megaphone, MessageCircle, PawPrint, PenLine, Users,
 } from "lucide-react";
 import AskAvaForm from "@/components/internship/AskAvaForm";
@@ -17,6 +17,7 @@ const learningLinks = [
   { label: "Syllabus", href: "/intern/milestones#syllabus", icon: BookOpen },
   { label: "Learning Modules", href: INTERN_ROUTES.training, icon: GraduationCap },
   { label: "Assignments", href: INTERN_ROUTES.assignments, icon: ClipboardList },
+  { label: "Grades", href: "/intern/grades", icon: FileCheck2 },
   { label: "Calendar", href: INTERN_ROUTES.calendar, icon: CalendarDays },
   { label: "Discussions & Messages", href: INTERN_ROUTES.messages, icon: MessageCircle },
   { label: "Announcements", href: "/intern/announcements", icon: Megaphone },

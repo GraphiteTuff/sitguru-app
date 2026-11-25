@@ -130,6 +130,7 @@ export function taskStatusLabel(status: string, reviewStage?: string | null) {
     in_progress: "In progress",
     submitted: "Needs manager review",
     not_accepted: "Not accepted",
+    excused: "Excused",
     blocked: "Blocked",
     draft: "Draft",
   };

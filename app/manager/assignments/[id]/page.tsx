@@ -1,3 +1,5 @@
+import AssignmentEvaluationForm from "@/components/internship/AssignmentEvaluationForm";
+import { listInstructorAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
 import AssignmentSubmissionHistory from "@/components/internship/AssignmentSubmissionHistory";
 import { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import Link from "next/link";
@@ -37,7 +39,7 @@ export default async function ManagerAssignmentDetailPage({
   const kind = internshipActorKind({ role: actor?.role, isSuperUser: actor?.isSuperUser });
   const { data: task } = await supabaseAdmin
     .from("internship_tasks")
-    .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,student_notes,brief_payload")
+    .select("id,intern_id,project_id,final_section,title,due_on,status,metric_affected,business_objective,student_notes,review_stage,submitted_at,brief_payload")
     .eq("id", id)
     .maybeSingle();
   if (!task?.id) notFound();
@@ -74,9 +76,10 @@ export default async function ManagerAssignmentDetailPage({
   const { data: linkedProject } = task.project_id
     ? await supabaseAdmin.from("internship_projects").select("name").eq("id", task.project_id).eq("cohort_id", intern.cohortId).maybeSingle()
     : { data: null };
-  const [links, history] = await Promise.all([
+  const [links, history, evaluations] = await Promise.all([
     listAssignmentIntegrations([String(task.id)]),
     listAssignmentSubmissionHistory(intern.id, String(task.id)),
+    listInstructorAssignmentEvaluations(intern.id, String(task.id)),
   ]);
   const pick = (provider: string) => links.find((item) => item.provider === provider);
   const isLola = intern.fullName.trim().toLowerCase() === "lola uhl";
@@ -185,6 +188,10 @@ export default async function ManagerAssignmentDetailPage({
         </section>
       ) : null}
       <AssignmentSubmissionHistory {...history} />
+      <AssignmentEvaluationForm taskId={String(task.id)} internId={intern.id}
+        submittedAt={String(task.submitted_at || "")} canCustomize={kind === "supervisor"}
+        canEvaluate={["submitted", "approved", "revision_requested"].includes(String(task.status))}
+        {...evaluations} />
       {pick("canva")?.externalUrl ? (
         <a href={pick("canva")?.externalUrl} className="inline-flex min-h-11 items-center rounded-full border border-slate-200 px-4 text-sm font-bold text-[#0F2744]">Open Canva design</a>
       ) : null}

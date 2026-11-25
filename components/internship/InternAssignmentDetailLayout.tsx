@@ -1,4 +1,5 @@
 import AssignmentSubmissionHistory from "@/components/internship/AssignmentSubmissionHistory";
+import type { getInternReleasedAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
 import type { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import { formatHours } from "@/lib/internship/hours";
 import { approvedHoursByAssignment } from "@/lib/internship/learning-dashboard";
@@ -26,6 +27,7 @@ export default function InternAssignmentDetailLayout({
   canSaveToSharePoint = false,
   flash,
   history,
+  evaluations,
 }: {
   workspace: InternshipWorkspaceData;
   task: InternshipTask;
@@ -35,6 +37,7 @@ export default function InternAssignmentDetailLayout({
   canSaveToSharePoint?: boolean;
   flash?: { ok?: string; error?: string };
   history?: Awaited<ReturnType<typeof listAssignmentSubmissionHistory>>;
+  evaluations?: Awaited<ReturnType<typeof getInternReleasedAssignmentEvaluations>>;
 }) {
   const brief = readAssignmentBrief(task.briefPayload);
   const pillar = GROWTH_PILLARS.find((row) => row.id === assignmentGrowthPillar(brief));
@@ -268,6 +271,20 @@ export default function InternAssignmentDetailLayout({
         ) : null}
       </section>
 
+      {evaluations?.entries.length ? (
+        <section className={`${DESK_UI.card} p-5`}>
+          <h2 className="text-lg font-black text-slate-950">Released evaluations</h2>
+          <ul className="mt-2 space-y-2">
+            {evaluations.entries.map((entry) => (
+              <li key={entry.id} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-800">
+                <p className="font-bold">{entry.total} / {entry.total_possible} · {entry.released_at?.slice(0, 10)}</p>
+                {entry.feedback ? <p className="mt-2 whitespace-pre-wrap break-words">{entry.feedback}</p> : null}
+              </li>
+            ))}
+          </ul>
+          <Link href="/intern/grades" className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-emerald-900 underline">Open My grades</Link>
+        </section>
+      ) : null}
       {history ? <AssignmentSubmissionHistory {...history} /> : null}
 
       <details className={`${DESK_UI.card} p-5`}>

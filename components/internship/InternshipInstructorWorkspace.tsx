@@ -186,6 +186,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {mode === "admin" ? <Link href={`/admin/internship/interns/${intern.id}`} className={button}>Intern record</Link> : null}
+                  <Link href={`/manager/instructor/evaluations/${intern.id}`} className={button}>Employer evaluations</Link>
                   <Link href={`/intern?view=${encodeURIComponent(intern.id)}`} className={button}>Student preview</Link>
                 </div>
               </li>

@@ -1,3 +1,4 @@
+import { getInternReleasedAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
 import { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import { notFound, redirect } from "next/navigation";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -33,9 +34,10 @@ export default async function InternAssignmentDetailPage({
     const raw = paramsValues[key];
     return String(Array.isArray(raw) ? raw[0] : raw || "");
   };
-  const [integrations, history] = await Promise.all([
+  const [integrations, history, evaluations] = await Promise.all([
     listAssignmentIntegrations([task.id]),
     listAssignmentSubmissionHistory(data.workspace.intern.id, task.id),
+    getInternReleasedAssignmentEvaluations(data.workspace.intern.id, task.id),
   ]);
 
   return (
@@ -44,6 +46,7 @@ export default async function InternAssignmentDetailPage({
       task={task}
       integrations={integrations}
       history={history}
+      evaluations={evaluations}
       backHref="/intern/assignments"
       canSaveToSharePoint={readMicrosoftGraphConfig().configured}
       flash={{ ok: flashValue("ok"), error: flashValue("error") }}

@@ -154,6 +154,7 @@ export const TASK_STATUSES = [
   "revision_requested",
   "not_accepted",
   "blocked",
+  "excused",
 ] as const;
 
 export const CONTRIBUTION_TYPES = [
