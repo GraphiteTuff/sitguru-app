@@ -205,19 +205,19 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      <div className="pb-[calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
+      <div className="pb-[calc(6rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
         data-ambassador-bottom-nav
-        className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-slate-200/90 bg-white/96 shadow-[0_-8px_28px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden"
+        className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-emerald-200 bg-white/95 shadow-[0_-10px_28px_rgba(15,23,42,0.09)] backdrop-blur-md lg:hidden"
         style={{
           bottom: "var(--sg-chrome-bottom, 0px)",
           paddingBottom:
             "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
         }}
       >
-        <div className="grid grid-cols-5 gap-0 px-1 pt-1">
+        <div className="mx-auto grid max-w-[650px] grid-cols-5 gap-0.5 px-1.5 pt-1.5">
           {[
             { label: "Home", href: "/ambassador/dashboard", icon: LayoutDashboard },
             { label: "My QR", href: "/ambassador/dashboard/referrals", icon: QrCode },
@@ -240,15 +240,15 @@ export default function AmbassadorDashboardLayout({
                 key={item.label}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-black leading-tight transition active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
-                  active ? "text-[#0D5C3A]" : "text-slate-500 active:bg-slate-50"
+                className={`flex min-h-[65px] min-w-0 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-1 text-[12px] font-black leading-tight transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 ${
+                  active ? "bg-emerald-50 text-[#0D5C3A]" : "text-slate-700 hover:bg-emerald-50"
                 }`}
               >
-                <span className={`grid h-8 w-12 place-items-center rounded-2xl transition ${
-                  active ? "bg-emerald-50" : "bg-transparent"
+                <span className={`grid h-9 w-11 shrink-0 place-items-center rounded-2xl ${
+                  active ? "bg-white" : ""
                 }`}>
                   <Icon
-                    className={`h-[22px] w-[22px] ${active ? "stroke-[2.35]" : "stroke-[2]"}`}
+                    className={`h-[24px] w-[24px] ${active ? "stroke-[2.4]" : "stroke-[2]"}`}
                     aria-hidden
                   />
                 </span>
