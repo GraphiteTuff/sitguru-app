@@ -1,3 +1,4 @@
+import SyllabusGrowthOverview from "@/components/internship/SyllabusGrowthOverview";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -72,6 +73,7 @@ export default async function InternshipPlaybookPage() {
         </Link>
       </div>
 
+      <SyllabusGrowthOverview mode="admin" />
       <InternshipSyllabusEnhancements
         academicRows={academicRows}
         cohortName={cohort?.name || "Spring 2027"}
