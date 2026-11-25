@@ -778,10 +778,10 @@ body[data-sitguru-more-open] [data-rogue-admin-dock] {
   display: none !important;
 }
 
-/* Admin, Manager and Intern phone: keep chat FAB above the bottom nav + Safari chrome. */
+/* Admin, Manager and Intern phone: keep chat FAB above the taller Guru-style tab bar. */
 .desk-chat-dock[data-desk-chat-above-nav="true"] {
   bottom: calc(
-    5.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+    6.75rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
   ) !important;
   padding-bottom: 0.5rem !important;
 }
