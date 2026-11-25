@@ -101,7 +101,7 @@ export default async function AdminGrowthReferralsHubPage({ searchParams }: { se
   const periodStart = resolveReferralPeriod(epoch, period);
   const [data, accounting, referralGrowth] = await Promise.all([
     getReferralsDashboardData(periodStart),
-    loadReferralAccounting(),
+    loadReferralAccounting(periodStart),
     loadReferralGrowthReport(period),
   ]);
   const today = new Date().toISOString().slice(0, 10);
