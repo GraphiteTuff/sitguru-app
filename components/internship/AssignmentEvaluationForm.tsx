@@ -7,13 +7,14 @@ const inputClass = "mt-1 block min-h-11 w-full rounded-xl border border-slate-30
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
 export default function AssignmentEvaluationForm({
-  taskId, internId, submittedAt, canCustomize, canEvaluate, entries, unavailable,
+  taskId, internId, submittedAt, canCustomize, canEvaluate, canRelease, entries, unavailable,
 }: Awaited<ReturnType<typeof listInstructorAssignmentEvaluations>> & {
   taskId: string;
   internId: string;
   submittedAt: string;
   canCustomize: boolean;
   canEvaluate: boolean;
+  canRelease: boolean;
 }) {
   const latest = entries[0];
   const current = latest?.evaluated_submission_at === (submittedAt || null) ? latest : null;
@@ -61,8 +62,9 @@ export default function AssignmentEvaluationForm({
             </label>
             <div className="flex flex-wrap gap-2">
               <button name="evaluationIntent" value="draft" className="min-h-12 rounded-xl border border-emerald-900 px-4 py-2 text-sm font-bold text-emerald-900">Save evaluation draft</button>
-              <button name="evaluationIntent" value="release" className="min-h-12 rounded-xl bg-emerald-900 px-4 py-2 text-sm font-bold !text-white">Release evaluation</button>
+              <button disabled={!canRelease} name="evaluationIntent" value="release" className="min-h-12 rounded-xl bg-emerald-900 px-4 py-2 text-sm font-bold !text-white disabled:opacity-50">Release evaluation</button>
             </div>
+            {!canRelease && <p className="text-sm text-slate-700">Release requires an active semester and verified grading.</p>}
           </form>
         )}
       {entries.length ? (

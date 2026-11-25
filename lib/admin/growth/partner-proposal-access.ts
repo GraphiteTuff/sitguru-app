@@ -14,7 +14,12 @@ export const PROPOSAL_PATHS = {
 
 export type ProposalMode = keyof typeof PROPOSAL_PATHS;
 
+export function partnerProposalWorkspaceVerified() {
+  return process.env.SITGURU_PARTNER_PROPOSALS_VERIFIED === "true";
+}
+
 export async function getPartnerProposalActor(mode: ProposalMode) {
+  if (!partnerProposalWorkspaceVerified()) return null;
   if (mode === "intern") {
     const intern = await currentAssignedIntern();
     if (!intern?.userId || !internOnboardingComplete(await getInternOnboarding(intern.id))) return null;

@@ -1,3 +1,4 @@
+import { canViewOfficialGrades, getProgramStatus } from "@/lib/internship/program-controls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -26,6 +27,16 @@ export default async function InternGradebookPage() {
   if (!data) return <p className="rounded-2xl bg-white p-5">Grades require a linked intern account.</p>;
 
   const { intern, tasks } = data.workspace;
+  const semesterStatus = await getProgramStatus(intern.cohortId);
+  if (!canViewOfficialGrades(semesterStatus)) {
+    return (
+      <section className="rounded-3xl border border-emerald-950/10 bg-white p-5 sm:p-7">
+        <h1 className="text-2xl font-black text-emerald-950">My grades</h1>
+        <p className="mt-2 text-sm text-slate-700">Official semester evaluations will appear here after the semester is activated and grading is available.</p>
+        <p className="mt-2 text-sm text-slate-700">SitGuru records employer evaluations. Your university issues official course grades.</p>
+      </section>
+    );
+  }
   const [result, program] = await Promise.all([
     getInternReleasedAssignmentEvaluations(intern.id),
     supabaseAdmin.from("internship_evaluations").select("id,kind,presented_at,payload")

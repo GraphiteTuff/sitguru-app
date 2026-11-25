@@ -6,6 +6,7 @@
  * The stable event ID + recipient uniqueness prevents duplicate delivery on
  * repeated cron runs (the live signal insert is the deduplication ledger).
  */
+import { getProgramStatus } from "@/lib/internship/program-controls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { parseAssignmentReminderSettings, reminderForDate, reminderMessage } from "@/lib/internship/assignment-reminder-rules";
 import { stableEventId, uniqueUserIds } from "@/lib/realtime/pure";
@@ -48,16 +49,24 @@ export async function dispatchInternshipAssignmentReminders(input?: {
 
   const internIds = [...new Set(scheduled.map((item) => String(item.task.intern_id)).filter(Boolean))];
   const { data: people, error: peopleError } = await supabaseAdmin.from("internship_interns")
-    .select("id,user_id,manager_user_id")
+    .select("id,user_id,manager_user_id,cohort_id")
     .in("id", internIds);
   if (peopleError) throw new Error("Could not resolve assignment reminder recipients.");
   const persons = new Map((people || []).map((row) => [String(row.id), row]));
+  const cohortIds = [...new Set<string>((people || []).map((person) => person.cohort_id).filter(Boolean))];
+  const cohortStates = new Map(await Promise.all(cohortIds.map(async (id) => [id, await getProgramStatus(id)] as const)));
   let delivered = 0;
   let skipped = 0;
 
   for (const { task, settings, daysBefore } of scheduled) {
     const intern = persons.get(String(task.intern_id));
-    if (!intern) { skipped += 1; continue; }
+    if (!intern || (intern.cohort_id && (
+      process.env.SITGURU_INTERNSHIP_DEADLINES_VERIFIED !== "true" ||
+      cohortStates.get(intern.cohort_id) !== "active"
+    ))) {
+      skipped += 1;
+      continue;
+    }
     const recipients = uniqueUserIds([
       settings.notifyIntern ? intern.user_id : null,
       settings.notifyManager ? intern.manager_user_id : null,

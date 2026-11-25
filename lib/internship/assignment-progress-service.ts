@@ -40,10 +40,12 @@ export async function saveOwnAssignmentProgress(input: {
   const previousWork = existing.internWork && typeof existing.internWork === "object"
     ? existing.internWork as Record<string, unknown>
     : {};
+  const attachmentWorkflowVerified = process.env.SITGURU_ASSIGNMENT_FILES_VERIFIED === "true";
   const priorAttachmentUrl = typeof previousWork.attachmentUrl === "string" && isHttpUrl(previousWork.attachmentUrl)
     ? previousWork.attachmentUrl : "";
   const upload = formData.get("supportingFile");
   const attachment = upload instanceof File && upload.size > 0 ? upload : undefined;
+  if (attachment && !attachmentWorkflowVerified) return fail("File uploads are awaiting verification. Add a SharePoint link instead.");
   if (attachment && (attachment.size > 10 * 1024 * 1024 || !/\.(pdf|docx|xlsx|pptx|png|jpe?g)$/i.test(attachment.name))) {
     return fail("Choose a PDF, Office document, PNG, or JPEG up to 10 MB.");
   }
@@ -75,7 +77,7 @@ export async function saveOwnAssignmentProgress(input: {
     notes,
     researchLink,
     supportingLinks,
-    submissionId: intent === "submit" ? randomUUID() : undefined,
+    submissionId: intent === "submit" && attachmentWorkflowVerified ? randomUUID() : undefined,
     attachment,
     priorAttachmentUrl,
   });
@@ -94,7 +96,7 @@ export async function saveOwnAssignmentProgress(input: {
       ? statusForStage("submitted_to_ava")
       : stage === "changes_requested" ? "revision_requested" : "in_progress",
     review_stage: intent === "submit"
-      ? "submitted_to_ava" : stage === "changes_requested" ? "changes_requested" : "",
+      ? "submitted_to_ava" : stage === "changes_requested" ? "changes_requested" : null,
     ...(intent === "submit" ? { submitted_at: now, supervisor_approved: false } : {}),
     updated_at: now,
   };

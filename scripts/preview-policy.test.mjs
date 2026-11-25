@@ -9,6 +9,20 @@ const safe = {
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "isolated-test-key", SUPABASE_SERVICE_ROLE_KEY: "isolated-test-key",
 };
+const internshipStaging = {
+  ...safe,
+  VERCEL_GIT_COMMIT_REF: "feature/growth-playbook-workspace",
+  SITGURU_PREVIEW_SUPABASE_REF: "ehdvngkqddttcwhjubwu",
+  NEXT_PUBLIC_SUPABASE_URL: "https://ehdvngkqddttcwhjubwu.supabase.co",
+  VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
+  SITGURU_PREVIEW_RELEASE_SHA: "a".repeat(40),
+};
+test("internship Preview requires its staging project and an approved release SHA", () => {
+  assert.equal(deploymentEnvironmentError(internshipStaging), null);
+  assert.ok(deploymentEnvironmentError({ ...internshipStaging, VERCEL_GIT_COMMIT_SHA: "b".repeat(40) }));
+  assert.ok(deploymentEnvironmentError({ ...safe, VERCEL_GIT_COMMIT_REF: internshipStaging.VERCEL_GIT_COMMIT_REF }));
+  assert.ok(deploymentEnvironmentError({ ...internshipStaging, NEXT_PUBLIC_SUPABASE_URL: "https://mmtjhxnzuglbyumbsjhs.supabase.co" }));
+});
 test("isolated branch preview can build only after explicit opt-in", () => {
   assert.equal(previewEnvironmentError(safe), null);
   for (const key of ["SITGURU_ENABLE_SAFE_PREVIEW", "SITGURU_ISOLATED_BACKEND", "SUPABASE_SERVICE_ROLE_KEY"]) assert.ok(previewEnvironmentError({ ...safe, [key]: "" }));
@@ -28,7 +42,7 @@ test("outbound service credentials fail closed without printing secrets", () => 
 });
 test('root deployment rule preserves production and gates the exact feature branch', () => {
   assert.equal(deploymentEnvironmentError({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'sitguru-main',RESEND_API_KEY:'existing-production-secret'}),null);
-  assert.equal(deploymentEnvironmentError(safe),null);
+  assert.equal(deploymentEnvironmentError(internshipStaging),null);
   assert.ok(deploymentEnvironmentError({...safe,RESEND_API_KEY:'live-secret'}));
   assert.ok(deploymentEnvironmentError({...safe,SITGURU_ENABLE_SAFE_PREVIEW:''}));
   assert.ok(deploymentEnvironmentError({...safe,VERCEL_ENV:'production'}));
@@ -38,9 +52,9 @@ test('root deployment rule preserves production and gates the exact feature bran
 test('Vercel command exit codes skip unsafe previews and reject forced builds', () => {
   for (const [env, ignore, build] of [
     [{VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'sitguru-main'},1,0],
-    [safe,1,0],
-    [{...safe,RESEND_API_KEY:'synthetic-live-key'},0,1],
-    [{...safe,SUPABASE_SERVICE_ROLE_KEY:''},0,1],
+    [internshipStaging,1,0],
+    [{...internshipStaging,RESEND_API_KEY:'synthetic-live-key'},0,1],
+    [{...internshipStaging,SUPABASE_SERVICE_ROLE_KEY:''},0,1],
   ]) {
     assert.equal(spawnSync(process.execPath,['scripts/vercel-deployment-ignore.mjs'],{env,encoding:'utf8'}).status,ignore);
     assert.equal(spawnSync(process.execPath,['scripts/verify-deployment-environment.mjs'],{env,encoding:'utf8'}).status,build);

@@ -10,6 +10,7 @@ import { sitguruApiFetch } from '@/lib/data/api';
 type LearningWorkspace = {
   mode: 'intern' | 'instructor';
   firstName?: string;
+  programStatus?: 'pre_launch' | 'active' | 'paused' | 'completed' | null;
   pillars?: { id: string; label: string; weight: number; assigned: number; completed: number; approvedHours: number }[];
   upcoming?: { id: string; title: string; date: string; type: string }[];
   grades?: { id: string; title: string; total: number; possible: number; feedback: string }[] | null;
@@ -17,6 +18,13 @@ type LearningWorkspace = {
   partners?: { id: string; name: string; status: string; category: string }[] | null;
   reviews?: { id: string; title: string; internName: string; statusLabel: string }[];
 };
+
+const semesterLabels = {
+  pre_launch: 'Pre-Launch',
+  active: 'Active',
+  paused: 'Paused',
+  completed: 'Completed',
+} as const;
 
 const site = 'https://www.sitguru.com';
 
@@ -59,6 +67,9 @@ export default function InternLearningScreen() {
           <TouchTarget onPress={() => void load()} style={styles.button}><Text style={styles.buttonText}>Try again</Text></TouchTarget>
         </View>
       ) : null}
+      {session && workspace?.programStatus ? (
+        <Text accessibilityLabel="Semester status" style={styles.status}>{semesterLabels[workspace.programStatus]}</Text>
+      ) : null}
       {session && workspace?.mode === 'instructor' ? (
         <View style={styles.card}>
           <Text style={styles.heading}>Pending assignment submissions</Text>
@@ -83,7 +94,7 @@ export default function InternLearningScreen() {
             ))}
           </View>
           <View style={styles.card}>
-            <Text style={styles.heading}>Upcoming deadlines</Text>
+            <Text style={styles.heading}>{workspace.programStatus === 'active' ? 'Upcoming deadlines' : 'Assignment and milestone dates'}</Text>
             {workspace.upcoming?.length ? workspace.upcoming.map((row) => (
               <Text key={`${row.type}-${row.id}`} style={styles.body}>{row.date} · {row.title}</Text>
             )) : <Text style={styles.body}>No upcoming assignment or milestone dates.</Text>}
@@ -97,7 +108,7 @@ export default function InternLearningScreen() {
                   <Text style={styles.label}>{row.title} · {row.total} / {row.possible}</Text>
                   {row.feedback ? <Text style={styles.body}>{row.feedback}</Text> : null}
                 </View>
-              )) : <Text style={styles.body}>No released evaluations.</Text>}
+              )) : <Text style={styles.body}>{workspace.programStatus === 'pre_launch' ? 'Official evaluations await semester activation and grading verification.' : 'No released evaluations.'}</Text>}
           </View>
           <View style={styles.card}>
             <Text style={styles.heading}>Announcements</Text>
@@ -126,6 +137,7 @@ const styles = StyleSheet.create({
   hero: { backgroundColor: BrandColors.greenDark, borderRadius: 20, padding: 18, marginBottom: 12 },
   title: { color: '#fff', fontSize: 24, fontWeight: '800' },
   welcome: { color: '#fff', fontSize: 15, marginTop: 6 },
+  status: { color: '#7c380e', backgroundColor: '#fff3db', borderRadius: 12, padding: 12, marginBottom: 12, fontWeight: '700' },
   heading: { color: BrandColors.greenDark, fontSize: 18, fontWeight: '800' },
   body: { color: BrandColors.slate, fontSize: 14, lineHeight: 20 },
   label: { color: BrandColors.greenDark, fontSize: 15, fontWeight: '700' },

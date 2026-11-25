@@ -1,13 +1,21 @@
 // Pure policy shared by Vercel's ignored-build step and its pre-build guard.
 // Vercel: exit 0 skips a build; exit 1 allows it. Never reuse for production.
+const internshipBranch = "feature/growth-playbook-workspace";
+const communityBranch = "feature/sitguru3-manager-community";
+const internshipStagingRef = "ehdvngkqddttcwhjubwu";
+
 export function previewEnvironmentError(env) {
   if (env.VERCEL_ENV !== "preview") return "This configuration only supports Preview deployments.";
-  if (env.VERCEL_GIT_COMMIT_REF !== "feature/sitguru3-manager-community") return "Preview is restricted to the SitGuru 3.0 feature branch.";
+  if (![communityBranch, internshipBranch].includes(env.VERCEL_GIT_COMMIT_REF)) return "Preview is restricted to an approved SitGuru feature branch.";
   if (env.SITGURU_ENABLE_SAFE_PREVIEW !== "true") return "Safe Preview has not been explicitly enabled.";
   if (env.SITGURU_ISOLATED_BACKEND !== "true") return "An isolated backend is required.";
   let url;
   try { url = new URL(env.NEXT_PUBLIC_SUPABASE_URL || ""); } catch { return "An isolated Supabase URL is required."; }
   const ref = env.SITGURU_PREVIEW_SUPABASE_REF || "";
+  if (env.VERCEL_GIT_COMMIT_REF === internshipBranch && (ref !== internshipStagingRef ||
+    !env.SITGURU_PREVIEW_RELEASE_SHA || env.SITGURU_PREVIEW_RELEASE_SHA !== env.VERCEL_GIT_COMMIT_SHA)) {
+    return "Preview requires SitGuru Staging and an explicitly approved release SHA.";
+  }
   if (!/^[a-z0-9]{20}$/.test(ref) || ref === "mmtjhxnzuglbyumbsjhs" || url.protocol !== "https:" || url.hostname !== `${ref}.supabase.co` || url.pathname !== "/" || url.username || url.password || url.search) {
     return "Supabase must match the explicitly selected non-production project.";
   }
@@ -28,6 +36,6 @@ export function previewEnvironmentError(env) {
 // must independently pass the isolated Preview policy, including forced builds.
 export function deploymentEnvironmentError(env) {
   if (env.VERCEL_GIT_COMMIT_REF === "sitguru-main" && env.VERCEL_ENV === "production") return null;
-  if (env.VERCEL_GIT_COMMIT_REF === "feature/sitguru3-manager-community") return previewEnvironmentError(env);
+  if (env.VERCEL_GIT_COMMIT_REF === internshipBranch) return previewEnvironmentError(env);
   return "Only the production source branch or an isolated feature Preview can build.";
 }

@@ -229,12 +229,13 @@ export function InternMilestonesPageView({
   );
 }
 
-export function InternCheckInsPageView({
+export function InternCheckInsPageView({semesterCheckIns = false,
   workspace,
   hourSummary,
   notice = "",
   error = "",
 }: {
+  semesterCheckIns?: boolean;
   workspace: InternshipWorkspaceData;
   hourSummary: HourSummary;
   notice?: string;
@@ -247,7 +248,7 @@ export function InternCheckInsPageView({
   const nowKey=new Date().toLocaleDateString("en-CA",{timeZone:"America/New_York"});
   const monday=weekMonday(nowKey);
   const start=workspace.intern.academicStartDate||workspace.cohort?.startsOn||"";
-  const canSubmit=workspace.intern.status==="active" && Boolean(start) && start<=nowKey;
+  const canSubmit=semesterCheckIns && workspace.intern.status==="active" && Boolean(start) && start<=nowKey;
   const thisWeek=reviews.find(row=>weekMonday(row.weekOf)===monday);
   const currentSubmitted=Boolean(thisWeek && isSubmittedWeeklyReview(String(thisWeek.reviewStatus||"")));
   const nextFriday=new Date(`${monday}T12:00:00Z`);
@@ -306,7 +307,7 @@ export function InternCheckInsPageView({
             </form>
           ):(
             <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-              Weekly check-in submission opens when your approved internship reaches its academic start date and your status is Active. You can review past check-ins now.
+              Official weekly check-ins open after semester activation, check-in verification, and your approved academic start date. Past check-ins remain available.
             </p>
           )}
         </article>

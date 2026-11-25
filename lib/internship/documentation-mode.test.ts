@@ -46,7 +46,7 @@ describe("intern documentation mode", () => {
     assert.equal(workspace.intern.fullName, "Taylor Morgan");
     assert.match(workspace.intern.email, /example\.edu$/);
     assert.equal(workspace.intern.requiredHours, 120);
-    assert.equal(workspace.tasks.length, 21);
+    assert.equal(workspace.tasks.length, 22);
     assert.ok(workspace.tasks.some((row) => row.status === "revision_requested"));
     assert.ok(workspace.metrics.some((row) => row.isVerified && row.label.includes("verified")));
     assert.equal(internDocumentationScene("checkin-form"), "checkin-form");

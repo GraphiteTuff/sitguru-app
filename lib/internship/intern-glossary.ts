@@ -401,7 +401,7 @@ export const INTERN_PAYMENTS_INTERN_SAFE: InternGlossaryTerm[] = [
   {
     label: "Trust & Safety",
     meaning:
-      "SitGuru holds the booking and the payment. A personal Venmo, PayPal, Zelle, or cash to a Guru is not SitGuru. Do not send people to Rover or Wag.",
+      "SitGuru holds the booking and the payment. A personal Venmo, PayPal, Zelle, or cash to a Guru is not SitGuru. Keep booking and payment on SitGuru.",
   },
   {
     label: "Guru payouts",

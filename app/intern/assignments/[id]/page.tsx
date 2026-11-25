@@ -1,3 +1,4 @@
+import { canViewOfficialGrades, getProgramStatus } from "@/lib/internship/program-controls";
 import { getInternReleasedAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
 import { listAssignmentSubmissionHistory } from "@/lib/internship/submission-history";
 import { notFound, redirect } from "next/navigation";
@@ -37,7 +38,9 @@ export default async function InternAssignmentDetailPage({
   const [integrations, history, evaluations] = await Promise.all([
     listAssignmentIntegrations([task.id]),
     listAssignmentSubmissionHistory(data.workspace.intern.id, task.id),
-    getInternReleasedAssignmentEvaluations(data.workspace.intern.id, task.id),
+    getProgramStatus(data.workspace.intern.cohortId).then((status) => canViewOfficialGrades(status)
+      ? getInternReleasedAssignmentEvaluations(data.workspace.intern.id, task.id)
+      : { entries: [], unavailable: false }),
   ]);
 
   return (

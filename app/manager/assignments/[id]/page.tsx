@@ -1,3 +1,4 @@
+import { canReleaseOfficialGrades } from "@/lib/internship/program-controls";
 import AssignmentEvaluationForm from "@/components/internship/AssignmentEvaluationForm";
 import { listInstructorAssignmentEvaluations } from "@/lib/internship/assignment-evaluations";
 import AssignmentSubmissionHistory from "@/components/internship/AssignmentSubmissionHistory";
@@ -76,7 +77,8 @@ export default async function ManagerAssignmentDetailPage({
   const { data: linkedProject } = task.project_id
     ? await supabaseAdmin.from("internship_projects").select("name").eq("id", task.project_id).eq("cohort_id", intern.cohortId).maybeSingle()
     : { data: null };
-  const [links, history, evaluations] = await Promise.all([
+  const [canRelease, links, history, evaluations] = await Promise.all([
+    canReleaseOfficialGrades(intern.cohortId),
     listAssignmentIntegrations([String(task.id)]),
     listAssignmentSubmissionHistory(intern.id, String(task.id)),
     listInstructorAssignmentEvaluations(intern.id, String(task.id)),
@@ -188,7 +190,7 @@ export default async function ManagerAssignmentDetailPage({
         </section>
       ) : null}
       <AssignmentSubmissionHistory {...history} />
-      <AssignmentEvaluationForm taskId={String(task.id)} internId={intern.id}
+      <AssignmentEvaluationForm canRelease={canRelease} taskId={String(task.id)} internId={intern.id}
         submittedAt={String(task.submitted_at || "")} canCustomize={kind === "supervisor"}
         canEvaluate={["submitted", "approved", "revision_requested"].includes(String(task.status))}
         {...evaluations} />

@@ -1,3 +1,4 @@
+import { canReleaseOfficialGrades, canViewOfficialGrades, getProgramStatus } from "@/lib/internship/program-controls";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,8 +15,10 @@ export default async function ProgramEvaluationPage({ params, searchParams }: {
   const { internId } = await params;
   const access = await getProgramEvaluationAccess(internId);
   if (!access) notFound();
-  const [flash, { data, error }] = await Promise.all([
+  const [flash, canRelease, status, { data, error }] = await Promise.all([
     searchParams,
+    canReleaseOfficialGrades(access.intern.cohortId),
+    getProgramStatus(access.intern.cohortId),
     supabaseAdmin.from("internship_evaluations").select("id,kind,status,payload,created_at")
       .eq("intern_id", internId).in("kind", ["midpoint", "final"]).order("created_at", { ascending: false }).limit(30),
   ]);
@@ -27,7 +30,7 @@ export default async function ProgramEvaluationPage({ params, searchParams }: {
       {flash.error ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{flash.error}</p> : null}
       {flash.ok ? <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{flash.ok}</p> : null}
       <p className="text-sm text-slate-700">Record midpoint and final employer evaluations. The Internship Supervisor releases final evaluations.</p>
-      {access.kind === "supervisor" ? (
+      {access.user.isSuperUser && canViewOfficialGrades(status) ? (
         <a href={`/api/manager/instructor/evaluations/${internId}/export`} className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-900 underline">Download university reporting CSV</a>
       ) : null}
       <form action={saveProgramEvaluation} className="space-y-3">
@@ -50,8 +53,9 @@ export default async function ProgramEvaluationPage({ params, searchParams }: {
         </label>
         <div className="flex flex-wrap gap-2">
           <button name="intent" value="draft" className="min-h-12 rounded-xl border border-emerald-900 px-4 text-sm font-bold text-emerald-900">Save draft</button>
-          <button name="intent" value="released" className="min-h-12 rounded-xl bg-emerald-900 px-4 text-sm font-bold !text-white">Release evaluation</button>
+          <button disabled={!canRelease} name="intent" value="released" className="min-h-12 rounded-xl bg-emerald-900 px-4 text-sm font-bold !text-white disabled:opacity-50">Release evaluation</button>
         </div>
+        {!canRelease && <p className="text-sm text-slate-700">Release requires an active semester and verified grading.</p>}
       </form>
       <section className="border-t border-slate-200 pt-4">
         <h2 className="font-black text-emerald-950">Evaluation history</h2>

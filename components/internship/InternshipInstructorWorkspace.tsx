@@ -2,6 +2,8 @@ import { GROWTH_PILLARS } from "@/lib/internship/university-syllabus";
 import { listCohortMilestones } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
+import { getProgramControlsActor, getProgramStatus, listProgramCohorts, PROGRAM_CONTROL_PATHS } from "@/lib/internship/program-controls";
+import ProgramStatusBanner from "@/components/internship/ProgramStatusBanner";
 import Link from "next/link";
 import { publishInternAnnouncement } from "@/lib/internship/announcement-actions";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -59,7 +61,13 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
     return <p className={baseCard}>Instructor access required.</p>;
   }
 
-  const data = await loadManagerDashboard({ actorKind: kind, actorUserId: actor.id });
+  const [data, programActor] = await Promise.all([
+    loadManagerDashboard({ actorKind: kind, actorUserId: actor.id }),
+    getProgramControlsActor(mode),
+  ]);
+  const programCohorts = programActor ? await listProgramCohorts(programActor) : null;
+  const programCohort = programCohorts?.data?.[0];
+  const programStatus = programCohort ? await getProgramStatus(programCohort.id) : null;
   const flash = searchParams ? await searchParams : {};
   const canCeo = canGiveCeoReview(kind);
   const returnTo = speedReview ? "/manager/speed-review" : mode === "admin" ? "/admin/internship/instructor" : "/manager/instructor";
@@ -90,6 +98,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
     matches("assignment", item.id) && matches("milestone", item.milestoneId) && matches("pillar", item.pillarId),
   ) : data.reviews;
   const destinations = [
+    [PROGRAM_CONTROL_PATHS[mode], "Program Controls"],
     ["/manager/assignments?create=true", "Create assignment"],
     ["/manager/assignments", "Manage assignments"],
     ["/manager/speed-review", "SitGuru Speed Review"],
@@ -107,6 +116,7 @@ export default async function InternshipInstructorWorkspace({ mode, searchParams
         <h1 className="text-2xl font-black !text-white sm:text-3xl">{speedReview ? "SitGuru Speed Review" : "Instructor & Supervisor Center"}</h1>
         <p className="mt-2 text-sm !text-white">{speedReview ? "Pending assignment submissions" : mode === "admin" ? "Internship oversight and employer review" : "Assigned interns, coursework, and submissions"}</p>
       </header>
+      {programCohort ? <ProgramStatusBanner status={programStatus} /> : null}
       {parameter("error") ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{parameter("error")}</p> : null}
       {parameter("ok") ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">{parameter("ok")}</p> : null}
       {!speedReview ? <nav aria-label="Instructor tools" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

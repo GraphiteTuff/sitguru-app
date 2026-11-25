@@ -240,11 +240,13 @@ export default function InternAssignmentDetailLayout({
               ) : null}
               {canEdit ? (
                 <>
+                {process.env.SITGURU_ASSIGNMENT_FILES_VERIFIED === "true" ? (
                 <label className="block text-sm font-semibold text-slate-900">
                   Supporting file
                   <input name="supportingFile" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg"
                     className="mt-1 block min-h-11 w-full rounded-xl border border-slate-200 p-2 text-sm" />
                 </label>
+                ) : null}
                 <p className="text-xs font-medium text-slate-500">Saving keeps your draft editable. Submitting sends it to Ava and pauses editing until review.</p>
                 <div className="flex flex-wrap gap-3">
                   <button type="submit" name="intent" value="save" disabled={!canSaveToSharePoint} className="min-h-11 rounded-full bg-blue-700 px-6 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">

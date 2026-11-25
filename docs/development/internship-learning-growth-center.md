@@ -96,3 +96,39 @@ The rollback candidate verified during this work is Vercel deployment `dpl_5RX2X
 - **Ava** opens Instructor Center in the Manager Portal to assign work, post announcements and review the assigned team. Speed Review filters the pending assignment queue.
 - **Jason** opens Instructor & Supervisor Center in Admin HQ to oversee reviews, release final employer evaluations and record sponsorship approval after verification.
 - **Interns** open Learning & Growth Center to see due work and hours, submit assignment files through the existing SharePoint connection, and see released grades and announcements.
+
+## Spring 2027 Pre-Launch release checklist
+
+The existing cohort's official dates are January 12 through May 7, 2027. The independent academic state defaults to Pre-Launch with activation OFF. Applying the migration does not activate the cohort or change an enrollment, assignment, timesheet, pay agreement, or milestone.
+
+| Item | Status |
+| --- | --- |
+| Cohort Program Controls | Implemented in Admin HQ and Manager Portal using shared persistent state. Changes require a current revision, an authorized role, and explicit confirmation. A database transaction records the actor, timestamp, and transition together. |
+| Gradebook and academic release | Gradebook shell, instructor draft preparation, and release guards are implemented. The database blocks assignment and program evaluation release while the cohort is inactive. Grades and exports require separate release verification. |
+| Official weekly check-ins and reminders | Visible with server-side gates for semester status and independent verification. Existing check-in history stays available. |
+| Assignment submissions | Existing SharePoint work links and the draft, submit, review, and revision flow remain available. Postgres records a snapshot per submission. New upload and SharePoint file-versioning controls await verification. |
+| Community and media pilots | The two proposed six-month pilots remain proposals. Existing Community Studio, Campus Growth, Content Studio, and referral paths remain available. The proposal pipeline, administrative approval, and kit ZIP are gated pending authenticated verification. |
+| Verification | Run the internship GitHub workflow and confirm the exact head. Local suites cover deployment policy, intern authorization, the existing desks, and all five migration files. |
+| Release and acceptance | Use the existing production configuration. Verify the deployment SHA, domain, role-based sign-in, operational work, runtime errors, and the Program Controls OFF state. Authenticated testing requires access to each corresponding role. |
+| Native | Run native type checking and Expo bundle exports. TestFlight and Android distribution require separately signed artifacts and device acceptance. |
+| Outstanding | Approved early-work credit designation, official 15-week schedule and progress tracking, richer module and discussion workflows, analytics attribution, full native instructor editing and deployment acceptance. |
+
+### Routes and enrollment
+
+- Learning & Growth Center `/intern`
+- Instructor & Supervisor Center `/manager/instructor` and `/admin/internship/instructor`
+- SitGuru Speed Review `/manager/speed-review`
+- Private gradebook `/intern/grades`
+- Manager Program Controls `/manager/internship/program-controls`
+- Admin Program Controls `/admin/internship/program-controls`
+- Partner workspace `/manager/partners` and `/intern/growth/partners`. The ZIP handler has a per-proposal URL displayed inside the authorized workspace when available.
+
+Use the existing approved cohort and university records. Ryan's workload plan is 75 hours in each pillar. Lalita's proposed plan is 150 in each pillar once documented. Use Lola's approved agreement for any allocation. Leave pre-launch and paid work in its existing workflow until academic eligibility is reviewed.
+
+### Release controls and rollback
+
+Keep `SITGURU_INTERNSHIP_PROGRAM_CONTROLS_VERIFIED`, `SITGURU_INTERNSHIP_GRADING_VERIFIED`, `SITGURU_INTERNSHIP_CHECK_INS_VERIFIED`, `SITGURU_INTERNSHIP_DEADLINES_VERIFIED`, `SITGURU_ASSIGNMENT_FILES_VERIFIED`, and `SITGURU_PARTNER_PROPOSALS_VERIFIED` disabled until each corresponding workflow passes acceptance. Enabling the Program Controls flag makes the authorized UI available and leaves the cohort in its existing state. Activation remains a manual action in Program Controls. Ava must be the cohort's assigned manager. Jason uses his Super Admin account. To activate once approved, choose the cohort, review readiness, check the confirmation, and select Activate semester. Pause and complete also require confirmation.
+
+The isolated Preview allowlist requires the exact release SHA through `SITGURU_PREVIEW_RELEASE_SHA`, SitGuru Staging (`ehdvngkqddttcwhjubwu`), branch-scoped staging credentials, the existing safe Preview opt-ins, and no outbound credentials. It never substitutes production credentials.
+
+The migration `20261125152918_internship_program_controls.sql` follows the private assignment evaluation table. Apply the five additive migrations in filename order when absent on the target project. Apply before starting a production build from the merged source. In a rollback, restore the previously verified Vercel deployment, keep additive tables and audit history, and verify the domain and role sign-in. Keep independent gates off while the issue is diagnosed.

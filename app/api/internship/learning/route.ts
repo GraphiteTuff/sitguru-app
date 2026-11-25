@@ -1,3 +1,5 @@
+import { canViewOfficialGrades, getProgramStatus } from "@/lib/internship/program-controls";
+import { partnerProposalWorkspaceVerified } from "@/lib/admin/growth/partner-proposal-access";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAdminIdentityForUser } from "@/lib/admin/access";
 import { canUseGrowthPortal } from "@/lib/admin/growth/access";
@@ -48,14 +50,15 @@ export async function GET(request: NextRequest) {
   const summary = buildLearningDashboard(workspace, new Date().toISOString().slice(0, 10));
   const assignments = summary.assignments;
   const titles = new Map(assignments.map((task) => [task.id, task.title]));
+  const programStatus = await getProgramStatus(intern.cohortId);
   const [evaluations, announcements, partners] = await Promise.all([
-    supabaseAdmin.from("internship_assignment_evaluations")
+    canViewOfficialGrades(programStatus) ? supabaseAdmin.from("internship_assignment_evaluations")
       .select("task_id,total,total_possible,feedback,released_at").eq("intern_id", intern.id)
-      .not("released_at", "is", null).order("released_at", { ascending: false }).limit(250),
+      .not("released_at", "is", null).order("released_at", { ascending: false }).limit(250) : { data: [], error: null },
     supabaseAdmin.from("internship_announcements").select("id,title,body,created_at")
       .eq("intern_id", intern.id).order("created_at", { ascending: false }).limit(20),
-    supabaseAdmin.from("growth_partner_proposals").select("id,name,category,status")
-      .eq("intern_id", intern.id).order("created_at", { ascending: false }).limit(30),
+    partnerProposalWorkspaceVerified() ? supabaseAdmin.from("growth_partner_proposals").select("id,name,category,status")
+      .eq("intern_id", intern.id).order("created_at", { ascending: false }).limit(30) : { data: [], error: null },
   ]);
   const grades = new Map<string, { id: string; title: string; total: number; possible: number; feedback: string }>();
   for (const row of evaluations.data || []) {
@@ -66,6 +69,7 @@ export async function GET(request: NextRequest) {
   }
   return reply(request, {
     mode: "intern",
+    programStatus,
     firstName: intern.preferredName || intern.fullName.split(/\s+/)[0],
     pillars: summary.pillars,
     upcoming: summary.upcoming.map(({ id, title, date, type }) => ({ id, title, date, type })),

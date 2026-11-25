@@ -1,3 +1,4 @@
+import { canUseOfficialCheckIns } from "@/lib/internship/program-controls";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
 import { loadInternSectionWorkspace } from "@/lib/internship/intern-section-data";
 import { InternCheckInsPageView } from "@/components/internship/InternSectionPages";
@@ -17,9 +18,10 @@ export default async function InternCheckInsPage({searchParams}:{
       </div>
     );
   }
+  const semesterCheckIns = await canUseOfficialCheckIns(data.workspace.intern.cohortId);
   const params=searchParams?await searchParams:{};
   const first=(v:string|string[]|undefined)=>Array.isArray(v)?v[0]||"":v||"";
   return (
-    <InternCheckInsPageView workspace={data.workspace} hourSummary={data.hourSummary} notice={first(params.ok)} error={first(params.error)} />
+    <InternCheckInsPageView semesterCheckIns={semesterCheckIns} workspace={data.workspace} hourSummary={data.hourSummary} notice={first(params.ok)} error={first(params.error)} />
   );
 }

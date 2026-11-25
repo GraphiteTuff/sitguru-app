@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
-import { getPartnerProposalActor, type ProposalMode } from "@/lib/admin/growth/partner-proposal-access";
+import { getPartnerProposalActor, partnerProposalWorkspaceVerified, type ProposalMode } from "@/lib/admin/growth/partner-proposal-access";
 import { savePartnerProposalAction } from "@/lib/admin/growth/partner-proposal-actions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -22,6 +22,14 @@ export default async function PartnerProposalWorkspace({ mode, searchParams }: {
   mode: ProposalMode;
   searchParams?: Promise<{ partnerOk?: string; partnerError?: string }>;
 }) {
+  if (!partnerProposalWorkspaceVerified()) {
+    return (
+      <section id="partner-proposals" className={card}>
+        <h2 className="text-2xl font-black text-emerald-950">Partnership proposals</h2>
+        <p className="mt-2 text-sm text-slate-700">The proposal pipeline, evidence review, and marketing kit ZIP tools are awaiting release verification.</p>
+      </section>
+    );
+  }
   const actor = await getPartnerProposalActor(mode);
   if (!actor) return null;
   const flash = searchParams ? await searchParams : {};

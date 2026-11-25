@@ -194,6 +194,90 @@ begin
   end if;
 end $$;`,
   },
+  {
+    migration: "20261125152918_internship_program_controls.sql",
+    setup: `reset role;
+create table public.internship_cohorts (
+  id uuid primary key, season text, year integer, starts_on date, ends_on date,
+  default_manager_user_id uuid, default_supervisor_user_id uuid
+);
+create table public.internship_evaluations (intern_id uuid, kind text, status text);
+grant select, insert, update on public.internship_evaluations to service_role;
+alter table public.internship_interns add column cohort_id uuid references public.internship_cohorts;
+insert into public.internship_cohorts values
+  ('10000000-0000-0000-0000-000000000001','spring',2027,'2027-01-12','2027-05-07',
+   '20000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000002'),
+  ('10000000-0000-0000-0000-000000000002','fall',2027,'2027-08-19','2027-12-03',
+   '20000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000002');
+update public.internship_interns set cohort_id='10000000-0000-0000-0000-000000000001'
+where id='ae924248-2fce-42ac-87b0-420b836a82a3';`,
+    check: `set role authenticated;
+do $$
+begin
+  if has_function_privilege(current_user, 'public.transition_internship_program(uuid,uuid,text,integer,text)', 'EXECUTE')
+    or has_table_privilege(current_user, 'public.internship_program_controls', 'SELECT')
+    or has_table_privilege(current_user, 'public.internship_program_control_events', 'SELECT') then
+    raise exception 'Authenticated client has program controls privileges';
+  end if;
+end $$;
+reset role;
+set role service_role;
+do $$
+declare
+  spring uuid := '10000000-0000-0000-0000-000000000001';
+  fall uuid := '10000000-0000-0000-0000-000000000002';
+  manager uuid := '20000000-0000-0000-0000-000000000001';
+  supervisor uuid := '20000000-0000-0000-0000-000000000002';
+  intern uuid := 'ae924248-2fce-42ac-87b0-420b836a82a3';
+begin
+  if not exists(select 1 from internship_program_controls where cohort_id=spring
+    and status='pre_launch' and revision=0 and activated_at is null and activated_by is null) then
+    raise exception 'Spring cohort is not initially pre-launch';
+  end if;
+  if has_table_privilege(current_user,'public.internship_program_control_events','UPDATE')
+      or has_table_privilege(current_user,'public.internship_program_controls','UPDATE') then
+    raise exception 'Service role is able to edit control state outside the audited function';
+  end if;
+  begin
+    perform public.transition_internship_program(fall,manager,'manager',0,'activate');
+    raise exception 'Manager activated a different cohort';
+  exception when insufficient_privilege then null;
+  end;
+  insert into internship_evaluations values (intern,'midpoint','draft');
+  begin
+    update internship_evaluations set status='released' where intern_id=intern;
+    raise exception 'Released pre-launch evaluation';
+  exception when check_violation then null;
+  end;
+  if not public.transition_internship_program(spring,manager,'manager',0,'activate') then
+    raise exception 'Authorized manager could not activate';
+  end if;
+  if public.transition_internship_program(spring,manager,'manager',0,'activate') then
+    raise exception 'Duplicate activation succeeded';
+  end if;
+  update internship_evaluations set status='released' where intern_id=intern;
+  if not public.transition_internship_program(spring,supervisor,'supervisor',1,'pause') then
+    raise exception 'Supervisor could not pause';
+  end if;
+  begin
+    insert into internship_evaluations values (intern,'final','released');
+    raise exception 'Released evaluation while paused';
+  exception when check_violation then null;
+  end;
+  if not public.transition_internship_program(spring,manager,'manager',2,'resume')
+    or not public.transition_internship_program(spring,supervisor,'supervisor',3,'complete') then
+    raise exception 'Resume or completion failed';
+  end if;
+  if public.transition_internship_program(spring,manager,'manager',4,'resume')
+    or exists(select 1 from internship_program_controls where cohort_id=fall)
+    or (select count(*) from internship_program_control_events where cohort_id=spring) <> 4
+    or not exists(select 1 from internship_program_controls where cohort_id=spring
+      and status='completed' and revision=4 and activated_by=manager and activated_at is not null) then
+    raise exception 'Transition history or state is incorrect';
+  end if;
+end $$;
+reset role;`,
+  },
 ];
 
 const docker = process.env.SITGURU_VERIFICATION_DOCKER_HOST

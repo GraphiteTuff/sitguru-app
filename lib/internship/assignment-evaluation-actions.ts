@@ -1,5 +1,6 @@
 "use server";
 
+import { canReleaseOfficialGrades } from "@/lib/internship/program-controls";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
@@ -7,8 +8,6 @@ import { parseAssignmentRubric } from "@/lib/internship/assignment-rubric";
 import { canReadPrivateInternRecord, internshipActorKind, isPortalUserId } from "@/lib/internship/manager-access";
 import { findInternById } from "@/lib/internship/queries";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
-function officialReleaseBlocked(intent: string): boolean { return intent === "release"; }
 
 export async function saveAssignmentEvaluation(form: FormData) {
   const read = (key: string) => String(form.get(key) ?? "").trim();
@@ -42,7 +41,6 @@ export async function saveAssignmentEvaluation(form: FormData) {
   if (read("evaluatedSubmissionAt") !== String(task.submitted_at || "")) {
     return fail("This assignment changed. Review the latest submission before saving an evaluation.");
   }
-  if (officialReleaseBlocked(intent)) return fail("Official semester evaluation release is disabled during pre-launch.");
   if (intent === "release" && kind !== "supervisor" &&
       ["submitted_to_jason", "ceo_review_required"].includes(String(task.review_stage))) {
     return fail("This assignment is waiting for supervisor review.");
@@ -56,6 +54,10 @@ export async function saveAssignmentEvaluation(form: FormData) {
     if (error || rubric.maximums.some((value, index) => value !== maximums[index])) {
       return fail("Only the supervisor can change rubric maximums.");
     }
+  }
+
+  if (intent === "release" && !await canReleaseOfficialGrades(intern.cohortId)) {
+    return fail("Official grade release requires an active semester and verified grading.");
   }
 
   const { error } = await supabaseAdmin.from("internship_assignment_evaluations").upsert({

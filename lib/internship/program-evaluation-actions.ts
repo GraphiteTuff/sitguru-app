@@ -1,5 +1,6 @@
 "use server";
 
+import { canReleaseOfficialGrades } from "@/lib/internship/program-controls";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProgramEvaluationAccess } from "@/lib/internship/program-evaluation-access";
@@ -23,9 +24,12 @@ export async function saveProgramEvaluation(form: FormData) {
       !["draft", "released"].includes(intent) || !summary || summary.length > 4000 || nextSteps.length > 4000) {
     return go("error", "Choose an evaluation period and add a summary.");
   }
-  if (intent === "released") return go("error", "Official semester evaluation release is disabled during pre-launch.");
   if (kind === "final" && intent === "released" && !access.user.isSuperUser) {
     return go("error", "The supervisor releases the final employer evaluation.");
+  }
+
+  if (intent === "released" && !await canReleaseOfficialGrades(access.intern.cohortId)) {
+    return go("error", "Official evaluation release requires an active semester and verified grading.");
   }
 
   const { error } = await supabaseAdmin.from("internship_evaluations").upsert({

@@ -1,3 +1,4 @@
+import { canViewOfficialGrades, getProgramStatus } from "@/lib/internship/program-controls";
 import { getProgramEvaluationAccess } from "@/lib/internship/program-evaluation-access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -12,7 +13,10 @@ function csvCell(value: unknown) {
 export async function GET(_request: Request, { params }: { params: Promise<{ internId: string }> }) {
   const { internId } = await params;
   const access = await getProgramEvaluationAccess(internId);
-  if (!access || access.kind !== "supervisor") return new Response("Supervisor access required.", { status: 403 });
+  if (!access?.user.isSuperUser) return new Response("Supervisor access required.", { status: 403 });
+  if (!canViewOfficialGrades(await getProgramStatus(access.intern.cohortId))) {
+    return new Response("Semester reporting is unavailable.", { status: 409 });
+  }
   const { data, error } = await supabaseAdmin.from("internship_evaluations")
     .select("kind,presented_at,payload,created_at")
     .eq("intern_id", internId).eq("status", "released").in("kind", ["midpoint", "final"])
