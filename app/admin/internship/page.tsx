@@ -27,6 +27,13 @@ export default async function InternshipProgramDashboardPage({
 
   return (
     <>
+      {canAdministerInternshipOnboarding(actor) ? (
+        <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
+          <Link href="/admin/internship/instructor" className="inline-flex min-h-12 items-center rounded-xl bg-[#10583f] px-4 text-sm font-bold !text-white">
+            Instructor &amp; Supervisor Center
+          </Link>
+        </div>
+      ) : null}
       {actor.isSuperUser ? (
         <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
           <Link href="/admin/internship/connection-health" className="inline-flex min-h-11 items-center rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 text-sm font-black text-[#1D4ED8] hover:bg-[#DBEAFE]">

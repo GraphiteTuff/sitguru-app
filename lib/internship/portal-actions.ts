@@ -20,6 +20,7 @@ import {
 import { WEEK_ZERO_ITEMS } from "@/lib/internship/week-zero";
 import {
   isOfficialReviewStage,
+  legacyStatusToStage,
   nextReviewStage,
   statusForStage,
   type ReviewAction,
@@ -87,6 +88,12 @@ async function actorContext(): Promise<{
     internId: intern?.id || null,
   };
 }
+
+const REVIEW_DESTINATIONS = new Set(["/manager/check-ins", "/manager/instructor", "/admin/internship/instructor"]);
+const STAFF_REVIEW_ACTIONS: ReadonlySet<string> = new Set<ReviewAction>([
+  "approve", "request_changes", "escalate", "ceo_approve", "ceo_request_changes",
+]);
+const STAFF_REVIEW_TARGETS = new Set(["task", "content", "weekly", "hours"]);
 
 async function assertCanTouchIntern(internId: string, actor: Awaited<ReturnType<typeof actorContext>>) {
   const intern = await findInternById(internId);
@@ -328,7 +335,8 @@ export async function approveWeekZero(formData: FormData) {
 
 export async function reviewPortalSubmission(formData: FormData) {
   const actor = await actorContext();
-  const returnTo=text(formData,"returnTo")==="/manager/check-ins"?"/manager/check-ins":"/intern/manage?tab=reviews";
+  const destination = text(formData, "returnTo");
+  const returnTo = REVIEW_DESTINATIONS.has(destination) ? destination : "/intern/manage?tab=reviews";
   const internId = text(formData, "internId");
   const intern = await assertCanTouchIntern(internId, actor);
   if (!intern || !canReviewRoutineWork(actor.kind)) {
@@ -338,6 +346,9 @@ export async function reviewPortalSubmission(formData: FormData) {
   const targetType = text(formData, "targetType");
   const targetId = text(formData, "targetId");
   const comment = text(formData, "comment");
+  if (!STAFF_REVIEW_ACTIONS.has(action) || !STAFF_REVIEW_TARGETS.has(targetType)) {
+    bounce(returnTo, "error", "Choose an available review action.");
+  }
   if ((action === "request_changes" || action === "escalate" || action === "ceo_request_changes") && !comment) {
     bounce(returnTo, "error", "Add a note so the intern knows what you decided.");
   }
@@ -346,6 +357,7 @@ export async function reviewPortalSubmission(formData: FormData) {
   }
 
   if (targetType === "hours") {
+    if (action === "escalate") bounce(returnTo, "error", "Open the hours review to manage this entry.");
     formData.set("id", targetId);
     formData.set("decision", action === "approve" || action === "ceo_approve" ? "approve" : "changes");
     if (action === "ceo_approve") formData.set("verify", "yes");
@@ -363,7 +375,15 @@ export async function reviewPortalSubmission(formData: FormData) {
   const currentStage = targetType === "weekly"
     ? String(existing.review_status || "submitted_to_ava")
     : String(existing.review_stage || existing.status || "submitted");
-  const next = nextReviewStage({ stage: currentStage, action, actor: actor.kind === "supervisor" ? "supervisor" : "manager" });
+  const current = legacyStatusToStage(currentStage);
+  if (action === "approve" && current !== "submitted_to_ava") {
+    bounce(returnTo, "error", "Only work submitted for routine review can be approved here.");
+  }
+  const presentedAt = text(formData, "presentedAt");
+  if (presentedAt && presentedAt !== String(existing.submitted_at || existing.week_of || "")) {
+    bounce(returnTo, "error", "This submission changed. Open the latest version before reviewing it.");
+  }
+  const next = nextReviewStage({ stage: current, action, actor: actor.kind === "supervisor" ? "supervisor" : "manager" });
   if (!next.ok) bounce(returnTo, "error", next.error);
 
   const now = new Date().toISOString();
@@ -385,8 +405,17 @@ export async function reviewPortalSubmission(formData: FormData) {
         ...(targetType === "task" ? { updated_at: now } : {}),
       };
 
-  const { error } = await supabaseAdmin.from(table).update(payload).eq("id", targetId).eq("intern_id", internId);
+  const stateColumn = targetType === "weekly" ? "review_status" : "review_stage";
+  const previousState = existing[stateColumn];
+  const update = supabaseAdmin.from(table).update(payload).eq("id", targetId).eq("intern_id", internId);
+  if (previousState == null) update.is(stateColumn, null);
+  else update.eq(stateColumn, previousState);
+  if (existing.submitted_at == null) update.is("submitted_at", null);
+  else update.eq("submitted_at", existing.submitted_at);
+  if (targetType !== "weekly") update.eq("status", existing.status);
+  const { data: updated, error } = await update.select("id").maybeSingle();
   if (error) bounce(returnTo, "error", "Review could not be saved.");
+  if (!updated) bounce(returnTo, "error", "This submission changed. Refresh the queue and review it again.");
 
   await supabaseAdmin.from("internship_review_events").insert({
     intern_id: internId,

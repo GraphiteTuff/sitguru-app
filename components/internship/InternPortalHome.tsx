@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight, BarChart3, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, ClipboardList,
-  Clock3, Flag, FolderOpen, GraduationCap, Handshake, MessageCircle, PawPrint, PenLine, Users,
+  Clock3, Flag, FolderOpen, GraduationCap, Handshake, Megaphone, MessageCircle, PawPrint, PenLine, Users,
 } from "lucide-react";
 import AskAvaForm from "@/components/internship/AskAvaForm";
 import InternWorkSystemsCard from "@/components/internship/InternWorkSystemsCard";
@@ -19,6 +19,7 @@ const learningLinks = [
   { label: "Assignments", href: INTERN_ROUTES.assignments, icon: ClipboardList },
   { label: "Calendar", href: INTERN_ROUTES.calendar, icon: CalendarDays },
   { label: "Discussions & Messages", href: INTERN_ROUTES.messages, icon: MessageCircle },
+  { label: "Announcements", href: "/intern/announcements", icon: Megaphone },
   { label: "My Files", href: "/intern/files", icon: FolderOpen },
   { label: "My Hours", href: INTERN_ROUTES.hours, icon: Clock3 },
   { label: "Weekly Check-Ins", href: INTERN_ROUTES.checkIns, icon: ClipboardCheck },
