@@ -89,7 +89,7 @@ const accountOptions: {
     badge: "Earn with care",
     panelTitle: "Start earning as a Guru",
     panelCopy:
-      "Create your Future Guru account now. Finish services, pricing, and availability from your dashboard before you go bookable.",
+      "Create your Guru profile and set up your services from your dashboard. You can add a payout account later, before accepting paid work.",
   },
   {
     key: "ambassador",
@@ -342,7 +342,7 @@ function buildAuthCallbackUrl({
 }
 
 function getRedirectPath(intent: AccountIntent) {
-  if (intent === "guru" || intent === "both") return "/guru/dashboard/profile";
+  if (intent === "guru" || intent === "both") return "/guru/dashboard";
   if (intent === "ambassador") return "/ambassador/dashboard";
   return "/customer/dashboard?coach=1";
 }
@@ -1057,7 +1057,7 @@ function SignupPageContent() {
         intent === "ambassador"
           ? "Your Ambassador account and workspace were created. Confirm the email we just sent and we’ll take you to onboarding automatically."
           : shouldCreateGuruProfile(intent)
-            ? "Account created. Confirm the email we just sent and we’ll continue to your Guru profile setup."
+            ? "Account created. Confirm your email to continue. You can set up payouts later in Guru Earnings."
             : "Account created. Confirm the email we just sent and we’ll open your dashboard automatically.",
       );
     } catch (caughtError) {
