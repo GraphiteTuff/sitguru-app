@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown, Plus } from "lucide-react";
 import {
   saveAccessGrant,
   saveExperiment,
@@ -38,6 +39,7 @@ import InternshipFinalProjectBoard, {
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 import InternAvatar from "@/components/internship/InternAvatar";
+import { FINAL_CONTRIBUTION_SECTIONS } from "@/lib/internship/final-project";
 
 const TABS = [
   { id: "plan", label: "Plan" },
@@ -56,6 +58,7 @@ function Input({
   required = false,
   placeholder = "",
   defaultValue = "",
+  plainLabel = false,
 }: {
   name: string;
   label: string;
@@ -63,10 +66,11 @@ function Input({
   required?: boolean;
   placeholder?: string;
   defaultValue?: string;
+  plainLabel?: boolean;
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+      <span className={plainLabel ? "text-sm font-bold text-slate-700" : "text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800"}>
         {label}
       </span>
       <input
@@ -75,7 +79,7 @@ function Input({
         required={required}
         placeholder={placeholder}
         defaultValue={defaultValue}
-        className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+        className={`mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-slate-950 ${plainLabel ? "bg-white text-base" : "text-sm font-semibold"}`}
       />
     </label>
   );
@@ -351,8 +355,73 @@ export default function InternshipGrowthWorkspace({
       ) : null}
 
       {tab === "tasks" ? (
-        <section className="grid gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-7 space-y-3">
+        <section className="space-y-4">
+          {readOnly ? (
+            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
+              Preview only. Open the review workspace to add an assignment.
+            </p>
+          ) : (
+            <details className="group rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 text-sm font-black text-[#2563EB] marker:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB] sm:px-5 [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-2"><Plus size={18} aria-hidden="true" /> New assignment</span>
+                <ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <form action={saveInternTask} className="space-y-4 border-t border-slate-100 p-4 sm:p-5">
+                <input type="hidden" name="internId" value={data.intern.id} />
+                <input type="hidden" name="mode" value={mode} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input name="title" label="Title (required)" required plainLabel />
+                  <Input name="dueOn" label="Due date" type="date" plainLabel />
+                  <label className="block sm:col-span-2">
+                    <span className="text-sm font-bold text-slate-700">{supervisor ? "Assignment notes" : "Intern notes"}</span>
+                    <textarea
+                      name="studentNotes"
+                      rows={3}
+                      className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-base text-slate-950"
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-sm font-bold text-slate-700">Related report section (required)</span>
+                    <select
+                      name="finalSection"
+                      required
+                      defaultValue=""
+                      className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 bg-white px-3 text-base text-slate-950"
+                    >
+                      <option value="">Choose a report section</option>
+                      {FINAL_CONTRIBUTION_SECTIONS.map((section) => (
+                        <option key={section.id} value={section.id}>{section.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <details className="rounded-xl border border-slate-200 bg-slate-50 px-4">
+                  <summary className="min-h-12 cursor-pointer py-3 text-sm font-bold text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]">
+                    More details
+                  </summary>
+                  <div className="grid gap-4 pb-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-sm font-bold text-slate-700">Status</span>
+                      <select name="status" defaultValue="todo" className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 bg-white px-3 text-base text-slate-950">
+                        <option value="todo">To do</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="blocked">Blocked</option>
+                      </select>
+                    </label>
+                    <Input name="workUrl" label="Work link" plainLabel />
+                    <Input name="businessObjective" label="Goal" plainLabel />
+                    <Input name="metricAffected" label="What will you measure?" plainLabel />
+                    <Input name="internReportedValue" label="Reported result" plainLabel />
+                  </div>
+                </details>
+                <button className="min-h-12 w-full rounded-2xl bg-[#2563EB] px-5 text-sm font-black !text-white hover:bg-[#1D4ED8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB] sm:w-auto">
+                  Save assignment
+                </button>
+              </form>
+            </details>
+          )}
+          <div className="space-y-3">
             {data.tasks.length ? (
               data.tasks.map((task) => (
                 <InternshipAssignmentReview
@@ -380,50 +449,10 @@ export default function InternshipGrowthWorkspace({
               ))
             ) : (
               <p className="rounded-2xl border border-dashed border-slate-200 p-5 text-sm font-semibold text-slate-500">
-                No tasks yet. Add work with a due date, business objective, and metric.
+                {readOnly ? "No assignments yet." : "No assignments yet. Select New assignment to add one."}
               </p>
             )}
           </div>
-          {readOnly ? (
-            <p className="lg:col-span-5 rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-              HQ preview is view-only. Assignments are added from Employer review.
-            </p>
-          ) : (
-            <form
-              action={saveInternTask}
-              className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-            >
-              <h3 className="font-black text-slate-950">New assignment</h3>
-              <input type="hidden" name="internId" value={data.intern.id} />
-              <input type="hidden" name="mode" value={mode} />
-              <Input name="title" label="Task" required />
-              <Input name="dueOn" label="Due date" type="date" />
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Status
-                </span>
-                <select
-                  name="status"
-                  defaultValue="todo"
-                  className="mt-1 min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
-                >
-                  <option value="todo">To do</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="blocked">Blocked</option>
-                </select>
-              </label>
-              <Input name="workUrl" label="Link to completed work" />
-              <Input name="businessObjective" label="Business objective" />
-              <Input name="metricAffected" label="Metric affected" />
-              <FinalSectionSelect />
-              <Input name="internReportedValue" label="Intern reported result" />
-              <Input name="studentNotes" label="Student notes" />
-              <button className="min-h-11 w-full rounded-2xl bg-[#2563EB] text-sm font-black !text-white">
-                Save task
-              </button>
-            </form>
-          )}
         </section>
       ) : null}
 
