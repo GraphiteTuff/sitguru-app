@@ -93,7 +93,7 @@ export default function GuruDashboardHeader({ activeTab, active }: GuruDashboard
           <Link
             href="/guru/dashboard/messages"
             aria-label="Guru notifications and messages"
-            className="grid h-11 w-11 place-items-center rounded-full text-slate-900 hover:bg-emerald-50"
+            className="grid h-11 w-11 place-items-center rounded-full text-[#0F2744] transition hover:bg-[#EEF2F6]"
           >
             <Bell className="h-5 w-5" />
           </Link>
