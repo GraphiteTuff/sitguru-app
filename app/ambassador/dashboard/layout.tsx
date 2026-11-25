@@ -19,6 +19,7 @@ import {
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { openCompanionChat } from "@/lib/companions/open-companion-chat";
 import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET, SITGURU_MOBILE_NAV_CONTENT_PAD } from "@/lib/portal/mobile-nav-style";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -205,19 +206,15 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      <div className="pb-[calc(6rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
+      <div className="lg:pb-0" style={{ paddingBottom: SITGURU_MOBILE_NAV_CONTENT_PAD }}>{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
         data-ambassador-bottom-nav
-        className="pointer-events-auto fixed inset-x-0 z-[60] border-t border-emerald-200 bg-white/95 shadow-[0_-10px_28px_rgba(15,23,42,0.09)] backdrop-blur-md lg:hidden"
-        style={{
-          bottom: "var(--sg-chrome-bottom, 0px)",
-          paddingBottom:
-            "max(0.4rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem))",
-        }}
+        className={`${NAV.surface} lg:hidden`}
+        style={SITGURU_MOBILE_NAV_INSET}
       >
-        <div className="mx-auto grid max-w-[650px] grid-cols-5 gap-0.5 px-1.5 pt-1.5">
+        <div className={NAV.grid}>
           {[
             { label: "Home", href: "/ambassador/dashboard", icon: LayoutDashboard },
             { label: "My QR", href: "/ambassador/dashboard/referrals", icon: QrCode },
@@ -240,19 +237,15 @@ export default function AmbassadorDashboardLayout({
                 key={item.label}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-[65px] min-w-0 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-1 text-[12px] font-black leading-tight transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 ${
-                  active ? "bg-emerald-50 text-[#0D5C3A]" : "text-slate-700 hover:bg-emerald-50"
-                }`}
+                className={`${NAV.tab} ${active ? NAV.active : NAV.idle}`}
               >
-                <span className={`grid h-9 w-11 shrink-0 place-items-center rounded-2xl ${
-                  active ? "bg-white" : ""
-                }`}>
+                <span className={`${NAV.icon} ${active ? NAV.iconActive : ""}`}>
                   <Icon
-                    className={`h-[24px] w-[24px] ${active ? "stroke-[2.4]" : "stroke-[2]"}`}
+                    className={`${NAV.iconSize} ${active ? NAV.iconStrokeActive : NAV.iconStrokeIdle}`}
                     aria-hidden
                   />
                 </span>
-                <span className={active ? "text-[#0D5C3A]" : undefined}>
+                <span>
                   {item.label}
                 </span>
               </Link>
