@@ -7,6 +7,7 @@
  * Public surfaces never call useGuruAuth / never wait on a session.
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -441,7 +442,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                   if (!window.confirm("End this chat and clear the conversation history?")) return;
                   setMessages([
                     {
-                      id: `scout-hello-reset-${Date.now()}`,
+                      id: "scout-hello-reset",
                       role: "assistant",
                       content: greeting,
                     },
@@ -647,7 +648,7 @@ function AIScoutCompanion({
   currentPath,
 }: AIScoutCompanionProps) {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
 
   const resolvedPath =
     currentPath ||
@@ -658,10 +659,6 @@ function AIScoutCompanion({
   const publicVariant = resolvePublicFormVariant(mode);
   const bot = getBotConfig({ mode, currentPath: resolvedPath });
   const variant = publicVariant ?? bot.variant;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted || !variant) return null;
   if (!publicVariant && !bot.shouldRender) return null;

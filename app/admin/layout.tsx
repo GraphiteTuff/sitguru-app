@@ -461,9 +461,11 @@ function MobileNav({
   const allow = (href: string) =>
     !modules || href === "/" || isAdminPathAllowedForModules(href, modules);
 
-  useEffect(() => {
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
     setMoreOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -889,14 +891,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   }, [navCollapsed]);
 
-  useEffect(() => {
+  const navigationKey = `${pathname}:${isGrowthChrome}`;
+  const [previousNavigationKey, setPreviousNavigationKey] = useState<string | null>(null);
+  if (previousNavigationKey !== navigationKey) {
+    setPreviousNavigationKey(navigationKey);
     const match = visibleNavSections.find((section) =>
       section.items.some((item) => isActivePath(pathname, item.href)),
     );
-    setOpenSection(
-      match?.title ?? visibleNavSections[0]?.title ?? "Overview & Work",
-    );
-  }, [pathname, isGrowthChrome]);
+    setOpenSection(match?.title ?? visibleNavSections[0]?.title ?? "Overview & Work");
+  }
 
   if (isAdminLoginPage) {
     return <>{children}</>;

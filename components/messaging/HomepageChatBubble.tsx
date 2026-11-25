@@ -5,6 +5,7 @@
  * Streams via Vercel AI SDK useChat → /api/chat/send.
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
@@ -332,7 +333,7 @@ export default function HomepageChatBubble() {
   const pathname = usePathname();
   const isCommunityPage = isCommunityCompanionPath(pathname);
   const compactLauncher = isCompactRogueLauncherPath(pathname);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [clientFirstName, setClientFirstName] = useState("");
@@ -513,8 +514,6 @@ export default function HomepageChatBubble() {
   }
 
   useEffect(() => {
-    setMounted(true);
-
     // Resolve auth first — guests must not reuse a prior signed-in name.
     void (async () => {
       try {

@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminUser } from "@/lib/supabase/admin";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
@@ -7,10 +8,10 @@ type AuthUserSummary = {
   created_at: string | null;
   last_sign_in_at: string | null;
   email_confirmed_at: string | null;
-  user_metadata?: Record<string, any> | null;
+  user_metadata?: Record<string, unknown> | null;
 };
 
-type AnyRow = Record<string, any>;
+type AnyRow = Record<string, unknown>;
 
 const emptyUuid = "00000000-0000-0000-0000-000000000000";
 
@@ -93,7 +94,7 @@ function getCleanEmailFallback(email: string) {
 function getDisplayName(
   profile: AnyRow,
   email: string,
-  userMetadata?: Record<string, any> | null,
+  userMetadata?: Record<string, unknown> | null,
 ) {
   const fullName = normalizeText(profile.full_name);
   const firstName = normalizeText(profile.first_name);
@@ -182,8 +183,8 @@ function countByUserId(rows: AnyRow[], keys: string[]) {
   return counts;
 }
 
-async function getAllAuthUsers(supabaseAdmin: any) {
-  const users: any[] = [];
+async function getAllAuthUsers(supabaseAdmin: Awaited<ReturnType<typeof requireAdminUser>>["supabaseAdmin"]) {
+  const users: User[] = [];
   let page = 1;
   const perPage = 1000;
 
@@ -289,7 +290,7 @@ export async function GET(request: NextRequest) {
     }
 
     const profileRows = profiles || [];
-    const profileIds = profileRows.map((profile: AnyRow) => profile.id);
+    const profileIds = profileRows.map((profile) => profile.id);
     const safeProfileIds = profileIds.length ? profileIds : [emptyUuid];
 
     const authUsers = await getAllAuthUsers(supabaseAdmin);
@@ -373,7 +374,7 @@ export async function GET(request: NextRequest) {
 
     const latestEventByUserId = new Map<string, AnyRow>();
 
-    lifecycleEvents.forEach((event: AnyRow) => {
+    lifecycleEvents.forEach((event) => {
       if (!latestEventByUserId.has(event.user_id)) {
         latestEventByUserId.set(event.user_id, event);
       }
@@ -404,7 +405,7 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    let accounts = profileRows.map((profile: AnyRow) => {
+    let accounts = profileRows.map((profile) => {
       const authUser = authUserById.get(profile.id);
       const latestEvent = latestEventByUserId.get(profile.id);
       const email =

@@ -1004,6 +1004,7 @@ export default function ReviewsScreen() {
 
   const isWide = width >= 720;
 
+  const accountId = user?.id;
   const refresh = useCallback(async () => {
     if (authLoading) return;
 
@@ -1015,7 +1016,7 @@ export default function ReviewsScreen() {
       return;
     }
 
-    if (!user?.id) {
+    if (!accountId) {
       setBooking(null);
       setReviews([]);
       setLoading(false);
@@ -1029,19 +1030,19 @@ export default function ReviewsScreen() {
     try {
       const nextBooking =
         (bookingId ? await loadBookingById(bookingId) : null) ||
-        (await loadLatestBookingForUser(user.id, effectiveRole));
+        (await loadLatestBookingForUser(accountId, effectiveRole));
 
       setBooking(nextBooking);
 
       const nextGuruUserId =
         requestedGuruId ||
         nextBooking?.guruUserId ||
-        (effectiveRole === 'guru' ? user.id : '');
+        (effectiveRole === 'guru' ? accountId : '');
 
-      if (nextBooking?.id && user?.id && roleCanReview(effectiveRole)) {
+      if (nextBooking?.id && accountId && roleCanReview(effectiveRole)) {
         const existing = await findExistingReview({
           bookingId: nextBooking.id,
-          reviewerUserId: user.id,
+          reviewerUserId: accountId,
         });
         setAlreadyReviewed(Boolean(existing));
       } else {
@@ -1090,7 +1091,7 @@ export default function ReviewsScreen() {
     bookingId,
     effectiveRole,
     requestedGuruId,
-    user?.id,
+    accountId,
   ]);
 
   useEffect(() => {

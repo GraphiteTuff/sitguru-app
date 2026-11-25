@@ -667,9 +667,11 @@ export default function Header({ user = null }: HeaderProps) {
   }, []);
 
 
-  useEffect(() => {
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
     setMobileOpen(false);
-  }, [pathname]);
+  }
 
   const activeUser = loadedUser;
   const isLoggedIn = Boolean(activeUser);

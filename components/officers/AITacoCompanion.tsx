@@ -8,6 +8,7 @@
  * Scout remains the Guru companion. Taco is Ambassador-only.
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -195,7 +196,7 @@ export default function AITacoCompanion({
     : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES) ||
       mode === "workspace";
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -218,10 +219,6 @@ export default function AITacoCompanion({
           }
         : null,
   );
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     try {

@@ -877,9 +877,11 @@ export default function AmbassadorReferralAnalyticsScreen() {
     ? resolveSupabaseStorageUrl(rawAvatar)
     : null;
 
+  const accountId = user?.id;
+  const accountEmail = user?.email;
   const refreshAnalytics = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setLoading(false);
         setRefreshing(false);
         setLoadError(
@@ -893,7 +895,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
       showRefresh ? setRefreshing(true) : setLoading(true);
 
       try {
-        const nextData = await loadAnalytics(user.id, user.email);
+        const nextData = await loadAnalytics(accountId, accountEmail);
         setData(nextData);
         setLoadError('');
       } catch {
@@ -905,7 +907,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
         setRefreshing(false);
       }
     },
-    [user?.email, user?.id],
+    [accountEmail, accountId],
   );
 
   useEffect(() => {

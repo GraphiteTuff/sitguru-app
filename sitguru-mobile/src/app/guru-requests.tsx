@@ -92,9 +92,10 @@ export default function GuruRequestsScreen() {
     null,
   );
 
+  const accountId = user?.id;
   const loadRequests = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setRequests([]);
         setLoading(false);
         setRefreshing(false);
@@ -105,7 +106,7 @@ export default function GuruRequestsScreen() {
       else setLoading(true);
 
       try {
-        const rows = await queryGuruRows(user.id);
+        const rows = await queryGuruRows(accountId);
         const mapped = rows
           .map((item, index) => mapRequest(item.row, item.table, index))
           .filter((item): item is CareRequest => Boolean(item))
@@ -122,7 +123,7 @@ export default function GuruRequestsScreen() {
         setRefreshing(false);
       }
     },
-    [user?.id],
+    [accountId],
   );
 
   useEffect(() => {
@@ -201,16 +202,10 @@ export default function GuruRequestsScreen() {
     );
   }, [focusedRequestId, visibleRequests]);
 
-  useEffect(() => {
-    if (!focusedRequest) {
-      setFocusedRequestId(null);
-      return;
-    }
-
-    if (focusedRequestId !== focusedRequest.id) {
-      setFocusedRequestId(focusedRequest.id);
-    }
-  }, [focusedRequest, focusedRequestId]);
+  const visibleFocusId = focusedRequest?.id ?? null;
+  if (focusedRequestId !== visibleFocusId) {
+    setFocusedRequestId(visibleFocusId);
+  }
 
   const stickyPending = tab === 'pending' && focusedRequest?.pending;
   const stickyUpcoming = tab === 'upcoming' && focusedRequest?.upcoming;

@@ -45,13 +45,8 @@ function BannerCardImage({
   alt: string;
 }) {
   const fallback = fallbackEventCardImage(alt);
-  const [current, setCurrent] = useState(src || fallback);
-  const [failedPrimary, setFailedPrimary] = useState(false);
-
-  useEffect(() => {
-    setCurrent(src || fallback);
-    setFailedPrimary(false);
-  }, [src, fallback]);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const current = src && src !== failedSrc ? src : fallback;
 
   return (
     <Image
@@ -61,10 +56,7 @@ function BannerCardImage({
       className="object-cover transition duration-500 group-hover:scale-[1.03]"
       sizes="300px"
       onError={() => {
-        if (!failedPrimary) {
-          setFailedPrimary(true);
-          setCurrent(fallback);
-        }
+        if (current === src) setFailedSrc(src);
       }}
     />
   );

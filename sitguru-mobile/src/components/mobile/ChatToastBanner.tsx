@@ -1,5 +1,5 @@
 import { MessageCircle, X } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -32,7 +32,7 @@ export default function ChatToastBanner({
   isDark = false,
 }: ChatToastBannerProps) {
   const insets = useSafeAreaInsets();
-  const animation = useRef(new Animated.Value(0)).current;
+  const [animation] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (!toast) {

@@ -115,9 +115,6 @@ export default function CustomerPawPerksPage() {
   );
 
   const loadPawPerks = useCallback(async () => {
-    setLoading(true);
-    setMessage("");
-    setCopyError("");
 
     const {
       data: { user },

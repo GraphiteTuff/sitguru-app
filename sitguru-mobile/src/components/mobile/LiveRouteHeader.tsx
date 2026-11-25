@@ -1,5 +1,7 @@
+import type NativeMapView from 'react-native-maps';
+import { nativeMaps as MapsModule } from '@/lib/native-maps';
 import { Camera, MapPin, Navigation, LocateFixed } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   StyleSheet,
@@ -14,15 +16,6 @@ type Region = {
   longitudeDelta: number;
 };
 
-type NativeMapModule = {
-  default: ComponentType<Record<string, unknown>>;
-  Marker: ComponentType<Record<string, unknown>>;
-  Polyline: ComponentType<Record<string, unknown>>;
-  PROVIDER_DEFAULT?: string;
-};
-
-const MapsModule: NativeMapModule | null =
-  Platform.OS === 'web' ? null : require('react-native-maps');
 const MapView = MapsModule?.default;
 const Marker = MapsModule?.Marker;
 const Polyline = MapsModule?.Polyline;
@@ -94,7 +87,7 @@ export default function LiveRouteHeader({
   expanded = false,
   autoCenter = true,
 }: LiveRouteHeaderProps) {
-  const mapRef = useRef<{ animateToRegion: (region: Region, duration?: number) => void } | null>(null);
+  const mapRef = useRef<NativeMapView>(null);
   const [followUser, setFollowUser] = useState(autoCenter);
   const showNativeMap = Platform.OS !== 'web';
 

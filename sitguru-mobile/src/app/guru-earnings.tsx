@@ -281,9 +281,10 @@ export default function GuruEarningsScreen() {
     return next;
   }, []);
 
+  const accountId = user?.id;
   const loadEarnings = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setData(mapEarningsData([], [], profileRecord));
         setLoading(false);
         setRefreshing(false);
@@ -295,8 +296,8 @@ export default function GuruEarningsScreen() {
 
       try {
         const [payoutRows, transactionRows] = await Promise.all([
-          queryRows(PAYOUT_TABLES, OWNER_FIELDS, user.id, 10),
-          queryRows(TRANSACTION_TABLES, OWNER_FIELDS, user.id, 200),
+          queryRows(PAYOUT_TABLES, OWNER_FIELDS, accountId, 10),
+          queryRows(TRANSACTION_TABLES, OWNER_FIELDS, accountId, 200),
           refreshPayoutStatus(),
         ]);
 
@@ -315,7 +316,7 @@ export default function GuruEarningsScreen() {
         setRefreshing(false);
       }
     },
-    [profileRecord, refreshLedger, refreshPayoutStatus, user?.id],
+    [profileRecord, refreshLedger, refreshPayoutStatus, accountId],
   );
 
   const weekNetTotal =

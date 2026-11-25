@@ -311,9 +311,12 @@ export default function AccountLifecycleTable({
     }
   }
 
-  useEffect(() => {
-    setRole(lockedRole || defaultRole);
-  }, [defaultRole, lockedRole]);
+  const defaultFilterRole = lockedRole || defaultRole;
+  const [previousFilterRole, setPreviousFilterRole] = useState(defaultFilterRole);
+  if (previousFilterRole !== defaultFilterRole) {
+    setPreviousFilterRole(defaultFilterRole);
+    setRole(defaultFilterRole);
+  }
 
   useEffect(() => {
     void loadAccounts();

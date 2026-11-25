@@ -224,7 +224,7 @@ async function safeSelect(
       return { ok: false, rows: [], message: error.message };
     }
 
-    const formattedRows: any[] = Array.isArray(data) ? data : [];
+    const formattedRows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
     return {
       ok: true,
       rows: formattedRows,

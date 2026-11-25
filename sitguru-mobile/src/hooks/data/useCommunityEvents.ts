@@ -52,15 +52,18 @@ export function useCommunityEvents(filters?: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const filterCity = filters?.city;
+  const filterQuery = filters?.q;
+  const filterState = filters?.state;
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
-      if (filters?.city) params.set("city", filters.city);
-      if (filters?.state) params.set("state", filters.state);
-      if (filters?.q) params.set("q", filters.q);
+      if (filterCity) params.set("city", filterCity);
+      if (filterState) params.set("state", filterState);
+      if (filterQuery) params.set("q", filterQuery);
 
       const response = await fetch(
         `${getApiBaseUrl()}/api/community/events?${params.toString()}`,
@@ -83,7 +86,7 @@ export function useCommunityEvents(filters?: {
     } finally {
       setLoading(false);
     }
-  }, [filters?.city, filters?.q, filters?.state]);
+  }, [filterCity, filterQuery, filterState]);
 
   useEffect(() => {
     void reload();

@@ -310,11 +310,9 @@ export default function CaregiverCarousel({
     return () => window.clearInterval(interval);
   }, [displayItems.length, hasMultipleItems, isPaused]);
 
-  useEffect(() => {
-    if (activeIndex > displayItems.length - 1) {
-      setActiveIndex(0);
-    }
-  }, [activeIndex, displayItems.length]);
+  if (activeIndex > 0 && activeIndex >= displayItems.length) {
+    setActiveIndex(0);
+  }
 
   useEffect(() => {
     return () => {

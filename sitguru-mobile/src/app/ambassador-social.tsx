@@ -301,9 +301,11 @@ export default function AmbassadorDashboardScreen() {
 
   const rank = getRank(points);
 
+  const accountId = user?.id;
+  const accountEmail = user?.email;
   const refreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setData(EMPTY_DATA);
         setLoading(false);
         setRefreshing(false);
@@ -317,7 +319,7 @@ export default function AmbassadorDashboardScreen() {
       }
 
       try {
-        setData(await loadAmbassadorDashboard(user.id, user.email));
+        setData(await loadAmbassadorDashboard(accountId, accountEmail));
         setLoadMessage('');
       } catch {
         setLoadMessage(
@@ -328,7 +330,7 @@ export default function AmbassadorDashboardScreen() {
         setRefreshing(false);
       }
     },
-    [user?.email, user?.id],
+    [accountEmail, accountId],
   );
 
   useEffect(() => {

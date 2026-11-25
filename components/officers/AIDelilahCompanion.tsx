@@ -5,6 +5,7 @@
  * Mounts on /events (and legacy /community) public surfaces.
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -82,16 +83,12 @@ export default function AIDelilahCompanion() {
   const pathname = usePathname();
   const routeEnabled = isEventsPath(pathname);
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const benefitsChip = getCompanionBenefitsChip(ACTIVE_COMPANION);
   const viewer = useCompanionViewer();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     try {

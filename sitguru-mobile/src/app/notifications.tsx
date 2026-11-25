@@ -510,11 +510,12 @@ export default function NotificationsScreen() {
     ? resolveSupabaseStorageUrl(rawAvatar)
     : null;
 
+  const accountId = user?.id;
   const refresh = useCallback(
     async (showRefresh = false) => {
       if (authLoading) return;
 
-      if (!isSupabaseConfigured || !user?.id) {
+      if (!isSupabaseConfigured || !accountId) {
         setItems([]);
         setLoading(false);
         setRefreshing(false);
@@ -533,7 +534,7 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const nextItems = await loadNotifications(user.id, activeRole);
+        const nextItems = await loadNotifications(accountId, activeRole);
 
         setItems(nextItems);
         setMessage('');
@@ -548,7 +549,7 @@ export default function NotificationsScreen() {
         setRefreshing(false);
       }
     },
-    [activeRole, authLoading, isAuthenticated, user?.id],
+    [activeRole, authLoading, isAuthenticated, accountId],
   );
 
   useEffect(() => {

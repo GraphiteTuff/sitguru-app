@@ -243,14 +243,10 @@ export default function CustomerPaymentsPage() {
   const [bookings, setBookings] = useState<DbRow[]>([]);
 
   const loadPayments = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-
-    try {
-      const {
+    return supabase.auth.getUser().then(async ({
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      }) => {
 
       if (userError || !user) {
         router.replace("/login");
@@ -259,16 +255,22 @@ export default function CustomerPaymentsPage() {
 
       const rows = await fetchCustomerBookings(user.id, user.email);
       setBookings(rows);
-    } catch (error) {
+    }).catch((error) => {
       setLoadError(
         error instanceof Error
           ? error.message
           : "Unable to load payments right now.",
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [router]);
+
+  async function refreshPayments() {
+    setLoading(true);
+    setLoadError("");
+    await loadPayments();
+  }
 
   useEffect(() => {
     void loadPayments();
@@ -419,7 +421,7 @@ export default function CustomerPaymentsPage() {
             {loadError}
             <button
               type="button"
-              onClick={() => void loadPayments()}
+              onClick={() => void refreshPayments()}
               className="ml-3 inline-flex min-h-[40px] items-center rounded-xl bg-rose-700 px-3 text-xs font-black text-white"
             >
               Retry

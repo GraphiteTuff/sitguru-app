@@ -137,9 +137,11 @@ export default function ChatWindow({
     void loadMessages();
   }, [loadMessages]);
 
-  useEffect(() => {
+  const [previousAiAssistSetting, setPreviousAiAssistSetting] = useState(aiAssistEnabled);
+  if (previousAiAssistSetting !== aiAssistEnabled) {
+    setPreviousAiAssistSetting(aiAssistEnabled);
     setAiEnabled(aiAssistEnabled);
-  }, [aiAssistEnabled]);
+  }
 
   // Presence heartbeat
   useEffect(() => {

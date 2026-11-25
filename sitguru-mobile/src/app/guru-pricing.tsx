@@ -306,12 +306,14 @@ export default function GuruPricingScreen() {
     return [1, 2, 3, 4, 5].includes(requested) ? (requested as PricingStep) : 1;
   });
 
-  useEffect(() => {
+  const [previousRequestedStep, setPreviousRequestedStep] = useState(requestedStep);
+  if (previousRequestedStep !== requestedStep) {
+    setPreviousRequestedStep(requestedStep);
     const requested = Number(requestedStep);
     if ([1, 2, 3, 4, 5].includes(requested)) {
       setCurrentStep(requested as PricingStep);
     }
-  }, [requestedStep]);
+  }
   const [selectedServiceId, setSelectedServiceId] =
     useState<ServiceId>('dog-walking');
   const [serviceRates, setServiceRates] =
@@ -445,9 +447,10 @@ export default function GuruPricingScreen() {
     ],
   );
 
+  const accountId = user?.id;
   const loadPricing = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setLoading(false);
         setRefreshing(false);
         return;
@@ -457,7 +460,7 @@ export default function GuruPricingScreen() {
       else setLoading(true);
 
       try {
-        const stored = await findPricingSettings(user.id);
+        const stored = await findPricingSettings(accountId);
 
         if (stored) {
           applyPricingPayload(stored, {
@@ -504,7 +507,7 @@ export default function GuruPricingScreen() {
         setRefreshing(false);
       }
     },
-    [profileRecord, user?.id],
+    [profileRecord, accountId],
   );
 
   useEffect(() => {

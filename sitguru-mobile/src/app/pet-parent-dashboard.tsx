@@ -232,7 +232,7 @@ export default function PetParentDashboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
@@ -292,9 +292,10 @@ export default function PetParentDashboardScreen() {
     ]) ?? 0,
   );
 
+  const accountId = user?.id;
   const refreshDashboard = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setDashboardData(EMPTY_DATA);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -305,7 +306,7 @@ export default function PetParentDashboardScreen() {
       else setIsLoading(true);
 
       try {
-        const data = await loadPetParentDashboard(user.id);
+        const data = await loadPetParentDashboard(accountId);
         setDashboardData(data);
         setLoadMessage('');
       } catch {
@@ -317,7 +318,7 @@ export default function PetParentDashboardScreen() {
         setIsRefreshing(false);
       }
     },
-    [user?.id],
+    [accountId],
   );
 
   useEffect(() => {

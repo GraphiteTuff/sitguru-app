@@ -121,7 +121,7 @@ export default function GuruLiveWalkScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [message, setMessage] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [visitMood, setVisitMood] = useState<string | null>(null);
   const [visitSummary, setVisitSummary] = useState('');
@@ -134,9 +134,10 @@ export default function GuruLiveWalkScreen() {
     : params.bookingId;
   const walk = useWalkSession(booking?.id || bookingId);
 
+  const accountId = user?.id;
   const loadCare = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setLoading(false);
         setRefreshing(false);
         return;
@@ -146,7 +147,7 @@ export default function GuruLiveWalkScreen() {
       else setLoading(true);
 
       try {
-        const bookingRow = await findBooking(user.id, bookingId);
+        const bookingRow = await findBooking(accountId, bookingId);
         const mappedBooking = bookingRow
           ? mapBooking(bookingRow)
           : null;
@@ -155,7 +156,7 @@ export default function GuruLiveWalkScreen() {
 
         const activeBookingId = mappedBooking?.id || bookingId || '';
         const sessionResult = activeBookingId
-          ? await findSession(user.id, activeBookingId)
+          ? await findSession(accountId, activeBookingId)
           : null;
 
         if (sessionResult) {
@@ -166,7 +167,7 @@ export default function GuruLiveWalkScreen() {
           setSession(mappedSession);
 
           const updateRows = await findUpdates(
-            user.id,
+            accountId,
             activeBookingId,
             mappedSession.id,
           );
@@ -193,7 +194,7 @@ export default function GuruLiveWalkScreen() {
         setRefreshing(false);
       }
     },
-    [bookingId, user?.id],
+    [bookingId, accountId],
   );
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import TouchTarget from '@/components/mobile/TouchTarget';
@@ -35,13 +35,18 @@ type Props = {
 export default function CommunitySchedulePicker({ publishAt, onPublishAt, petOfWeek, weekOf, onWeekOf, disabled = false }: Props) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const today = new Date(now).toISOString().slice(0, 10);
   const dates = Array.from({ length: 14 }, (_, index) => dateAfter(today, index));
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
   const mondays = Array.from({ length: 4 }, (_, index) => dateAfter(today, (8 - weekday) % 7 + index * 7));
   const selectedDate = publishAt.slice(0, 10);
   const selectedTime = publishAt.slice(11, 16);
-  const future = (date: string, time: string) => Date.parse(`${date}T${time}:00Z`) > Date.now();
+  const future = (date: string, time: string) => Date.parse(`${date}T${time}:00Z`) > now;
   const label = { color: colors.text };
   const selectedStyle = { backgroundColor: colors.primarySoft, borderColor: colors.primary };
   const unselectedStyle = { backgroundColor: colors.card, borderColor: colors.border };

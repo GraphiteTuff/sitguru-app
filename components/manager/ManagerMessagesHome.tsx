@@ -125,8 +125,13 @@ export default function ManagerMessagesHome({
   const attachRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const reading = useRef(new Set<string>());
+  const optimisticMessageId = useRef(0);
 
-  useEffect(() => { setThreads(initialSort(conversations)); }, [conversations]);
+  const [previousConversations, setPreviousConversations] = useState(conversations);
+  if (previousConversations !== conversations) {
+    setPreviousConversations(conversations);
+    setThreads(initialSort(conversations));
+  }
   const selected = threads.find(item => item.id === selectedId) || null;
   const unreadThreads = threads.filter(item => (item.unreadCount || 0) > 0).length;
   const unreadMessages = threads.reduce((sum, item) => sum + (item.unreadCount || 0), 0);
@@ -219,7 +224,6 @@ export default function ManagerMessagesHome({
   useEffect(() => {
     if (!newConversation) return;
     let active = true;
-    setPeopleLoading(true);
     const timeout = window.setTimeout(async () => {
       try {
         const response = await fetch("/api/messaging/people?audience=" + encodeURIComponent(audiencePick) +
@@ -243,6 +247,7 @@ export default function ManagerMessagesHome({
   }
   function beginNew() {
     setSelectedId("");
+    if (!newConversation || personQuery) setPeopleLoading(true);
     setNewConversation(true);
     setShowMobileThread(true);
     setMedia([]);
@@ -294,7 +299,7 @@ export default function ManagerMessagesHome({
     if (!text && !media.length) return;
     const before = selectedId;
     const currentMedia = media;
-    const localId = "local-" + Date.now();
+    const localId = "local-" + ++optimisticMessageId.current;
     const now = new Date().toISOString();
     const optimistic: Message = {
       id: localId, author: me.firstName, own: true, internal: false,
@@ -598,7 +603,10 @@ export default function ManagerMessagesHome({
               <div className="mt-4 flex flex-wrap gap-2">
                 {(audience === "manager" ? AUDIENCES : AUDIENCES.filter(item => item.value === "staff" || item.value === "admin")).map(option => (
                   <button key={option.value} type="button" aria-pressed={audiencePick === option.value}
-                    onClick={() => { setAudiencePick(option.value); setPersonQuery(""); }}
+                    onClick={() => {
+                      if (audiencePick !== option.value || personQuery) setPeopleLoading(true);
+                      setAudiencePick(option.value); setPersonQuery("");
+                    }}
                     className={"min-h-10 rounded-xl px-3 text-xs font-black " +
                       (audiencePick === option.value ? "bg-[#2563EB] !text-white" : "bg-[#F1F5F9] text-[#0F2744] hover:bg-[#EFF6FF]")}>
                     {option.label}
@@ -608,7 +616,7 @@ export default function ManagerMessagesHome({
               <label className="relative mt-4">
                 <span className="sr-only">Find a recipient</span>
                 <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#2563EB]" aria-hidden="true" />
-                <input type="search" value={personQuery} onChange={event => setPersonQuery(event.target.value)}
+                <input type="search" value={personQuery} onChange={event => { setPeopleLoading(true); setPersonQuery(event.target.value); }}
                   placeholder="Search by name..."
                   className="min-h-12 w-full rounded-xl border border-slate-200 bg-[#F8FAFC] pl-10 pr-3 text-sm font-semibold text-[#0F2744] focus:border-[#2563EB] focus:ring-2 focus:ring-[#DBEAFE]" />
               </label>

@@ -38,11 +38,11 @@ const channels:Channel[]=['facebook','instagram','tiktok','x','other'];
 const initial:Metrics={linkOpens:0,qrOpens:0,profileClicks:0,inquiryClicks:0,sharesReported:0,copyIntents:0};
 type Params={city:string;state:string;service:Service;pet:Pet;radius:number;channel:Channel};
 function GuruAvatar({name,photoUrl}:{name:string;photoUrl:string|null}){
-  const [failed,setFailed]=useState(false);
-  useEffect(()=>setFailed(false),[photoUrl]);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
+  const failed = Boolean(photoUrl && failedImageSrc === photoUrl);
   const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('')||'SG';
   return photoUrl&&!failed?
-    <Image source={{uri:photoUrl}} style={styles.avatar} onError={()=>setFailed(true)}
+    <Image source={{uri:photoUrl}} style={styles.avatar} onError={()=>setFailedImageSrc(photoUrl ?? null)}
       accessibilityLabel={name+' profile photo'}/>:
     <View style={[styles.avatar,styles.avatarBlank]} accessibilityLabel={name+' initials avatar'}>
       <Text style={styles.paw}>{initials}</Text>
@@ -75,11 +75,8 @@ function Body(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
-  const [role,setRole]=useState<'admin'|'manager'|'intern'>('intern');
-  const auth=useAuth();
-  useEffect(()=>{
-    setRole(auth.roles.includes('admin')?'admin':auth.roles.includes('manager')?'manager':'intern');
-  },[auth.roles]);
+  const auth = useAuth();
+  const role = auth.roles.includes('admin') ? 'admin' : auth.roles.includes('manager') ? 'manager' : 'intern';
   const reload=useCallback(async(search=false)=>{
     setLoading(true);setError('');
     const q=new URLSearchParams();

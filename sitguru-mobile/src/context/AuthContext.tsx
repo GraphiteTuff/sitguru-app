@@ -1943,9 +1943,10 @@ export function AuthProvider({
       [roles],
     );
 
+  const sessionUser = session?.user;
   const firstName = useMemo(() => {
-    const metadata = session?.user
-      ? getUserMetadata(session.user)
+    const metadata = sessionUser
+      ? getUserMetadata(sessionUser)
       : {};
 
     return firstNameFromPerson(
@@ -1959,11 +1960,11 @@ export function AuthProvider({
         full_name: profile?.full_name,
         name:
           typeof metadata.name === 'string' ? metadata.name : null,
-        email: profile?.email || session?.user?.email,
+        email: profile?.email || sessionUser?.email,
       },
       'there',
     );
-  }, [profile, session?.user]);
+  }, [profile, sessionUser]);
 
   const value =
     useMemo<AuthContextValue>(

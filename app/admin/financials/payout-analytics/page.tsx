@@ -45,6 +45,98 @@ type PayoutRow = {
   isDemo?: boolean;
 };
 
+type PayoutContact = {
+  city?: string | null;
+  company_name?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  state?: string | null;
+  zip?: string | null;
+};
+
+type PayoutDataRow = {
+  [column: string]: unknown;
+  account_name?: string | null;
+  arrival_date?: string | null;
+  batch?: string | null;
+  batch_name?: string | null;
+  booking_date?: string | null;
+  booking_id?: string | null;
+  category?: string | null;
+  city?: string | null;
+  company_name?: string | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  description?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  guru_city?: string | null;
+  guru_email?: string | null;
+  guru_name?: string | null;
+  guru_state?: string | null;
+  id?: string | null;
+  location_city?: string | null;
+  location_state?: string | null;
+  memo?: string | null;
+  name?: string | null;
+  notes?: string | null;
+  participant_type?: string | null;
+  partner_city?: string | null;
+  partner_email?: string | null;
+  partner_name?: string | null;
+  partner_state?: string | null;
+  partner_type?: string | null;
+  payment_intent_id?: string | null;
+  payment_status?: string | null;
+  payout_batch?: string | null;
+  payout_date?: string | null;
+  payout_id?: string | null;
+  payout_status?: string | null;
+  program_type?: string | null;
+  provider_email?: string | null;
+  provider_name?: string | null;
+  recipient_email?: string | null;
+  recipient_name?: string | null;
+  reference?: string | null;
+  reward_type?: string | null;
+  scheduled_for?: string | null;
+  scheduled_payout_at?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
+  sitter_email?: string | null;
+  sitter_name?: string | null;
+  source?: string | null;
+  start_time?: string | null;
+  state?: string | null;
+  status?: string | null;
+  stripe_checkout_session_id?: string | null;
+  stripe_payout_id?: string | null;
+  stripe_session_id?: string | null;
+  stripe_status?: string | null;
+  stripe_transfer_id?: string | null;
+  transaction_reference?: string | null;
+  transfer_id?: string | null;
+  type?: string | null;
+  updated_at?: string | null;
+  zip?: string | null;
+  zip_code?: string | null;
+  amount?: number | string | null;
+  commission_amount?: number | string | null;
+  guru_amount?: number | string | null;
+  guru_net_amount?: number | string | null;
+  guru_payout?: number | string | null;
+  guru_payout_amount?: number | string | null;
+  net_amount?: number | string | null;
+  payout_amount?: number | string | null;
+  provider_amount?: number | string | null;
+  total_amount?: number | string | null;
+  transfer_amount?: number | string | null;
+  guru?: PayoutContact | null;
+  partner?: PayoutContact | null;
+};
+
 type PayoutSummary = {
   totalScheduled: number;
   totalPaid: number;
@@ -328,7 +420,7 @@ function normalizeTypeLabel(value: unknown, fallback = "Unclassified") {
     .join(" ");
 }
 
-function getFirstValue(row: any, keys: string[]) {
+function getFirstValue(row: PayoutDataRow, keys: string[]) {
   for (const key of keys) {
     const value = row?.[key];
 
@@ -340,7 +432,7 @@ function getFirstValue(row: any, keys: string[]) {
   return "";
 }
 
-function getPartnerType(row: any) {
+function getPartnerType(row: PayoutDataRow) {
   return normalizeTypeLabel(
     getFirstValue(row, [
       "partner_type",
@@ -357,7 +449,7 @@ function getPartnerType(row: any) {
   );
 }
 
-function getAmbassadorType(row: any) {
+function getAmbassadorType(row: PayoutDataRow) {
   const directValue = getFirstValue(row, [
     "ambassador_type",
     "ambassadorType",
@@ -400,7 +492,7 @@ function getAmbassadorType(row: any) {
   return "Not Ambassador";
 }
 
-function getProgramType(row: any) {
+function getProgramType(row: PayoutDataRow) {
   return normalizeTypeLabel(
     getFirstValue(row, [
       "program_type",
@@ -444,21 +536,21 @@ function getPercent(value: number, total: number) {
   return Math.min(100, Math.max(0, Math.round((value / total) * 100)));
 }
 
-async function safeSelect<T>(table: string, query = "*") {
+async function safeSelect(table: string, query = "*") {
   try {
     const { data, error } = await supabaseAdmin
       .from(table)
       .select(query)
       .limit(500);
 
-    if (error || !data) return [] as T[];
-    return data as T[];
+    if (error || !data) return [] as unknown as PayoutDataRow[];
+    return data as unknown as PayoutDataRow[];
   } catch {
-    return [] as T[];
+    return [] as unknown as PayoutDataRow[];
   }
 }
 
-function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
+function buildGuruPayoutRows(rows: PayoutDataRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `guru-${index}`),
     source: "Guru",
@@ -493,7 +585,7 @@ function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
   }));
 }
 
-function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
+function buildPartnerPayoutRows(rows: PayoutDataRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `partner-${index}`),
     source: "Partner",
@@ -528,7 +620,7 @@ function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
   }));
 }
 
-function buildBookingPayoutRows(rows: any[]): PayoutRow[] {
+function buildBookingPayoutRows(rows: PayoutDataRow[]): PayoutRow[] {
   return rows
     .map((row, index) => {
       const amount = normalizeAmount(
@@ -594,7 +686,7 @@ function buildBookingPayoutRows(rows: any[]): PayoutRow[] {
     .filter(Boolean) as PayoutRow[];
 }
 
-function buildStripePayoutRows(rows: any[]): PayoutRow[] {
+function buildStripePayoutRows(rows: PayoutDataRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.stripe_payout_id || row.payout_id || `stripe-payout-${index}`),
     source: normalizeSource(row.source || row.type || "Platform"),
@@ -633,7 +725,7 @@ function buildStripePayoutRows(rows: any[]): PayoutRow[] {
   }));
 }
 
-function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
+function buildGenericPayoutRows(rows: PayoutDataRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `generic-${index}`),
     source: normalizeSource(row.source || row.type || row.category || "Platform"),
@@ -683,16 +775,16 @@ function dedupeRows(rows: PayoutRow[]) {
 }
 
 async function getPayoutRows() {
-  const bookingRows = buildBookingPayoutRows(await safeSelect<any>("bookings"));
-  const guruRows = buildGuruPayoutRows(await safeSelect<any>("guru_payouts"));
-  const partnerRows = buildPartnerPayoutRows(await safeSelect<any>("partner_payouts"));
-  const stripePayoutRows = buildStripePayoutRows(await safeSelect<any>("stripe_payouts"));
-  const stripeTransferRows = buildStripePayoutRows(await safeSelect<any>("stripe_transfers"));
-  const payoutsRows = buildGenericPayoutRows(await safeSelect<any>("payouts"));
+  const bookingRows = buildBookingPayoutRows(await safeSelect("bookings"));
+  const guruRows = buildGuruPayoutRows(await safeSelect("guru_payouts"));
+  const partnerRows = buildPartnerPayoutRows(await safeSelect("partner_payouts"));
+  const stripePayoutRows = buildStripePayoutRows(await safeSelect("stripe_payouts"));
+  const stripeTransferRows = buildStripePayoutRows(await safeSelect("stripe_transfers"));
+  const payoutsRows = buildGenericPayoutRows(await safeSelect("payouts"));
   const financialPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>("financial_payouts"),
+    await safeSelect("financial_payouts"),
   );
-  const adminPayoutRows = buildGenericPayoutRows(await safeSelect<any>("admin_payouts"));
+  const adminPayoutRows = buildGenericPayoutRows(await safeSelect("admin_payouts"));
 
   const merged = dedupeRows([
     ...bookingRows,

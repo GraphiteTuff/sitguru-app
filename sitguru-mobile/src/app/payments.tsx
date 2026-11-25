@@ -1341,6 +1341,7 @@ export default function PaymentsScreen() {
     [bookingCurrency],
   );
 
+  const accountId = user?.id;
   const refresh = useCallback(async () => {
     if (authLoading) return;
 
@@ -1352,7 +1353,7 @@ export default function PaymentsScreen() {
       return;
     }
 
-    if (!user?.id) {
+    if (!accountId) {
       setBooking(null);
       setPayments([]);
       setLoading(false);
@@ -1365,7 +1366,7 @@ export default function PaymentsScreen() {
 
     try {
       const nextBooking = await loadLatestBooking(
-        user.id,
+        accountId,
         effectiveRole,
         requestedBookingId,
       );
@@ -1373,9 +1374,9 @@ export default function PaymentsScreen() {
       setBooking(nextBooking);
 
       const [nextPayments, nextCredits, nextPayout] = await Promise.all([
-        loadPayments(user.id, nextBooking?.id || ''),
+        loadPayments(accountId, nextBooking?.id || ''),
         effectiveRole === 'pet_parent'
-          ? loadCredits(user.id)
+          ? loadCredits(accountId)
           : Promise.resolve({
               availableCents: 0,
               pawPerksCents: 0,
@@ -1383,7 +1384,7 @@ export default function PaymentsScreen() {
               giftCents: 0,
             }),
         effectiveRole === 'guru'
-          ? loadPayoutSummary(user.id)
+          ? loadPayoutSummary(accountId)
           : Promise.resolve({
               connected: false,
               detailsSubmitted: false,
@@ -1413,7 +1414,7 @@ export default function PaymentsScreen() {
     authLoading,
     effectiveRole,
     requestedBookingId,
-    user?.id,
+    accountId,
   ]);
 
   useEffect(() => {

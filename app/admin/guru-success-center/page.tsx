@@ -155,26 +155,30 @@ export default function AdminGuruSuccessCenterPage() {
   const videoCount = resources.filter((resource) => resource.type === "video").length;
 
   async function loadResources() {
-    setLoading(true);
-    setErrorMessage("");
-
-    const { data, error } = await supabase
+    return supabase
       .from("guru_success_resources")
       .select(
         "id,title,description,category,resource_type,status,tags,keywords,video_url,thumbnail_url,href,featured,sort_order,created_at,updated_at",
       )
       .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }).then(async ({ data, error }) => {
 
-    if (error) {
-      setErrorMessage(error.message);
-      setResources([]);
+      if (error) {
+        setErrorMessage(error.message);
+        setResources([]);
+        setLoading(false);
+        return;
+      }
+
+      setResources(((data || []) as GuruSuccessResourceRow[]).map(mapRowToResource));
       setLoading(false);
-      return;
-    }
+    });
+  }
 
-    setResources(((data || []) as GuruSuccessResourceRow[]).map(mapRowToResource));
-    setLoading(false);
+  async function refreshResources() {
+    setLoading(true);
+    setErrorMessage("");
+    await loadResources();
   }
 
   useEffect(() => {
@@ -240,7 +244,7 @@ export default function AdminGuruSuccessCenterPage() {
     setSelectedCategory(categories[0]);
     setFeatured(false);
     setStatusMessage("Resource saved successfully.");
-    await loadResources();
+    await refreshResources();
     setSaving(false);
   }
 
@@ -266,7 +270,7 @@ export default function AdminGuruSuccessCenterPage() {
     }
 
     setStatusMessage("Resource updated.");
-    await loadResources();
+    await refreshResources();
   }
 
   async function toggleStatus(resource: AdminGuruResource) {
@@ -300,7 +304,7 @@ export default function AdminGuruSuccessCenterPage() {
     }
 
     setStatusMessage("Resource deleted.");
-    await loadResources();
+    await refreshResources();
   }
 
   return (

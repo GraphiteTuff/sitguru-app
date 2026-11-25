@@ -119,11 +119,7 @@ export default function AccountLifecycleRollupCard({
   }
 
   async function loadAccounts() {
-    setIsLoading(true);
-    setMessage("");
-
-    try {
-      const accessToken = await getAccessToken();
+    return getAccessToken().then(async (accessToken) => {
 
       const response = await fetch("/api/admin/accounts?status=all&role=all", {
         headers: {
@@ -138,15 +134,15 @@ export default function AccountLifecycleRollupCard({
       }
 
       setAccounts(result.accounts || []);
-    } catch (error) {
+    }).catch((error) => {
       setMessage(
         error instanceof Error
           ? error.message
           : "Unable to load lifecycle totals.",
       );
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
-    }
+    });
   }
 
   useEffect(() => {

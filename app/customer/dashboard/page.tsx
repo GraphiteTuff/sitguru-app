@@ -2763,7 +2763,7 @@ export default function CustomerDashboardPage() {
   const [referralMessage, setReferralMessage] = useState("");
   const [showBookingCelebration, setShowBookingCelebration] = useState(false);
   const [confettiPieces, setConfettiPieces] = useState<ConfettiPiece[]>([]);
-  const [customerPhotoFailed, setCustomerPhotoFailed] = useState(false);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
@@ -2782,6 +2782,7 @@ export default function CustomerDashboardPage() {
 
   const customerAvatarSrc = customerProfile?.avatar_url?.trim() || "";
 
+  const customerPhotoFailed = Boolean(customerAvatarSrc && failedImageSrc === customerAvatarSrc);
   const showCustomerProfilePhoto =
     Boolean(customerAvatarSrc) && !customerPhotoFailed;
 
@@ -2938,9 +2939,6 @@ export default function CustomerDashboardPage() {
     };
   }, [loadDashboard, router]);
 
-  useEffect(() => {
-    setCustomerPhotoFailed(false);
-  }, [customerAvatarSrc]);
 
   useEffect(() => {
     if (loading) return;
@@ -3149,7 +3147,7 @@ export default function CustomerDashboardPage() {
       setCustomerProfile(profileWithPhoto);
       setProfileForm(customerProfileToForm(profileWithPhoto));
       setFirstName(getSafeFirstName(profileWithPhoto, user.email));
-      setCustomerPhotoFailed(false);
+      setFailedImageSrc(null);
       setAvatarMessage("Profile picture updated.");
     } catch (error) {
       setAvatarError(
@@ -4168,7 +4166,7 @@ export default function CustomerDashboardPage() {
                     <img
                       src={customerAvatarSrc}
                       alt={`${customerDisplayName} profile photo`}
-                      onError={() => setCustomerPhotoFailed(true)}
+                      onError={() => setFailedImageSrc(customerAvatarSrc ?? null)}
                       className="absolute inset-0 h-full w-full object-cover object-center"
                     />
                   ) : (

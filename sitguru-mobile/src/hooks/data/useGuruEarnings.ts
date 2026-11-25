@@ -435,8 +435,9 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const accountId = user?.id;
   const refresh = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !user?.id || !isSupabaseConfigured) {
+    if (!enabled || !isAuthenticated || !accountId || !isSupabaseConfigured) {
       setItems([]);
       setPayoutSetup(EMPTY_PAYOUT);
       setError(null);
@@ -447,9 +448,9 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
 
     try {
       const [payments, bookings, payouts, setup] = await Promise.all([
-        queryPaymentLedger(user.id),
-        queryCompletedBookings(user.id),
-        queryGuruPayouts(user.id),
+        queryPaymentLedger(accountId),
+        queryCompletedBookings(accountId),
+        queryGuruPayouts(accountId),
         loadPayoutSetup(),
       ]);
 
@@ -488,7 +489,7 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, isAuthenticated, user?.id]);
+  }, [enabled, isAuthenticated, accountId]);
 
   useEffect(() => {
     void refresh();

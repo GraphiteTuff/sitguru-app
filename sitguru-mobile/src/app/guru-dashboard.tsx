@@ -317,7 +317,7 @@ export default function GuruDashboardScreen() {
     useState('');
 
   const [now, setNow] =
-    useState(Date.now());
+    useState(Date.now);
 
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] =
     useState(false);
@@ -381,10 +381,11 @@ export default function GuruDashboardScreen() {
       avatarUrl,
     );
 
+  const accountId = user?.id;
   const refreshDashboard = useCallback(
     async (showRefresh = false) => {
       if (
-        !user?.id ||
+        !accountId ||
         !isSupabaseConfigured
       ) {
         setData(EMPTY_DATA);
@@ -402,7 +403,7 @@ export default function GuruDashboardScreen() {
       try {
         setData(
           await loadDashboard(
-            user.id,
+            accountId,
             profileRecord,
           ),
         );
@@ -419,7 +420,7 @@ export default function GuruDashboardScreen() {
     },
     [
       profileRecord,
-      user?.id,
+      accountId,
     ],
   );
 

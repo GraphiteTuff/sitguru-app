@@ -123,9 +123,10 @@ export default function MessagesScreen() {
     roles,
   });
 
+  const accountId = user?.id;
   const loadMessages = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setConversations([]);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -136,7 +137,7 @@ export default function MessagesScreen() {
       else setIsLoading(true);
 
       try {
-        const rows = await loadConversationPreviews(user.id);
+        const rows = await loadConversationPreviews(accountId);
         setConversations(rows);
         setLoadMessage('');
       } catch {
@@ -148,7 +149,7 @@ export default function MessagesScreen() {
         setIsRefreshing(false);
       }
     },
-    [user?.id],
+    [accountId],
   );
 
   useEffect(() => {

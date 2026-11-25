@@ -32,11 +32,11 @@ The production read-only audit returned Ryan at 150 hours and Lola at 150 hours,
 | Internship, Community Studio, Microsoft Graph, Teams, SharePoint and regression suite | `npm run test:sitguru3` passed 73 tests, including 6 preview policy tests. Integration calls use fixtures. |
 | Targeted internship, access, rubric and Microsoft tests | 36 passed, including manager scope, cross-intern access decisions, revision transitions and rubric validation. |
 | Desk regression | `npm run test:desks` passed all 20 tests. The preservation test now asserts Content Studio, Reads & Media, and Community Studio in their existing order and covers the full intern sidebar. |
-| Repository-wide lint | The production baseline reported 398 source errors and the feature branch had 387 before the follow-up. The follow-up reduces this to 303 errors across 146 source files, with no new errors by file and rule. Most remaining errors involve React hooks and TypeScript typing. ESLint skips the Git-ignored generated Next.js fixture output, and all source rules remain enabled. |
+| Repository-wide lint | The production baseline reported 398 source errors. The initial follow-up brought the feature branch to 303, and the next pass reduced that to 138 across 104 source files. All 138 remaining errors are `react-hooks/set-state-in-effect` findings. The branch introduced no new lint errors by file and keeps all source rules enabled. |
 | Web TypeScript and build | Web TypeScript and the isolated production-mode Next.js build passed with fixture credentials. Production credential and authenticated portal tests are pending. |
 | Desktop/mobile browser | The dashboard fixture passed at 320, 390, 768 and 1440 CSS pixels. The document matched each viewport width, and the floating chat control cleared the mobile navigation. |
 | Anonymous authorization | New Intern and Admin pages redirected to login. Manager pages rendered the default access denial. Native learning/work and protected exports denied unauthenticated access. The local smoke suite passed, including the exact Pack submit redirect in HTTP or streamed HTML. |
-| Native | Expo TypeScript and iOS/Android bundle export passed. No signed IPA, APK or AAB was produced. The environment lacks the native signing and EAS configuration needed for a release artifact. |
+| Native | Expo TypeScript and iOS, Android, and web bundle exports passed. Signed IPA, APK and AAB artifacts still require an EAS release build and signing configuration. |
 | Vercel baseline logs | The 30-minute error/fatal query for the existing production deployment returned no grouped results. |
 
 ### Migration verification

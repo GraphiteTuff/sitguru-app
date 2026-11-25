@@ -175,7 +175,11 @@ export function SiteAccountMenu({
     };
   }, []);
 
-  useEffect(() => { setOpen(false); }, [pathname]);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
+    setOpen(false);
+  }
 
   useEffect(() => {
     if (!open) return;

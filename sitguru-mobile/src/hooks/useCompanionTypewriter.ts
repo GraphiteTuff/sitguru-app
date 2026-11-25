@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   COMPANION_MS_PER_WORD,
@@ -25,19 +25,13 @@ export function useCompanionTypewriter(
   const [visibleCount, setVisibleCount] = useState(() =>
     enabled ? 0 : tokens.length,
   );
-  const resetKeyRef = useRef(resetKey);
-
-  useEffect(() => {
-    if (resetKeyRef.current !== resetKey) {
-      resetKeyRef.current = resetKey;
-      setVisibleCount(enabled ? 0 : tokens.length);
-      return;
-    }
-
-    if (!enabled) {
-      setVisibleCount(tokens.length);
-    }
-  }, [enabled, resetKey, tokens.length]);
+  const [previousResetKey, setPreviousResetKey] = useState(resetKey);
+  if (previousResetKey !== resetKey) {
+    setPreviousResetKey(resetKey);
+    setVisibleCount(enabled ? 0 : tokens.length);
+  } else if (!enabled && visibleCount !== tokens.length) {
+    setVisibleCount(tokens.length);
+  }
 
   useEffect(() => {
     if (!enabled) return;

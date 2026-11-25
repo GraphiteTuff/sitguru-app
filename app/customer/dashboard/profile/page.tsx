@@ -534,7 +534,7 @@ export default function CustomerProfileSetupPage() {
     completed: 0,
   });
   const [errorMessage, setErrorMessage] = useState("");
-  const [avatarImageFailed, setAvatarImageFailed] = useState(false);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [pets, setPets] = useState<ProfilePet[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
 
@@ -737,11 +737,9 @@ export default function CustomerProfileSetupPage() {
   const avatarSrc = profile?.avatar_url || "";
   const displayName = getCustomerDisplayName(profile);
   const avatarInitials = getCustomerInitials(profile);
+  const avatarImageFailed = Boolean(avatarSrc && failedImageSrc === avatarSrc);
   const showAvatarImage = Boolean(avatarSrc) && !avatarImageFailed;
 
-  useEffect(() => {
-    setAvatarImageFailed(false);
-  }, [avatarSrc]);
 
   if (loading) {
     return (

@@ -38,9 +38,11 @@ export default function CommunityEventsExplorer({
   const [countyDraft, setCountyDraft] = useState(initialFilters.county);
   const [hydratedLocation, setHydratedLocation] = useState(false);
 
-  useEffect(() => {
+  const [previousCounty, setPreviousCounty] = useState(filters.county);
+  if (previousCounty !== filters.county) {
+    setPreviousCounty(filters.county);
     setCountyDraft(filters.county);
-  }, [filters.county]);
+  }
 
   useEffect(() => {
     if (hydratedLocation) return;

@@ -106,9 +106,10 @@ export default function GuruReferralsScreen() {
       'referral_link',
     ]) || `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`;
 
+  const accountId = user?.id;
   const loadReferrals = useCallback(
     async (showRefresh = false) => {
-      if (!user?.id || !isSupabaseConfigured) {
+      if (!accountId || !isSupabaseConfigured) {
         setData(EMPTY_DATA);
         setLoading(false);
         setRefreshing(false);
@@ -119,7 +120,7 @@ export default function GuruReferralsScreen() {
       else setLoading(true);
 
       try {
-        const rows = await queryRows(user.id);
+        const rows = await queryRows(accountId);
         setData(mapReferralData(rows));
         setMessage('');
       } catch {
@@ -131,7 +132,7 @@ export default function GuruReferralsScreen() {
         setRefreshing(false);
       }
     },
-    [user?.id],
+    [accountId],
   );
 
   useEffect(() => {

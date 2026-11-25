@@ -6,6 +6,7 @@
  * /api/ai/officer-stream (Rogue admin route remains untouched).
  */
 
+import { useHasHydrated } from "@/hooks/useHasHydrated";
 import {
   useEffect,
   useRef,
@@ -332,7 +333,7 @@ export default function OfficerFloatingAssistant({
   avatarObjectPosition = "center 18%",
   surface = "dashboard",
 }: OfficerFloatingAssistantProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasHydrated();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [preset, setPreset] = useState<string>("");
@@ -422,10 +423,6 @@ export default function OfficerFloatingAssistant({
     isLoading,
     idPrefix: officerId,
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;

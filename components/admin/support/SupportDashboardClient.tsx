@@ -159,9 +159,11 @@ export default function SupportDashboardClient({
     [pushToast, upsertCase]
   );
 
-  useEffect(() => {
+  const [previousCases, setPreviousCases] = useState(initialCases);
+  if (previousCases !== initialCases) {
+    setPreviousCases(initialCases);
     setCases(initialCases);
-  }, [initialCases]);
+  }
 
   useEffect(() => {
     let active = true;
