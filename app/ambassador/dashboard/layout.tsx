@@ -19,7 +19,7 @@ import {
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { openCompanionChat } from "@/lib/companions/open-companion-chat";
 import { useBrowserChromeInset } from "@/hooks/useBrowserChromeInset";
-import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET, SITGURU_MOBILE_NAV_CONTENT_PAD } from "@/lib/portal/mobile-nav-style";
+import { SITGURU_MOBILE_NAV as NAV, SITGURU_MOBILE_NAV_INSET } from "@/lib/portal/mobile-nav-style";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -206,7 +206,7 @@ export default function AmbassadorDashboardLayout({
         </div>
       </header>
 
-      <div className="lg:pb-0" style={{ paddingBottom: SITGURU_MOBILE_NAV_CONTENT_PAD }}>{children}</div>
+      <div className="pb-[calc(6rem+env(safe-area-inset-bottom,0px)+var(--sg-chrome-bottom,0px))] lg:pb-0">{children}</div>
 
       <nav
         aria-label="Ambassador quick navigation"
