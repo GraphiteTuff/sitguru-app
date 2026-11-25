@@ -17,6 +17,9 @@ export default async function InternMilestonesPage() {
     );
   }
   return (
-    <div className="space-y-4"><SyllabusGrowthOverview mode="intern" /><InternMilestonesPageView workspace={data.workspace} hourSummary={data.hourSummary} /></div>
+    <div className="space-y-4">
+      <div id="syllabus" className="scroll-mt-24"><SyllabusGrowthOverview mode="intern" /></div>
+      <InternMilestonesPageView workspace={data.workspace} hourSummary={data.hourSummary} />
+    </div>
   );
 }

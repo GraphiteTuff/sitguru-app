@@ -96,7 +96,7 @@ export default function InternPortalShell({
     <div className={`min-h-dvh ${DESK_UI.pageBg} text-[#0F2744]`}>
       <div className="mx-auto flex min-h-dvh max-w-[1600px]">
         {showFullChrome ? (
-          <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white xl:flex">
+          <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-emerald-950/10 bg-white xl:flex">
             <div className="border-b border-slate-100 px-4 py-5">
               <Link href="/intern" className="block" aria-label="SitGuru Intern Portal">
                 <Image
@@ -120,10 +120,11 @@ export default function InternPortalShell({
                   <Link
                     key={item.id}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     className={
                       active
-                        ? `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${DESK_UI.sidebarActive}`
-                        : `flex min-h-10 items-center gap-3 rounded-2xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
+                        ? `flex min-h-11 items-center gap-3 rounded-xl bg-[#10583f] px-3 text-sm font-bold !text-white`
+                        : `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${DESK_UI.sidebarIdle}`
                     }
                   >
                     <Icon size={17} className="shrink-0 opacity-90" />
@@ -181,8 +182,8 @@ export default function InternPortalShell({
           {showFullChrome ? (
             <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur">
               <div className="flex min-h-[4.75rem] items-center gap-3 px-3 py-2 sm:px-5 lg:px-6">
-                <Link href="/intern" className="min-w-0 shrink-0 xl:hidden">
-                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#2563EB]">
+                <Link href="/intern" className="min-w-0 xl:hidden">
+                  <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#10583f]">
                     SitGuru Internship
                   </p>
                   <p className="truncate text-sm font-black text-[#0F2744]">

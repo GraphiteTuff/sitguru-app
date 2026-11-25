@@ -352,12 +352,7 @@ export function InternMockFrame({
               hourSummary={hourSummary}
               firstName={firstName}
               weeklyDone
-              currentAssignmentTitle="Social Media Campaign"
               preview
-              onOpenWork={() => {}}
-              onOpenCheckIn={() => {}}
-              onOpenHours={() => {}}
-              onOpenMilestones={() => {}}
             />
           </div>
           {mobile ? <MockMobileBar kind="intern" /> : null}
