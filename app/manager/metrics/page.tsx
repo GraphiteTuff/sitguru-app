@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Megaphone, PawPrint, TrendingUp } from "lucide-react";
+import { BarChart3, Handshake, Megaphone, PawPrint, TrendingUp } from "lucide-react";
 import SocialIntelligenceBoard from "@/components/social-intelligence/SocialIntelligenceBoard";
 import { loadSocialIntelligenceSnapshot } from "@/lib/social-intelligence/dashboard";
 import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
@@ -34,6 +34,7 @@ export default async function ManagerMetricsPage({
         <Link href="/manager/community-studio/guru-match" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-2 text-sm font-black text-[#0D5C3A]"><PawPrint size={17}/> Guru Match Tracking</Link>
         <Link href="/manager/community-studio/event-match" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#D1EADD] bg-[#F0FDF4] px-4 py-2 text-sm font-black text-[#0D5C3A]"><PawPrint size={17}/> Event Match &amp; Share</Link>
         <Link href="/manager/campaigns-content" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-4 py-2 text-sm font-bold text-[#0F2744]"><Megaphone size={17}/> Content Studio</Link>
+        <Link href="/manager/referrals" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-950"><Handshake size={17}/> Referral & Partner Results</Link>
       </nav>
       <LiveSocialAutoRefresh intervalMs={90_000}/>
       <SocialIntelligenceBoard snapshot={socialSnapshot} />
@@ -58,12 +59,13 @@ export default async function ManagerMetricsPage({
         <p className="text-xs font-black uppercase tracking-wider text-[#0D5C3A]">SitGuru · Live Social & Community Growth</p>
         <h1 className="mt-1 text-xl font-black text-[#0F2744] sm:text-2xl">Metrics & Social Intelligence</h1>
         <p className="mt-1 text-sm font-semibold text-slate-600">Find official Facebook and Instagram posts, available insights, tracked clicks and signups, Guru promotions, and Content Studio updates. Reports show unavailable sources rather than invented numbers.</p>
-        <nav aria-label="Open social growth workspaces" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <nav aria-label="Open social growth workspaces" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
           <span aria-current="page" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#0F2744] px-4 py-3 text-sm font-black text-white"><BarChart3 size={18}/> Growth Metrics</span>
           <Link href="/manager/metrics?view=social-intelligence" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#1D4ED8]"><TrendingUp size={18}/> Open Social Intelligence</Link>
           <Link href="/manager/community-studio/guru-match" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#D1EADD] bg-white px-4 py-3 text-sm font-black text-[#0D5C3A] hover:bg-[#F0FDF4]"><PawPrint size={18}/> Guru Match Tracking</Link>
           <Link href="/manager/community-studio/event-match" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#D1EADD] bg-white px-4 py-3 text-sm font-black text-[#0D5C3A] hover:bg-[#F0FDF4]"><PawPrint size={18}/> Event Match &amp; Share</Link>
           <Link href="/manager/campaigns-content" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#DBEAFE] bg-white px-4 py-3 text-sm font-black text-[#0F2744] hover:bg-[#EFF6FF]"><Megaphone size={18}/> Content Studio</Link>
+          <Link href="/manager/referrals" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950 hover:bg-emerald-100"><Handshake size={18}/> Referrals & Partners</Link>
         </nav>
       </section>
       <GrowthCenterInsightsBoard
