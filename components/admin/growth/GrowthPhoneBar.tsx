@@ -120,7 +120,7 @@ export default function GrowthPhoneBar({
       <div className="h-28" />
       {moreOpen ? (
         <div className="fixed inset-x-0 z-[97] px-3" style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px))" }}>
-          <div className={`rounded-[1.5rem] border bg-white p-3 shadow-xl ${desk ? "border-sky-100" : "border-emerald-100"}`}>
+          <div className={`max-h-[min(60dvh,30rem)] overflow-y-auto rounded-[1.5rem] border bg-white p-3 shadow-xl ${desk ? "border-sky-100" : "border-emerald-100"}`}>
             <div className="grid grid-cols-2 gap-2">
               {moreLinks.map((item) => {
                 const Icon = item.icon;
