@@ -42,7 +42,7 @@ export default async function PublicReferralInvitation({ params, searchParams }:
   const isAmbassador = Boolean(referral.ambassadorId);
   const isPartner = Boolean(referral.partnerId);
   const identity = referral.displayName;
-  const posterUrl = isAmbassador && referral.isPublicAmbassador
+  const posterUrl = isAmbassador
     ? `/api/ambassador/card/${encodeURIComponent(referral.code)}` : null;
   const invitationUrl = `/r/${encodeURIComponent(referral.code)}?via=qr`;
   const qrSrc = "https://api.qrserver.com/v1/create-qr-code/?size=460x460&margin=12&data=" +
