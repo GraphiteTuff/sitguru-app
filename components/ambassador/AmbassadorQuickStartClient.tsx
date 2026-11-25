@@ -297,7 +297,7 @@ export default function AmbassadorQuickStartClient({
           aria-label={destinations[selected].title + " referral QR code"}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-4"
         >
-          <section className="w-full max-w-lg rounded-[28px] bg-white p-5 shadow-2xl sm:p-7">
+          <section className="max-h-[calc(100svh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[28px] bg-white p-5 shadow-2xl sm:p-7">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-wider text-green-700">SitGuru Ambassador</p>
@@ -306,6 +306,7 @@ export default function AmbassadorQuickStartClient({
               <button
                 type="button"
                 onClick={() => setSelected(null)}
+                autoFocus
                 className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 text-slate-900 hover:bg-slate-50"
                 aria-label="Close QR code"
               >
@@ -317,7 +318,7 @@ export default function AmbassadorQuickStartClient({
               <img
                 src={destinations[selected].qrUrl}
                 alt={"Scan to join SitGuru as a " + destinations[selected].title}
-                className="aspect-square w-full object-contain"
+                className="aspect-square w-full max-h-[min(52svh,380px)] object-contain"
               />
             </div>
             <p className="mt-3 text-center text-sm font-bold text-slate-600">Let someone scan this code to open your tracked referral link.</p>
