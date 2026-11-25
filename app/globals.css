@@ -2483,3 +2483,28 @@ div.homepage-chat-panel__header,
     right: 1rem;
   }
 }
+
+/* Ambassador Dashboard and Portal share one phone navigation dock.
+   Keep Taco visible but prevent its tip and avatar from covering quick actions. */
+@media (max-width: 1023px) {
+  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] {
+    bottom: calc(
+      6.5rem + env(safe-area-inset-bottom, 0px) + var(--sg-chrome-bottom, 0px)
+    ) !important;
+    right: 0.9rem;
+    max-width: calc(100vw - 1.8rem);
+  }
+
+  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] > .homepage-chat-tip {
+    display: none !important;
+  }
+
+  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] > .homepage-chat-launcher {
+    width: 56px;
+    height: 56px;
+  }
+
+  body:has([data-ambassador-bottom-nav]) [data-ai-taco-companion="true"] [role="dialog"] {
+    max-height: min(68svh, 640px);
+  }
+}
