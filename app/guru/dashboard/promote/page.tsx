@@ -53,6 +53,7 @@ export default async function GuruPromotePage() {
         />
         <GuruProfileShare
           name={name}
+          experienceYears={Number(profile?.experience_years)}
           location={location}
           photo={photo}
           services={[...new Set(services)]}
